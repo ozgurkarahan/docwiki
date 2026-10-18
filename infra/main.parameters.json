@@ -18,6 +18,8 @@
     "mcpTokenValidation": { "value": "${DOCWIKI_MCP_TOKEN_VALIDATION}" },
     "enablePortal": { "value": "${DOCWIKI_ENABLE_PORTAL}" },
     "portalAccess": { "value": "${DOCWIKI_PORTAL_ACCESS}" },
+    "enableStudio": { "value": "${DOCWIKI_ENABLE_STUDIO}" },
+    "studioMinReplicas": { "value": "${DOCWIKI_STUDIO_MIN_REPLICAS}" },
     "enableEventTrigger": { "value": "${DOCWIKI_ENABLE_EVENT_TRIGGER}" },
     "reconcileCron": { "value": "${DOCWIKI_RECONCILE_CRON}" },
     "audience": { "value": "${DOCWIKI_AUDIENCE}" },
@@ -34,11 +36,15 @@
     "mcpAllowedClientIds": { "value": "${DOCWIKI_MCP_ALLOWED_CLIENT_IDS}" },
     "mcpConnectionName": { "value": "${DOCWIKI_MCP_CONNECTION}" },
     "portalClientId": { "value": "${DOCWIKI_PORTAL_CLIENT_ID}" },
+    "studioClientId": { "value": "${DOCWIKI_STUDIO_CLIENT_ID}" },
+    "studioAllowedPrincipals": { "value": "${DOCWIKI_STUDIO_ALLOWED_PRINCIPALS}" },
     "jobImage": { "value": "${SERVICE_JOB_IMAGE_NAME}" },
     "mcpImage": { "value": "${SERVICE_MCP_IMAGE_NAME}" },
     "portalImage": { "value": "${SERVICE_PORTAL_IMAGE_NAME}" },
+    "studioImage": { "value": "${SERVICE_STUDIO_IMAGE_NAME}" },
     "jobExists": { "value": "${SERVICE_JOB_RESOURCE_EXISTS}" },
     "mcpExists": { "value": "${SERVICE_MCP_RESOURCE_EXISTS}" },
-    "portalExists": { "value": "${SERVICE_PORTAL_RESOURCE_EXISTS}" }
+    "portalExists": { "value": "${SERVICE_PORTAL_RESOURCE_EXISTS}" },
+    "studioExists": { "value": "${SERVICE_STUDIO_RESOURCE_EXISTS}" }
   }
 }

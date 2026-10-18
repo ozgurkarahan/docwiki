@@ -41,6 +41,7 @@ MCP and Agent Skills).
 | **Agent kit** | `AGENTS.md`, `llms.txt`, `catalog.json` (pages and typed edges), `search.db` (SQLite FTS5 over page sections **and** raw extracted blocks) and Agent Skills, projected identically for GitHub Copilot, Claude Code and Codex (`.github/skills`, `.claude/skills`, `.agents/skills`). |
 | **MCP server** | `docwiki-mcp`: 10 read tools (search, pages, indexes, links, glossary, evidence, read-only SQL over tables, skills, recent changes) and 9 operations tools, over stateless streamable HTTP or stdio. Roles are enforced by the server, not by tool visibility. |
 | **Two Foundry agents** | The **Researcher** answers with numbered citations and abstains when the wiki is silent; the **Librarian** runs and repairs ingests, with human approval for every change. |
+| **DocWiki Studio** | A signed-in web app on Container Apps: drop documents into the pipeline, follow each run (stages, gates, cost), ask the Researcher with clickable citations and approve or deny the Librarian's operations in the page. Owner only, fail closed ([docs/studio.md](docs/studio.md)). |
 | **Quality gates** | 15 gates (G01–G15): schemas, links and anchors, citations, quote verification, safe content, sidecars, audience, injection canaries, paths, supersession, skills… A failing blocking gate keeps the previous release online. |
 | **Immutable releases** | Each run publishes a complete, hashed release and swaps one pointer (`current.json`) with an ETag precondition. Readers never see a half-built wiki; rollback is a pointer change. |
 | **Domain packs** | Taxonomy, entity registry, topics, glossary, sensitivity, supersession and contradiction rules as YAML. Ships with a wind-farm operations pack and an IT-runbooks pack. |
@@ -112,6 +113,19 @@ agent-executable runbook (GOAL, COMMAND, VERIFY and ON_FAIL for every step) that
 RBAC and authentication, uploads the sample corpus, watches the first run, smoke-tests both agents
 and tears everything down. Day-2 tasks are in [docs/operations.md](docs/operations.md).
 
+### 4. Work in DocWiki Studio
+
+The Studio is the application around the pipeline: one signed-in page to add documents, watch the
+ingest job compile them, and ask the agents. Add it to a deployment with
+`azd env set DOCWIKI_ENABLE_STUDIO true`, `azd provision` and `azd deploy studio`; only you can
+sign in. Try the interface without Azure on canned data:
+`uv run python tests/studio/studio_preview.py`. Details, access model and a demo script:
+[docs/studio.md](docs/studio.md).
+
+| Cited answer, with the agent's tool trace | Human approval of a Librarian operation |
+|---|---|
+| [![DocWiki Studio: documents with their pipeline status and a Researcher answer whose citations open the change record, a work-order row, a service bulletin page and a transcript cue](docs/assets/screenshots/studio.png)](docs/assets/screenshots/studio.png) | [![DocWiki Studio: the Librarian asks for approval before starting an ingest run; Approve and Deny buttons](docs/assets/screenshots/studio-approval.png)](docs/assets/screenshots/studio-approval.png) |
+
 ### Compile your own documents
 
 Local mode keeps storage in a folder and runs without a queue; it calls the models of a Foundry
@@ -137,6 +151,7 @@ Values can also live in a git-ignored `.env` file (in PowerShell, set them with
 | `docwiki site [--release …] [--out <dir>]` | Build the Quartz site of a release (Node 22+ and git) |
 | `docwiki serve --stdio \| --http <host:port> [--release <dir>]` | Run the MCP server; `docwiki-mcp` is the same entry point |
 | `docwiki ask "<question>" [--agent researcher\|librarian] [--approve prompt\|deny] [--json]` | Ask a deployed Foundry agent; prints the answer, its sources and a receipt |
+| `docwiki studio [--local] [--port N]` | Run DocWiki Studio; `--local` serves 127.0.0.1 with your `az login` ([docs/studio.md](docs/studio.md)) |
 | `docwiki export obsidian --out <vault>` | Copy a release into an Obsidian vault with `[[wikilinks]]` |
 | `docwiki release list`, `docwiki release rollback <release_id>` | List releases; point `current.json` back at an earlier one |
 | `docwiki worker`, `docwiki reconcile` | Job entry points: drain the queue, or the scheduled safety net |
@@ -157,6 +172,9 @@ flowchart LR
   mcp -->|"MCP, Wiki.Read"| researcher["Researcher agent<br/>own Entra agent identity"]
   mcp -->|"MCP, Wiki.Read + Wiki.Operate"| librarian["Librarian agent<br/>own Entra agent identity"]
   librarian -.->|"ingest_start, recompile<br/>human approval"| queue
+  studio["Container App: Studio<br/>owner sign-in"] -->|"upload"| raw
+  studio -->|"Responses API,<br/>approvals"| researcher
+  studio --> librarian
 ```
 
 | Component | Runs on | Role |
@@ -167,6 +185,7 @@ flowchart LR
 | MCP server | Container App `mcp` behind built-in authentication | Serves the current release; enforces `Wiki.Read` and `Wiki.Operate` per tool |
 | Agents | Foundry prompt agents `docwiki-researcher` and `docwiki-librarian` | Cited answers; operations with approvals |
 | Site | Quartz on GitHub Pages (public sample) or the optional `portal` Container App (Entra sign-in, or no sign-in for a public-audience build) | Human view and evidence microscope |
+| Studio | Optional `studio` Container App (Entra sign-in, owner only, one replica) | Uploads, run timeline, agent questions and approvals in one page |
 | Operations | Log Analytics, Application Insights, Foundry tracing, budget alerts | Spans per stage, model call and tool call; a cost receipt per run |
 
 Run control, release lifecycle and identities: [docs/architecture.md](docs/architecture.md).
@@ -337,6 +356,7 @@ vulnerabilities privately: [SECURITY.md](SECURITY.md).
 | [Architecture](docs/architecture.md) | Components, data flow, run control, release lifecycle, identities |
 | [Wiki format](docs/wiki-format.md) | A tour of the wiki contract with an example page |
 | [Agents](docs/agents.md) | Researcher and Librarian: behaviour, tools, approvals, routine |
+| [Studio](docs/studio.md) | The web app: documents, pipeline, agents; access model; demo script |
 | [Skills and agent kit](docs/skills.md) | `AGENTS.md`, `llms.txt`, catalog, search index, skill projections |
 | [Local agents](docs/local-agents.md) | GitHub Copilot (VS Code and CLI), Claude Code and Codex on the sample wiki |
 | [Security](docs/security.md) | Threat model, identity model, leak guard, publication process |
@@ -350,7 +370,7 @@ vulnerabilities privately: [SECURITY.md](SECURITY.md).
 
 | Path | Content |
 |---|---|
-| [`src/docwiki/`](src/docwiki) | The Python package: `extract`, `evidence`, `stages`, `orchestration`, `llm`, `mcp`, `agents_client`, `release`, `search`, `storage`, `site`, `portal`, `domain`, `contracts` |
+| [`src/docwiki/`](src/docwiki) | The Python package: `extract`, `evidence`, `stages`, `orchestration`, `llm`, `mcp`, `agents_client`, `release`, `search`, `storage`, `site`, `portal`, `studio`, `domain`, `contracts` |
 | [`agents/`](agents/README.md) | Researcher and Librarian definitions, instructions, routine and deployment script |
 | [`skills/templates/`](skills/templates) | Reviewed templates of `AGENTS.md` and the four core skills |
 | [`domains/`](domains) | Domain packs: `wind-om` (sample) and `it-runbooks` |

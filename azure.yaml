@@ -3,9 +3,12 @@
 # Images are built remotely in the environment's Azure Container Registry (no local Docker).
 # The `job` service image runs both Container Apps jobs: azd deploys it to the ingest job
 # (tag azd-service-name: job) and the postdeploy hook copies it to the reconcile job.
+# The `portal` and `studio` services are optional apps (DOCWIKI_ENABLE_PORTAL,
+# DOCWIKI_ENABLE_STUDIO): without them their apps stay dormant (zero replicas, no ingress).
 # Hooks: preprovision = preflight; postprovision = Entra app registration, built-in auth, MCP
-# connection, agents and their access (ADR 0003); postdeploy = reconcile image + MCP smoke test;
-# predown/postdown = agents before the resource group, app registrations after.
+# connection, agents and their access (ADR 0003), portal and Studio sign-in; postdeploy =
+# reconcile image + MCP smoke test; predown/postdown = agents before the resource group, app
+# registrations after.
 name: docwiki
 metadata:
   template: docwiki@0.1.0
@@ -38,6 +41,14 @@ services:
     language: docker
     docker:
       path: docker/portal.Dockerfile
+      context: .
+      remoteBuild: true
+  studio:
+    project: .
+    host: containerapp
+    language: docker
+    docker:
+      path: docker/studio.Dockerfile
       context: .
       remoteBuild: true
 hooks:

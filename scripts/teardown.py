@@ -59,7 +59,7 @@ from azdlib import (
     warn,
 )
 
-ENTRA_KEYS = ("mcp_api", "portal_app")
+ENTRA_KEYS = ("mcp_api", "portal_app", "studio_app")
 # Foundry data plane (project endpoint): token audience and API version of the agents API.
 FOUNDRY_DATA_PLANE = "https://ai.azure.com"
 AGENTS_API = "v1"

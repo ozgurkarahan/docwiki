@@ -33,25 +33,30 @@ flowchart LR
   mcp -->|"read and<br/>operations tools"| librarian["Foundry prompt agent<br/>Librarian"]
   mcp -.->|"ingest_start, recompile<br/>after approval"| queue
   mcp -.->|"proposals, health<br/>reports, overlay"| work
+  studio["Container App: studio<br/>optional, owner sign-in"] -->|"upload"| raw
+  studio -->|"Responses API:<br/>questions, approvals"| researcher
+  studio --> librarian
 ```
 
 The jobs read `raw/` and write `work/` and `releases/`. The MCP server reads releases and, for the
 operations tools, run reports, source states and proposals in `work/`; it writes nothing but
-proposals, health reports and the overlay. The portal only reads releases. The public sample site
-on GitHub Pages is built by a workflow from the sample release committed to the repository, not
-from an Azure deployment.
+proposals, health reports and the overlay. The portal only reads releases. The optional Studio
+([studio.md](studio.md)) uploads into `raw/` (it cannot delete), reads source states, run reports
+and the current release, and asks the agents through the project's Responses API. The public sample
+site on GitHub Pages is built by a workflow from the sample release committed to the repository,
+not from an Azure deployment.
 
 | Resource | Purpose |
 |---|---|
 | Microsoft Foundry account and project (local auth disabled) | Model deployments `fast` and `smart`, Content Understanding, the two prompt agents, tracing |
 | Storage account (shared keys disabled, versioning and soft delete on) | Containers `raw`, `work`, `releases`; queues `ingest` and `ingest-poison` |
 | Event Grid system topic | `raw/` BlobCreated and BlobDeleted events to the `ingest` queue, delivered with a managed identity |
-| Container Apps environment (Consumption) | Jobs `ingest` and `reconcile`, apps `mcp` and `portal` (the portal is disabled by default) |
-| Container registry (Basic, admin user disabled) | Images for the job, the MCP server and the portal, built remotely by azd |
-| Managed identities | One user-assigned identity per workload: jobs, MCP app, portal |
+| Container Apps environment (Consumption) | Jobs `ingest` and `reconcile`, apps `mcp`, `portal` and `studio` (the portal and the Studio are disabled by default) |
+| Container registry (Basic, admin user disabled) | Images for the job, the MCP server, the portal and the Studio, built remotely by azd |
+| Managed identities | One user-assigned identity per workload: jobs, MCP app, portal, Studio |
 | Log Analytics and Application Insights | Container logs, OpenTelemetry traces, Foundry agent traces (30-day retention) |
 | Budget and action group | Alerts at 50, 80 and 100 % of a monthly amount |
-| Entra app registration (created by the hooks) | The MCP API audience with app roles `Wiki.Read` and `Wiki.Operate` |
+| Entra app registrations (created by the hooks) | The MCP API audience with app roles `Wiki.Read` and `Wiki.Operate`; the sign-in applications of the portal and the Studio when they are enabled |
 
 Everything is declared in [`infra/`](../infra) (azd and Bicep) and deployed by
 [`BOOTSTRAP.md`](../BOOTSTRAP.md). Allowed regions are `swedencentral` (default), `eastus2` and
@@ -283,6 +288,7 @@ identity, so the post-provision hook re-applies roles and the allowlist
 | Jobs identity (`ingest`, `reconcile`) | Blob Data Reader on `raw`; Blob Data Contributor on `work` and `releases`; Queue Data Contributor on `ingest` (renews message visibility during long runs), Message Sender on `ingest-poison`; Cognitive Services User and Azure AI User on Foundry; AcrPull; Monitoring Metrics Publisher |
 | MCP identity | Blob Data Reader on `releases`; Blob Data Contributor on `work` with a condition that limits writes to `reports/`, `proposals/` and `state/overlay.yaml`; Queue Data Message Sender on `ingest`; AcrPull; Monitoring Metrics Publisher. Nothing on `raw`, nothing on Foundry |
 | Portal identity | Blob Data Reader on `releases`; AcrPull; Monitoring Metrics Publisher |
+| Studio identity | Blob Data Contributor on `raw` with a condition that denies deletes; Blob Data Reader on `work` and `releases`; Queue Data Reader on `ingest`; Azure AI User on Foundry (asks the agents); AcrPull; Monitoring Metrics Publisher |
 | Event Grid system topic | Queue Data Message Sender on the storage account (Event Grid validates managed-identity delivery to a queue at the account scope; the identity is used by Event Grid only) |
 | Network (optional, `DOCWIKI_NETWORK_PERIMETER=true`) | The storage account sits in a network security perimeter: public access only for managed identities of the subscription (workloads, queue scaler) and the operator ranges in `DOCWIKI_ALLOWED_IP_RANGES`; for tenants whose policy disables public network access on storage accounts. Event Grid cannot create its subscription inside the perimeter; one created before the perimeter keeps delivering (managed-identity deliveries), otherwise the reconcile schedule, manual starts and ingest messages wake the pipeline |
 | Deployer | Owner (or Contributor and User Access Administrator) on the resource group, permission to register Entra applications; data roles to upload to `raw` and enqueue messages |
@@ -305,7 +311,9 @@ The same engine runs on a laptop:
 - OpenTelemetry in the job, the MCP server and the portal exports to Application Insights: one span
   per stage, per model call (tier, deployment, model version, tokens, latency, estimated cost) and
   per MCP tool call (hashed principal, access level, result size). Service names are
-  `docwiki-ingest`, `docwiki-reconcile`, `docwiki-mcp` and `docwiki-portal`.
+  `docwiki-ingest`, `docwiki-reconcile`, `docwiki-mcp` and `docwiki-portal`. The Studio
+  (`docwiki-studio`) exports its logs: uploads, questions and every approval decision with the
+  signed-in user.
 - Foundry tracing is enabled for both agents.
 - Every run writes `work/runs/<run_id>/report.json` with counts, per-stage results, gate results,
   versions and a **cost receipt**, and the release it publishes contains a readable receipt page,

@@ -430,6 +430,23 @@ def ask(
     typer.echo(answer.model_dump_json(indent=2) if as_json else format_answer(answer))
 
 
+@app.command()
+def studio(
+    host: Annotated[str, typer.Option("--host", help="Interface to listen on.")] = "127.0.0.1",
+    port: Annotated[int, typer.Option("--port", help="Port to listen on.")] = 8090,
+    local: Annotated[
+        bool,
+        typer.Option(
+            "--local", help="No sign-in checks (loopback only); uses your az login and settings."
+        ),
+    ] = False,
+) -> None:
+    """Run DocWiki Studio: add documents, follow the pipeline, ask the agents (docs/studio.md)."""
+    main_fn = _delegate("docwiki.studio.__main__", "main")
+    argv = ["--host", host, "--port", str(port), *(["--local"] if local else [])]
+    raise typer.Exit(int(main_fn(argv) or 0))
+
+
 @export_app.command("obsidian")
 def export_obsidian_command(
     out: Annotated[Path, typer.Option("--out", help="Vault folder to write.")],

@@ -270,8 +270,10 @@ def ensure_portal_app(
     known_app_id: str | None,
     redirect_uri: str,
     owner_object_id: str = "",
+    description: str = "DocWiki private portal sign-in.",
 ) -> AppRegistration:
-    """Portal sign-in app: web redirect URI and ID tokens only (no client secret)."""
+    """Sign-in app of a web app (portal, Studio): web redirect URI and ID tokens only (no client
+    secret). ``description`` is only used when the registration is created."""
     web = {
         "redirectUris": [redirect_uri],
         "implicitGrantSettings": {
@@ -284,7 +286,7 @@ def ensure_portal_app(
         display_name=display_name,
         tag=tag,
         known_app_id=known_app_id,
-        initial={"description": "DocWiki private portal sign-in.", "web": web},
+        initial={"description": description, "web": web},
     )
     current = app.get("web") or {}
     redirects = list(current.get("redirectUris") or [])

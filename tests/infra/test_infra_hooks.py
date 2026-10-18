@@ -3,7 +3,15 @@
 from __future__ import annotations
 
 import base64
+import io
 import json
+import re
+import threading
+import urllib.error
+import urllib.request
+from collections.abc import Mapping
+from email.message import Message
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +32,8 @@ MCP_APP = "ca-mcp-tok123"
 MCP_FQDN = "ca-mcp-tok123.region.azurecontainerapps.example"
 APP = "app-1"
 APP_URI = f"api://{APP}"
+STUDIO_APP = "ca-studio-tok123"
+STUDIO_FQDN = "ca-studio-tok123.region.azurecontainerapps.example"
 
 
 def base_env(**extra: str) -> dict[str, str]:
@@ -36,6 +46,7 @@ def base_env(**extra: str) -> dict[str, str]:
         "DOCWIKI_MCP_APP_NAME": MCP_APP,
         "DOCWIKI_MCP_FQDN": MCP_FQDN,
         "DOCWIKI_PORTAL_APP_NAME": "ca-portal-tok123",
+        "DOCWIKI_STUDIO_APP_NAME": STUDIO_APP,
         "DOCWIKI_CONTAINER_APPS_DEFAULT_DOMAIN": "region.azurecontainerapps.example",
         "DOCWIKI_FOUNDRY_ACCOUNT_ENDPOINT": "https://aif-tok123.services.ai.azure.com/",
         "DOCWIKI_INGEST_JOB_NAME": "caj-ingest-tok123",
@@ -144,6 +155,434 @@ def test_signed_in_principal_from_token(runner: FakeRunner, tmp_path: Path) -> N
     runner.on(r"^az account get-access-token", {"accessToken": fake_token({"oid": "user-oid"})})
     assert tools(runner, tmp_path).signed_in_object_id() == ("user-oid", "User")
     assert not runner.commands(r"^az ad ")
+
+
+# Microsoft Graph through the azd sign-in (DOCWIKI_GRAPH_TOKEN_SOURCE=azd, opt-in) ---------------
+
+CAE_REFUSAL = Result(
+    1, "", "ERROR: AADSTS50173: TokenCreatedWithOutdatedPolicies (claims challenge)"
+)
+APPLICATIONS = f"{azdlib.GRAPH}/applications"
+OPT_IN = {"DOCWIKI_GRAPH_TOKEN_SOURCE": "azd"}
+
+
+class FakeHttp:
+    """Replaces the HTTP client of the Graph fallback: records requests and answers in order
+    (the last answer repeats). An answer is ``(status, JSON data | bytes | None)``."""
+
+    def __init__(self, *answers: tuple[int, Any]) -> None:
+        self.answers = list(answers)
+        self.requests: list[tuple[str, str, dict[str, str], bytes | None]] = []
+
+    def __call__(
+        self, method: str, url: str, headers: Mapping[str, str], body: bytes | None
+    ) -> tuple[int, bytes]:
+        self.requests.append((method, url, dict(headers), body))
+        status, payload = self.answers.pop(0) if len(self.answers) > 1 else self.answers[0]
+        if payload is None:
+            return status, b""
+        return status, payload if isinstance(payload, bytes) else json.dumps(payload).encode()
+
+
+def graph_refused(
+    runner: FakeRunner,
+    azd_claims: dict[str, str] | None = None,
+    cli_claims: dict[str, str] | None = None,
+    *,
+    cli_token: bool = True,
+) -> str:
+    """Graph refuses the Azure CLI's token (continuous access evaluation) and azd has another.
+
+    The claims override the account both tokens carry (an empty value drops the claim). Returns
+    the azd token, built at run time: no message may ever contain it.
+    """
+
+    def token(audience: str, claims: dict[str, str] | None) -> str:
+        merged = {"aud": audience, "tid": TENANT, "oid": "user-oid", **(claims or {})}
+        return fake_token({name: value for name, value in merged.items() if value})
+
+    azd_token = token("graph", azd_claims)
+    runner.on(r"^az rest ", CAE_REFUSAL)
+    runner.on(r"^azd auth token", {"token": azd_token, "expiresOn": "2099-01-01T00:00:00Z"})
+    if cli_token:
+        runner.on(r"^az account get-access-token", {"accessToken": token("arm", cli_claims)})
+    else:
+        runner.on(r"^az account get-access-token", Result(1, "", "ERROR: no token"))
+    return azd_token
+
+
+def graph_tools(runner: FakeRunner, root: Path, http: FakeHttp, **extra: str) -> Tools:
+    t = tools(runner, root, **extra)
+    t.http = http
+    return t
+
+
+@pytest.mark.parametrize("source", ["", "az", "off", "azd-cli"])
+def test_graph_refusal_stays_an_error_without_the_opt_in(
+    runner: FakeRunner, tmp_path: Path, source: str
+) -> None:
+    graph_refused(runner)
+    http = FakeHttp((200, {}))
+    t = graph_tools(
+        runner, tmp_path, http, **({"DOCWIKI_GRAPH_TOKEN_SOURCE": source} if source else {})
+    )
+    with pytest.raises(HookError) as raised:
+        t.rest("GET", APPLICATIONS)
+    assert "needs a fresh sign-in" in str(raised.value)
+    remediation = raised.value.remediation or ""
+    assert "az login" in remediation and "azd auth login" in remediation
+    assert "DOCWIKI_GRAPH_TOKEN_SOURCE=azd" in remediation
+    assert not runner.commands(r"^azd auth token") and not http.requests
+
+
+@pytest.mark.parametrize("where", ["azd environment", "process environment"])
+def test_graph_fallback_calls_graph_with_the_azd_token(
+    runner: FakeRunner,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    where: str,
+) -> None:
+    if where == "process environment":
+        monkeypatch.setenv("DOCWIKI_GRAPH_TOKEN_SOURCE", " AZD ")
+    azd_token = graph_refused(runner)
+    http = FakeHttp((200, {"value": [{"id": "obj-1"}]}), (201, {"id": "sp-1"}))
+    t = graph_tools(runner, tmp_path, http, **(OPT_IN if where == "azd environment" else {}))
+    url = f"{APPLICATIONS}?$filter=displayName eq 'docwiki-x'"
+    assert t.rest("GET", url) == {"value": [{"id": "obj-1"}]}
+    created = t.rest("POST", f"{azdlib.GRAPH}/servicePrincipals", body={"appId": "app-1"})
+    assert created == {"id": "sp-1"}
+    # One token for the run, for the tenant of the environment, as JSON.
+    assert runner.commands(r"^azd auth token") == [
+        "azd auth token --scope https://graph.microsoft.com/.default "
+        f"--tenant-id {TENANT} --output json"
+    ]
+    (get, post) = http.requests
+    assert get[:2] == ("GET", url) and get[3] is None
+    assert get[2]["Authorization"] == f"Bearer {azd_token}"
+    assert post[:2] == ("POST", f"{azdlib.GRAPH}/servicePrincipals")
+    assert json.loads(post[3] or b"") == {"appId": "app-1"}
+    assert post[2]["Content-Type"] == "application/json"
+    shown = capsys.readouterr()
+    assert azd_token not in shown.out + shown.err and azd_token not in repr(t)
+    assert "azd sign-in" in shown.out, "the operator is told which token is used"
+    assert not list((tmp_path / ".azure" / ENV / "hook-tmp").glob("*.json")), "no body left"
+
+
+@pytest.mark.parametrize(
+    ("azd_claims", "differs"),
+    [({"oid": "someone-else"}, "object ID"), ({"tid": "another-tenant"}, "tenant")],
+)
+def test_graph_fallback_refuses_another_account(
+    runner: FakeRunner, tmp_path: Path, azd_claims: dict[str, str], differs: str
+) -> None:
+    azd_token = graph_refused(runner, azd_claims=azd_claims)
+    http = FakeHttp((200, {}))
+    t = graph_tools(runner, tmp_path, http, **OPT_IN)
+    with pytest.raises(HookError) as raised:
+        t.rest("GET", APPLICATIONS)
+    assert "different accounts" in str(raised.value) and differs in str(raised.value)
+    assert "azd auth login" in (raised.value.remediation or "")
+    assert azd_token not in str(raised.value) + (raised.value.remediation or "")
+    assert not http.requests, "nothing is sent with a token of another account"
+    # Nothing is cached: once the accounts agree, the same instance goes through.
+    runner.rules.clear()
+    graph_refused(runner)
+    assert t.rest("GET", APPLICATIONS) == {}
+
+
+@pytest.mark.parametrize(
+    ("azd_claims", "cli_claims", "cli_token"),
+    [
+        ({"tid": ""}, None, True),
+        ({"oid": ""}, None, True),
+        (None, {"oid": ""}, True),
+        (None, None, False),
+    ],
+)
+def test_graph_fallback_needs_both_identities_to_compare(
+    runner: FakeRunner,
+    tmp_path: Path,
+    azd_claims: dict[str, str] | None,
+    cli_claims: dict[str, str] | None,
+    cli_token: bool,
+) -> None:
+    graph_refused(runner, azd_claims, cli_claims, cli_token=cli_token)
+    http = FakeHttp((200, {}))
+    with pytest.raises(HookError, match="cannot tell whether azd and the Azure CLI"):
+        graph_tools(runner, tmp_path, http, **OPT_IN).rest("GET", APPLICATIONS)
+    assert not http.requests
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        f"{azdlib.ARM}/subscriptions/{SUB}?api-version=2022-12-01",
+        "https://graph.microsoft.com.example.net/v1.0/applications",
+        "https://evilgraph.microsoft.com/v1.0/applications",
+        "https://sub.graph.microsoft.com/v1.0/applications",
+        "https://graph.microsoft.com./v1.0/applications",
+        # Built at run time: a literal user@host in the sources trips the leak guard's e-mail rule.
+        "https://" + "someone" + "@" + "graph.microsoft.com/v1.0/applications",
+        "https://example.net/graph.microsoft.com/v1.0/applications",
+        "https://graph.microsoft.com@example.net/v1.0/applications",
+        "https://graph.microsoft.com:8443/v1.0/applications",
+        "https://graph.microsoft.us/v1.0/applications",
+        "http://graph.microsoft.com/v1.0/applications",
+    ],
+)
+def test_graph_fallback_never_applies_to_another_host(
+    runner: FakeRunner, tmp_path: Path, url: str
+) -> None:
+    graph_refused(runner)
+    http = FakeHttp((200, {}))
+    with pytest.raises(HookError, match="needs a fresh sign-in") as raised:
+        graph_tools(runner, tmp_path, http, **OPT_IN).rest("GET", url)
+    assert not runner.commands(r"^azd auth token") and not http.requests
+    assert not azdlib.is_graph_url(url)
+    if "management" in url:
+        assert "DOCWIKI_GRAPH_TOKEN_SOURCE" not in (raised.value.remediation or "")
+
+
+def test_the_azd_token_is_refused_for_any_other_url(runner: FakeRunner, tmp_path: Path) -> None:
+    graph_refused(runner)
+    http = FakeHttp((200, {}))
+    with pytest.raises(HookError, match="refusing to send the Microsoft Graph token"):
+        graph_tools(runner, tmp_path, http, **OPT_IN).graph_rest("GET", f"{azdlib.ARM}/x?y=1")
+    assert not runner.commands(r"^azd auth token") and not http.requests
+
+
+def test_graph_fallback_without_a_tenant_lets_azd_choose(
+    runner: FakeRunner, tmp_path: Path
+) -> None:
+    graph_refused(runner)
+    t = graph_tools(runner, tmp_path, FakeHttp((200, {})), **OPT_IN)
+    del t.env["AZURE_TENANT_ID"]
+    assert t.rest("GET", APPLICATIONS) == {}
+    assert runner.commands(r"^azd auth token") == [
+        "azd auth token --scope https://graph.microsoft.com/.default --output json"
+    ]
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        Result(1, "AZD-STDOUT-SENTINEL", "AZD-STDERR-SENTINEL"),
+        Result(0, "AZD-STDOUT-SENTINEL", ""),
+        Result(0, "{}", ""),
+        Result(0, '{"token": ""}', ""),
+        Result(0, "[]", ""),
+    ],
+)
+def test_graph_fallback_reports_azd_failures_without_its_output(
+    runner: FakeRunner, tmp_path: Path, answer: Result
+) -> None:
+    runner.on(r"^az rest ", CAE_REFUSAL)
+    runner.on(r"^azd auth token", answer)
+    http = FakeHttp((200, {}))
+    with pytest.raises(HookError) as raised:
+        graph_tools(runner, tmp_path, http, **OPT_IN).rest("GET", APPLICATIONS)
+    shown = str(raised.value) + (raised.value.remediation or "")
+    assert "did not give a Microsoft Graph token" in shown and "azd auth login" in shown
+    assert "SENTINEL" not in shown
+    assert not http.requests and not runner.commands(r"^az account get-access-token")
+
+
+def test_graph_fallback_answers_like_az_rest(runner: FakeRunner, tmp_path: Path) -> None:
+    graph_refused(runner)
+    missing = {"error": {"code": "Request_ResourceNotFound", "message": "Resource 'x' not found."}}
+    http = FakeHttp((404, missing), (404, missing), (204, None), (200, b"  "), (200, b"{broken"))
+    t = graph_tools(runner, tmp_path, http, **OPT_IN)
+    assert t.rest("GET", APPLICATIONS, allow_not_found=True) is None
+    with pytest.raises(azdlib.CommandError) as raised:
+        t.rest("GET", APPLICATIONS)
+    assert "HTTP 404" in str(raised.value) and "Request_ResourceNotFound" in str(raised.value)
+    assert azdlib.is_not_found(raised.value.result), "callers that tolerate a 404 keep working"
+    assert t.rest("DELETE", f"{APPLICATIONS}/obj-1") is None
+    assert t.rest("PATCH", f"{APPLICATIONS}/obj-1", body={"web": {}}) is None
+    with pytest.raises(HookError, match="did not return JSON"):
+        t.rest("GET", APPLICATIONS)
+    assert [request[0] for request in http.requests] == ["GET", "GET", "DELETE", "PATCH", "GET"]
+
+
+def test_graph_fallback_errors_show_graphs_code_and_message_only(
+    runner: FakeRunner, tmp_path: Path
+) -> None:
+    azd_token = graph_refused(runner)
+    denied = {
+        "error": {
+            "code": "Authorization_RequestDenied",
+            "message": "Insufficient privileges\nto complete the operation.",
+            "innerError": {"request-id": "internal-detail"},
+        }
+    }
+    http = FakeHttp((403, denied), (302, None), (400, b"<html>proxy error</html>"))
+    t = graph_tools(runner, tmp_path, http, **OPT_IN)
+    with pytest.raises(azdlib.CommandError) as raised:
+        t.rest("POST", f"{APPLICATIONS}", body={"displayName": "x"})
+    message = str(raised.value)
+    assert "HTTP 403: Authorization_RequestDenied: Insufficient privileges to complete" in message
+    assert "internal-detail" not in message and azd_token not in message
+    assert isinstance(raised.value, HookError) and not azdlib.is_not_found(raised.value.result)
+    with pytest.raises(azdlib.CommandError, match="HTTP 302"):
+        t.rest("GET", APPLICATIONS)
+    with pytest.raises(azdlib.CommandError) as raised:
+        t.rest("GET", APPLICATIONS)
+    assert "HTTP 400" in str(raised.value) and "proxy error" not in str(raised.value)
+
+
+def test_graph_fallback_401_asks_for_a_new_azd_sign_in(runner: FakeRunner, tmp_path: Path) -> None:
+    azd_token = graph_refused(runner)
+    revoked = {"error": {"code": "InvalidAuthenticationToken", "message": "Token is revoked."}}
+    with pytest.raises(HookError) as raised:
+        graph_tools(runner, tmp_path, FakeHttp((401, revoked)), **OPT_IN).rest("GET", APPLICATIONS)
+    assert not isinstance(raised.value, azdlib.CommandError), "not retried like a Graph failure"
+    assert "refused the azd token too" in str(raised.value)
+    assert "InvalidAuthenticationToken" in str(raised.value)
+    assert "azd auth login" in (raised.value.remediation or "")
+    assert azd_token not in str(raised.value) + (raised.value.remediation or "")
+
+
+def test_graph_fallback_errors_are_retried_like_az_rest_errors(
+    runner: FakeRunner, tmp_path: Path
+) -> None:
+    """A new application can take seconds to replicate: ``retry`` covers the fallback too."""
+    graph_refused(runner)
+    lagging = {"error": {"code": "Request_ResourceNotFound", "message": "not replicated yet"}}
+    http = FakeHttp((404, lagging), (201, {"id": "sp-1"}))
+    t = graph_tools(runner, tmp_path, http, **OPT_IN)
+    created = azdlib.retry(
+        lambda: t.rest("POST", f"{azdlib.GRAPH}/servicePrincipals", body={"appId": "app-1"}),
+        sleep=lambda _: None,
+    )
+    assert created == {"id": "sp-1"} and len(http.requests) == 2
+    assert len(runner.commands(r"^azd auth token")) == 1
+
+
+def test_az_rest_that_succeeds_never_reaches_for_azd(runner: FakeRunner, tmp_path: Path) -> None:
+    runner.on(r"^az rest ", {"value": []})
+    http = FakeHttp((200, {}))
+    assert graph_tools(runner, tmp_path, http, **OPT_IN).rest("GET", APPLICATIONS) == {"value": []}
+    assert not http.requests and not runner.commands(r"^azd ")
+
+
+class FakeOpener:
+    """Stands in for ``urllib.request.build_opener(...)``: records the request, then answers."""
+
+    def __init__(self, outcome: Any) -> None:
+        self.outcome = outcome
+        self.handlers: tuple[Any, ...] = ()
+        self.request: urllib.request.Request | None = None
+        self.timeout: float | None = None
+
+    def build(self, *handlers: Any) -> FakeOpener:
+        self.handlers = handlers
+        return self
+
+    def open(self, request: urllib.request.Request, timeout: float | None = None) -> Any:
+        self.request, self.timeout = request, timeout
+        if isinstance(self.outcome, BaseException):
+            raise self.outcome
+        return self.outcome
+
+
+class FakeResponse:
+    def __init__(self, status: int, body: bytes) -> None:
+        self.status, self._body = status, body
+
+    def __enter__(self) -> FakeResponse:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return self._body
+
+
+def test_default_http_client_encodes_the_url_and_sends_the_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    opener = FakeOpener(FakeResponse(200, b'{"value": []}'))
+    monkeypatch.setattr(urllib.request, "build_opener", opener.build)
+    url = f"{APPLICATIONS}?$filter=displayName eq 'docwiki-x'&$top=9"
+    status, body = azdlib.urllib_http("PATCH", url, {"X-Docwiki-Test": "1"}, b"{}")
+    assert (status, body) == (200, b'{"value": []}')
+    assert opener.handlers == (azdlib._NoRedirect,), "redirects are not followed"
+    assert opener.timeout == azdlib.GRAPH_HTTP_TIMEOUT_S
+    request = opener.request
+    assert request is not None
+    assert request.full_url == f"{APPLICATIONS}?$filter=displayName%20eq%20'docwiki-x'&$top=9"
+    assert request.get_method() == "PATCH" and request.data == b"{}"
+    assert request.get_header("X-docwiki-test") == "1"
+
+
+def test_default_http_client_returns_error_statuses_and_maps_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    refused = urllib.error.HTTPError(
+        APPLICATIONS, 403, "Forbidden", Message(), io.BytesIO(b'{"a": 1}')
+    )
+    monkeypatch.setattr(urllib.request, "build_opener", FakeOpener(refused).build)
+    assert azdlib.urllib_http("GET", APPLICATIONS, {}, None) == (403, b'{"a": 1}')
+    unreachable = FakeOpener(urllib.error.URLError("name resolution failed"))
+    monkeypatch.setattr(urllib.request, "build_opener", unreachable.build)
+    with pytest.raises(HookError, match=r"graph\.microsoft\.com could not be reached"):
+        azdlib.urllib_http("GET", APPLICATIONS, {}, None)
+    timed_out = FakeOpener(TimeoutError("timed out"))
+    monkeypatch.setattr(urllib.request, "build_opener", timed_out.build)
+    with pytest.raises(HookError, match="could not be reached"):
+        azdlib.urllib_http("GET", APPLICATIONS, {}, None)
+
+
+def test_default_http_client_only_speaks_https(monkeypatch: pytest.MonkeyPatch) -> None:
+    opener = FakeOpener(FakeResponse(200, b"{}"))
+    monkeypatch.setattr(urllib.request, "build_opener", opener.build)
+    for url in ("http://graph.microsoft.com/v1.0/me", "file:///etc/hosts", "//graph.microsoft.com"):
+        with pytest.raises(HookError, match="refusing to send a request"):
+            azdlib.urllib_http("GET", url, {}, None)
+    assert opener.request is None
+
+
+def test_a_redirect_is_an_answer_the_token_does_not_follow() -> None:
+    seen: list[str] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            seen.append(self.path)
+            if self.path == "/start":
+                self.send_response(302)
+                self.send_header("Location", "/elsewhere")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+            else:
+                self.send_response(200)
+                self.send_header("Content-Length", "2")
+                self.end_headers()
+                self.wfile.write(b"{}")
+
+        def log_message(self, fmt: str, *args: object) -> None:
+            return None
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{server.server_port}/start", headers={"X-Docwiki-Test": "1"}
+        )
+        with pytest.raises(urllib.error.HTTPError) as raised:
+            # No proxy: the loopback server is reached directly, whatever the environment says.
+            opener = urllib.request.build_opener(
+                urllib.request.ProxyHandler({}), azdlib._NoRedirect
+            )
+            opener.open(request, timeout=10)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=10)
+    assert raised.value.code == 302 and seen == ["/start"]
+    raised.value.close()
 
 
 # ---------------------------------------------------------------------------
@@ -279,6 +718,41 @@ def test_duplicate_tagged_registrations_are_refused(runner: FakeRunner, tmp_path
             tag=f"docwiki-env:{ENV}-{TOKEN}",
             known_app_id=None,
         )
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "description"),
+    [
+        ({}, "DocWiki private portal sign-in."),
+        (
+            {"description": "DocWiki Studio sign-in (owner only)."},
+            "DocWiki Studio sign-in (owner only).",
+        ),
+    ],
+)
+def test_sign_in_app_describes_the_app_it_serves(
+    runner: FakeRunner, tmp_path: Path, kwargs: dict[str, str], description: str
+) -> None:
+    runner.on(r"GET .*applications\?\$filter", {"value": []})
+    runner.on(r"POST .*/applications ", {"id": "obj-9", "appId": "app-9", "web": {}})
+    runner.on(r"PATCH .*/applications/obj-9", None)
+    runner.on(
+        r"GET .*servicePrincipals\(appId='app-9'\)",
+        {"id": "sp-9", "appRoleAssignmentRequired": True},
+    )
+    registration = entra.ensure_portal_app(
+        tools(runner, tmp_path),
+        display_name=f"docwiki-x-{ENV}-{TOKEN}",
+        tag=f"docwiki-env:{ENV}-{TOKEN}",
+        known_app_id=None,
+        redirect_uri="https://app.example/.auth/login/aad/callback",
+        **kwargs,
+    )
+    created = runner.body_for(r"POST .*/applications ")[0]
+    assert created["description"] == description
+    assert created["web"]["redirectUris"] == ["https://app.example/.auth/login/aad/callback"]
+    assert created["web"]["implicitGrantSettings"]["enableAccessTokenIssuance"] is False
+    assert registration.created and registration.service_principal_id == "sp-9"
 
 
 # ---------------------------------------------------------------------------
@@ -1087,6 +1561,331 @@ def test_public_portal_registers_nothing(
     assert code == 0
     assert not runner.calls, "no Entra registration, auth config or ingress change"
     assert expected in capsys.readouterr().out
+
+
+STUDIO_ID = "studio-app"
+STUDIO_CALLBACK = f"https://{STUDIO_FQDN}/.auth/login/aad/callback"
+STUDIO_GET = rf"GET .*containerApps/{STUDIO_APP}\?"
+STUDIO_ENV = {"DOCWIKI_ENABLE_STUDIO": "true"}
+
+
+def studio_auth_properties(
+    *,
+    enabled: bool = True,
+    action: str = "RedirectToLoginPage",
+    excluded: tuple[str, ...] = ("/healthz", "/livez"),
+    allowed: tuple[str, ...] = (),
+) -> dict[str, Any]:
+    """Built-in auth of the Studio app as ``az containerapp auth show`` prints it."""
+    validation: dict[str, Any] = {"allowedAudiences": [STUDIO_ID]}
+    if allowed:
+        validation["defaultAuthorizationPolicy"] = {"allowedApplications": list(allowed)}
+    return {
+        "platform": {"enabled": enabled},
+        "globalValidation": {
+            "unauthenticatedClientAction": action,
+            "excludedPaths": list(excluded),
+        },
+        "identityProviders": {
+            "azureActiveDirectory": {
+                "enabled": True,
+                "registration": {"clientId": STUDIO_ID, "openIdIssuer": ISSUER},
+                "validation": validation,
+            }
+        },
+        "login": {"tokenStore": {"enabled": False}},
+    }
+
+
+def studio_app_view(env: dict[str, str] | None = None, *, external: bool = False) -> dict[str, Any]:
+    """ARM view of the Studio container app."""
+    container = {
+        "name": "studio",
+        "image": "mcr.microsoft.com/dotnet/samples:aspnetapp",
+        "env": [{"name": key, "value": value} for key, value in (env or {}).items()],
+    }
+    configuration = {"ingress": {"external": True, "fqdn": STUDIO_FQDN}} if external else {}
+    return {"properties": {"configuration": configuration, "template": {"containers": [container]}}}
+
+
+def studio_azure(
+    runner: FakeRunner,
+    *,
+    shown: dict[str, Any] | None = None,
+    deployment: Result | None = None,
+) -> FakeRunner:
+    """Fake Azure for a first Studio provision: no app registration, no built-in auth yet."""
+    runner.on(r"^az account show", {"id": SUB, "user": {"type": "user"}})
+    runner.on(r"^az account get-access-token", {"accessToken": fake_token({"oid": "user-oid"})})
+    runner.on(r"GET .*applications\?\$filter", {"value": []})
+    runner.on(r"POST .*/applications ", {"id": "studio-obj", "appId": STUDIO_ID, "web": {}})
+    runner.on(r"PATCH .*/applications/studio-obj", None)
+    runner.on(rf"GET .*servicePrincipals\(appId='{STUDIO_ID}'\)", not_found())
+    runner.on(r"POST .*/servicePrincipals ", {"id": "studio-sp", "appRoleAssignmentRequired": True})
+    runner.on(r"GET .*/servicePrincipals/studio-sp/owners", {"value": []})
+    runner.on(r"POST .*/owners/\$ref", None)
+    runner.on(r"GET .*appRoleAssignedTo", {"value": []})
+    runner.on(r"POST .*appRoleAssignedTo", {"id": "default-access"})
+    runner.on(r"^azd env set", None)
+    runner.queue(
+        r"GET .*authConfigs/current", not_found(), {"properties": studio_auth_properties()}
+    )
+    runner.on(r"^az deployment group create", deployment)
+    runner.on(r"^az containerapp auth show", studio_auth_properties() if shown is None else shown)
+    runner.on(STUDIO_GET, studio_app_view())
+    runner.on(r"^az containerapp update", None)
+    runner.on(r"^az containerapp ingress enable", {"external": True, "fqdn": STUDIO_FQDN})
+    return runner
+
+
+def test_studio_flow_registers_its_owner_secures_then_exposes(
+    runner: FakeRunner, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code = postprovision.main(
+        ["--only", "studio"],
+        runner=studio_azure(runner),
+        environ=base_env(**STUDIO_ENV),
+        root=tmp_path,
+    )
+    assert code == 0
+    created = runner.body_for(r"POST .*/applications ")[0]
+    assert created["displayName"] == f"docwiki-studio-{ENV}-{TOKEN}"
+    assert created["description"] == "DocWiki Studio sign-in (owner only)."
+    assert created["signInAudience"] == "AzureADMyOrg"
+    assert created["web"] == {
+        "redirectUris": [STUDIO_CALLBACK],
+        "implicitGrantSettings": {
+            "enableIdTokenIssuance": True,
+            "enableAccessTokenIssuance": False,
+        },
+    }
+    assert runner.body_for(r"POST .*/servicePrincipals ")[0]["appRoleAssignmentRequired"] is True
+    state = json.loads(azdlib.state_path(ENV, tmp_path).read_text(encoding="utf-8"))
+    assert state["studio_app"]["app_id"] == STUDIO_ID
+    assert state["studio_app"]["created_by_hook"] is True
+    assert state["studio_app"]["service_principal_id"] == "studio-sp"
+    assert "portal_app" not in state
+    sets = runner.commands(r"^azd env set")
+    assert any(f"DOCWIKI_STUDIO_CLIENT_ID {STUDIO_ID} --environment demo" in s for s in sets)
+    assert any("DOCWIKI_STUDIO_ALLOWED_PRINCIPALS user-oid --environment demo" in s for s in sets)
+    # Sign-in requires an assignment: the deployer is the only user assigned.
+    assert runner.body_for(r"POST .*appRoleAssignedTo") == [
+        {
+            "principalId": "user-oid",
+            "resourceId": "studio-sp",
+            "appRoleId": entra.DEFAULT_ACCESS_ROLE_ID,
+        }
+    ]
+    (parameters,) = auth_parameters(runner)
+    assert parameters["containerAppName"]["value"] == STUDIO_APP
+    assert parameters["clientId"]["value"] == STUDIO_ID
+    assert parameters["allowedAudiences"]["value"] == [STUDIO_ID]
+    assert parameters["unauthenticatedClientAction"]["value"] == "RedirectToLoginPage"
+    assert parameters["excludedPaths"]["value"] == ["/healthz", "/livez"]
+    assert parameters["allowedApplications"]["value"] == []
+    deployment = runner.commands(r"^az deployment group create")[0]
+    assert "--name docwiki-studio-auth" in deployment and "app-auth.bicep" in deployment
+    # Fail closed: auth applied and verified, then the owner allowlist, then ingress.
+    assert exposure_order(runner) == ["auth-deploy", "auth-verify", "settings", "ingress"]
+    update = runner.commands(r"^az containerapp update")[0]
+    assert f"--name {STUDIO_APP}" in update and "--container-name studio" in update
+    assert "--set-env-vars DOCWIKI_STUDIO_ALLOWED_PRINCIPALS=user-oid --output none" in update
+    (ingress,) = runner.commands(r"ingress enable")
+    assert f"--name {STUDIO_APP}" in ingress and "--type external" in ingress
+    assert "--target-port 8080" in ingress
+    assert not runner.commands(r"credential reset|secret"), "no client secret is ever created"
+    assert not list((tmp_path / ".azure" / ENV / "hook-tmp").glob("*.json")), "bodies cleaned up"
+    output = capsys.readouterr().out
+    assert f"studio ready at https://{STUDIO_FQDN}/ (Entra sign-in, owner only)" in output
+    assert "owner allowlist" not in output, "set now, not 'already up to date'"
+
+
+def test_studio_auth_declared_by_the_hook_is_what_bicep_declares(
+    runner: FakeRunner, tmp_path: Path
+) -> None:
+    postprovision.main(
+        ["--only", "studio"],
+        runner=studio_azure(runner),
+        environ=base_env(**STUDIO_ENV),
+        root=tmp_path,
+    )
+    (parameters,) = auth_parameters(runner)
+    bicep = (REPO_ROOT / "infra" / "main.bicep").read_text(encoding="utf-8")
+    block = bicep[bicep.index("module studioAuth") : bicep.index("module budget")]
+    action = parameters["unauthenticatedClientAction"]["value"]
+    assert f"unauthenticatedClientAction: '{action}'" in block
+    assert re.findall(r"'(/[a-z]+)'", block) == parameters["excludedPaths"]["value"]
+    assert re.search(r"allowedAudiences: \[\s*studioClientId\s*\]", block)
+    assert "allowedApplications" not in block and parameters["allowedApplications"]["value"] == []
+    # The values the hook writes to the azd environment are the ones Bicep reads.
+    mapped = json.loads((REPO_ROOT / "infra" / "main.parameters.json").read_text("utf-8"))
+    assert mapped["parameters"]["studioClientId"]["value"] == "${DOCWIKI_STUDIO_CLIENT_ID}"
+    assert mapped["parameters"]["studioAllowedPrincipals"]["value"] == (
+        "${" + postprovision.STUDIO_PRINCIPALS_SETTING + "}"
+    )
+    assert runner.commands(rf"^azd env set {postprovision.STUDIO_PRINCIPALS_SETTING} ")
+
+
+def test_studio_step_follows_the_portal_step() -> None:
+    names = [name for name, _ in postprovision.STEPS]
+    assert names.index("studio") == names.index("portal") + 1
+    assert "``studio``" in (postprovision.__doc__ or "")
+
+
+def test_studio_second_run_changes_nothing(runner: FakeRunner, tmp_path: Path) -> None:
+    azdlib.save_state(
+        azdlib.state_path(ENV, tmp_path),
+        {
+            "studio_app": {
+                "app_id": STUDIO_ID,
+                "object_id": "studio-obj",
+                "display_name": f"docwiki-studio-{ENV}-{TOKEN}",
+                "service_principal_id": "studio-sp",
+                "created_by_hook": True,
+            }
+        },
+    )
+    runner.on(r"^az account show", {"id": SUB, "user": {"type": "user"}})
+    runner.on(r"^az account get-access-token", {"accessToken": fake_token({"oid": "user-oid"})})
+    registered = {
+        "id": "studio-obj",
+        "appId": STUDIO_ID,
+        "web": {
+            "redirectUris": [STUDIO_CALLBACK],
+            "implicitGrantSettings": {
+                "enableIdTokenIssuance": True,
+                "enableAccessTokenIssuance": False,
+            },
+        },
+    }
+    runner.on(rf"GET .*applications\(appId='{STUDIO_ID}'\)", registered)
+    runner.on(
+        rf"GET .*servicePrincipals\(appId='{STUDIO_ID}'\)",
+        {"id": "studio-sp", "appRoleAssignmentRequired": True},
+    )
+    runner.on(r"GET .*/servicePrincipals/studio-sp/owners", {"value": [{"id": "user-oid"}]})
+    assigned = {"id": "as-1", "principalId": "user-oid", "appRoleId": entra.DEFAULT_ACCESS_ROLE_ID}
+    runner.on(r"GET .*appRoleAssignedTo", {"value": [assigned]})
+    runner.on(r"GET .*authConfigs/current", {"properties": studio_auth_properties()})
+    runner.on(r"^az containerapp auth show", studio_auth_properties())
+    settled = {"DOCWIKI_STUDIO_ALLOWED_PRINCIPALS": "user-oid"}
+    runner.on(STUDIO_GET, studio_app_view(settled, external=True))
+    environ = base_env(
+        **STUDIO_ENV,
+        DOCWIKI_STUDIO_CLIENT_ID=STUDIO_ID,
+        DOCWIKI_STUDIO_ALLOWED_PRINCIPALS="user-oid",
+    )
+    code = postprovision.main(["--only", "studio"], runner=runner, environ=environ, root=tmp_path)
+    assert code == 0
+    assert not runner.commands(
+        r"--method (POST|PATCH|DELETE)|deployment group create|^azd env set|"
+        r"containerapp update|ingress enable"
+    )
+    assert exposure_order(runner) == ["auth-verify"]
+
+
+def test_studio_keeps_the_allowed_principals_of_the_environment(
+    runner: FakeRunner, tmp_path: Path
+) -> None:
+    environ = base_env(**STUDIO_ENV, DOCWIKI_STUDIO_ALLOWED_PRINCIPALS="owner-a,owner-b")
+    code = postprovision.main(
+        ["--only", "studio"], runner=studio_azure(runner), environ=environ, root=tmp_path
+    )
+    assert code == 0
+    assert not runner.commands(r"^azd env set DOCWIKI_STUDIO_ALLOWED_PRINCIPALS")
+    update = runner.commands(r"^az containerapp update")[0]
+    assert (
+        "--set-env-vars DOCWIKI_STUDIO_ALLOWED_PRINCIPALS=owner-a,owner-b --output none" in update
+    )
+
+
+def test_studio_updates_a_stale_allowlist_on_the_running_container(
+    runner: FakeRunner, tmp_path: Path
+) -> None:
+    """On the first provision Bicep ran before the hook set it; later provisions carry it."""
+    studio_azure(runner)
+    runner.rules = [rule for rule in runner.rules if rule[0].pattern != STUDIO_GET]
+    stale = {"DOCWIKI_STUDIO_ALLOWED_PRINCIPALS": "previous-owner"}
+    runner.on(STUDIO_GET, studio_app_view(stale))
+    ctx = context(runner, tmp_path, **STUDIO_ENV, DOCWIKI_STUDIO_ALLOWED_PRINCIPALS="owner-a")
+    postprovision.step_studio(ctx)
+    update = runner.commands(r"^az containerapp update")[0]
+    assert "--set-env-vars DOCWIKI_STUDIO_ALLOWED_PRINCIPALS=owner-a --output none" in update
+
+
+@pytest.mark.parametrize("value", [None, "false", "FALSE"])
+def test_studio_disabled_registers_nothing(
+    runner: FakeRunner, tmp_path: Path, capsys: pytest.CaptureFixture[str], value: str | None
+) -> None:
+    environ = base_env() if value is None else base_env(DOCWIKI_ENABLE_STUDIO=value)
+    code = postprovision.main(["--only", "studio"], runner=runner, environ=environ, root=tmp_path)
+    assert code == 0
+    assert not runner.calls, "no Entra registration, auth config or ingress change"
+    assert "studio disabled" in capsys.readouterr().out
+
+
+def test_studio_needs_a_user_as_its_owner(
+    runner: FakeRunner, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    runner.on(r"^az account show", {"id": SUB, "user": {"type": "servicePrincipal", "name": "sp"}})
+    runner.on(
+        r"^az account get-access-token",
+        {"accessToken": fake_token({"oid": "sp-oid", "idtyp": "app"})},
+    )
+    code = postprovision.main(
+        ["--only", "studio"], runner=runner, environ=base_env(**STUDIO_ENV), root=tmp_path
+    )
+    assert code == 0
+    assert not runner.commands(r"graph\.microsoft\.com|deployment group|containerapp|^azd env set")
+    output = capsys.readouterr().out
+    assert "ServicePrincipal, not a user" in output and "without ingress" in output
+    assert "studio ready" not in output
+
+
+@pytest.mark.parametrize(
+    ("shown", "problem"),
+    [
+        (studio_auth_properties(enabled=False), "built-in auth is not enabled"),
+        ({}, "built-in auth is not enabled"),
+        (studio_auth_properties(action="Return401"), "not answered with RedirectToLoginPage"),
+        (studio_auth_properties(excluded=("/healthz",)), "the excluded paths differ"),
+        (studio_auth_properties(allowed=("someone-else",)), "the allowed applications differ"),
+    ],
+)
+def test_studio_ingress_waits_for_verified_auth(
+    runner: FakeRunner, tmp_path: Path, shown: dict[str, Any], problem: str
+) -> None:
+    """Auth that ``az containerapp auth show`` does not confirm keeps the Studio private."""
+    studio_azure(runner, shown=shown)
+    ctx = context(runner, tmp_path, **STUDIO_ENV)
+    with pytest.raises(HookError) as raised:
+        postprovision.step_studio(ctx)
+    assert problem in str(raised.value)
+    assert "external ingress stays disabled" in str(raised.value)
+    assert "az containerapp auth show" in (raised.value.remediation or "")
+    assert not runner.commands(r"containerapp update|ingress enable")
+    assert not runner.commands(rf"containerApps/{STUDIO_APP}\?"), "the app is not even read"
+
+
+def test_studio_failed_auth_deployment_never_enables_ingress(
+    runner: FakeRunner, tmp_path: Path
+) -> None:
+    studio_azure(runner, deployment=Result(1, "", "ERROR: deployment refused"))
+    with pytest.raises(HookError, match="deployment refused"):
+        postprovision.step_studio(context(runner, tmp_path, **STUDIO_ENV))
+    assert not runner.commands(r"auth show|containerapp update|ingress enable")
+
+
+def test_studio_unverifiable_registration_stops_before_any_exposure(
+    runner: FakeRunner, tmp_path: Path
+) -> None:
+    """Graph refusing the registration (no Application Developer role) leaves the app private."""
+    runner.on(r"^az account show", {"id": SUB, "user": {"type": "user"}})
+    runner.on(r"^az account get-access-token", {"accessToken": fake_token({"oid": "user-oid"})})
+    runner.on(r"GET .*applications\?\$filter", Result(1, "", "ERROR: Forbidden (403)"))
+    with pytest.raises(azdlib.CommandError):
+        postprovision.step_studio(context(runner, tmp_path, **STUDIO_ENV))
+    assert not runner.commands(r"deployment group|containerapp|^azd env set")
 
 
 # ---------------------------------------------------------------------------

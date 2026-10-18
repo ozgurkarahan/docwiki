@@ -186,3 +186,59 @@ def test_second_run_has_nothing_left_to_delete(
         == 0
     )
     assert not again.calls
+
+
+def with_studio(state_file: Path, *, created_by_hook: bool = True) -> None:
+    state = azdlib.load_state(state_file)
+    state["studio_app"] = {
+        "object_id": "obj-3",
+        "display_name": "docwiki-studio-demo",
+        "created_by_hook": created_by_hook,
+    }
+    azdlib.save_state(state_file, state)
+
+
+def test_studio_registration_is_deleted_like_the_portal_one(
+    runner: FakeRunner, tmp_path: Path, state_file: Path
+) -> None:
+    assert "studio_app" in teardown.ENTRA_KEYS
+    with_studio(state_file)
+    azure(runner).on(r"DELETE .*/applications/obj-3", None).on(
+        r"DELETE .*/directory/deletedItems/obj-3", None
+    )
+    code = teardown.main(["--entra-only", "--yes"], runner=runner, environ=environ(), root=tmp_path)
+    assert code == 0
+    assert runner.commands(r"DELETE .*/applications/obj-3")
+    assert runner.commands(r"DELETE .*/directory/deletedItems/obj-3"), "purged"
+    assert runner.commands(r"DELETE .*/applications/obj-1"), "the MCP API one goes too"
+    assert not runner.commands(r"obj-2"), "a registration the hooks did not create is kept"
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    assert state["studio_app"]["deleted_at"]
+    again = FakeRunner()
+    teardown.main(["--entra-only", "--yes"], runner=again, environ=environ(), root=tmp_path)
+    assert not again.calls, "deleted once"
+
+
+def test_studio_registration_that_pre_existed_is_kept(
+    runner: FakeRunner, tmp_path: Path, state_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with_studio(state_file, created_by_hook=False)
+    code = teardown.main(
+        ["--entra-only", "--yes"], runner=azure(runner), environ=environ(), root=tmp_path
+    )
+    assert code == 0
+    assert not runner.commands(r"obj-3")
+    assert "studio_app: docwiki-studio-demo was not created by the hooks; kept" in (
+        capsys.readouterr().out
+    )
+
+
+def test_dry_run_lists_the_studio_registration(
+    runner: FakeRunner, tmp_path: Path, state_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with_studio(state_file)
+    assert teardown.main(["--dry-run"], runner=runner, environ=environ(), root=tmp_path) == 0
+    assert "delete app registration (studio_app): docwiki-studio-demo (then purge)" in (
+        capsys.readouterr().out
+    )
+    assert not runner.calls

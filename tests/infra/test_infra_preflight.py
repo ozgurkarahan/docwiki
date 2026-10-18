@@ -378,6 +378,25 @@ def test_graph_requiring_a_fresh_sign_in_fails_instead_of_crashing(
     assert "foundry-soft-delete" in text, "the remaining checks still run"
 
 
+def test_graph_fallback_for_another_account_fails_the_entra_check(
+    runner: FakeRunner, tmp_path: Path
+) -> None:
+    """With DOCWIKI_GRAPH_TOKEN_SOURCE=azd, the token of another account is never used."""
+    refused = Result(1, "", "ERROR: InteractionRequired and code: TokenCreatedWithOutdatedPolicies")
+    runner.on(r"memberOf/microsoft.graph.directoryRole", refused)  # first matching rule wins
+    runner.on(
+        r"^az account get-access-token",
+        {"accessToken": fake_token({"tid": "tenant-1", "oid": "oid-1"})},
+    )
+    runner.on(r"^azd auth token", {"token": fake_token({"tid": "tenant-1", "oid": "oid-2"})})
+    code, text = run(healthy(runner), tmp_path, DOCWIKI_GRAPH_TOKEN_SOURCE="azd")
+    assert code == 1
+    assert "[FAIL] entra-app-registration" in text and "different accounts" in text
+    assert "azd auth login" in text
+    assert "signature" not in text, "no token is ever printed"
+    assert "foundry-soft-delete" in text, "the remaining checks still run"
+
+
 def test_secrets_never_reach_the_output(runner: FakeRunner, tmp_path: Path) -> None:
     code, text = run(healthy(runner), tmp_path, "--json")
     assert code == 0

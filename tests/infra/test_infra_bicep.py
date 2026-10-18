@@ -62,6 +62,8 @@ def test_spec_parameters_and_defaults() -> None:
         "mcpTokenValidation": "'required'",
         "enablePortal": "false",
         "portalAccess": "'entra'",
+        "enableStudio": "false",
+        "studioMinReplicas": "1",
         "enableEventTrigger": "true",
         "reconcileCron": "'0 */6 * * *'",
         "audience": "'internal'",
@@ -181,6 +183,13 @@ def test_container_settings_are_known_keys() -> None:
     }
     names = set(re.findall(r"name: '(DOCWIKI_[A-Z0-9_]+)'", main_text()))
     assert names, "no DOCWIKI_* container settings found"
+    # The Studio reads its own settings (docwiki.studio.config), not the engine's.
+    studio_config = pytest.importorskip("docwiki.studio.config")
+    known |= {
+        value
+        for name, value in vars(studio_config).items()
+        if name.endswith("_ENV") and isinstance(value, str)
+    }
     assert names <= known, f"unknown settings: {sorted(names - known)}"
     for required in (
         "DOCWIKI_FOUNDRY_PROJECT_ENDPOINT",
@@ -279,6 +288,174 @@ def test_portal_without_sign_in_only_for_public_audience_builds() -> None:
     assert parameters["parameters"]["portalAccess"] == {"value": "${DOCWIKI_PORTAL_ACCESS}"}
 
 
+def test_studio_parameters_outputs_and_mapping() -> None:
+    main = main_text()
+    for declaration in (
+        r"^param enableStudio bool = false$",
+        r"^param studioClientId string = ''$",
+        r"^param studioAllowedPrincipals string = ''$",
+        r"^param studioMinReplicas int = 1$",
+        r"^param studioImage string = ''$",
+        r"^param studioExists bool = false$",
+    ):
+        assert re.search(declaration, main, re.MULTILINE), declaration
+    assert re.search(
+        r"@minValue\(0\)\s*@maxValue\(1\)\s*@description\([^\n]*\)\s*param studioMinReplicas int",
+        main,
+    ), "one replica at most: questions in flight live in memory"
+    assert "studioIdentity: 'id-docwiki-studio-${resourceToken}'" in main
+    assert "studioApp: 'ca-studio-${resourceToken}'" in main
+    mapped = json.loads((INFRA / "main.parameters.json").read_text(encoding="utf-8"))["parameters"]
+    assert {name: entry["value"] for name, entry in mapped.items() if "studio" in name.lower()} == {
+        "enableStudio": "${DOCWIKI_ENABLE_STUDIO}",
+        "studioMinReplicas": "${DOCWIKI_STUDIO_MIN_REPLICAS}",
+        "studioClientId": "${DOCWIKI_STUDIO_CLIENT_ID}",
+        "studioAllowedPrincipals": "${DOCWIKI_STUDIO_ALLOWED_PRINCIPALS}",
+        "studioImage": "${SERVICE_STUDIO_IMAGE_NAME}",
+        "studioExists": "${SERVICE_STUDIO_RESOURCE_EXISTS}",
+    }
+    outputs = re.findall(r"^output (\w+) ", main, re.MULTILINE)
+    for name in (
+        "DOCWIKI_STUDIO_IDENTITY_NAME",
+        "DOCWIKI_STUDIO_IDENTITY_CLIENT_ID",
+        "DOCWIKI_STUDIO_IDENTITY_PRINCIPAL_ID",
+        "DOCWIKI_STUDIO_APP_NAME",
+        "DOCWIKI_ENABLE_STUDIO",
+        "DOCWIKI_STUDIO_URL",
+    ):
+        assert name in outputs, name
+    assert "output DOCWIKI_ENABLE_STUDIO bool = enableStudio" in main
+    assert (
+        "var studioUrl = 'https://${names.studioApp}.${containerAppsEnvironment.outputs.defaultDomain}'"
+        in main
+    )
+    assert "output DOCWIKI_STUDIO_URL string = enableStudio ? studioUrl : ''" in main
+    assert len(outputs) <= 64, "ARM caps a template at 64 outputs (Bicep rule max-outputs)"
+
+
+def test_studio_ingress_waits_for_sign_in_and_an_allowed_owner() -> None:
+    """Fail closed (portal pattern): external ingress only where the Entra sign-in and an allowed
+    owner are declared; on the first provision the postprovision hook declares both, verifies the
+    built-in auth and only then enables ingress."""
+    main = main_text()
+    assert re.search(
+        r"^var studioPublic = enableStudio && !empty\(studioClientId\) && "
+        r"!empty\(studioAllowedPrincipals\)$",
+        main,
+        re.MULTILINE,
+    )
+    assert "module studioAuth 'modules/app-auth.bicep' = if (studioPublic)" in main
+    block = main[main.index("module studioApp") : main.index("module studioAuth")]
+    assert "ingressMode: studioPublic ? 'external' : 'none'" in block
+    assert "ingressMode: 'external'" not in block
+    auth = main[main.index("module studioAuth") : main.index("module budget")]
+    assert "clientId: studioClientId" in auth
+    assert re.search(r"allowedAudiences: \[\s*studioClientId\s*\]", auth)
+    assert "unauthenticatedClientAction: 'RedirectToLoginPage'" in auth
+    assert re.search(r"excludedPaths: \[\s*'/healthz'\s*'/livez'\s*\]", auth)
+    assert "allowedApplications" not in auth
+    # The new modules come after the portal's and before the budget: the other tests slice
+    # main.bicep between module names.
+    order = [main.index(f"module {name} ") for name in ("portalAuth", "studioApp", "studioAuth")]
+    assert order == sorted(order) and order[-1] < main.index("module budget ")
+
+
+def test_studio_app_settings_and_scale() -> None:
+    main = main_text()
+    block = main[main.index("module studioApp") : main.index("module studioAuth")]
+    assert "'azd-service-name': 'studio'" in block and "containerName: 'studio'" in block
+    assert "image: !empty(resolvedStudioImage) ? resolvedStudioImage : placeholderAppImage" in block
+    assert "module studioCurrentImage 'modules/current-image.bicep'" in main
+    assert (
+        "var resolvedStudioImage = !empty(studioImage) ? studioImage : "
+        "studioCurrentImage.outputs.image" in main
+    )
+    # The names are the app's own (test_container_settings_are_known_keys checks they exist).
+    expected = {
+        "AZURE_CLIENT_ID": "studioIdentity.outputs.clientId",
+        "DOCWIKI_FOUNDRY_PROJECT_ENDPOINT": "foundry.outputs.projectEndpoint",
+        "DOCWIKI_STUDIO_REQUIRE_SIGN_IN": "'true'",
+        "DOCWIKI_STUDIO_ALLOWED_PRINCIPALS": "studioAllowedPrincipals",
+        "DOCWIKI_STUDIO_WIKI_URL": "portalUrl",
+        "OTEL_SERVICE_NAME": "'docwiki-studio'",
+    }
+    for name, value in expected.items():
+        assert re.search(rf"name: '{name}'\s*value: {re.escape(value)}", block), name
+    assert re.search(r"concat\(\s*sharedEnv,", block), "the shared storage settings"
+    # Unset until known: the app refuses everyone without an allowed owner.
+    assert re.search(r"empty\(studioAllowedPrincipals\)\s*\?\s*\[\]", block)
+    # The wiki link only exists with a portal.
+    assert re.search(r"enablePortal\s*\?\s*\[\s*\{\s*name: 'DOCWIKI_STUDIO_WIKI_URL'", block)
+    assert "cpu: '0.5'" in block and "memory: '1Gi'" in block
+    assert "minReplicas: enableStudio ? studioMinReplicas : 0" in block
+    assert "maxReplicas: 1" in block, "questions and approvals in flight live in one replica"
+    assert "dormant: !enableStudio" in block
+    assert "targetPort: 8080" in block and "tcpProbes: true" in block
+
+
+def test_studio_storage_access_is_least_privilege() -> None:
+    storage = (INFRA / "modules" / "storage.bicep").read_text(encoding="utf-8")
+    assert re.search(r"^param studioPrincipalId string = ''$", storage, re.MULTILINE)
+    assert "var grantStudio = !empty(studioPrincipalId)" in storage
+    assert re.findall(r"^resource (studio\w+) ", storage, re.MULTILINE) == [
+        "studioRawContributor",
+        "studioWorkReader",
+        "studioReleasesReader",
+        "studioIngestReader",
+    ]
+    assigned = re.findall(
+        r"^resource (studio\w+) '[^']+' = if \(grantStudio\) \{\s*scope: (\w+)\s*"
+        r"name: guid\(\w+\.id, studioPrincipalId, roleIds\.(\w+)\)",
+        storage,
+        re.MULTILINE,
+    )
+    # Uploads to raw/, reads work/ (source states, run reports) and releases/ (pointer, catalog),
+    # peeks the ingest queue: nothing else, and nothing without a Studio identity.
+    assert assigned == [
+        ("studioRawContributor", "rawContainer", "storageBlobDataContributor"),
+        ("studioWorkReader", "workContainer", "storageBlobDataReader"),
+        ("studioReleasesReader", "releasesContainer", "storageBlobDataReader"),
+        ("studioIngestReader", "ingestQueue", "storageQueueDataReader"),
+    ]
+    condition = storage[
+        storage.index("var studioRawCondition") : storage.index("resource storage ")
+    ]
+    delete = (
+        "!(ActionMatches{'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete'})"
+    )
+    assert delete in condition
+    assert condition.count("ActionMatches") == 1, "only the delete is withheld from the role"
+    raw = storage[
+        storage.index("resource studioRawContributor") : storage.index("resource studioWorkReader")
+    ]
+    assert "condition: studioRawCondition" in raw and "conditionVersion: '2.0'" in raw
+    assert "principalType: 'ServicePrincipal'" in raw
+    for name in ("studioWorkReader", "studioReleasesReader", "studioIngestReader"):
+        block = storage[storage.index(f"resource {name} ") :].split("\n}\n", 1)[0]
+        assert "condition:" not in block, name
+    roles = (INFRA / "modules" / "roles.bicep").read_text(encoding="utf-8")
+    assert "storageQueueDataReader: '19e7f393-937e-4f77-808e-94535e297925'" in roles
+    assert "Studio" in storage[: storage.index("import {")], "the header lists the identities"
+
+
+def test_studio_foundry_access_is_azure_ai_user_only() -> None:
+    foundry = (INFRA / "modules" / "foundry.bicep").read_text(encoding="utf-8")
+    assert re.search(r"^param studioPrincipalId string = ''$", foundry, re.MULTILINE)
+    assert "var grantStudio = !empty(studioPrincipalId)" in foundry
+    assert re.findall(
+        r"^resource (studio\w+) '[^']+' = if \(grantStudio\) \{\s*scope: (\w+)\s*"
+        r"name: guid\(\w+\.id, studioPrincipalId, roleIds\.(\w+)\)",
+        foundry,
+        re.MULTILINE,
+    ) == [("studioAzureAiUser", "account", "azureAiUser")]
+    assert len(re.findall(r"^resource studio\w+ ", foundry, re.MULTILINE)) == 1
+    # While the Studio is disabled its identity holds no data-plane role.
+    main = main_text()
+    for module, following in (("storage", "foundry"), ("foundry", "containerAppsEnvironment")):
+        block = main[main.index(f"module {module} ") : main.index(f"module {following} ")]
+        assert "studioPrincipalId: enableStudio ? studioIdentity.outputs.principalId : ''" in block
+
+
 def test_mcp_server_validates_the_forwarded_token() -> None:
     main = main_text()
     block = main[main.index("module mcpApp") : main.index("module portalApp")]
@@ -323,7 +500,7 @@ def test_mcp_connection_uses_the_agents_own_identities() -> None:
 
 def test_each_workload_runs_as_its_own_identity() -> None:
     main = main_text()
-    for module in ("identity", "mcpIdentity", "portalIdentity"):
+    for module in ("identity", "mcpIdentity", "portalIdentity", "studioIdentity"):
         assert (
             f"module {module} 'br/public:avm/res/managed-identity/user-assigned-identity:" in main
         )
@@ -332,17 +509,19 @@ def test_each_workload_runs_as_its_own_identity() -> None:
         "reconcile": main[main.index("module reconcileJob") : main.index("module mcpApp")],
         "mcp": main[main.index("module mcpApp") : main.index("module portalApp")],
         "portal": main[main.index("module portalApp") : main.index("module mcpAuth")],
+        "studio": main[main.index("module studioApp") : main.index("module studioAuth")],
     }
     expected = {
         "ingest": "identity",
         "reconcile": "identity",
         "mcp": "mcpIdentity",
         "portal": "portalIdentity",
+        "studio": "studioIdentity",
     }
     for workload, module in expected.items():
         block = blocks[workload]
         assert f"identityResourceId: {module}.outputs.resourceId" in block, workload
-    for workload in ("mcp", "portal"):
+    for workload in ("mcp", "portal", "studio"):
         module = expected[workload]
         assert re.search(
             rf"name: 'AZURE_CLIENT_ID'\s*value: {module}\.outputs\.clientId", blocks[workload]
@@ -351,8 +530,15 @@ def test_each_workload_runs_as_its_own_identity() -> None:
     assert re.search(r"name: 'AZURE_CLIENT_ID'\s*value: identity\.outputs\.clientId", pipeline)
     assert "healthPath" not in blocks["mcp"], "/healthz answers 503 before the first release"
     registry = main[main.index("module registry") : main.index("module storage")]
-    for module in expected.values():
+    for module in set(expected.values()):
         assert f"principalId: {module}.outputs.principalId" in registry, module
+    # Every identity pulls its image and publishes its telemetry.
+    assert len(re.findall(r"roleDefinitionIdOrName: 'AcrPull'", registry)) == len(
+        set(expected.values())
+    )
+    monitoring = main[main.index("module monitoring") : main.index("module registry")]
+    for module in set(expected.values()):
+        assert f"{module}.outputs.principalId" in monitoring, module
 
 
 def test_mcp_probes_tolerate_cold_starts() -> None:
@@ -457,6 +643,9 @@ def test_dockerfiles_are_non_root_with_expected_entrypoints() -> None:
         "portal.Dockerfile": (
             'ENTRYPOINT ["python", "-m", "docwiki.portal", "--host", "0.0.0.0", "--port", "8080"]',
         ),
+        "studio.Dockerfile": (
+            'ENTRYPOINT ["python", "-m", "docwiki.studio", "--host", "0.0.0.0", "--port", "8080"]',
+        ),
     }
     for name, lines in expected.items():
         text = (REPO_ROOT / "docker" / name).read_text(encoding="utf-8")
@@ -473,7 +662,7 @@ def test_dockerfile_extras_exist() -> None:
     extras = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"][
         "optional-dependencies"
     ]
-    for name in ("job.Dockerfile", "mcp.Dockerfile"):
+    for name in ("job.Dockerfile", "mcp.Dockerfile", "studio.Dockerfile"):
         text = (REPO_ROOT / "docker" / name).read_text(encoding="utf-8")
         used = re.findall(r'"\.\[([a-z,]+)\]"', text)
         assert used, name
@@ -482,6 +671,10 @@ def test_dockerfile_extras_exist() -> None:
     portal = (REPO_ROOT / "docker" / "portal.Dockerfile").read_text(encoding="utf-8")
     assert '"azure,portal" if "portal" in extras else "azure,mcp"' in portal
     assert {"azure", "mcp"} <= set(extras), "portal web stack fallback"
+    # The Studio needs the web stack, the Azure SDKs and, because docwiki.studio imports
+    # docwiki.extract (whose package imports Pillow and the document readers), `extract`.
+    studio = (REPO_ROOT / "docker" / "studio.Dockerfile").read_text(encoding="utf-8")
+    assert re.findall(r'"\.\[([a-z,]+)\]"', studio) == ["azure,portal,extract"]
 
 
 def test_job_image_mirrors_a_checkout_for_the_site_stage() -> None:
@@ -583,7 +776,32 @@ def test_bicep_build_is_clean(compiled: dict[str, Any]) -> None:
         "DOCWIKI_RECONCILE_JOB_NAME",
         "DOCWIKI_MCP_IDENTITY_CLIENT_ID",
         "DOCWIKI_PORTAL_IDENTITY_CLIENT_ID",
+        "DOCWIKI_STUDIO_IDENTITY_CLIENT_ID",
+        "DOCWIKI_STUDIO_APP_NAME",
+        "DOCWIKI_ENABLE_STUDIO",
+        "DOCWIKI_STUDIO_URL",
         "DOCWIKI_MCP_CONNECTION",
         "APPLICATIONINSIGHTS_CONNECTION_STRING",
     ):
         assert name in outputs, name
+    assert len(outputs) <= 64, "ARM caps a template at 64 outputs"
+
+
+def test_compiled_studio_is_fail_closed(compiled: dict[str, Any]) -> None:
+    expression = compiled["variables"]["studioPublic"]
+    for name in ("enableStudio", "studioClientId", "studioAllowedPrincipals"):
+        assert f"parameters('{name}')" in expression, name
+    assert "or(" not in expression, "every condition must hold"
+    assert compiled["parameters"]["enableStudio"]["defaultValue"] is False
+    assert compiled["parameters"]["studioMinReplicas"]["maxValue"] == 1
+    resources = compiled["resources"]  # a list, or a dict by symbolic name in newer Bicep
+    modules = {
+        resource["name"]: resource
+        for resource in (resources.values() if isinstance(resources, dict) else resources)
+        if resource["type"] == "Microsoft.Resources/deployments"
+    }
+    assert modules["studioAuth"]["condition"] == "[variables('studioPublic')]"
+    app = modules["studioApp"]["properties"]["parameters"]
+    assert app["maxReplicas"] == {"value": 1}
+    assert app["dormant"] == {"value": "[not(parameters('enableStudio'))]"}
+    assert "variables('studioPublic')" in json.dumps(app["ingressMode"])

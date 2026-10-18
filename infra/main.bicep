@@ -1,7 +1,8 @@
 // DocWiki infrastructure (azd + Bicep), docs/spec/infra-ops-security.md §1.
 // One resource group per azd environment: Microsoft Foundry (models, agents, Content
 // Understanding), Blob/Queue storage with Event Grid, Container Apps (ingest + reconcile
-// jobs, MCP app, optional portal), registry, one identity per workload, monitoring and a budget.
+// jobs, MCP app, optional portal and Studio), registry, one identity per workload, monitoring and
+// a budget.
 // Zero secrets: managed identities and Entra ID only; no access keys, SAS tokens or key listing.
 
 targetScope = 'subscription'
@@ -97,6 +98,14 @@ param enablePortal bool = false
 @description('Portal access (DOCWIKI_PORTAL_ACCESS): entra = Entra sign-in; public = no sign-in, honoured only when the audience is public (any other audience keeps the portal without ingress).')
 param portalAccess string = 'entra'
 
+@description('Deploy the optional Studio: an owner-only web app to add documents, follow the pipeline and ask the agents (Entra sign-in, one allowed owner).')
+param enableStudio bool = false
+
+@minValue(0)
+@maxValue(1)
+@description('Minimum replicas of the Studio: 1 keeps agent questions and approval waits in memory and avoids cold starts; 0 scales to zero when idle (a question in flight is lost). The Studio never runs more than one replica.')
+param studioMinReplicas int = 1
+
 @description('Wake the ingest job from the queue (KEDA); false makes it a manually started job.')
 param enableEventTrigger bool = true
 
@@ -168,6 +177,12 @@ param mcpConnectionName string = 'docwiki-mcp'
 @description('Client ID of the portal sign-in app registration (set by the postprovision hook).')
 param portalClientId string = ''
 
+@description('Client ID of the Studio sign-in app registration (set by the postprovision hook).')
+param studioClientId string = ''
+
+@description('Comma-separated Entra object IDs allowed into the Studio (DOCWIKI_STUDIO_ALLOWED_PRINCIPALS, written by the postprovision hook: the deployer). The Studio gets no ingress while empty, and refuses everyone.')
+param studioAllowedPrincipals string = ''
+
 @description('Image of the job service (SERVICE_JOB_IMAGE_NAME, written by azd deploy).')
 param jobImage string = ''
 
@@ -177,6 +192,9 @@ param mcpImage string = ''
 @description('Image of the portal service (SERVICE_PORTAL_IMAGE_NAME, written by azd deploy).')
 param portalImage string = ''
 
+@description('Image of the studio service (SERVICE_STUDIO_IMAGE_NAME, written by azd deploy).')
+param studioImage string = ''
+
 @description('Whether the job service resource exists (SERVICE_JOB_RESOURCE_EXISTS, set by azd).')
 param jobExists bool = false
 
@@ -185,6 +203,9 @@ param mcpExists bool = false
 
 @description('Whether the portal service resource exists (SERVICE_PORTAL_RESOURCE_EXISTS, set by azd).')
 param portalExists bool = false
+
+@description('Whether the studio service resource exists (SERVICE_STUDIO_RESOURCE_EXISTS, set by azd).')
+param studioExists bool = false
 
 // ---------------------------------------------------------------------------
 // Names
@@ -200,6 +221,7 @@ var names = {
   identity: 'id-docwiki-${resourceToken}'
   mcpIdentity: 'id-docwiki-mcp-${resourceToken}'
   portalIdentity: 'id-docwiki-portal-${resourceToken}'
+  studioIdentity: 'id-docwiki-studio-${resourceToken}'
   logAnalytics: 'log-${resourceToken}'
   appInsights: 'appi-${resourceToken}'
   registry: 'cr${resourceToken}'
@@ -213,6 +235,7 @@ var names = {
   reconcileJob: 'caj-reconcile-${resourceToken}'
   mcpApp: 'ca-mcp-${resourceToken}'
   portalApp: 'ca-portal-${resourceToken}'
+  studioApp: 'ca-studio-${resourceToken}'
   actionGroup: 'ag-docwiki-${resourceToken}'
   budget: 'budget-docwiki-${resourceToken}'
 }
@@ -230,6 +253,11 @@ var deployerPrincipalId = grantDeployerDataAccess ? principalId : ''
 // public-audience build (DOCWIKI_PORTAL_ACCESS=public); any other combination fails closed.
 var portalAnonymous = enablePortal && portalAccess == 'public' && audience == 'public'
 var portalPublic = portalAnonymous || (enablePortal && portalAccess == 'entra' && !empty(portalClientId))
+// Fail closed: the Studio gets external ingress only once its Entra sign-in (studioClientId) and
+// its owner (studioAllowedPrincipals) are declared here. On the first provision the
+// postprovision hook registers the app, sets both, applies and verifies the built-in auth and
+// only then enables ingress.
+var studioPublic = enableStudio && !empty(studioClientId) && !empty(studioAllowedPrincipals)
 // Fail closed: the MCP app gets external ingress only once its built-in auth is declared here
 // (mcpApiClientId set). On the first provision the postprovision hook applies and verifies the
 // auth config, sets the token settings below and only then enables ingress.
@@ -251,9 +279,10 @@ resource rg 'Microsoft.Resources/resourceGroups@2024-11-01' = {
   tags: tags
 }
 
-// Three runtime identities, least privilege per workload (architecture.md §6): the jobs
+// Four runtime identities, least privilege per workload (architecture.md §6): the jobs
 // (pipeline: storage + Foundry), the MCP app (read the wiki, write proposals/reports/overlay,
-// enqueue) and the portal (read the published site).
+// enqueue), the portal (read the published site) and the Studio (upload to raw/, read the
+// pipeline state and releases, ask the agents).
 module identity 'br/public:avm/res/managed-identity/user-assigned-identity:0.6.0' = {
   name: 'identity'
   scope: rg
@@ -287,6 +316,17 @@ module portalIdentity 'br/public:avm/res/managed-identity/user-assigned-identity
   }
 }
 
+module studioIdentity 'br/public:avm/res/managed-identity/user-assigned-identity:0.6.0' = {
+  name: 'studioIdentity'
+  scope: rg
+  params: {
+    name: names.studioIdentity
+    location: location
+    tags: tags
+    enableTelemetry: false
+  }
+}
+
 module monitoring 'modules/monitoring.bicep' = {
   name: 'monitoring'
   scope: rg
@@ -299,6 +339,7 @@ module monitoring 'modules/monitoring.bicep' = {
       identity.outputs.principalId
       mcpIdentity.outputs.principalId
       portalIdentity.outputs.principalId
+      studioIdentity.outputs.principalId
     ]
   }
 }
@@ -332,6 +373,11 @@ module registry 'br/public:avm/res/container-registry/registry:0.13.1' = {
         principalType: 'ServicePrincipal'
         roleDefinitionIdOrName: 'AcrPull'
       }
+      {
+        principalId: studioIdentity.outputs.principalId
+        principalType: 'ServicePrincipal'
+        roleDefinitionIdOrName: 'AcrPull'
+      }
     ]
   }
 }
@@ -347,6 +393,7 @@ module storage 'modules/storage.bicep' = {
     runtimePrincipalId: identity.outputs.principalId
     mcpPrincipalId: mcpIdentity.outputs.principalId
     portalPrincipalId: portalIdentity.outputs.principalId
+    studioPrincipalId: enableStudio ? studioIdentity.outputs.principalId : ''
     deployerPrincipalId: deployerPrincipalId
     deployerPrincipalType: principalType
     networkPerimeter: networkPerimeter
@@ -372,6 +419,7 @@ module foundry 'modules/foundry.bicep' = {
     smartCapacity: smartCapacity
     deploymentSku: deploymentSku
     runtimePrincipalId: identity.outputs.principalId
+    studioPrincipalId: enableStudio ? studioIdentity.outputs.principalId : ''
     deployerPrincipalId: deployerPrincipalId
     deployerPrincipalType: principalType
     enableTracing: enableFoundryTracing
@@ -421,11 +469,23 @@ module portalCurrentImage 'modules/current-image.bicep' = {
   }
 }
 
+module studioCurrentImage 'modules/current-image.bicep' = {
+  name: 'studioCurrentImage'
+  scope: rg
+  params: {
+    kind: 'app'
+    name: names.studioApp
+    exists: studioExists
+  }
+}
+
 var resolvedJobImage = !empty(jobImage) ? jobImage : jobCurrentImage.outputs.image
 var resolvedMcpImage = !empty(mcpImage) ? mcpImage : mcpCurrentImage.outputs.image
 var resolvedPortalImage = !empty(portalImage) ? portalImage : portalCurrentImage.outputs.image
+var resolvedStudioImage = !empty(studioImage) ? studioImage : studioCurrentImage.outputs.image
 
 var portalUrl = 'https://${names.portalApp}.${containerAppsEnvironment.outputs.defaultDomain}'
+var studioUrl = 'https://${names.studioApp}.${containerAppsEnvironment.outputs.defaultDomain}'
 // The external FQDN the MCP app has (or gets from the hook) in this environment.
 var mcpFqdn = '${names.mcpApp}.${containerAppsEnvironment.outputs.defaultDomain}'
 var mcpUrl = 'https://${mcpFqdn}/mcp'
@@ -750,6 +810,94 @@ module portalAuth 'modules/app-auth.bicep' = if (portalPublic && !portalAnonymou
   }
 }
 
+// The Studio app always exists so that `azd deploy` can publish its image; it gets ingress only
+// when enabled AND its Entra sign-in and its owner are declared (fail closed). Disabled, it is
+// dormant (zero replicas). Enabled but not yet public (first provision), it has no scale rule so
+// the HTTP default applies once the postprovision hook turns its ingress on. One replica at most:
+// the questions in flight and their approvals live in the app's memory.
+module studioApp 'modules/container-app.bicep' = {
+  name: 'studioApp'
+  scope: rg
+  params: {
+    location: location
+    tags: union(tags, {
+      'azd-service-name': 'studio'
+    })
+    name: names.studioApp
+    containerName: 'studio'
+    environmentId: containerAppsEnvironment.outputs.id
+    workloadProfileName: containerAppsEnvironment.outputs.workloadProfileName
+    identityResourceId: studioIdentity.outputs.resourceId
+    registryServer: registry.outputs.loginServer
+    image: !empty(resolvedStudioImage) ? resolvedStudioImage : placeholderAppImage
+    // The app checks the sign-in again (fail closed): it refuses a call without the principal
+    // headers of built-in auth, and every call while DOCWIKI_STUDIO_ALLOWED_PRINCIPALS is empty
+    // or does not list the caller's object ID.
+    env: concat(
+      sharedEnv,
+      [
+        {
+          name: 'AZURE_CLIENT_ID'
+          value: studioIdentity.outputs.clientId
+        }
+        {
+          name: 'DOCWIKI_FOUNDRY_PROJECT_ENDPOINT'
+          value: foundry.outputs.projectEndpoint
+        }
+        {
+          name: 'DOCWIKI_STUDIO_REQUIRE_SIGN_IN'
+          value: 'true'
+        }
+        {
+          name: 'OTEL_SERVICE_NAME'
+          value: 'docwiki-studio'
+        }
+      ],
+      empty(studioAllowedPrincipals)
+        ? []
+        : [
+            {
+              name: 'DOCWIKI_STUDIO_ALLOWED_PRINCIPALS'
+              value: studioAllowedPrincipals
+            }
+          ],
+      enablePortal
+        ? [
+            {
+              name: 'DOCWIKI_STUDIO_WIKI_URL'
+              value: portalUrl
+            }
+          ]
+        : []
+    )
+    cpu: '0.5'
+    memory: '1Gi'
+    minReplicas: enableStudio ? studioMinReplicas : 0
+    maxReplicas: 1
+    ingressMode: studioPublic ? 'external' : 'none'
+    dormant: !enableStudio
+    targetPort: 8080
+    tcpProbes: true
+  }
+}
+
+module studioAuth 'modules/app-auth.bicep' = if (studioPublic) {
+  name: 'studioAuth'
+  scope: rg
+  params: {
+    containerAppName: studioApp.outputs.name
+    clientId: studioClientId
+    allowedAudiences: [
+      studioClientId
+    ]
+    unauthenticatedClientAction: 'RedirectToLoginPage'
+    excludedPaths: [
+      '/healthz'
+      '/livez'
+    ]
+  }
+}
+
 module budget 'modules/budget.bicep' = if (deployBudget) {
   name: 'budget'
   scope: rg
@@ -764,7 +912,8 @@ module budget 'modules/budget.bicep' = if (deployBudget) {
 }
 
 // ---------------------------------------------------------------------------
-// Outputs (azd writes them to .azure/<env>/.env; the hooks and BOOTSTRAP.md read them)
+// Outputs (azd writes them to .azure/<env>/.env; the hooks and BOOTSTRAP.md read them).
+// ARM caps a template at 64 outputs (Bicep rule max-outputs): add one only when something reads it.
 // ---------------------------------------------------------------------------
 
 output AZURE_LOCATION string = location
@@ -785,6 +934,9 @@ output DOCWIKI_MCP_IDENTITY_PRINCIPAL_ID string = mcpIdentity.outputs.principalI
 output DOCWIKI_PORTAL_IDENTITY_NAME string = portalIdentity.outputs.name
 output DOCWIKI_PORTAL_IDENTITY_CLIENT_ID string = portalIdentity.outputs.clientId
 output DOCWIKI_PORTAL_IDENTITY_PRINCIPAL_ID string = portalIdentity.outputs.principalId
+output DOCWIKI_STUDIO_IDENTITY_NAME string = studioIdentity.outputs.name
+output DOCWIKI_STUDIO_IDENTITY_CLIENT_ID string = studioIdentity.outputs.clientId
+output DOCWIKI_STUDIO_IDENTITY_PRINCIPAL_ID string = studioIdentity.outputs.principalId
 
 output DOCWIKI_FOUNDRY_ACCOUNT_NAME string = foundry.outputs.accountName
 output DOCWIKI_FOUNDRY_ACCOUNT_ENDPOINT string = foundry.outputs.accountEndpoint
@@ -826,10 +978,12 @@ output DOCWIKI_PORTAL_APP_NAME string = portalApp.outputs.name
 output DOCWIKI_ENABLE_PORTAL bool = enablePortal
 output DOCWIKI_PORTAL_ANONYMOUS bool = portalAnonymous
 output DOCWIKI_PORTAL_URL string = enablePortal ? portalUrl : ''
+output DOCWIKI_STUDIO_APP_NAME string = studioApp.outputs.name
+output DOCWIKI_ENABLE_STUDIO bool = enableStudio
+output DOCWIKI_STUDIO_URL string = enableStudio ? studioUrl : ''
 output DOCWIKI_CONTAINER_APPS_DEFAULT_DOMAIN string = containerAppsEnvironment.outputs.defaultDomain
 
 output DOCWIKI_LOG_ANALYTICS_WORKSPACE_ID string = monitoring.outputs.logAnalyticsWorkspaceCustomerId
 output DOCWIKI_LOG_ANALYTICS_WORKSPACE_NAME string = monitoring.outputs.logAnalyticsWorkspaceName
 output DOCWIKI_APPINSIGHTS_NAME string = monitoring.outputs.appInsightsName
 output APPLICATIONINSIGHTS_CONNECTION_STRING string = monitoring.outputs.appInsightsConnectionString
-output DOCWIKI_BUDGET_ENABLED bool = deployBudget

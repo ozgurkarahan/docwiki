@@ -32,11 +32,11 @@ What gets deployed (`infra/main.bicep`):
 | Container registry | `cr<token>` | Basic, admin user disabled; images built remotely by azd |
 | Container Apps environment | `cae-<token>` | Consumption profile; logs to Log Analytics through Azure Monitor |
 | Jobs | `caj-ingest-<token>`, `caj-reconcile-<token>` | Queue-triggered (KEDA, one execution) and scheduled reconcile |
-| Apps | `ca-mcp-<token>`, `ca-portal-<token>` | MCP server behind built-in auth (`/healthz` excluded; external ingress only once that auth is verified; the server validates the forwarded bearer token too); portal private unless enabled |
-| Managed identities | `id-docwiki-<token>`, `id-docwiki-mcp-<token>`, `id-docwiki-portal-<token>` | One per workload: pipeline jobs, MCP app, portal (least privilege) |
+| Apps | `ca-mcp-<token>`, `ca-portal-<token>`, `ca-studio-<token>` | MCP server behind built-in auth (`/healthz` excluded; external ingress only once that auth is verified; the server validates the forwarded bearer token too); portal and Studio private unless enabled |
+| Managed identities | `id-docwiki-<token>`, `id-docwiki-mcp-<token>`, `id-docwiki-portal-<token>`, `id-docwiki-studio-<token>` | One per workload: pipeline jobs, MCP app, portal, Studio (least privilege) |
 | Log Analytics + Application Insights | `log-<token>`, `appi-<token>` | 30-day retention |
 | Budget + action group | `budget-docwiki-<token>` | 50/80/100 % alerts (when contacts are set) |
-| Entra app registrations (hooks) | `docwiki-mcp-api-<env>-<token>` (+ `docwiki-portal-…`) | MCP API audience and app roles `Wiki.Read`, `Wiki.Operate` |
+| Entra app registrations (hooks) | `docwiki-mcp-api-<env>-<token>` (+ `docwiki-portal-…`, `docwiki-studio-…`) | MCP API audience and app roles `Wiki.Read`, `Wiki.Operate`; sign-in of the portal and the Studio |
 | Foundry project connection | `docwiki-mcp` | MCP tool of the agents: `RemoteTool` / `AgenticIdentityToken`, target `DOCWIKI_MCP_URL`, audience = MCP API identifier URI |
 | Foundry agents (hooks) | `docwiki-researcher`, `docwiki-librarian` | Each with its own Entra agent identity (ADR 0003); app roles and MCP allowlist set by the hooks |
 
@@ -128,6 +128,8 @@ azd env set DOCWIKI_MCP_MIN_REPLICAS 0
 | `DOCWIKI_MCP_MIN_REPLICAS` | `0` | `1` keeps the MCP server warm for demos (from zero, a cold start adds about 30 s to an agent turn) |
 | `DOCWIKI_ENABLE_PORTAL` | `false` | Portal Container App serving the current release's site (Entra sign-in by default) |
 | `DOCWIKI_PORTAL_ACCESS` | `entra` | `public` serves the portal without sign-in; honoured only with `DOCWIKI_AUDIENCE=public`, otherwise the portal gets no ingress |
+| `DOCWIKI_ENABLE_STUDIO` | `false` | DocWiki Studio ([docs/studio.md](docs/studio.md)): owner-only web app to upload documents, follow runs and ask the agents; always behind Entra sign-in |
+| `DOCWIKI_STUDIO_MIN_REPLICAS` | `1` | `0` lets the Studio scale to zero (questions in flight are then lost when it does) |
 | `DOCWIKI_ENABLE_EVENT_TRIGGER` | `true` | `false` makes the ingest job manual |
 | `DOCWIKI_RECONCILE_CRON` | `0 */6 * * *` | Reconcile schedule (UTC) |
 | `DOCWIKI_AUDIENCE` | `internal` | Build audience (`public`, `internal`, `restricted`) |
@@ -235,7 +237,9 @@ ON_FAIL:
 - Hook failures print an `ERROR` and a `remediation`; fix and re-run only the hook:
   `azd hooks run postprovision` or `azd hooks run postdeploy`. `the signed-in session needs a
   fresh sign-in` means continuous access evaluation revoked the cached Microsoft Graph token:
-  `az logout`, `az login`, `azd auth login`, then re-run the hook.
+  `az logout`, `az login`, `azd auth login`, then re-run the hook (or, with the owner's
+  agreement, set `DOCWIKI_GRAPH_TOKEN_SOURCE=azd` so the hooks use the azd sign-in for Graph
+  after checking it is the same account).
 - Model deployment errors (`InsufficientQuota`, `DeploymentModelNotSupported`): go back to
   Step 5.
 - Budget creation refused (subscription types without Cost Management budgets): with the

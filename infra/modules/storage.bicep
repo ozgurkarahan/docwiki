@@ -1,7 +1,8 @@
 // Storage account (Entra-only), containers raw/work/releases, queues ingest/ingest-poison,
 // Event Grid system topic delivering raw/ BlobCreated/BlobDeleted events to the ingest queue
 // with its managed identity, and the data-plane role assignments of architecture.md §6 for
-// three runtime identities: the jobs, the MCP app and the portal (least privilege per app).
+// four runtime identities: the jobs, the MCP app, the portal and the Studio (least privilege per
+// app).
 
 import { roleIds } from 'roles.bicep'
 
@@ -18,6 +19,9 @@ param mcpPrincipalId string
 
 @description('Principal ID of the portal app identity.')
 param portalPrincipalId string
+
+@description('Principal ID of the Studio app identity; empty skips the Studio data-plane roles.')
+param studioPrincipalId string = ''
 
 @description('Object ID of the deployer; empty skips the deployer data-plane roles.')
 param deployerPrincipalId string = ''
@@ -53,6 +57,7 @@ var releasesContainerName = 'releases'
 var ingestQueueName = 'ingest'
 var poisonQueueName = 'ingest-poison'
 var grantDeployer = !empty(deployerPrincipalId)
+var grantStudio = !empty(studioPrincipalId)
 
 // Attribute-based condition on the MCP app's work/ role: it reads everything but writes only
 // health reports, proposals and the domain overlay (decide_proposal, write_health_report).
@@ -75,6 +80,14 @@ var mcpWorkWriteCondition = '''
   OR
   @Resource[Microsoft.Storage/storageAccounts/blobServices/containers/blobs:path] StringEquals 'state/overlay.yaml'
  )
+)
+'''
+
+// Attribute-based condition on the Studio's raw/ role: it uploads and replaces documents but
+// never deletes a blob (soft delete and versioning keep what a replacement overwrites).
+var studioRawCondition = '''
+(
+ !(ActionMatches{'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete'})
 )
 '''
 
@@ -319,6 +332,59 @@ resource portalReleasesReader 'Microsoft.Authorization/roleAssignments@2022-04-0
     principalId: portalPrincipalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.storageBlobDataReader)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Studio identity (owner-only web app): uploads documents to raw/ and never deletes one, reads
+// the work/ state and run reports and the releases/ pointer and catalog, and peeks the ingest
+// queue. No write access to work/ or releases/, no queue send.
+// ---------------------------------------------------------------------------
+
+resource studioRawContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (grantStudio) {
+  scope: rawContainer
+  name: guid(rawContainer.id, studioPrincipalId, roleIds.storageBlobDataContributor)
+  properties: {
+    principalId: studioPrincipalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      roleIds.storageBlobDataContributor
+    )
+    condition: studioRawCondition
+    conditionVersion: '2.0'
+    description: 'DocWiki Studio: read and upload documents in raw/, never delete a blob'
+  }
+}
+
+resource studioWorkReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (grantStudio) {
+  scope: workContainer
+  name: guid(workContainer.id, studioPrincipalId, roleIds.storageBlobDataReader)
+  properties: {
+    principalId: studioPrincipalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.storageBlobDataReader)
+  }
+}
+
+resource studioReleasesReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (grantStudio) {
+  scope: releasesContainer
+  name: guid(releasesContainer.id, studioPrincipalId, roleIds.storageBlobDataReader)
+  properties: {
+    principalId: studioPrincipalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.storageBlobDataReader)
+  }
+}
+
+// The dashboard shows the queue depth (Peek Messages needs queues/messages/read).
+resource studioIngestReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (grantStudio) {
+  scope: ingestQueue
+  name: guid(ingestQueue.id, studioPrincipalId, roleIds.storageQueueDataReader)
+  properties: {
+    principalId: studioPrincipalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.storageQueueDataReader)
   }
 }
 

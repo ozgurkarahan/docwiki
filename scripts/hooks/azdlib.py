@@ -15,12 +15,16 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 import uuid
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from http.client import HTTPMessage
 from pathlib import Path
-from typing import Any
+from typing import IO, Any
+from urllib.parse import quote, urlsplit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ALLOWED_REGIONS = ("swedencentral", "eastus2", "westeurope")
@@ -30,6 +34,15 @@ STATE_SCHEMA = 1
 ARM = "https://management.azure.com"
 GRAPH = "https://graph.microsoft.com/v1.0"
 COGNITIVE_SERVICES_RESOURCE = "https://cognitiveservices.azure.com"
+
+# Opt-in (DOCWIKI_GRAPH_TOKEN_SOURCE=azd): when continuous access evaluation refuses the Azure CLI
+# token for Microsoft Graph, the calls use the azd sign-in's token instead (Tools.graph_rest).
+GRAPH_TOKEN_SOURCE = "DOCWIKI_GRAPH_TOKEN_SOURCE"
+GRAPH_HOST = "graph.microsoft.com"
+GRAPH_SCOPE = "https://graph.microsoft.com/.default"
+GRAPH_HTTP_TIMEOUT_S = 60.0
+# Characters left as they are when a URL built by the hooks (spaces in a `$filter`) is encoded.
+_URL_SAFE = "!#$%&'()*+,/:;=?@[]~"
 
 # Characters that cmd.exe interprets even inside quoted arguments of a .cmd/.bat launcher
 # (az on Windows is az.cmd). Arguments containing them must travel through a file.
@@ -149,6 +162,48 @@ def subprocess_runner(
         check=False,
     )
     return Result(completed.returncode, completed.stdout or "", completed.stderr or "")
+
+
+HttpCall = Callable[[str, str, Mapping[str, str], bytes | None], tuple[int, bytes]]
+"""``http(method, url, headers, body) -> (status, body)``: an answer for every HTTP status."""
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """A redirect is an answer, not a request to repeat: the bearer token never follows it."""
+
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: IO[bytes],
+        code: int,
+        msg: str,
+        headers: HTTPMessage,
+        newurl: str,
+    ) -> urllib.request.Request | None:
+        return None
+
+
+def urllib_http(
+    method: str,
+    url: str,
+    headers: Mapping[str, str],
+    body: bytes | None,
+    timeout_s: float = GRAPH_HTTP_TIMEOUT_S,
+) -> tuple[int, bytes]:
+    """Default :data:`HttpCall`: https only, with a timeout, redirects are not followed."""
+    parts = urlsplit(url)
+    if parts.scheme != "https":
+        raise HookError(f"refusing to send a request over {parts.scheme or 'an unknown scheme'}")
+    request = urllib.request.Request(
+        quote(url, safe=_URL_SAFE), data=body, headers=dict(headers), method=method
+    )
+    try:
+        with urllib.request.build_opener(_NoRedirect).open(request, timeout=timeout_s) as response:
+            return int(response.status), response.read()
+    except urllib.error.HTTPError as exc:
+        return int(exc.code), exc.read()
+    except OSError as exc:  # URLError, timeouts and connection failures
+        raise HookError(f"{parts.netloc} could not be reached: {exc}") from None
 
 
 def is_true(value: str | None, default: bool = False) -> bool:
@@ -306,6 +361,9 @@ class Tools:
     scratch_dir: Path | None = None
     sleep: Callable[[float], None] = time.sleep
     which: Callable[[str], str | None] = shutil.which
+    http: HttpCall = urllib_http
+    # Graph token of the azd sign-in (Tools.graph_token): never shown, never compared.
+    _graph_token: str | None = field(default=None, init=False, repr=False, compare=False)
 
     # -- generic ---------------------------------------------------------------
 
@@ -379,7 +437,11 @@ class Tools:
         resource: str | None = None,
         allow_not_found: bool = False,
     ) -> Any:
-        """``az rest`` call returning parsed JSON (``None`` for empty bodies or tolerated 404)."""
+        """``az rest`` call returning parsed JSON (``None`` for empty bodies or tolerated 404).
+
+        A Microsoft Graph call that continuous access evaluation refuses (the CLI's cached token
+        is revoked) is retried with the azd sign-in when ``DOCWIKI_GRAPH_TOKEN_SOURCE=azd``.
+        """
         args = ["rest", "--method", method, "--url", url]
         body_file: Path | None = None
         if body is not None:
@@ -397,10 +459,19 @@ class Tools:
                 return None
             if needs_fresh_sign_in(result):
                 # Continuous access evaluation revoked the CLI's cached token (spike F9).
+                graph = is_graph_url(url)
+                if graph and self.graph_token_source() == "azd":
+                    return self.graph_rest(method, url, body=body, allow_not_found=allow_not_found)
                 raise HookError(
                     f"az rest {method} was refused: the signed-in session needs a fresh sign-in",
                     "Run `az logout`, `az login` and `azd auth login`, then re-run the hook "
-                    "(azd hooks run postprovision).",
+                    "(azd hooks run postprovision)."
+                    + (
+                        f" For Microsoft Graph, {GRAPH_TOKEN_SOURCE}=azd uses the azd sign-in "
+                        "instead (after checking that it is the same account)."
+                        if graph
+                        else ""
+                    ),
                 )
             raise CommandError(["az", *args], result)
         text = result.stdout.strip()
@@ -410,6 +481,107 @@ class Tools:
             return json.loads(text)
         except json.JSONDecodeError as exc:
             raise HookError(f"az rest {method} did not return JSON: {exc}") from None
+
+    # -- Microsoft Graph through the azd sign-in (opt-in) -----------------------
+
+    def graph_token_source(self) -> str:
+        """``azd`` when the opt-in is set (azd environment or process environment), else empty."""
+        value = self.get(GRAPH_TOKEN_SOURCE) or os.environ.get(GRAPH_TOKEN_SOURCE, "")
+        return value.strip().lower()
+
+    def graph_token(self) -> str:
+        """Microsoft Graph token of the azd sign-in, fetched once and only for the account the
+        Azure CLI is signed in as. It is never printed, logged or echoed in an error."""
+        if self._graph_token is None:
+            command = ["azd", "auth", "token", "--scope", GRAPH_SCOPE]
+            tenant = self.get("AZURE_TENANT_ID")
+            if tenant:
+                command += ["--tenant-id", tenant]
+            result = self.run([*command, "--output", "json"], check=False)
+            token = ""
+            if result.ok:
+                try:
+                    data = json.loads(result.stdout)
+                except json.JSONDecodeError:
+                    data = None
+                if isinstance(data, dict):
+                    token = str(data.get("token") or data.get("accessToken") or "")
+            if not token:
+                raise HookError(
+                    "azd did not give a Microsoft Graph token "
+                    f"({GRAPH_TOKEN_SOURCE}=azd): is azd signed in?",
+                    "Run `azd auth login` as the account that is signed in to the Azure CLI, "
+                    "then re-run the hook.",
+                )
+            self._require_same_account(token)
+            info(f"Microsoft Graph: using the azd sign-in's token ({GRAPH_TOKEN_SOURCE}=azd)")
+            self._graph_token = token
+        return self._graph_token
+
+    def _require_same_account(self, graph_token: str) -> None:
+        """The azd token must carry the tenant and object ID of the Azure CLI's own token."""
+        arm = self.az_json("account", "get-access-token", check=False)
+        cli = jwt_claims(str(arm.get("accessToken", ""))) if isinstance(arm, dict) else {}
+        azd = jwt_claims(graph_token)
+        sign_in_again = (
+            "Sign in to both as the same account (`az login` and `azd auth login`), then re-run "
+            "the hook."
+        )
+        if not all(str(claims.get(name) or "") for claims in (azd, cli) for name in ("tid", "oid")):
+            raise HookError(
+                "cannot tell whether azd and the Azure CLI are signed in as the same account: "
+                "a token carries no tenant or object ID",
+                sign_in_again,
+            )
+        for name, what in (("tid", "tenant"), ("oid", "object ID")):
+            if str(azd[name]).lower() != str(cli[name]).lower():
+                raise HookError(
+                    f"azd and the Azure CLI are signed in as different accounts (the {what} "
+                    "differs): the azd token is not used for Microsoft Graph",
+                    sign_in_again,
+                )
+
+    def graph_rest(
+        self, method: str, url: str, *, body: Any = None, allow_not_found: bool = False
+    ) -> Any:
+        """Microsoft Graph call with the azd token (``rest`` falls back to it, opt-in only).
+
+        Returns parsed JSON (``None`` for empty bodies or a tolerated 404); an error answer is
+        raised with Graph's code and message, never with the token. HTTP errors are
+        :class:`CommandError` like ``az rest`` failures, so callers that tolerate or retry
+        those behave the same.
+        """
+        if not is_graph_url(url):
+            raise HookError(f"refusing to send the Microsoft Graph token to {url.split('?')[0]}")
+        headers = {
+            "Authorization": f"Bearer {self.graph_token()}",
+            "Accept": "application/json",
+            "User-Agent": "docwiki-hook",
+        }
+        payload: bytes | None = None
+        if body is not None:
+            payload = json.dumps(body).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        status, content = self.http(method.upper(), url, headers, payload)
+        if status == 404 and allow_not_found:
+            return None
+        if status >= 300:
+            detail = graph_error_detail(content)
+            reason = f"HTTP {status}" + (f": {detail}" if detail else "")
+            if status == 401:
+                raise HookError(
+                    f"Microsoft Graph refused the azd token too ({reason})",
+                    "Run `azd auth login` again, then re-run the hook.",
+                )
+            failure = Result(1, "", f"ERROR: Microsoft Graph answered {reason}")
+            raise CommandError(["graph", method.upper(), url], failure)
+        text = content.decode("utf-8", errors="replace").strip()
+        if not text:
+            return None
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise HookError(f"Microsoft Graph {method} did not return JSON: {exc}") from None
 
     # -- azd -------------------------------------------------------------------
 
@@ -456,6 +628,28 @@ class Tools:
                 "Sign in again with `az login`, then re-run.",
             )
         return object_id, principal_type
+
+
+def is_graph_url(url: str) -> bool:
+    """An https URL on exactly graph.microsoft.com (no port, no user info)."""
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return False
+    return parts.scheme == "https" and parts.netloc.lower() == GRAPH_HOST
+
+
+def graph_error_detail(content: bytes) -> str:
+    """``code: message`` of a Microsoft Graph error body; nothing else of the answer is shown."""
+    try:
+        data = json.loads(content.decode("utf-8", errors="replace"))
+    except json.JSONDecodeError:
+        return ""
+    error = data.get("error") if isinstance(data, dict) else None
+    if not isinstance(error, dict):
+        return ""
+    parts = [str(error.get("code") or ""), str(error.get("message") or "")]
+    return " ".join(": ".join(part for part in parts if part).split())[:300]
 
 
 def jwt_claims(token: str) -> dict[str, Any]:

@@ -28,6 +28,9 @@ param deploymentSku string
 @description('Principal ID of the runtime user-assigned identity.')
 param runtimePrincipalId string
 
+@description('Principal ID of the Studio app identity; empty skips its Foundry role.')
+param studioPrincipalId string = ''
+
 @description('Object ID of the deployer; empty skips the deployer roles.')
 param deployerPrincipalId string = ''
 
@@ -48,6 +51,7 @@ param appInsightsConnectionString string
 var fastDeploymentName = 'fast'
 var smartDeploymentName = 'smart'
 var grantDeployer = !empty(deployerPrincipalId)
+var grantStudio = !empty(studioPrincipalId)
 
 resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   name: accountName
@@ -166,6 +170,17 @@ resource runtimeAzureAiUser 'Microsoft.Authorization/roleAssignments@2022-04-01'
   name: guid(account.id, runtimePrincipalId, roleIds.azureAiUser)
   properties: {
     principalId: runtimePrincipalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.azureAiUser)
+  }
+}
+
+// The Studio asks the agents through the project's Responses API: Azure AI User, nothing else.
+resource studioAzureAiUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (grantStudio) {
+  scope: account
+  name: guid(account.id, studioPrincipalId, roleIds.azureAiUser)
+  properties: {
+    principalId: studioPrincipalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.azureAiUser)
   }

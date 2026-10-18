@@ -39,10 +39,11 @@ also trigger work. This page describes the threat model and the controls. The no
 | Jobs identity (`ingest`, `reconcile`) | Read `raw`; read and write `work` and `releases`; process the `ingest` queue; call Foundry models and Content Understanding; pull images |
 | MCP identity | Read `releases`; write in `work` only under `reports/`, `proposals/` and `state/overlay.yaml` (role-assignment condition); send to the `ingest` queue; pull images. Nothing on `raw`, nothing on Foundry |
 | Portal identity | Read `releases`; pull images |
+| Studio identity | Upload to `raw` (a role-assignment condition denies deletes); read `work` and `releases`; peek the `ingest` queue; ask the Foundry agents; pull images |
 | Event Grid system topic | Send to the `ingest` queue |
 | Researcher agent identity | App role `Wiki.Read` on the MCP API |
 | Librarian agent identity | App roles `Wiki.Read` and `Wiki.Operate` on the MCP API |
-| People | Entra sign-in: the deployer (resource group owner and Entra application rights), operators (data roles on `raw` and the queues), portal readers (assigned to the portal application) |
+| People | Entra sign-in: the deployer (resource group owner and Entra application rights), operators (data roles on `raw` and the queues), portal readers (assigned to the portal application), the Studio owner (assigned to the Studio application and listed in its allow-list) |
 
 Platform settings: Foundry `disableLocalAuth: true`; storage `allowSharedKeyAccess: false` and no
 public blob access; registry admin user disabled; MCP built-in authentication with
@@ -67,6 +68,14 @@ The optional portal uses interactive Entra sign-in with ID tokens and no client 
 or groups assigned to its enterprise application get in. A public-audience deployment may serve it
 without sign-in (`DOCWIKI_PORTAL_ACCESS=public`): it then exposes only the static site of a build
 that excludes internal and restricted sources; any other audience keeps the portal without ingress.
+
+The optional Studio ([studio.md](studio.md)) can upload documents and spend model tokens, so it
+fails closed at every layer: no ingress until its sign-in is declared and verified; Entra sign-in
+with ID tokens, no client secret and assignment required; an application allow-list of object IDs
+(written by the hook, empty means nobody); `X-DocWiki-Studio` header plus same-origin checks
+against cross-site request forgery; a Content Security Policy without inline script; model output
+rendered as text; daily limits on questions and uploads. Unlike the portal it never runs without
+sign-in.
 
 ## Content safety in the pipeline
 

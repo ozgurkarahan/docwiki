@@ -20,6 +20,7 @@ written down. Never paste the values (IDs, addresses, tokens) into issues or com
 | Foundry account / project endpoint | `DOCWIKI_FOUNDRY_ACCOUNT_NAME` / `DOCWIKI_FOUNDRY_PROJECT_ENDPOINT` |
 | Log Analytics workspace (for queries) | `DOCWIKI_LOG_ANALYTICS_WORKSPACE_ID` |
 | Managed identities: jobs / MCP app / portal | `DOCWIKI_RUNTIME_IDENTITY_NAME` / `DOCWIKI_MCP_IDENTITY_NAME` / `DOCWIKI_PORTAL_IDENTITY_NAME` |
+| Studio app / URL / identity (when `DOCWIKI_ENABLE_STUDIO=true`) | `DOCWIKI_STUDIO_APP_NAME` / `DOCWIKI_STUDIO_URL` / `DOCWIKI_STUDIO_IDENTITY_NAME` |
 
 The hooks keep a local record of the Entra objects they created in
 `.azure/<env>/docwiki-state.json` (git-ignored); `scripts/teardown.py` relies on it.
@@ -196,7 +197,7 @@ minute per capacity unit).
 ## Images and updates
 
 - `azd deploy` rebuilds and deploys all images remotely in the registry; `azd deploy job`,
-  `azd deploy mcp` or `azd deploy portal` deploy one service. The `postdeploy` hook copies the
+  `azd deploy mcp`, `azd deploy portal` or `azd deploy studio` deploy one service. The `postdeploy` hook copies the
   job image to the reconcile job and smoke-tests the MCP endpoint: built-in auth enabled
   (`Return401`), and 401 without a token, to a forged principal header and to a token for
   another audience (`python scripts/hooks/postdeploy.py --smoke-only` repeats the test).
@@ -228,7 +229,10 @@ minute per capacity unit).
   - MCP app (`DOCWIKI_MCP_IDENTITY_*`): reads `releases/` and `work/`, writes only
     `work/reports/`, `work/proposals/` and `work/state/overlay.yaml` (Blob Data Contributor
     with an attribute-based condition), enqueues on `ingest`; no `raw/`, no Foundry;
-  - portal (`DOCWIKI_PORTAL_IDENTITY_*`): reads `releases/`.
+  - portal (`DOCWIKI_PORTAL_IDENTITY_*`): reads `releases/`;
+  - Studio (`DOCWIKI_STUDIO_IDENTITY_*`): uploads to `raw/` (Blob Data Contributor with a
+    condition that denies deletes), reads `work/` and `releases/`, peeks the `ingest` queue, asks
+    the Foundry agents (Azure AI User).
 
   List them with
   `az role assignment list --assignee $(azd env get-value DOCWIKI_MCP_IDENTITY_PRINCIPAL_ID) --all --output table`
@@ -280,9 +284,18 @@ minute per capacity unit).
   and no app registration; Bicep gives the portal its ingress, so anyone with the URL can read the
   public build. A portal that already had Entra sign-in keeps it until you run
   `az containerapp auth update --name <portal app> --resource-group <rg> --enabled false`.
+- Studio (when `DOCWIKI_ENABLE_STUDIO=true`, [studio.md](studio.md)): Entra sign-in, then the
+  application checks the object ID against `DOCWIKI_STUDIO_ALLOWED_PRINCIPALS` (the hook writes
+  the deployer's). To let someone in, assign them under Enterprise applications →
+  `docwiki-studio-<env>-<token>` → Users and groups **and** append their object ID to
+  `DOCWIKI_STUDIO_ALLOWED_PRINCIPALS`, then run `azd provision`. Container logs and the
+  `docwiki-studio` logs in Application Insights record uploads, questions and approval decisions.
 - The hooks call Microsoft Graph with the Azure CLI sign-in. When continuous access evaluation
   revokes it, they stop with `the signed-in session needs a fresh sign-in`: run `az logout`,
-  `az login` and `azd auth login`, then re-run the hook.
+  `az login` and `azd auth login`, then re-run the hook. Alternatively,
+  `DOCWIKI_GRAPH_TOKEN_SOURCE=azd` (in the shell or the azd environment) lets the hooks use the
+  azd sign-in for Graph after checking that azd and az are signed in as the same account in the
+  same tenant.
 
 ## Storage network perimeter (optional)
 
