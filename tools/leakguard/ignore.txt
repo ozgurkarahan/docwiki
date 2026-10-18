@@ -3,3 +3,5 @@
 # The id is a fingerprint of rule + file + matched text, so one entry covers every occurrence
 # of that text in that file (and in its history). Deny-list findings can never be ignored.
 # Prefer fixing the content or extending an allowlist; keep this list short and reviewed.
+LG-06b837632d  # docs/studio.md, an earlier revision: "ca-studio-…" was the generic Container App name prefix in an example log line, not a host; replaced by a placeholder
+LG-5174f800ca  # tests/studio/studio_testkit.py, an earlier revision: fake all-zero test object ID; now built with uuid.UUID(int=...)
