@@ -1,0 +1,712 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Proposal (discriminated on kind)",
+  "$defs": {
+    "EntityProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^prop-[0-9a-f]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "entity",
+          "default": "entity",
+          "title": "Kind",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/EntityProposalPayload"
+        },
+        "evidence": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ProposalEvidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "status": {
+          "default": "open",
+          "enum": [
+            "open",
+            "accepted",
+            "rejected"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "decided_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Decided By"
+        },
+        "decided_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Decided At"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "id",
+        "payload",
+        "created_at"
+      ],
+      "title": "EntityProposal",
+      "type": "object"
+    },
+    "EntityProposalPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "maxLength": 64,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Type",
+          "type": "string"
+        },
+        "key": {
+          "maxLength": 64,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Key",
+          "type": "string"
+        },
+        "label": {
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "aliases": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ProposalAlias"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Attributes",
+          "type": "object"
+        }
+      },
+      "required": [
+        "type",
+        "key",
+        "label"
+      ],
+      "title": "EntityProposalPayload",
+      "type": "object"
+    },
+    "GlossaryProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^prop-[0-9a-f]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "glossary",
+          "default": "glossary",
+          "title": "Kind",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/GlossaryProposalPayload"
+        },
+        "evidence": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ProposalEvidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "status": {
+          "default": "open",
+          "enum": [
+            "open",
+            "accepted",
+            "rejected"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "decided_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Decided By"
+        },
+        "decided_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Decided At"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "id",
+        "payload",
+        "created_at"
+      ],
+      "title": "GlossaryProposal",
+      "type": "object"
+    },
+    "GlossaryProposalPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "term": {
+          "minLength": 1,
+          "title": "Term",
+          "type": "string"
+        },
+        "definition": {
+          "minLength": 1,
+          "title": "Definition",
+          "type": "string"
+        },
+        "synonyms": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "title": "Synonyms",
+          "type": "object"
+        },
+        "see_also": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "See Also",
+          "type": "array"
+        }
+      },
+      "required": [
+        "term",
+        "definition"
+      ],
+      "title": "GlossaryProposalPayload",
+      "type": "object"
+    },
+    "InjectionProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^prop-[0-9a-f]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "injection",
+          "default": "injection",
+          "title": "Kind",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/InjectionProposalPayload"
+        },
+        "evidence": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ProposalEvidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "status": {
+          "default": "open",
+          "enum": [
+            "open",
+            "accepted",
+            "rejected"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "decided_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Decided By"
+        },
+        "decided_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Decided At"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "id",
+        "payload",
+        "created_at"
+      ],
+      "title": "InjectionProposal",
+      "type": "object"
+    },
+    "InjectionProposalPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "source_id": {
+          "pattern": "^src-[0-9a-f]{12}$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "block_id": {
+          "pattern": "^b\\d{4,}$",
+          "title": "Block Id",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "excerpt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Excerpt"
+        }
+      },
+      "required": [
+        "source_id",
+        "block_id",
+        "reason"
+      ],
+      "title": "InjectionProposalPayload",
+      "type": "object"
+    },
+    "ProposalAlias": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "lang": {
+          "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
+          "title": "Lang",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "lang"
+      ],
+      "title": "ProposalAlias",
+      "type": "object"
+    },
+    "ProposalEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "source_id": {
+          "pattern": "^src-[0-9a-f]{12}$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "block_id": {
+          "pattern": "^b\\d{4,}$",
+          "title": "Block Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_id",
+        "block_id"
+      ],
+      "title": "ProposalEvidence",
+      "type": "object"
+    },
+    "RecompileProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^prop-[0-9a-f]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "recompile",
+          "default": "recompile",
+          "title": "Kind",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/RecompileProposalPayload"
+        },
+        "evidence": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ProposalEvidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "status": {
+          "default": "open",
+          "enum": [
+            "open",
+            "accepted",
+            "rejected"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "decided_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Decided By"
+        },
+        "decided_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Decided At"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "id",
+        "payload",
+        "created_at"
+      ],
+      "title": "RecompileProposal",
+      "type": "object"
+    },
+    "RecompileProposalPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "source_ids": {
+          "items": {
+            "pattern": "^src-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "hints": {
+          "default": "",
+          "title": "Hints",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_ids"
+      ],
+      "title": "RecompileProposalPayload",
+      "type": "object"
+    },
+    "TopicProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^prop-[0-9a-f]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "topic",
+          "default": "topic",
+          "title": "Kind",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/TopicProposalPayload"
+        },
+        "evidence": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ProposalEvidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "status": {
+          "default": "open",
+          "enum": [
+            "open",
+            "accepted",
+            "rejected"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "decided_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Decided By"
+        },
+        "decided_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Decided At"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "id",
+        "payload",
+        "created_at"
+      ],
+      "title": "TopicProposal",
+      "type": "object"
+    },
+    "TopicProposalPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "slug": {
+          "maxLength": 64,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Slug",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "keywords": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Keywords",
+          "type": "array"
+        },
+        "aliases": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ProposalAlias"
+          },
+          "title": "Aliases",
+          "type": "array"
+        }
+      },
+      "required": [
+        "slug",
+        "title"
+      ],
+      "title": "TopicProposalPayload",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "entity": "#/$defs/EntityProposal",
+      "glossary": "#/$defs/GlossaryProposal",
+      "injection": "#/$defs/InjectionProposal",
+      "recompile": "#/$defs/RecompileProposal",
+      "topic": "#/$defs/TopicProposal"
+    },
+    "propertyName": "kind"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/EntityProposal"
+    },
+    {
+      "$ref": "#/$defs/GlossaryProposal"
+    },
+    {
+      "$ref": "#/$defs/TopicProposal"
+    },
+    {
+      "$ref": "#/$defs/InjectionProposal"
+    },
+    {
+      "$ref": "#/$defs/RecompileProposal"
+    }
+  ]
+}

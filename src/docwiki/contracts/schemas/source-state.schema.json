@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Per-source state shard",
+  "$defs": {
+    "StageState": {
+      "additionalProperties": false,
+      "description": "Status of one stage of a source.\n\nA quarantine caused by a transient problem (``retryable``) is retried by the next runs until\n``attempts`` (consecutive failures of this stage for the current content) reaches\n:data:`RETRY_ATTEMPTS`; any other quarantine stays until the content changes or a recompile\nis requested.",
+      "properties": {
+        "status": {
+          "enum": [
+            "pending",
+            "done",
+            "failed",
+            "quarantined",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "cache_key": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cache Key"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Updated At"
+        },
+        "retryable": {
+          "default": false,
+          "title": "Retryable",
+          "type": "boolean"
+        },
+        "attempts": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Attempts",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "StageState",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "State of one raw file. Written with ETag If-Match; conflicts retry with fresh state.\n\nA deleted raw file keeps its shard as a tombstone (``deleted: true`` + ``deleted_at``).",
+  "properties": {
+    "schema": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema",
+      "type": "integer"
+    },
+    "source_id": {
+      "pattern": "^src-[0-9a-f]{12}$",
+      "title": "Source Id",
+      "type": "string"
+    },
+    "raw_path": {
+      "title": "Raw Path",
+      "type": "string"
+    },
+    "content_hash": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Content Hash",
+      "type": "string"
+    },
+    "size": {
+      "minimum": 0,
+      "title": "Size",
+      "type": "integer"
+    },
+    "media_type": {
+      "pattern": "^[a-z0-9][a-z0-9.+\\-]*/[a-z0-9][a-z0-9.+\\-]*$",
+      "title": "Media Type",
+      "type": "string"
+    },
+    "sensitivity": {
+      "enum": [
+        "public",
+        "internal",
+        "restricted"
+      ],
+      "title": "Sensitivity",
+      "type": "string"
+    },
+    "revision_group": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Revision Group"
+    },
+    "stages": {
+      "additionalProperties": {
+        "$ref": "#/$defs/StageState"
+      },
+      "default": {},
+      "propertyNames": {
+        "enum": [
+          "discover",
+          "extract",
+          "classify",
+          "compile",
+          "entities",
+          "topics",
+          "links",
+          "indexes",
+          "agentkit",
+          "evidence",
+          "verify",
+          "site",
+          "publish"
+        ]
+      },
+      "title": "Stages",
+      "type": "object"
+    },
+    "last_error": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Error"
+    },
+    "deleted": {
+      "default": false,
+      "title": "Deleted",
+      "type": "boolean"
+    },
+    "first_seen_at": {
+      "format": "date-time",
+      "title": "First Seen At",
+      "type": "string"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    },
+    "deleted_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Deleted At"
+    }
+  },
+  "required": [
+    "source_id",
+    "raw_path",
+    "content_hash",
+    "size",
+    "media_type",
+    "sensitivity",
+    "first_seen_at",
+    "updated_at"
+  ],
+  "type": "object"
+}

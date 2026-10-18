@@ -1,0 +1,22 @@
+# Closed topic catalog of the it-runbooks pack.
+topics:
+  - slug: incident-response
+    title: Incident response
+    description: Severity levels, incident commanders, status updates and escalation.
+    keywords: [incident, severity, SEV1, SEV2, incident commander, escalation, status update]
+    aliases: []
+  - slug: database-operations
+    title: Database operations
+    description: The orders database, replication, failover and recovery targets.
+    keywords: [orders-db, database, failover, standby, replication, RPO, RTO, PostgreSQL]
+    aliases: []
+  - slug: on-call
+    title: On-call
+    description: Rotations, handovers, paging and response times.
+    keywords: [on-call, rotation, handover, page, acknowledge]
+    aliases: []
+  - slug: service-reliability
+    title: Service reliability
+    description: Alerts, connection pools, capacity and lessons from postmortems.
+    keywords: [alert, latency, error rate, connection pool, postmortem, action item, SLO]
+    aliases: []

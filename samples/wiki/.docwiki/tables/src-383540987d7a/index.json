@@ -1,0 +1,141 @@
+{
+  "schema": 1,
+  "source_id": "src-383540987d7a",
+  "sensitivity": "public",
+  "tables": [
+    {
+      "id": "t01",
+      "file": "t01.parquet",
+      "locator": {
+        "kind": "pdf-page",
+        "page": 1,
+        "bbox": [
+          0.0821,
+          0.116,
+          0.9131,
+          0.282
+        ]
+      },
+      "provenance": "native-text",
+      "columns": [
+        {
+          "name": "field",
+          "header": "Field",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "value",
+          "header": "Value",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 6,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006",
+        "r0007"
+      ]
+    },
+    {
+      "id": "t02",
+      "file": "t02.parquet",
+      "locator": {
+        "kind": "pdf-page",
+        "page": 1,
+        "bbox": [
+          0.0809,
+          0.3579,
+          0.9131,
+          0.5249
+        ]
+      },
+      "provenance": "native-text",
+      "columns": [
+        {
+          "name": "category",
+          "header": "Category",
+          "type": "BIGINT"
+        },
+        {
+          "name": "meaning",
+          "header": "Meaning",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "required_action",
+          "header": "Required action",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 6,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006",
+        "r0007"
+      ]
+    },
+    {
+      "id": "t03",
+      "file": "t03.parquet",
+      "locator": {
+        "kind": "pdf-page",
+        "page": 1,
+        "bbox": [
+          0.0823,
+          0.5327,
+          0.9126,
+          0.8398
+        ]
+      },
+      "provenance": "native-text",
+      "columns": [
+        {
+          "name": "turbine",
+          "header": "Turbine",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "blade_a",
+          "header": "Blade A",
+          "type": "BIGINT"
+        },
+        {
+          "name": "blade_b",
+          "header": "Blade B",
+          "type": "BIGINT"
+        },
+        {
+          "name": "blade_c",
+          "header": "Blade C",
+          "type": "BIGINT"
+        },
+        {
+          "name": "highest",
+          "header": "Highest",
+          "type": "BIGINT"
+        }
+      ],
+      "row_count": 12,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006",
+        "r0007",
+        "r0008",
+        "r0009",
+        "r0010",
+        "r0011",
+        "r0012",
+        "r0013"
+      ]
+    }
+  ]
+}

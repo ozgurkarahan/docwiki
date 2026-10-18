@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "source_id": "src-67f6c3ce9754",
+  "sensitivity": "public",
+  "tables": [
+    {
+      "id": "t01",
+      "file": "t01.parquet",
+      "locator": {
+        "kind": "pdf-page",
+        "page": 1,
+        "bbox": [
+          0.0613,
+          0.1213,
+          0.854,
+          0.2646
+        ]
+      },
+      "provenance": "ocr",
+      "columns": [
+        {
+          "name": "client",
+          "header": "Client:",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "contoso_renewables_quellmoor_ridge_wind_farm",
+          "header": "Contoso Renewables - Quellmoor Ridge Wind Farm",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 5,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006"
+      ]
+    },
+    {
+      "id": "t02",
+      "file": "t02.parquet",
+      "locator": {
+        "kind": "pdf-page",
+        "page": 1,
+        "bbox": [
+          0.0634,
+          0.2957,
+          0.9473,
+          0.4851
+        ]
+      },
+      "provenance": "ocr",
+      "columns": [
+        {
+          "name": "c_1_crane_and_rigging",
+          "header": "1. Crane and rigging",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "c_1_crane_and_rigging_2",
+          "header": "1. Crane and rigging",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "c_1_crane_and_rigging_3",
+          "header": "1. Crane and rigging",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 8,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006",
+        "r0007",
+        "r0008",
+        "r0009"
+      ]
+    }
+  ]
+}

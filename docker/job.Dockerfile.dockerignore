@@ -1,0 +1,20 @@
+# Build-context allowlist for docker/job.Dockerfile.
+# azd remote builds (and BuildKit) read <Dockerfile>.dockerignore before the root .dockerignore.
+*
+!pyproject.toml
+!README.md
+!LICENSE
+!src
+!domains
+!skills
+!site
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/node_modules
+**/.env
+**/.env.*
+site/.quartz
+site/public

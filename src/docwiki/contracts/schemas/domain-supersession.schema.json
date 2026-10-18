@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Domain pack supersession.yaml",
+  "additionalProperties": false,
+  "description": "``supersession.yaml``. Regexes may use named groups ``number`` / ``rev``.",
+  "properties": {
+    "doc_number_regex": {
+      "minLength": 1,
+      "title": "Doc Number Regex",
+      "type": "string"
+    },
+    "revision_regex": {
+      "minLength": 1,
+      "title": "Revision Regex",
+      "type": "string"
+    },
+    "revision_order": {
+      "anyOf": [
+        {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "const": "numeric",
+          "type": "string"
+        }
+      ],
+      "title": "Revision Order"
+    },
+    "explicit_reference_regex": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Explicit Reference Regex"
+    }
+  },
+  "required": [
+    "doc_number_regex",
+    "revision_regex",
+    "revision_order"
+  ],
+  "type": "object"
+}

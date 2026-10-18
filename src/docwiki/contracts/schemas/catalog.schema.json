@@ -1,0 +1,316 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "catalog.json",
+  "$defs": {
+    "CatalogEdge": {
+      "additionalProperties": false,
+      "description": "Directed relation between two pages (see CONTRACT.md for the meaning of each kind).",
+      "properties": {
+        "from": {
+          "minLength": 1,
+          "title": "From",
+          "type": "string"
+        },
+        "to": {
+          "minLength": 1,
+          "title": "To",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "mentions",
+            "supersedes",
+            "cites",
+            "related",
+            "topic-of"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "kind"
+      ],
+      "title": "CatalogEdge",
+      "type": "object"
+    },
+    "CatalogGlossaryEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "term": {
+          "minLength": 1,
+          "title": "Term",
+          "type": "string"
+        },
+        "synonyms": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "title": "Synonyms",
+          "type": "object"
+        },
+        "page": {
+          "pattern": "^glossary\\.md#[^\\s#]+$",
+          "title": "Page",
+          "type": "string"
+        }
+      },
+      "required": [
+        "term",
+        "page"
+      ],
+      "title": "CatalogGlossaryEntry",
+      "type": "object"
+    },
+    "CatalogPage": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "source",
+            "entity",
+            "topic",
+            "index",
+            "query",
+            "meta",
+            "glossary",
+            "log"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "sensitivity": {
+          "enum": [
+            "public",
+            "internal",
+            "restricted"
+          ],
+          "title": "Sensitivity",
+          "type": "string"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "enum": [
+                "current",
+                "superseded",
+                "withdrawn"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Status"
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "entities": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Entities",
+          "type": "array"
+        },
+        "topics": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Topics",
+          "type": "array"
+        },
+        "sources": {
+          "default": [],
+          "items": {
+            "pattern": "^src-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
+        "lang": {
+          "const": "en",
+          "default": "en",
+          "title": "Lang",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "path",
+        "title",
+        "summary",
+        "sensitivity"
+      ],
+      "title": "CatalogPage",
+      "type": "object"
+    },
+    "CatalogSource": {
+      "additionalProperties": false,
+      "properties": {
+        "source_id": {
+          "pattern": "^src-[0-9a-f]{12}$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "hash": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Hash",
+          "type": "string"
+        },
+        "media_type": {
+          "pattern": "^[a-z0-9][a-z0-9.+\\-]*/[a-z0-9][a-z0-9.+\\-]*$",
+          "title": "Media Type",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "current",
+            "superseded",
+            "withdrawn"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "doc_number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Doc Number"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        }
+      },
+      "required": [
+        "source_id",
+        "path",
+        "hash",
+        "media_type",
+        "status"
+      ],
+      "title": "CatalogSource",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema",
+      "type": "integer"
+    },
+    "release_id": {
+      "pattern": "^(\\d{8}T\\d{6}Z)-([0-9a-f]{8})$",
+      "title": "Release Id",
+      "type": "string"
+    },
+    "audience": {
+      "enum": [
+        "public",
+        "internal",
+        "restricted"
+      ],
+      "title": "Audience",
+      "type": "string"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "pages": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/CatalogPage"
+      },
+      "title": "Pages",
+      "type": "array"
+    },
+    "edges": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/CatalogEdge"
+      },
+      "title": "Edges",
+      "type": "array"
+    },
+    "sources": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/CatalogSource"
+      },
+      "title": "Sources",
+      "type": "array"
+    },
+    "glossary": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/CatalogGlossaryEntry"
+      },
+      "title": "Glossary",
+      "type": "array"
+    }
+  },
+  "required": [
+    "release_id",
+    "audience",
+    "generated_at"
+  ],
+  "type": "object"
+}

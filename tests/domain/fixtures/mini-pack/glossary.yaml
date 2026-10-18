@@ -1,0 +1,10 @@
+terms:
+  - term: LOTO
+    definition: Lockout/tagout, isolating energy sources before work starts.
+    synonyms:
+      en: [lockout/tagout]
+      fr: [consignation]
+      de: [Freischaltung]
+    see_also: [procedure:sop-gbx-010]
+  - term: SCADA
+    definition: Supervisory control and data acquisition system of the wind farm.

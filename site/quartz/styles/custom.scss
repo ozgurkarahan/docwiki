@@ -1,0 +1,456 @@
+@use "./base.scss";
+@use "./variables.scss" as *;
+
+// DocWiki theme: calm, low-chroma stone and sage, WCAG AA contrast in both colour schemes.
+// Theme colours live in quartz.config.ts; DocWiki tokens below. No web fonts are downloaded.
+
+// Quartz appends its theme variables after this file, so the overrides need extra specificity.
+:root:root {
+  --titleFont:
+    system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+  --headerFont: var(--titleFont);
+  --bodyFont: var(--titleFont);
+  --codeFont:
+    ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+:root {
+  --dw-surface: #efede6;
+  --dw-shadow: rgba(34, 35, 31, 0.16);
+
+  --dw-verified-bg: #e3eee5;
+  --dw-verified-fg: #2c5b3c;
+  --dw-verified-border: #9dbfa7;
+  --dw-native-bg: #e8eee6;
+  --dw-native-fg: #35553f;
+  --dw-native-border: #a9bfad;
+  --dw-paraphrase-bg: #efeee9;
+  --dw-paraphrase-fg: #4a4943;
+  --dw-paraphrase-border: #9f9d93;
+  --dw-table-bg: #e5eaef;
+  --dw-table-fg: #33485c;
+  --dw-table-border: #a7b6c4;
+  --dw-ocr-bg: #f3ecda;
+  --dw-ocr-fg: #674c12;
+  --dw-ocr-border: #b39a5e;
+  --dw-generated-bg: #eee7ef;
+  --dw-generated-fg: #5a3e62;
+  --dw-generated-border: #a993b0;
+
+  --dw-fictional-bg: #f2ead6;
+  --dw-fictional-fg: #57441a;
+  --dw-fictional-border: #d3bf8e;
+  --dw-superseded-bg: #f5e9e3;
+  --dw-superseded-fg: #6e3a26;
+  --dw-superseded-border: #d9b3a3;
+}
+
+:root[saved-theme="dark"] {
+  --dw-surface: #20231f;
+  --dw-shadow: rgba(0, 0, 0, 0.45);
+
+  --dw-verified-bg: #223428;
+  --dw-verified-fg: #bfe0c8;
+  --dw-verified-border: #4f7a5c;
+  --dw-native-bg: #253128;
+  --dw-native-fg: #c6dccb;
+  --dw-native-border: #55705c;
+  --dw-paraphrase-bg: #2b2c28;
+  --dw-paraphrase-fg: #d2d1c8;
+  --dw-paraphrase-border: #7d7c72;
+  --dw-table-bg: #222c36;
+  --dw-table-fg: #c3d3e3;
+  --dw-table-border: #546a80;
+  --dw-ocr-bg: #352d1a;
+  --dw-ocr-fg: #ecd49a;
+  --dw-ocr-border: #8a7340;
+  --dw-generated-bg: #33283a;
+  --dw-generated-fg: #e0cbe8;
+  --dw-generated-border: #7c6488;
+
+  --dw-fictional-bg: #2f2a1b;
+  --dw-fictional-fg: #ecdcae;
+  --dw-fictional-border: #6f6036;
+  --dw-superseded-bg: #36241d;
+  --dw-superseded-fg: #f0c9b8;
+  --dw-superseded-border: #7d5141;
+}
+
+// ----- Reading comfort -----
+
+article {
+  > p,
+  > ul,
+  > ol,
+  > blockquote,
+  > .docwiki-badge-legend {
+    max-width: 72ch;
+  }
+
+  li > p {
+    margin: 0.25rem 0;
+  }
+}
+
+h1.article-title {
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--secondary);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.breadcrumb-container [aria-current="page"] {
+  color: var(--gray);
+  font-weight: $normalWeight;
+}
+
+// Quartz fades secondary navigation with opacity, which drops below 4.5:1; use the AA grey.
+ul.toc-content.overflow > li > a {
+  opacity: 1;
+  color: var(--gray);
+
+  &.in-view {
+    opacity: 1;
+    color: var(--dark);
+  }
+}
+
+.section .meta {
+  opacity: 1;
+  color: var(--gray);
+}
+
+// ----- Site-wide fictional sample banner -----
+
+header:has(.docwiki-banner) {
+  margin: 1.5rem 0 0.5rem;
+}
+
+.docwiki-banner {
+  flex: 1 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.6rem;
+  align-items: baseline;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--dw-fictional-border);
+  border-radius: 6px;
+  background: var(--dw-fictional-bg);
+  color: var(--dw-fictional-fg);
+  font-size: 0.875rem;
+  line-height: 1.45;
+
+  .docwiki-banner-label {
+    font-weight: $semiBoldWeight;
+  }
+
+  @media all and ($mobile) {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.8rem;
+  }
+}
+
+// ----- Notices at the top of a page (fictional stamp, superseded, warnings) -----
+// The document stamp is an outline (the banner above is the filled, site-level notice);
+// superseded and warning notices are filled because they change how to read the page.
+
+article blockquote.docwiki-notice {
+  margin: 1rem 0 1.25rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--dw-fictional-border);
+  border-radius: 6px;
+  background: transparent;
+
+  > p {
+    margin: 0;
+    color: var(--dw-fictional-fg);
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  strong {
+    color: inherit;
+  }
+
+  &.docwiki-notice--superseded,
+  &.docwiki-notice--warning {
+    padding: 0.55rem 0.85rem;
+    border-color: var(--dw-superseded-border);
+    background: var(--dw-superseded-bg);
+
+    > p {
+      color: var(--dw-superseded-fg);
+      font-size: 1rem;
+    }
+  }
+
+  a.internal {
+    background: transparent;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    color: inherit;
+  }
+}
+
+// Previews (popovers, search) show the page itself: no navigation chrome or repeated stamps.
+.popover-inner,
+.preview-inner {
+  .breadcrumb-container,
+  .tags,
+  .docwiki-notice--fictional {
+    display: none;
+  }
+}
+
+// ----- Provenance badges (footnotes, sidecars, legend) -----
+// Each kind differs by more than colour: check glyph, outline style, shape or slant.
+
+.docwiki-badge {
+  --badge-bg: var(--dw-paraphrase-bg);
+  --badge-fg: var(--dw-paraphrase-fg);
+  --badge-border: var(--dw-paraphrase-border);
+  display: inline-block;
+  padding: 0 0.45rem;
+  border: 1px solid var(--badge-border);
+  border-radius: 999px;
+  background: var(--badge-bg);
+  color: var(--badge-fg);
+  font-family: var(--bodyFont);
+  font-size: 0.78rem;
+  font-weight: $semiBoldWeight;
+  line-height: 1.5;
+  white-space: nowrap;
+  vertical-align: 0.05em;
+
+  &.docwiki-badge--verified {
+    --badge-bg: var(--dw-verified-bg);
+    --badge-fg: var(--dw-verified-fg);
+    --badge-border: var(--dw-verified-border);
+  }
+
+  &.docwiki-badge--native {
+    --badge-bg: var(--dw-native-bg);
+    --badge-fg: var(--dw-native-fg);
+    --badge-border: var(--dw-native-border);
+  }
+
+  &.docwiki-badge--paraphrase {
+    border-style: dashed;
+  }
+
+  &.docwiki-badge--table {
+    --badge-bg: var(--dw-table-bg);
+    --badge-fg: var(--dw-table-fg);
+    --badge-border: var(--dw-table-border);
+    border-radius: 3px;
+  }
+
+  &.docwiki-badge--ocr {
+    --badge-bg: var(--dw-ocr-bg);
+    --badge-fg: var(--dw-ocr-fg);
+    --badge-border: var(--dw-ocr-border);
+    border-style: dotted;
+    border-width: 2px;
+    padding: 0 0.4rem;
+  }
+
+  &.docwiki-badge--generated {
+    --badge-bg: var(--dw-generated-bg);
+    --badge-fg: var(--dw-generated-fg);
+    --badge-border: var(--dw-generated-border);
+    border-style: dashed;
+    font-style: italic;
+  }
+}
+
+// ----- Footnotes: the citations of a page -----
+
+section.footnotes {
+  margin-top: 1.25rem;
+  padding-top: 0.5rem;
+  font-size: 0.92rem;
+
+  ol {
+    padding-left: 1.5rem;
+  }
+
+  li {
+    margin: 0.35rem 0;
+  }
+
+  li > p {
+    margin: 0;
+  }
+
+  li:target {
+    background: var(--textHighlight);
+    border-radius: 4px;
+  }
+
+  .data-footnote-backref {
+    background: transparent;
+    font-weight: $normalWeight;
+  }
+}
+
+.docwiki-badge-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.25rem;
+  margin: 1.25rem 0 0;
+  font-size: 0.84rem;
+  line-height: 1.5;
+
+  .docwiki-badge-legend-title {
+    flex-basis: 100%;
+    color: var(--darkgray);
+    font-weight: $semiBoldWeight;
+  }
+
+  .docwiki-badge-legend-item {
+    color: var(--gray);
+  }
+}
+
+// ----- Evidence microscope (sidecar pages) -----
+
+.docwiki-evidence-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  margin: 0.75rem 0 0.25rem;
+  font-size: 0.9rem;
+
+  .docwiki-evidence-provenance {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--gray);
+  }
+}
+
+article.docwiki-evidence {
+  .docwiki-evidence-nav {
+    max-width: none;
+    font-size: 0.9rem;
+    color: var(--gray);
+  }
+
+  blockquote.docwiki-verbatim {
+    margin: 1rem 0 1.5rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--lightgray);
+    border-radius: 6px;
+    background: var(--dw-surface);
+
+    > p {
+      margin: 0.35rem 0;
+      color: var(--dark);
+    }
+  }
+
+  a.docwiki-zoom {
+    display: block;
+    width: fit-content;
+    max-width: 100%;
+    padding: 0;
+    background: transparent;
+    cursor: zoom-in;
+  }
+
+  img.docwiki-specimen {
+    display: block;
+    margin: 1rem 0;
+    border: 1px solid var(--lightgray);
+    border-radius: 4px;
+    background: #fff;
+    box-shadow: 0 6px 18px -10px var(--dw-shadow);
+  }
+
+  h2[id^="row-"] {
+    margin: 1.5rem 0 0.25rem;
+    font-size: 1rem;
+  }
+
+  h2:target {
+    background: var(--textHighlight);
+    border-radius: 4px;
+  }
+
+  .table-container > table {
+    margin: 0.25rem 0 1rem;
+  }
+}
+
+a.docwiki-original::after {
+  content: " ↗";
+}
+
+// ----- Landing page: About DocWiki -----
+
+.docwiki-about {
+  margin-top: 0.5rem;
+
+  h2 {
+    margin-top: 0;
+    font-size: 1.15rem;
+  }
+
+  p,
+  ul {
+    max-width: 72ch;
+  }
+}
+
+// ----- Footer -----
+
+footer.docwiki-footer {
+  margin: 2.5rem 0 3rem;
+
+  p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--gray);
+  }
+
+  code {
+    font-size: 0.8rem;
+  }
+}
+
+@media print {
+  .docwiki-banner {
+    border-width: 2px;
+  }
+
+  .left.sidebar,
+  .right.sidebar,
+  .docwiki-badge-legend {
+    display: none;
+  }
+}

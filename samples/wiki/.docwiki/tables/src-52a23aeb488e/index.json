@@ -1,0 +1,92 @@
+{
+  "schema": 1,
+  "source_id": "src-52a23aeb488e",
+  "sensitivity": "public",
+  "tables": [
+    {
+      "id": "t01",
+      "file": "t01.parquet",
+      "locator": {
+        "kind": "pdf-page",
+        "page": 1,
+        "bbox": [
+          0.0824,
+          0.116,
+          0.9131,
+          0.2815
+        ]
+      },
+      "provenance": "native-text",
+      "columns": [
+        {
+          "name": "field",
+          "header": "Field",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "value",
+          "header": "Value",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 6,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006",
+        "r0007"
+      ]
+    },
+    {
+      "id": "t02",
+      "file": "t02.parquet",
+      "locator": {
+        "kind": "pdf-page",
+        "page": 1,
+        "bbox": [
+          0.0823,
+          0.584,
+          0.9131,
+          0.7344
+        ]
+      },
+      "provenance": "native-text",
+      "columns": [
+        {
+          "name": "id",
+          "header": "ID",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "action",
+          "header": "Action",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "owner",
+          "header": "Owner",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "due",
+          "header": "Due",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "status",
+          "header": "Status",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 4,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005"
+      ]
+    }
+  ]
+}

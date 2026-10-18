@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Evidence index frontmatter",
+  "additionalProperties": false,
+  "description": "Frontmatter of ``evidence/<source_id>/index.md``.",
+  "properties": {
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "type": {
+      "const": "evidence-index",
+      "default": "evidence-index",
+      "title": "Type",
+      "type": "string"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "source_id": {
+      "pattern": "^src-[0-9a-f]{12}$",
+      "title": "Source Id",
+      "type": "string"
+    },
+    "sensitivity": {
+      "enum": [
+        "public",
+        "internal",
+        "restricted"
+      ],
+      "title": "Sensitivity",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "source_id",
+    "sensitivity"
+  ],
+  "type": "object"
+}

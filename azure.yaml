@@ -1,0 +1,99 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+# DocWiki deployment with the Azure Developer CLI. Runbook: BOOTSTRAP.md.
+# Images are built remotely in the environment's Azure Container Registry (no local Docker).
+# The `job` service image runs both Container Apps jobs: azd deploys it to the ingest job
+# (tag azd-service-name: job) and the postdeploy hook copies it to the reconcile job.
+# Hooks: preprovision = preflight; postprovision = Entra app registration, built-in auth, MCP
+# connection, agents and their access (ADR 0003); postdeploy = reconcile image + MCP smoke test;
+# predown/postdown = agents before the resource group, app registrations after.
+name: docwiki
+metadata:
+  template: docwiki@0.1.0
+requiredVersions:
+  azd: ">= 1.23.8"
+infra:
+  provider: bicep
+  path: infra
+  module: main
+services:
+  job:
+    project: .
+    host: containerapp
+    language: docker
+    docker:
+      path: docker/job.Dockerfile
+      context: .
+      remoteBuild: true
+  mcp:
+    project: .
+    host: containerapp
+    language: docker
+    docker:
+      path: docker/mcp.Dockerfile
+      context: .
+      remoteBuild: true
+  portal:
+    project: .
+    host: containerapp
+    language: docker
+    docker:
+      path: docker/portal.Dockerfile
+      context: .
+      remoteBuild: true
+hooks:
+  preprovision:
+    windows:
+      shell: pwsh
+      run: python scripts/hooks/preprovision.py
+      interactive: true
+      continueOnError: false
+    posix:
+      shell: sh
+      run: python3 scripts/hooks/preprovision.py
+      interactive: true
+      continueOnError: false
+  postprovision:
+    windows:
+      shell: pwsh
+      run: python scripts/hooks/postprovision.py
+      interactive: true
+      continueOnError: false
+    posix:
+      shell: sh
+      run: python3 scripts/hooks/postprovision.py
+      interactive: true
+      continueOnError: false
+  postdeploy:
+    windows:
+      shell: pwsh
+      run: python scripts/hooks/postdeploy.py
+      interactive: true
+      continueOnError: false
+    posix:
+      shell: sh
+      run: python3 scripts/hooks/postdeploy.py
+      interactive: true
+      continueOnError: false
+  predown:
+    # Delete the agents (and their Entra agent identities) before azd deletes the resource group.
+    windows:
+      shell: pwsh
+      run: python scripts/teardown.py --agents-only --yes
+      interactive: true
+      continueOnError: false
+    posix:
+      shell: sh
+      run: python3 scripts/teardown.py --agents-only --yes
+      interactive: true
+      continueOnError: false
+  postdown:
+    windows:
+      shell: pwsh
+      run: python scripts/teardown.py --entra-only --yes
+      interactive: true
+      continueOnError: false
+    posix:
+      shell: sh
+      run: python3 scripts/teardown.py --entra-only --yes
+      interactive: true
+      continueOnError: false

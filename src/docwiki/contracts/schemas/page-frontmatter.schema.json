@@ -1,0 +1,904 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Wiki page frontmatter (discriminated on type)",
+  "$defs": {
+    "Alias": {
+      "additionalProperties": false,
+      "description": "Alternative name with a language tag (``{text, lang}``).",
+      "properties": {
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "lang": {
+          "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
+          "title": "Lang",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "lang"
+      ],
+      "title": "Alias",
+      "type": "object"
+    },
+    "DocwikiStamp": {
+      "additionalProperties": false,
+      "description": "``docwiki: {schema: 1, release: <release_id>}``.",
+      "properties": {
+        "schema": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema",
+          "type": "integer"
+        },
+        "release": {
+          "pattern": "^(\\d{8}T\\d{6}Z)-([0-9a-f]{8})$",
+          "title": "Release",
+          "type": "string"
+        }
+      },
+      "required": [
+        "release"
+      ],
+      "title": "DocwikiStamp",
+      "type": "object"
+    },
+    "EntityFrontmatter": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "entity",
+          "default": "entity",
+          "title": "Type",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "lang": {
+          "const": "en",
+          "default": "en",
+          "title": "Lang",
+          "type": "string"
+        },
+        "sensitivity": {
+          "enum": [
+            "public",
+            "internal",
+            "restricted"
+          ],
+          "title": "Sensitivity",
+          "type": "string"
+        },
+        "updated": {
+          "format": "date",
+          "title": "Updated",
+          "type": "string"
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "pattern": "^[a-z0-9]+(?:[-_/][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "docwiki": {
+          "$ref": "#/$defs/DocwikiStamp"
+        },
+        "entity_type": {
+          "maxLength": 64,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "key": {
+          "maxLength": 64,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Key",
+          "type": "string"
+        },
+        "aliases": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Alias"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "sources": {
+          "default": [],
+          "items": {
+            "pattern": "^src-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "title": "Sources",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "summary",
+        "sensitivity",
+        "updated",
+        "docwiki",
+        "entity_type",
+        "key"
+      ],
+      "title": "EntityFrontmatter",
+      "type": "object"
+    },
+    "ExtractionSummary": {
+      "additionalProperties": false,
+      "description": "``extraction: {adapter, version, provenance_mix}``; the mix counts blocks per provenance.",
+      "properties": {
+        "adapter": {
+          "enum": [
+            "local",
+            "content-understanding"
+          ],
+          "title": "Adapter",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "provenance_mix": {
+          "additionalProperties": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "default": {},
+          "propertyNames": {
+            "enum": [
+              "native-text",
+              "ocr",
+              "deterministic-table",
+              "model-description"
+            ]
+          },
+          "title": "Provenance Mix",
+          "type": "object"
+        }
+      },
+      "required": [
+        "adapter",
+        "version"
+      ],
+      "title": "ExtractionSummary",
+      "type": "object"
+    },
+    "GlossaryFrontmatter": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "const": "glossary",
+          "default": "glossary",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "glossary",
+          "default": "glossary",
+          "title": "Type",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "lang": {
+          "const": "en",
+          "default": "en",
+          "title": "Lang",
+          "type": "string"
+        },
+        "sensitivity": {
+          "enum": [
+            "public",
+            "internal",
+            "restricted"
+          ],
+          "title": "Sensitivity",
+          "type": "string"
+        },
+        "updated": {
+          "format": "date",
+          "title": "Updated",
+          "type": "string"
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "pattern": "^[a-z0-9]+(?:[-_/][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "docwiki": {
+          "$ref": "#/$defs/DocwikiStamp"
+        }
+      },
+      "required": [
+        "title",
+        "summary",
+        "sensitivity",
+        "updated",
+        "docwiki"
+      ],
+      "title": "GlossaryFrontmatter",
+      "type": "object"
+    },
+    "IndexFrontmatter": {
+      "additionalProperties": false,
+      "description": "Index pages: ``index:home``, ``index:sources``, ``index:entities``,\n``index:entities/<type>``,\n``index:topics``, ``index:queries``.",
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "index",
+          "default": "index",
+          "title": "Type",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "lang": {
+          "const": "en",
+          "default": "en",
+          "title": "Lang",
+          "type": "string"
+        },
+        "sensitivity": {
+          "enum": [
+            "public",
+            "internal",
+            "restricted"
+          ],
+          "title": "Sensitivity",
+          "type": "string"
+        },
+        "updated": {
+          "format": "date",
+          "title": "Updated",
+          "type": "string"
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "pattern": "^[a-z0-9]+(?:[-_/][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "docwiki": {
+          "$ref": "#/$defs/DocwikiStamp"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "summary",
+        "sensitivity",
+        "updated",
+        "docwiki"
+      ],
+      "title": "IndexFrontmatter",
+      "type": "object"
+    },
+    "LogFrontmatter": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "const": "log",
+          "default": "log",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "log",
+          "default": "log",
+          "title": "Type",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "lang": {
+          "const": "en",
+          "default": "en",
+          "title": "Lang",
+          "type": "string"
+        },
+        "sensitivity": {
+          "enum": [
+            "public",
+            "internal",
+            "restricted"
+          ],
+          "title": "Sensitivity",
+          "type": "string"
+        },
+        "updated": {
+          "format": "date",
+          "title": "Updated",
+          "type": "string"
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "pattern": "^[a-z0-9]+(?:[-_/][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "docwiki": {
+          "$ref": "#/$defs/DocwikiStamp"
+        }
+      },
+      "required": [
+        "title",
+        "summary",
+        "sensitivity",
+        "updated",
+        "docwiki"
+      ],
+      "title": "LogFrontmatter",
+      "type": "object"
+    },
+    "MetaFrontmatter": {
+      "additionalProperties": false,
+      "description": "Meta pages: ``meta:agents`` (AGENTS.md), ``meta:quality``, ``meta:runs/<run_id>``.",
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "meta",
+          "default": "meta",
+          "title": "Type",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "lang": {
+          "const": "en",
+          "default": "en",
+          "title": "Lang",
+          "type": "string"
+        },
+        "sensitivity": {
+          "enum": [
+            "public",
+            "internal",
+            "restricted"
+          ],
+          "title": "Sensitivity",
+          "type": "string"
+        },
+        "updated": {
+          "format": "date",
+          "title": "Updated",
+          "type": "string"
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "pattern": "^[a-z0-9]+(?:[-_/][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "docwiki": {
+          "$ref": "#/$defs/DocwikiStamp"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "summary",
+        "sensitivity",
+        "updated",
+        "docwiki"
+      ],
+      "title": "MetaFrontmatter",
+      "type": "object"
+    },
+    "QueryFrontmatter": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "query",
+          "default": "query",
+          "title": "Type",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "lang": {
+          "const": "en",
+          "default": "en",
+          "title": "Lang",
+          "type": "string"
+        },
+        "sensitivity": {
+          "enum": [
+            "public",
+            "internal",
+            "restricted"
+          ],
+          "title": "Sensitivity",
+          "type": "string"
+        },
+        "updated": {
+          "format": "date",
+          "title": "Updated",
+          "type": "string"
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "pattern": "^[a-z0-9]+(?:[-_/][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "docwiki": {
+          "$ref": "#/$defs/DocwikiStamp"
+        },
+        "question": {
+          "minLength": 1,
+          "title": "Question",
+          "type": "string"
+        },
+        "asked_by": {
+          "enum": [
+            "researcher",
+            "human"
+          ],
+          "title": "Asked By",
+          "type": "string"
+        },
+        "sources": {
+          "default": [],
+          "items": {
+            "pattern": "^src-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
+        "approved_by": {
+          "minLength": 1,
+          "title": "Approved By",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "summary",
+        "sensitivity",
+        "updated",
+        "docwiki",
+        "question",
+        "asked_by",
+        "approved_by"
+      ],
+      "title": "QueryFrontmatter",
+      "type": "object"
+    },
+    "SourceFrontmatter": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "source",
+          "default": "source",
+          "title": "Type",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "lang": {
+          "const": "en",
+          "default": "en",
+          "title": "Lang",
+          "type": "string"
+        },
+        "sensitivity": {
+          "enum": [
+            "public",
+            "internal",
+            "restricted"
+          ],
+          "title": "Sensitivity",
+          "type": "string"
+        },
+        "updated": {
+          "format": "date",
+          "title": "Updated",
+          "type": "string"
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "pattern": "^[a-z0-9]+(?:[-_/][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "docwiki": {
+          "$ref": "#/$defs/DocwikiStamp"
+        },
+        "source_id": {
+          "pattern": "^src-[0-9a-f]{12}$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "source_path": {
+          "title": "Source Path",
+          "type": "string"
+        },
+        "source_hash": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Source Hash",
+          "type": "string"
+        },
+        "media_type": {
+          "pattern": "^[a-z0-9][a-z0-9.+\\-]*/[a-z0-9][a-z0-9.+\\-]*$",
+          "title": "Media Type",
+          "type": "string"
+        },
+        "doc_type": {
+          "maxLength": 64,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Doc Type",
+          "type": "string"
+        },
+        "category": {
+          "maxLength": 64,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Category",
+          "type": "string"
+        },
+        "doc_number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Doc Number"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        },
+        "status": {
+          "enum": [
+            "current",
+            "superseded",
+            "withdrawn"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "supersedes": {
+          "default": [],
+          "items": {
+            "pattern": "^src-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "title": "Supersedes",
+          "type": "array"
+        },
+        "superseded_by": {
+          "default": [],
+          "items": {
+            "pattern": "^src-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "title": "Superseded By",
+          "type": "array"
+        },
+        "original_lang": {
+          "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
+          "title": "Original Lang",
+          "type": "string"
+        },
+        "pages": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pages"
+        },
+        "entities": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Entities",
+          "type": "array"
+        },
+        "topics": {
+          "default": [],
+          "items": {
+            "pattern": "^topic:[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "title": "Topics",
+          "type": "array"
+        },
+        "authority": {
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Authority",
+          "type": "integer"
+        },
+        "extraction": {
+          "$ref": "#/$defs/ExtractionSummary"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "summary",
+        "sensitivity",
+        "updated",
+        "docwiki",
+        "source_id",
+        "source_path",
+        "source_hash",
+        "media_type",
+        "doc_type",
+        "category",
+        "status",
+        "original_lang",
+        "authority",
+        "extraction"
+      ],
+      "title": "SourceFrontmatter",
+      "type": "object"
+    },
+    "TopicFrontmatter": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "topic",
+          "default": "topic",
+          "title": "Type",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "lang": {
+          "const": "en",
+          "default": "en",
+          "title": "Lang",
+          "type": "string"
+        },
+        "sensitivity": {
+          "enum": [
+            "public",
+            "internal",
+            "restricted"
+          ],
+          "title": "Sensitivity",
+          "type": "string"
+        },
+        "updated": {
+          "format": "date",
+          "title": "Updated",
+          "type": "string"
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "pattern": "^[a-z0-9]+(?:[-_/][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "docwiki": {
+          "$ref": "#/$defs/DocwikiStamp"
+        },
+        "topic_slug": {
+          "maxLength": 64,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Topic Slug",
+          "type": "string"
+        },
+        "sources": {
+          "default": [],
+          "items": {
+            "pattern": "^src-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ],
+          "title": "Confidence",
+          "type": "string"
+        },
+        "contradictions": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Contradictions",
+          "type": "integer"
+        },
+        "superseded_claims": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Superseded Claims",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "summary",
+        "sensitivity",
+        "updated",
+        "docwiki",
+        "topic_slug",
+        "confidence"
+      ],
+      "title": "TopicFrontmatter",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "entity": "#/$defs/EntityFrontmatter",
+      "glossary": "#/$defs/GlossaryFrontmatter",
+      "index": "#/$defs/IndexFrontmatter",
+      "log": "#/$defs/LogFrontmatter",
+      "meta": "#/$defs/MetaFrontmatter",
+      "query": "#/$defs/QueryFrontmatter",
+      "source": "#/$defs/SourceFrontmatter",
+      "topic": "#/$defs/TopicFrontmatter"
+    },
+    "propertyName": "type"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/SourceFrontmatter"
+    },
+    {
+      "$ref": "#/$defs/EntityFrontmatter"
+    },
+    {
+      "$ref": "#/$defs/TopicFrontmatter"
+    },
+    {
+      "$ref": "#/$defs/QueryFrontmatter"
+    },
+    {
+      "$ref": "#/$defs/IndexFrontmatter"
+    },
+    {
+      "$ref": "#/$defs/MetaFrontmatter"
+    },
+    {
+      "$ref": "#/$defs/GlossaryFrontmatter"
+    },
+    {
+      "$ref": "#/$defs/LogFrontmatter"
+    }
+  ]
+}

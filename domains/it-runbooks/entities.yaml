@@ -1,0 +1,27 @@
+# Entity registry of the it-runbooks pack (fictional, see samples/fiction/bible.yaml it_world).
+types:
+  - {key: service, title: Services, description: Services in the service catalog.}
+  - {key: alert, title: Alerts, description: Monitoring alerts with their conditions.}
+  - {key: rotation, title: On-call rotations, description: On-call rotations and their handover times.}
+  - {key: severity, title: Severity levels, description: Incident severity levels.}
+  - {key: procedure, title: Procedures, description: Runbooks and operational procedures.}
+registry:
+  - {type: service, key: ticketing-api, label: ticketing-api, aliases: [{text: ticketing-api, lang: en}, {text: ticketing API, lang: en}], attributes: {tier: 1}}
+  - {type: service, key: checkout-web, label: checkout-web, aliases: [{text: checkout-web, lang: en}, {text: checkout, lang: en}], attributes: {tier: 1}}
+  - {type: service, key: orders-db, label: orders-db, aliases: [{text: orders-db, lang: en}, {text: orders database, lang: en}], attributes: {tier: 1, technology: PostgreSQL}}
+  - {type: service, key: notification-worker, label: notification-worker, aliases: [{text: notification-worker, lang: en}], attributes: {tier: 2}}
+  - {type: service, key: reporting-batch, label: reporting-batch, aliases: [{text: reporting-batch, lang: en}], attributes: {tier: 3}}
+  - {type: alert, key: ticketingapihighlatency, label: TicketingApiHighLatency, aliases: [{text: TicketingApiHighLatency, lang: en}], attributes: {service: ticketing-api}}
+  - {type: alert, key: ticketingapierrorrate, label: TicketingApiErrorRate, aliases: [{text: TicketingApiErrorRate, lang: en}], attributes: {service: ticketing-api}}
+  - {type: alert, key: ticketingapidown, label: TicketingApiDown, aliases: [{text: TicketingApiDown, lang: en}], attributes: {service: ticketing-api}}
+  - {type: alert, key: ticketingapipoolsaturation, label: TicketingApiPoolSaturation, aliases: [{text: TicketingApiPoolSaturation, lang: en}], attributes: {service: ticketing-api}}
+  - {type: rotation, key: sre-primary, label: sre-primary, aliases: [{text: sre-primary, lang: en}], attributes: {}}
+  - {type: rotation, key: sre-secondary, label: sre-secondary, aliases: [{text: sre-secondary, lang: en}], attributes: {}}
+  - {type: rotation, key: dba-primary, label: dba-primary, aliases: [{text: dba-primary, lang: en}], attributes: {}}
+  - {type: rotation, key: business-hours, label: business-hours, aliases: [{text: business-hours, lang: en}], attributes: {}}
+  - {type: severity, key: sev1, label: SEV1, aliases: [{text: SEV1, lang: en}, {text: severity 1, lang: en}], attributes: {}}
+  - {type: severity, key: sev2, label: SEV2, aliases: [{text: SEV2, lang: en}, {text: severity 2, lang: en}], attributes: {}}
+  - {type: severity, key: sev3, label: SEV3, aliases: [{text: SEV3, lang: en}, {text: severity 3, lang: en}], attributes: {}}
+  - {type: severity, key: sev4, label: SEV4, aliases: [{text: SEV4, lang: en}, {text: severity 4, lang: en}], attributes: {}}
+  - {type: procedure, key: rb-tkt-002, label: RB-TKT-002 ticketing-api runbook, aliases: [{text: RB-TKT-002, lang: en}], attributes: {}}
+  - {type: procedure, key: prc-db-007, label: PRC-DB-007 orders-db failover, aliases: [{text: PRC-DB-007, lang: en}, {text: orders-db failover, lang: en}], attributes: {}}

@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "source_id": "src-43c97f7dfcde",
+  "sensitivity": "public",
+  "tables": [
+    {
+      "id": "t01",
+      "file": "t01.parquet",
+      "locator": {
+        "kind": "xlsx-rows",
+        "sheet": "Plan",
+        "sheet_slug": null,
+        "row_start": 1,
+        "row_end": 4,
+        "cols": null
+      },
+      "provenance": "deterministic-table",
+      "columns": [
+        {
+          "name": "asset",
+          "header": "Asset",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "task",
+          "header": "Task",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "oil_grade",
+          "header": "Oil grade",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "due",
+          "header": "Due",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "hours",
+          "header": "Hours",
+          "type": "BIGINT"
+        }
+      ],
+      "row_count": 3,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004"
+      ]
+    }
+  ]
+}

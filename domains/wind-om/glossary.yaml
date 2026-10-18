@@ -1,0 +1,132 @@
+# Glossary seeds of the wind-om pack: generic industry terms with French and German synonyms.
+# Site- or manufacturer-specific acronyms (for example the turbine variant code) are left to the
+# documents that define them, so that their definition is always cited from a source.
+terms:
+  - term: gearbox
+    definition: Mechanical transmission between the rotor shaft and the generator that raises the rotational speed.
+    synonyms: {fr: [multiplicateur, boîte de vitesses], de: [Getriebe]}
+    see_also: [component:gearbox, topic:gearbox-lubrication]
+  - term: gear oil
+    definition: Lubricant of the gearbox; the manufacturer specifies its product and viscosity grade.
+    synonyms: {fr: [huile de multiplicateur, huile d'engrenage], de: [Getriebeöl]}
+    see_also: [topic:gearbox-lubrication]
+  - term: viscosity grade
+    definition: Classification of an industrial oil by its kinematic viscosity at 40 °C (ISO VG).
+    synonyms: {fr: [grade de viscosité], de: [Viskositätsklasse]}
+    see_also: [topic:gearbox-lubrication]
+  - term: oil filter element
+    definition: Replaceable filter cartridge of the gearbox oil circuit.
+    synonyms: {fr: [élément filtrant], de: [Ölfilterelement]}
+    see_also: [component:oil-filter]
+  - term: oil cooler
+    definition: Air/oil heat exchanger with a fan that removes heat from the gearbox oil.
+    synonyms: {fr: [refroidisseur d'huile], de: [Ölkühler]}
+    see_also: [component:oil-cooler, topic:gearbox-condition-monitoring]
+  - term: bearing
+    definition: Machine element that supports a rotating shaft.
+    synonyms: {fr: [roulement], de: [Lager]}
+    see_also: [topic:gearbox-condition-monitoring]
+  - term: vibration velocity
+    definition: Vibration level expressed as the RMS value of the velocity, in mm/s.
+    synonyms: {fr: [vitesse vibratoire], de: [Schwinggeschwindigkeit]}
+    see_also: [topic:gearbox-condition-monitoring]
+  - term: oil analysis
+    definition: Laboratory analysis of an oil sample (wear metals, water, viscosity, particles).
+    synonyms: {fr: [analyse d'huile], de: [Ölanalyse]}
+    see_also: [topic:gearbox-condition-monitoring]
+  - term: lockout/tagout
+    definition: Isolation of all energy sources with personal padlocks and tags before work starts.
+    synonyms: {fr: [consignation], de: [Freischaltung]}
+    see_also: [procedure:sop-loto-001, topic:safety-and-access]
+  - term: working at height
+    definition: Work where a person could fall, such as climbing a tower or working in the nacelle.
+    synonyms: {fr: [travail en hauteur], de: [Arbeiten in der Höhe]}
+    see_also: [procedure:sop-wah-003, topic:safety-and-access]
+  - term: rescue kit
+    definition: Sealed kit with a descent device used to lower a casualty from the nacelle.
+    synonyms: {fr: [kit de sauvetage], de: [Rettungsset]}
+    see_also: [component:rescue-kit]
+  - term: exclusion zone
+    definition: Area that nobody enters during work above it or during a lift.
+    synonyms: {fr: [zone d'exclusion], de: [Sperrbereich]}
+    see_also: [topic:safety-and-access]
+  - term: near miss
+    definition: Unplanned event that could have caused harm but did not.
+    synonyms: {fr: [presque accident], de: [Beinaheunfall]}
+    see_also: [topic:safety-and-access]
+  - term: service bulletin
+    definition: Instruction from the turbine manufacturer that changes maintenance requirements or parts.
+    synonyms: {fr: [bulletin de service], de: [Service-Bulletin]}
+    see_also: [topic:gearbox-lubrication]
+  - term: management of change
+    definition: Formal review and approval of a technical or organisational change before it is made.
+    synonyms: {fr: [gestion des modifications], de: [Änderungsmanagement]}
+    see_also: [topic:gearbox-lubrication]
+  - term: work order
+    definition: Record of a maintenance job with its turbine, parts, dates and status.
+    synonyms: {fr: [ordre de travail, OT], de: [Arbeitsauftrag]}
+    see_also: [topic:spare-parts-and-supply]
+  - term: spare part
+    definition: Part kept in stock to repair or maintain the turbines.
+    synonyms: {fr: [pièce de rechange], de: [Ersatzteil]}
+    see_also: [topic:spare-parts-and-supply]
+  - term: minimum stock level
+    definition: Quantity below which a part must be reordered.
+    synonyms: {fr: [stock minimum], de: [Mindestbestand]}
+    see_also: [topic:spare-parts-and-supply]
+  - term: delivery date
+    definition: Date on which a supplier delivers ordered parts.
+    synonyms: {fr: [date de livraison], de: [Liefertermin]}
+    see_also: [topic:spare-parts-and-supply]
+  - term: curtailment
+    definition: Deliberate reduction or stop of power production, for example because of permit conditions or a grid limit.
+    synonyms: {fr: [bridage], de: [Abregelung, Abschaltung]}
+    see_also: [topic:environmental-compliance, topic:grid-operations]
+  - term: environmental permit
+    definition: Authorisation issued by the environmental regulator with conditions on the operation of the site.
+    synonyms: {fr: [autorisation environnementale], de: [Umweltgenehmigung]}
+    see_also: [topic:environmental-compliance]
+  - term: generator brush
+    definition: Carbon brush that carries current to the generator rotor through the slip ring.
+    synonyms: {fr: [balai de génératrice, balai], de: [Generatorbürste, Kohlebürste]}
+    see_also: [component:generator-brushes, topic:generator-and-electrical]
+  - term: slip ring
+    definition: Rotating ring on the generator shaft on which the brushes slide.
+    synonyms: {fr: [bague collectrice], de: [Schleifring]}
+    see_also: [component:slip-ring]
+  - term: rotor blade
+    definition: One of the three blades of the rotor.
+    synonyms: {fr: [pale], de: [Rotorblatt]}
+    see_also: [component:rotor-blade, topic:blades-and-rotor]
+  - term: leading-edge erosion
+    definition: Wear of the front edge of a blade by rain, hail and particles.
+    synonyms: {fr: [érosion du bord d'attaque], de: [Vorderkantenerosion]}
+    see_also: [topic:blades-and-rotor]
+  - term: pitch bearing
+    definition: Bearing that connects a blade to the hub and lets the blade turn about its axis.
+    synonyms: {fr: [roulement de pale], de: [Blattlager]}
+    see_also: [component:pitch-bearing, topic:blades-and-rotor]
+  - term: lift plan
+    definition: Plan of a crane lift with loads, radius, weather limits and exclusion zone.
+    synonyms: {fr: [plan de levage], de: [Hebeplan]}
+    see_also: [topic:blades-and-rotor]
+  - term: shift handover
+    definition: Note passed from one shift to the next with the status of turbines and open work.
+    synonyms: {fr: [note de relève], de: [Schichtübergabe]}
+    see_also: [topic:training-and-onboarding]
+  - term: toolbox talk
+    definition: Short safety briefing held with the team before work.
+    synonyms: {fr: [causerie sécurité], de: [Sicherheitsunterweisung]}
+    see_also: [topic:training-and-onboarding]
+  - term: SCADA
+    definition: Supervisory control and data acquisition system that records turbine alarms and status changes.
+    synonyms: {fr: [SCADA], de: [SCADA]}
+    see_also: [topic:gearbox-condition-monitoring]
+  - term: operating hours
+    definition: Time during which a machine has been running.
+    synonyms: {fr: [heures de fonctionnement], de: [Betriebsstunden]}
+    see_also: [topic:gearbox-lubrication]
+  - term: run-in
+    definition: Period of reduced load after new parts are fitted.
+    synonyms: {fr: [rodage], de: [Einlaufen]}
+    see_also: [topic:generator-and-electrical]

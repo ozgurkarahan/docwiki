@@ -1,0 +1,5 @@
+# Reviewed false positives of the leak guard.
+# Format: LG-xxxxxxxxxx  # reason   (the id is printed by the scanner; the reason is mandatory)
+# The id is a fingerprint of rule + file + matched text, so one entry covers every occurrence
+# of that text in that file (and in its history). Deny-list findings can never be ignored.
+# Prefer fixing the content or extending an allowlist; keep this list short and reviewed.

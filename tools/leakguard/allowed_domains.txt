@@ -1,0 +1,19 @@
+# Domains accepted by the leak guard in e-mail addresses (rule "email") and host names
+# (rule "internal-host"). Built in, always allowed: example.com, example.org and
+# users.noreply.github.com (the GitHub noreply author address).
+#
+# One entry per line (inline "# comments" allowed):
+#   domain.tld     the domain and all of its subdomains
+#   .suffix        every domain that ends with the suffix (reserved test TLDs)
+#   user@domain    exactly one address
+#
+# Fictional sample domains must come from samples/fiction/bible.yaml. Prefer the reserved
+# ".example" top-level domain (RFC 2606), for example: contoso-renewables.example
+
+example.net                # RFC 2606 reserved
+.example                   # RFC 2606 reserved top-level domain
+.test                      # RFC 2606 reserved top-level domain
+.invalid                   # RFC 2606 reserved top-level domain
+.localhost                 # RFC 2606 reserved top-level domain
+git@github.com             # SSH remote user of GitHub, not a person
+noreply@github.com         # GitHub system sender, not a person

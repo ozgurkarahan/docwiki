@@ -1,0 +1,46 @@
+# Foundry prompt agent, deployed by agents/deploy.py (one new version per definition change).
+# Schema: docwiki.agents_client.definitions.AgentDefinition. ${NAME} values come from the
+# environment at deploy time; nothing environment-specific is stored here.
+name: docwiki-researcher
+description: >-
+  Answers questions from the DocWiki wiki with verifiable citations to evidence sidecars
+  (read-only MCP tools).
+model: ${DOCWIKI_SMART_DEPLOYMENT}
+instructions_file: instructions.md
+tools:
+  - type: mcp
+    server_label: docwiki
+    server_url_env: DOCWIKI_MCP_URL
+    allowed_tools:
+      - search
+      - read_page
+      - get_index
+      - get_links
+      - glossary
+      - get_evidence
+      - query_table
+      - get_skill
+      - list_skills
+      - recent_changes
+    require_approval:
+      always: []
+      never:
+        - search
+        - read_page
+        - get_index
+        - get_links
+        - glossary
+        - get_evidence
+        - query_table
+        - get_skill
+        - list_skills
+        - recent_changes
+    auth:
+      # ADR 0003 (accepted): the agent's own Entra agent identity, through the
+      # AgenticIdentityToken project connection named by DOCWIKI_MCP_CONNECTION.
+      strategy: per-agent-identity
+      connection_env: DOCWIKI_MCP_CONNECTION
+      app_roles: [Wiki.Read]
+metadata:
+  docwiki_agent: researcher
+  docwiki_spec: mcp-and-agents.md section 2

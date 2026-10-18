@@ -1,0 +1,13 @@
+topics:
+  - slug: gearbox-oil
+    title: Gearbox oil
+    description: Oil grade, change intervals and oil analysis.
+    keywords: [gearbox oil, oil grade, viscosity grade, oil change]
+    aliases:
+      - {text: huile de boîte de vitesses, lang: fr}
+      - {text: Getriebeöl, lang: de}
+  - slug: cold-weather
+    title: Cold-weather operation
+    keywords: [cold weather, low temperature]
+    min_score: 2
+    min_sources: 1

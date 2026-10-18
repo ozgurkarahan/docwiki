@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "docwiki.ingest/v1 queue message",
+  "$defs": {
+    "QueueScope": {
+      "additionalProperties": false,
+      "description": "Optional narrowing: explicit sources and/or a raw path prefix (``None`` = everything).",
+      "properties": {
+        "source_ids": {
+          "default": [],
+          "items": {
+            "pattern": "^src-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "prefix": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prefix"
+        }
+      },
+      "title": "QueueScope",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Wake-up message for the ingest job; ``hints`` may carry ``operator_notes`` (reviewed).",
+  "properties": {
+    "schema": {
+      "const": "docwiki.ingest/v1",
+      "default": "docwiki.ingest/v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "ingest",
+        "recompile",
+        "rebuild",
+        "reconcile"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "scope": {
+      "$ref": "#/$defs/QueueScope"
+    },
+    "hints": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {},
+      "title": "Hints",
+      "type": "object"
+    },
+    "requested_by": {
+      "enum": [
+        "librarian",
+        "event",
+        "cli",
+        "schedule"
+      ],
+      "title": "Requested By",
+      "type": "string"
+    },
+    "idempotency_key": {
+      "minLength": 1,
+      "title": "Idempotency Key",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "requested_by",
+    "idempotency_key",
+    "created_at"
+  ],
+  "type": "object"
+}

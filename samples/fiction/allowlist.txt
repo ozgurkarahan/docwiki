@@ -1,0 +1,387 @@
+Ablagerungen
+Abregelung
+Abschaltung
+Acknowledged
+Action
+Adventure Works
+Adventure Works Industrial Supply
+Alarm
+Alert
+Amara Teodorescu
+Anlage
+Anzugsmoment
+Append-only
+Approuvé
+Arbeiten
+Arbeitsauftrag
+Arbeitssicherheit
+At
+AUD
+Außenringe
+Authoring
+AWI
+Azimutsystem
+Azure
+Beinaheunfall
+Betriebsstunden
+BIGINT
+Bin
+Blameless
+Blattlager
+Blattlagerschrauben
+Bram Okkerse
+Bullet
+Callum Rydings
+CANARY-B08DE0CB
+Category
+Champ
+Check
+CHK
+City Power & Light
+Classification
+Client
+Climate
+Closure
+Coating
+Code
+Cold
+Commissioned
+Compliance
+Contoso
+Contoso Renewables
+Control
+Coordinates
+coreProperties
+Corporate HSE Auditor
+Cosmetic
+CPL-CI
+Cr
+Cu
+Curated
+Curtailed
+Customer
+Dario Penwarden
+Database Administrator
+Date
+degC
+Deliberate
+Description
+DN
+docProps
+DocWiki
+Draining
+Drone
+Due
+Easting
+Ecology
+Einbau
+Eine
+Einlaufen
+Elevation
+Elise Ternaux
+Engineering Manager
+English
+Entry
+EP
+Erosion
+Ersatzteil
+EUR
+Expected
+Exploded
+Export
+Fabrikam
+Fabrikam FGT-3200
+Fabrikam Getriebetechnik GmbH
+Fasteners
+Fe
+FGT-P
+Field Service Engineer
+Filed
+Finding
+Fledermaus
+Freischaltung
+From
+Für
+GBX
+Gelcoat
+Generatorbürste
+Generatorbürsten
+Getriebe
+Getriebeöl
+Getriebeölwechsel
+Greta Vollan
+GS
+Hebeplan
+Hello
+Henrik Saltvedt
+Hi
+Highest
+HSE Coordinator
+HSS
+Hydrauliksystem
+Höhe
+ICP
+Imogen Thackwray
+IMS
+Indexation
+Installation
+Intermediate
+Interval
+Investigated
+Item
+January
+Joint
+Jun Hallgarth
+Katrin Ostermeier
+KOH
+Kohlebürste
+Kubernetes
+Lager
+Lagerdeckelschrauben
+Language
+Last
+LB
+Lead Blade Inspector
+Lead Wind Technician
+Leading
+Leilani Hartfield
+LF
+Lieferantenhinweis
+Liefertermin
+Lieferzeit
+Lift Planner (Appointed Person)
+Litware
+Litware LT-32
+Litware Wind Systems
+LP
+LSS
+LT-32 CCV
+Lubricant
+Luftfracht
+LWS-MM-GBX
+LWS-P
+LWS-TS
+Lüftermotor
+Mal
+Mandatory
+Maren Ellingsby
+Markdown
+Meaning
+Message
+Method
+MIN
+Mindestbestand
+Mixing
+MM-01 met mast
+MOD
+Modification
+Movements
+MP-BLD
+MP-GBX
+MP-GEN
+MP-HSE
+MP-HYD
+MP-PIT
+MP-YAW
+Near
+Network
+Netzbetreiber
+Nightly
+Nitrile
+Northing
+O&M Supervisor
+Obtenir
+Oil
+Ordering
+Oskar Vennholm
+OT
+Owner
+PAO
+Parameter
+Payment
+Permitting Officer
+Planetenstufe
+Planned
+Pollution
+Possible
+PostgreSQL
+Postmortem
+PQ
+PRC-DB
+Proseware
+Proseware Lubricants
+Proseware PWG 220
+Proseware PWG 320
+PWS
+Python
+Quantity
+Quellmoor
+Quellmoor Ridge
+Quellmoor Ridge O&M building
+Quellmoor Ridge substation
+Quellmoor Ridge Wind Farm
+RB-CHK
+RB-NTF
+RB-RPT
+RB-TKT
+re:A\d{4}
+re:AUD-\d{4}-\d{2}
+re:AWI-\d{5}
+re:CHK-\d{2}
+re:CPL-CI-\d{4}-\d{3}
+re:EP-\d{4}-\d{4}
+re:FGT-3200-\d{2}-\d{5}
+re:FGT-P-\d{5}
+re:GBX_TMIN_START
+re:INC-\d{4}-\d{3}
+re:LB575-\d{2}-\d{4}
+re:LP-\d{4}-\d{3}
+re:LT32-\d{2}-\d{4}
+re:LWS-MM-[A-Z]{3}-\d{2}
+re:LWS-P-\d{5}
+re:LWS-TS-\d{5}
+re:MM-\d{2}
+re:MOC-\d{4}-\d{3}
+re:MP-[A-Z]{3}-\d{2}
+re:PM-\d{4}-\d{3}
+re:PO-\d{5}
+re:PRC-[A-Z]{2}-\d{3}
+re:PWS-\d{3}-D\d{3}
+re:RB-[A-Z]{3}-\d{3}
+re:S\d{3}
+re:SB-LWS-\d{4}-\d{2}
+re:SEV[1-4]
+re:SOP-[A-Z]{3,4}-\d{3}
+re:SPL-\d{3}
+re:TR-\d{2}-\d{5}
+re:TR-OA-\d{4}-\d{4}
+re:TS-600C-\d{2}
+re:WBS-\d{4}-\d{3}
+re:WI-[A-Z]{3}-\d{3}
+re:WO-\d{2}-\d{4}
+re:WTG-\d{2}
+Reason
+Recommended
+Reconstruct
+Recurring
+Relecloud
+Reliability Engineer
+Relief
+Reorder
+Replace
+Replaceable
+Report
+Reporting
+Required
+Result
+Rettungsset
+Rev
+RevA
+RevB
+RevC
+RevD
+Revise
+Rotations
+Rotorblatt
+RPO
+RTO
+Runbook
+Ruth Kessington
+Rédigé
+Rédigée
+Rückfragen
+Sampled
+SB-LWS
+Schichtübergabe
+Schleifring
+Schulung
+Schwinggeschwindigkeit
+SDEA
+Sealing
+Semantics
+Senior Lubrication Analyst
+Serviceaufzug
+SEV
+Shortest
+Sicherheitsunterweisung
+Silicon
+Siobhan Carrick
+Site Manager
+Site Reliability Engineering Lead
+Skelvane
+Skelvane 132 kV substation
+Skelvane District Environmental Authority
+Skelvane Wood
+Slip
+SLO
+SOP-GBX
+SOP-LOTO
+SOP-WAH
+Specification
+Sperrbereich
+Standardarbeitsanweisung
+Status
+Stores and Spare Parts Coordinator
+Summarise
+Supervisory
+SW
+tableStyleId
+Tailspin
+Tailspin Heavy Lift
+Task
+TBT
+Technical Support Engineer
+Test
+The
+Thread
+Thunderstorm
+TicketingApiDown
+TicketingApiErrorRate
+TicketingApiHighLatency
+TicketingApiPoolSaturation
+Tightening
+TMIN
+To
+Tomasz Lebrecht
+TR-OA
+Trey Research
+Trey Research Laboratories
+TS-600C
+TTL
+Turbine
+TXT
+Umstellung
+Umweltgenehmigung
+Undefined
+Uninterruptible
+Unit
+Valeur
+Validity
+Value
+VARCHAR
+Vereisung
+Verfügung
+Version
+Viskositätsklasse
+Vorderkantenerosion
+WBS
+WI-GEN
+Wind Technician
+Windpark
+Wingtip
+Wingtip Blade Services
+WTG-NN
+Wärmebehandlung
+Yusuf Arkwell
+Zeitpunkt
+Änderungsmanagement
+Élise Ternaux
+Ölanalyse
+Ölfilter
+Ölfilterelement
+Ölheizung
+Ölkühler
+Ölkühlers
+Ölprobe
+Ölumstellung
+Ölwechsel

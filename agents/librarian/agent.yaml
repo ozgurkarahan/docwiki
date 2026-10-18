@@ -1,0 +1,65 @@
+# Foundry prompt agent, deployed by agents/deploy.py (one new version per definition change).
+# Schema: docwiki.agents_client.definitions.AgentDefinition. ${NAME} values come from the
+# environment at deploy time; nothing environment-specific is stored here.
+name: docwiki-librarian
+description: >-
+  Operates and maintains the DocWiki pipeline: starts ingests, watches runs, diagnoses failed
+  sources, proposes fixes, reviews proposals and writes health reports.
+model: ${DOCWIKI_SMART_DEPLOYMENT}
+instructions_file: instructions.md
+tools:
+  - type: mcp
+    server_label: docwiki
+    server_url_env: DOCWIKI_MCP_URL
+    allowed_tools:
+      - search
+      - read_page
+      - get_index
+      - get_links
+      - glossary
+      - get_evidence
+      - query_table
+      - get_skill
+      - list_skills
+      - recent_changes
+      - ingest_start
+      - run_status
+      - list_sources
+      - quality_report
+      - explain_source
+      - recompile
+      - list_proposals
+      - decide_proposal
+      - write_health_report
+    require_approval:
+      # Mutating tools: a human approves every call.
+      always:
+        - ingest_start
+        - recompile
+        - decide_proposal
+      never:
+        - search
+        - read_page
+        - get_index
+        - get_links
+        - glossary
+        - get_evidence
+        - query_table
+        - get_skill
+        - list_skills
+        - recent_changes
+        - run_status
+        - list_sources
+        - quality_report
+        - explain_source
+        - list_proposals
+        - write_health_report
+    auth:
+      # ADR 0003 (accepted): the agent's own Entra agent identity, through the
+      # AgenticIdentityToken project connection named by DOCWIKI_MCP_CONNECTION.
+      strategy: per-agent-identity
+      connection_env: DOCWIKI_MCP_CONNECTION
+      app_roles: [Wiki.Read, Wiki.Operate]
+metadata:
+  docwiki_agent: librarian
+  docwiki_spec: mcp-and-agents.md section 2

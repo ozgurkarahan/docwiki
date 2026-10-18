@@ -1,0 +1,20 @@
+{
+  "servers": {
+    "docwiki": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--extra",
+        "mcp",
+        "python",
+        "-m",
+        "docwiki.mcp.server",
+        "--stdio",
+        "--release",
+        "samples/wiki"
+      ],
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}

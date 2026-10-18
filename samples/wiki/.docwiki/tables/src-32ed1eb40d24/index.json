@@ -1,0 +1,92 @@
+{
+  "schema": 1,
+  "source_id": "src-32ed1eb40d24",
+  "sensitivity": "public",
+  "tables": [
+    {
+      "id": "t01",
+      "file": "t01.parquet",
+      "locator": {
+        "kind": "csv-rows",
+        "row_start": 1,
+        "row_end": 36
+      },
+      "provenance": "deterministic-table",
+      "columns": [
+        {
+          "name": "date",
+          "header": "date",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "turbine",
+          "header": "turbine",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "sensor",
+          "header": "sensor",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "velocity_rms_mm_s",
+          "header": "velocity_rms_mm_s",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "envelope_ge",
+          "header": "envelope_ge",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "oil_temp_avg_c",
+          "header": "oil_temp_avg_c",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "power_avg_kw",
+          "header": "power_avg_kw",
+          "type": "BIGINT"
+        }
+      ],
+      "row_count": 35,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006",
+        "r0007",
+        "r0008",
+        "r0009",
+        "r0010",
+        "r0011",
+        "r0012",
+        "r0013",
+        "r0014",
+        "r0015",
+        "r0016",
+        "r0017",
+        "r0018",
+        "r0019",
+        "r0020",
+        "r0021",
+        "r0022",
+        "r0023",
+        "r0024",
+        "r0025",
+        "r0026",
+        "r0027",
+        "r0028",
+        "r0029",
+        "r0030",
+        "r0031",
+        "r0032",
+        "r0033",
+        "r0034",
+        "r0035",
+        "r0036"
+      ]
+    }
+  ]
+}

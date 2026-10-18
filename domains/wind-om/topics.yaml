@@ -1,0 +1,87 @@
+# Closed topic catalog of the wind-om pack (10 topics). Keywords and aliases are matched
+# case-insensitively on word boundaries in titles, headings and body text.
+topics:
+  - slug: gearbox-lubrication
+    title: Gearbox lubrication and oil changes
+    description: Gear oil specification, viscosity grade changes, oil changes, flushing, filters and oil level checks.
+    keywords: [gear oil, gearbox oil, oil change, viscosity, viscosity grade, ISO VG, PWG 220, PWG 320, flush, oil filter, filter element, lubrication, sight glass, oil level]
+    aliases:
+      - {text: huile de multiplicateur, lang: fr}
+      - {text: vidange, lang: fr}
+      - {text: Getriebeöl, lang: de}
+      - {text: Ölwechsel, lang: de}
+      - {text: Ölfilter, lang: de}
+  - slug: gearbox-condition-monitoring
+    title: Gearbox temperature, vibration and oil analysis
+    description: Gearbox over-temperature alarms, cooling, vibration trends, oil analysis results and bearing condition.
+    keywords: [over-temperature, oil temperature, A2101, A2102, oil cooler, cooler fan, radiator, vibration, velocity RMS, HSS bearing, bearing, oil analysis, iron, PQ index, endoscope]
+    aliases:
+      - {text: roulement, lang: fr}
+      - {text: analyse d'huile, lang: fr}
+      - {text: HSS-Lager, lang: de}
+      - {text: Ölprobe, lang: de}
+  - slug: environmental-compliance
+    title: Environmental permit and night curtailment
+    description: Permit conditions on noise, shadow flicker, ice, pollution and bat protection, and the resulting turbine curtailment.
+    keywords: [environmental permit, permit condition, curtailment, bat, bat protection, noise, shadow flicker, S420, annual report, spill]
+    aliases:
+      - {text: bridage, lang: fr}
+      - {text: autorisation environnementale, lang: fr}
+      - {text: Fledermaus, lang: de}
+      - {text: Abschaltung, lang: de}
+  - slug: grid-operations
+    title: Grid connection and grid operator instructions
+    description: Grid connection, export limits and curtailment instructions from the grid operator.
+    keywords: [grid, export limit, curtailment instruction, network control, S430, setpoint, ramp rate, 132 kV, substation]
+    aliases:
+      - {text: réseau, lang: fr}
+      - {text: Netzbetreiber, lang: de}
+  - slug: spare-parts-and-supply
+    title: Spare parts, stock levels and supply
+    description: Stock on hand, minimum levels, purchase orders, delivery dates and work orders waiting for parts.
+    keywords: [spare part, stock, minimum level, on hand, purchase order, lead time, delivery, shortage, waiting for parts, part number]
+    aliases:
+      - {text: pièce de rechange, lang: fr}
+      - {text: Liefertermin, lang: de}
+      - {text: Lieferzeit, lang: de}
+      - {text: Ersatzteil, lang: de}
+  - slug: safety-and-access
+    title: Safety, isolation and work at height
+    description: Lockout/tagout, permits to work, working at height, rescue, dropped objects and safety audit findings.
+    keywords: [lockout, tagout, padlock, PTW, permit, working at height, rescue, rescue kit, exclusion zone, dropped object, tool tether, near miss, audit, finding]
+    aliases:
+      - {text: consignation, lang: fr}
+      - {text: travail en hauteur, lang: fr}
+      - {text: Arbeitssicherheit, lang: de}
+  - slug: blades-and-rotor
+    title: Blades, pitch bearings and main-component lifts
+    description: Blade inspections and damage, pitch bearing bolts and crane lifts for main components.
+    keywords: [blade, rotor blade, trailing edge, leading-edge erosion, crack, lightning receptor, pitch bearing, bolt, re-torque, crane, lift plan]
+    aliases:
+      - {text: pale, lang: fr}
+      - {text: Rotorblatt, lang: de}
+      - {text: Blattlager, lang: de}
+  - slug: generator-and-electrical
+    title: Generator brushes and electrical systems
+    description: Generator brushes, slip rings, generator temperatures and electrical alarms.
+    keywords: [generator, brush, generator brush, slip ring, A3210, winding temperature, 690 V]
+    aliases:
+      - {text: balais, lang: fr}
+      - {text: génératrice, lang: fr}
+      - {text: bague collectrice, lang: fr}
+      - {text: Generatorbürste, lang: de}
+  - slug: cold-climate-operation
+    title: Cold-climate operation and icing
+    description: Cold starts, oil heating, start-up temperatures, icing and winter safety.
+    keywords: [cold start, cold weather, ice, icing, A7001, heater, start-up temperature, CCV, winter]
+    aliases:
+      - {text: givre, lang: fr}
+      - {text: grand froid, lang: fr}
+      - {text: Vereisung, lang: de}
+  - slug: training-and-onboarding
+    title: Training, site rules and acronyms
+    description: Induction, site rules, toolbox talks, single-point lessons and the acronyms used on site.
+    keywords: [onboarding, induction, site rules, toolbox talk, single-point lesson, acronym, training, quiz]
+    aliases:
+      - {text: formation, lang: fr}
+      - {text: Schulung, lang: de}

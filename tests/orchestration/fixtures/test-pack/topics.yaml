@@ -1,0 +1,12 @@
+topics:
+  - slug: gearbox-oil
+    title: Gearbox oil
+    description: Oil grade and oil change of the gearboxes.
+    keywords: [gearbox oil, oil grade, ISO VG]
+    aliases:
+      - {text: huile de boîte de vitesses, lang: fr}
+    min_score: 2
+    min_sources: 2
+  - slug: blade-inspection
+    title: Blade inspection
+    keywords: [blade inspection, leading edge]

@@ -1,0 +1,17 @@
+# Reviewed exemptions for third-party code that the Quartz site generator bundles into a built
+# site (scan --site). Only files matching a "file" glob are vendor bundles, and only the findings
+# listed by an "allow" entry are dropped there. Everything else in those files (deny-list terms,
+# tokens, other addresses or URLs) and every content page stays fully scanned.
+#
+# file <glob>                          path inside the site folder ("**/" matches any folders)
+# allow <rule> re:<regex>  # reason    the matched text fully matches the regex
+# allow <rule> sha256:<hex>  # reason  sha256 of the matched text starts with <hex>; use it for
+#                                      personal data (licence-header addresses) so that the data
+#                                      itself is never written into this repository
+# The reason comment is mandatory. Deny-list findings can never be exempted.
+# To review an entry, scan the site with an empty list: --site-vendor <empty file>.
+
+file **/prescript.js
+file **/postscript.js
+
+allow email sha256:c57b31c04075b96b  # author address in the licence header of the bundled "filesize" npm package (Quartz v4.5.2)

@@ -1,0 +1,68 @@
+# DocWiki LLM price table - USD per 1 million tokens.
+#
+# !!! PLACEHOLDER PRICES - NOT VERIFIED !!!
+# These values are rough public list prices kept for development and tests only. They are NOT
+# authoritative and may be wrong for your region, deployment type (Global, Data Zone, Regional),
+# commitment or date. Before relying on cost receipts, copy this file, verify every price against
+# the official Azure pricing pages, set `verified: true` (globally or per model) and point
+# DOCWIKI_LLM_PRICE_TABLE at your copy. Receipts built from unverified prices report
+# `prices_verified: false`.
+#
+# Lookup order for a call: `deployments` mapping below, then the model id configured for the tier
+# (DOCWIKI_FAST_MODEL / DOCWIKI_SMART_MODEL), then the model id reported by the service, then the
+# deployment name. A model id matches exactly or as the longest `<model>-` prefix, so a reported
+# `gpt-4.1-mini-2025-04-14` uses the `gpt-4.1-mini` row. `cached_input` defaults to `input`.
+format: docwiki.llm.prices/v1
+currency: USD
+unit: per_1m_tokens
+verified: false
+source: "placeholder - verify at https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/"
+models:
+  # Global Standard list prices observed in October 2026 (Data Zone Standard is about 10 % higher:
+  # gpt-5.5 6.00 / 0.60 / 36.00, gpt-5.4-mini 0.90 / 0.09 / 5.40); verify before relying on receipts.
+  gpt-5.5:
+    input: 5.00
+    cached_input: 0.50
+    output: 30.00
+  gpt-5.4-mini:
+    input: 0.75
+    cached_input: 0.075
+    output: 4.50
+  gpt-4.1:
+    input: 2.00
+    cached_input: 0.50
+    output: 8.00
+  gpt-4.1-mini:
+    input: 0.40
+    cached_input: 0.10
+    output: 1.60
+  gpt-4.1-nano:
+    input: 0.10
+    cached_input: 0.025
+    output: 0.40
+  gpt-4o:
+    input: 2.50
+    cached_input: 1.25
+    output: 10.00
+  gpt-4o-mini:
+    input: 0.15
+    cached_input: 0.075
+    output: 0.60
+  gpt-5:
+    input: 1.25
+    cached_input: 0.125
+    output: 10.00
+  gpt-5-mini:
+    input: 0.25
+    cached_input: 0.025
+    output: 2.00
+  gpt-5-nano:
+    input: 0.05
+    cached_input: 0.005
+    output: 0.40
+  o4-mini:
+    input: 1.10
+    cached_input: 0.275
+    output: 4.40
+# Optional mapping from deployment name to model id (deployment names are environment specific).
+deployments: {}

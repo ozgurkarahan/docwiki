@@ -1,0 +1,542 @@
+{
+  "schema": 1,
+  "release_id": "20260215T090000Z-decd4b59",
+  "audience": "public",
+  "generated_at": "2026-02-15T09:00:00Z",
+  "pages": [
+    {
+      "id": "meta:agents",
+      "type": "meta",
+      "path": "AGENTS.md",
+      "title": "Agent guide",
+      "summary": "How agents should use this wiki: page types, navigation, citations, skills and safety.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [],
+      "entities": [],
+      "topics": [],
+      "sources": [],
+      "lang": "en"
+    },
+    {
+      "id": "meta:quality",
+      "type": "meta",
+      "path": "_meta/quality.md",
+      "title": "Quality report",
+      "summary": "Gate results of this release.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [],
+      "entities": [],
+      "topics": [],
+      "sources": [],
+      "lang": "en"
+    },
+    {
+      "id": "index:entities/asset",
+      "type": "index",
+      "path": "entities/asset/index.md",
+      "title": "Assets",
+      "summary": "Turbines and major components.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [],
+      "entities": [],
+      "topics": [],
+      "sources": [],
+      "lang": "en"
+    },
+    {
+      "id": "asset:wtg-07",
+      "type": "entity",
+      "path": "entities/asset/wtg-07.md",
+      "title": "WTG-07",
+      "summary": "Turbine WTG-07 of the fictional Contoso Renewables wind farm.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [
+        "asset",
+        "turbine"
+      ],
+      "entities": [],
+      "topics": [],
+      "sources": [
+        "src-43c97f7dfcde",
+        "src-4d9c65e05302"
+      ],
+      "lang": "en"
+    },
+    {
+      "id": "asset:wtg-12",
+      "type": "entity",
+      "path": "entities/asset/wtg-12.md",
+      "title": "WTG-12",
+      "summary": "Turbine WTG-12 of the fictional Contoso Renewables wind farm.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [
+        "asset",
+        "turbine"
+      ],
+      "entities": [],
+      "topics": [],
+      "sources": [
+        "src-43c97f7dfcde"
+      ],
+      "lang": "en"
+    },
+    {
+      "id": "index:entities",
+      "type": "index",
+      "path": "entities/index.md",
+      "title": "Entities",
+      "summary": "Entity types of this wiki and their pages.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [],
+      "entities": [],
+      "topics": [],
+      "sources": [],
+      "lang": "en"
+    },
+    {
+      "id": "index:entities/organisation",
+      "type": "index",
+      "path": "entities/organisation/index.md",
+      "title": "Organisations",
+      "summary": "Organisations referenced by the sources.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [],
+      "entities": [],
+      "topics": [],
+      "sources": [],
+      "lang": "en"
+    },
+    {
+      "id": "organisation:litware",
+      "type": "entity",
+      "path": "entities/organisation/litware.md",
+      "title": "Litware",
+      "summary": "Litware, the fictional turbine OEM that supplies the gearboxes.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [
+        "oem",
+        "organisation"
+      ],
+      "entities": [],
+      "topics": [],
+      "sources": [
+        "src-4d9c65e05302",
+        "src-f2750f41f3fa"
+      ],
+      "lang": "en"
+    },
+    {
+      "id": "glossary",
+      "type": "glossary",
+      "path": "glossary.md",
+      "title": "Glossary",
+      "summary": "Terms with definitions, multilingual synonyms and links.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [],
+      "entities": [],
+      "topics": [],
+      "sources": [],
+      "lang": "en"
+    },
+    {
+      "id": "index:home",
+      "type": "index",
+      "path": "index.md",
+      "title": "Contoso Renewables mock wiki",
+      "summary": "Home of the hand-made mock release: purpose, navigation, topics, stats and recent changes.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [],
+      "entities": [],
+      "topics": [],
+      "sources": [],
+      "lang": "en"
+    },
+    {
+      "id": "log",
+      "type": "log",
+      "path": "log.md",
+      "title": "Log",
+      "summary": "Append-only change log of this wiki.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [],
+      "entities": [],
+      "topics": [],
+      "sources": [],
+      "lang": "en"
+    },
+    {
+      "id": "query:2026-02-12-cold-site-gearbox-oil",
+      "type": "query",
+      "path": "queries/2026-02-12-cold-site-gearbox-oil.md",
+      "title": "Which gearbox oil grade applies to WTG-07 in winter?",
+      "summary": "ISO VG 220 per the current procedure; the 2026 plan still lists ISO VG 320.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [
+        "gearbox",
+        "oil"
+      ],
+      "entities": [],
+      "topics": [],
+      "sources": [
+        "src-43c97f7dfcde",
+        "src-4d9c65e05302"
+      ],
+      "lang": "en"
+    },
+    {
+      "id": "index:sources",
+      "type": "index",
+      "path": "sources/index.md",
+      "title": "Sources",
+      "summary": "All sources grouped by category, with status and sensitivity.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [],
+      "entities": [],
+      "topics": [],
+      "sources": [],
+      "lang": "en"
+    },
+    {
+      "id": "src-43c97f7dfcde",
+      "type": "source",
+      "path": "sources/maintenance-plan-2026.md",
+      "title": "Maintenance plan 2026",
+      "summary": "Fictional 2026 maintenance plan listing planned tasks per turbine.",
+      "sensitivity": "public",
+      "status": "current",
+      "tags": [
+        "maintenance",
+        "plan"
+      ],
+      "entities": [
+        "asset:wtg-07",
+        "asset:wtg-12"
+      ],
+      "topics": [
+        "topic:gearbox-oil"
+      ],
+      "sources": [
+        "src-43c97f7dfcde"
+      ],
+      "lang": "en"
+    },
+    {
+      "id": "src-f2750f41f3fa",
+      "type": "source",
+      "path": "sources/sop-gbx-010-rev-a.md",
+      "title": "Gearbox oil change SOP rev A",
+      "summary": "Superseded revision A of the fictional gearbox oil change procedure SOP-GBX-010.",
+      "sensitivity": "public",
+      "status": "superseded",
+      "tags": [
+        "gearbox",
+        "procedure"
+      ],
+      "entities": [
+        "organisation:litware"
+      ],
+      "topics": [
+        "topic:gearbox-oil"
+      ],
+      "sources": [
+        "src-f2750f41f3fa"
+      ],
+      "lang": "en"
+    },
+    {
+      "id": "src-4d9c65e05302",
+      "type": "source",
+      "path": "sources/sop-gbx-010-rev-b.md",
+      "title": "Gearbox oil change SOP rev B",
+      "summary": "Current revision B of the fictional gearbox oil change procedure, with a cold-site oil grade.",
+      "sensitivity": "public",
+      "status": "current",
+      "tags": [
+        "cold-weather",
+        "gearbox",
+        "procedure"
+      ],
+      "entities": [
+        "asset:wtg-07",
+        "organisation:litware"
+      ],
+      "topics": [
+        "topic:gearbox-oil"
+      ],
+      "sources": [
+        "src-4d9c65e05302"
+      ],
+      "lang": "en"
+    },
+    {
+      "id": "topic:gearbox-oil",
+      "type": "topic",
+      "path": "topics/gearbox-oil.md",
+      "title": "Gearbox oil",
+      "summary": "Gearbox oil grade requirements, the cold-site change and the open plan contradiction.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [
+        "gearbox",
+        "oil"
+      ],
+      "entities": [],
+      "topics": [],
+      "sources": [
+        "src-43c97f7dfcde",
+        "src-4d9c65e05302",
+        "src-f2750f41f3fa"
+      ],
+      "lang": "en"
+    },
+    {
+      "id": "index:topics",
+      "type": "index",
+      "path": "topics/index.md",
+      "title": "Topics",
+      "summary": "Curated multi-source syntheses.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [],
+      "entities": [],
+      "topics": [],
+      "sources": [],
+      "lang": "en"
+    }
+  ],
+  "edges": [
+    {
+      "from": "asset:wtg-07",
+      "to": "src-43c97f7dfcde",
+      "kind": "cites"
+    },
+    {
+      "from": "asset:wtg-07",
+      "to": "src-4d9c65e05302",
+      "kind": "cites"
+    },
+    {
+      "from": "asset:wtg-07",
+      "to": "topic:gearbox-oil",
+      "kind": "related"
+    },
+    {
+      "from": "asset:wtg-12",
+      "to": "src-43c97f7dfcde",
+      "kind": "cites"
+    },
+    {
+      "from": "asset:wtg-12",
+      "to": "topic:gearbox-oil",
+      "kind": "related"
+    },
+    {
+      "from": "organisation:litware",
+      "to": "src-4d9c65e05302",
+      "kind": "cites"
+    },
+    {
+      "from": "organisation:litware",
+      "to": "topic:gearbox-oil",
+      "kind": "related"
+    },
+    {
+      "from": "query:2026-02-12-cold-site-gearbox-oil",
+      "to": "asset:wtg-07",
+      "kind": "related"
+    },
+    {
+      "from": "query:2026-02-12-cold-site-gearbox-oil",
+      "to": "src-43c97f7dfcde",
+      "kind": "cites"
+    },
+    {
+      "from": "query:2026-02-12-cold-site-gearbox-oil",
+      "to": "src-4d9c65e05302",
+      "kind": "cites"
+    },
+    {
+      "from": "query:2026-02-12-cold-site-gearbox-oil",
+      "to": "topic:gearbox-oil",
+      "kind": "related"
+    },
+    {
+      "from": "src-43c97f7dfcde",
+      "to": "asset:wtg-07",
+      "kind": "mentions"
+    },
+    {
+      "from": "src-43c97f7dfcde",
+      "to": "asset:wtg-12",
+      "kind": "mentions"
+    },
+    {
+      "from": "src-43c97f7dfcde",
+      "to": "topic:gearbox-oil",
+      "kind": "related"
+    },
+    {
+      "from": "src-4d9c65e05302",
+      "to": "asset:wtg-07",
+      "kind": "mentions"
+    },
+    {
+      "from": "src-4d9c65e05302",
+      "to": "organisation:litware",
+      "kind": "mentions"
+    },
+    {
+      "from": "src-4d9c65e05302",
+      "to": "src-f2750f41f3fa",
+      "kind": "supersedes"
+    },
+    {
+      "from": "src-4d9c65e05302",
+      "to": "topic:gearbox-oil",
+      "kind": "related"
+    },
+    {
+      "from": "src-f2750f41f3fa",
+      "to": "organisation:litware",
+      "kind": "mentions"
+    },
+    {
+      "from": "src-f2750f41f3fa",
+      "to": "src-4d9c65e05302",
+      "kind": "related"
+    },
+    {
+      "from": "src-f2750f41f3fa",
+      "to": "topic:gearbox-oil",
+      "kind": "related"
+    },
+    {
+      "from": "topic:gearbox-oil",
+      "to": "asset:wtg-07",
+      "kind": "related"
+    },
+    {
+      "from": "topic:gearbox-oil",
+      "to": "asset:wtg-12",
+      "kind": "related"
+    },
+    {
+      "from": "topic:gearbox-oil",
+      "to": "organisation:litware",
+      "kind": "related"
+    },
+    {
+      "from": "topic:gearbox-oil",
+      "to": "src-43c97f7dfcde",
+      "kind": "cites"
+    },
+    {
+      "from": "topic:gearbox-oil",
+      "to": "src-43c97f7dfcde",
+      "kind": "topic-of"
+    },
+    {
+      "from": "topic:gearbox-oil",
+      "to": "src-4d9c65e05302",
+      "kind": "cites"
+    },
+    {
+      "from": "topic:gearbox-oil",
+      "to": "src-4d9c65e05302",
+      "kind": "topic-of"
+    },
+    {
+      "from": "topic:gearbox-oil",
+      "to": "src-f2750f41f3fa",
+      "kind": "cites"
+    },
+    {
+      "from": "topic:gearbox-oil",
+      "to": "src-f2750f41f3fa",
+      "kind": "topic-of"
+    }
+  ],
+  "sources": [
+    {
+      "source_id": "src-43c97f7dfcde",
+      "path": "records/maintenance-plan-2026.xlsx",
+      "hash": "sha256:547eeaad80cc9f73e634445f7b5744579739b8423dd2dbf30ecea3acf9b0b46f",
+      "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "status": "current",
+      "doc_number": null,
+      "revision": null
+    },
+    {
+      "source_id": "src-4d9c65e05302",
+      "path": "procedures/SOP-GBX-010 rev B.docx",
+      "hash": "sha256:f368b876bde1fcdb2bf14b66ac7d3b7b3d4fe7bcf69085e0b1b916a417856c71",
+      "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "status": "current",
+      "doc_number": "SOP-GBX-010",
+      "revision": "B"
+    },
+    {
+      "source_id": "src-f2750f41f3fa",
+      "path": "procedures/SOP-GBX-010 rev A.pdf",
+      "hash": "sha256:6227f274b1df1a1da846cf32a187a3956a30003cc3177ff1c9d43cc90dd44166",
+      "media_type": "application/pdf",
+      "status": "superseded",
+      "doc_number": "SOP-GBX-010",
+      "revision": "A"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "ISO VG",
+      "synonyms": {
+        "de": [
+          "ISO-Viskositätsklasse"
+        ],
+        "fr": [
+          "grade de viscosité ISO"
+        ]
+      },
+      "page": "glossary.md#iso-vg"
+    },
+    {
+      "term": "SOP",
+      "synonyms": {
+        "de": [
+          "Standardarbeitsanweisung"
+        ],
+        "fr": [
+          "procédure opératoire standard"
+        ]
+      },
+      "page": "glossary.md#sop"
+    },
+    {
+      "term": "WTG",
+      "synonyms": {
+        "de": [
+          "Windenergieanlage"
+        ],
+        "en": [
+          "wind turbine generator"
+        ],
+        "fr": [
+          "éolienne"
+        ]
+      },
+      "page": "glossary.md#wtg"
+    }
+  ]
+}

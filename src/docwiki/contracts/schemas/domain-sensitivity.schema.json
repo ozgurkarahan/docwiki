@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Domain pack sensitivity.yaml",
+  "$defs": {
+    "SensitivityRule": {
+      "additionalProperties": false,
+      "properties": {
+        "tier": {
+          "enum": [
+            "public",
+            "internal",
+            "restricted"
+          ],
+          "title": "Tier",
+          "type": "string"
+        },
+        "path_glob": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path Glob"
+        },
+        "doc_type": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Doc Type"
+        }
+      },
+      "required": [
+        "tier"
+      ],
+      "title": "SensitivityRule",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "``sensitivity.yaml``; when several rules match, the highest tier wins.",
+  "properties": {
+    "default": {
+      "enum": [
+        "public",
+        "internal"
+      ],
+      "type": "string",
+      "title": "Default"
+    },
+    "rules": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/SensitivityRule"
+      },
+      "title": "Rules",
+      "type": "array"
+    }
+  },
+  "required": [
+    "default"
+  ],
+  "type": "object"
+}

@@ -1,0 +1,99 @@
+{
+  "schema": 1,
+  "source_id": "src-9d075c6edcd5",
+  "sensitivity": "public",
+  "tables": [
+    {
+      "id": "t01",
+      "file": "t01.parquet",
+      "locator": {
+        "kind": "pdf-page",
+        "page": 1,
+        "bbox": [
+          0.082,
+          0.1161,
+          0.9131,
+          0.3525
+        ]
+      },
+      "provenance": "native-text",
+      "columns": [
+        {
+          "name": "field",
+          "header": "Field",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "value",
+          "header": "Value",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 7,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006",
+        "r0007",
+        "r0008"
+      ]
+    },
+    {
+      "id": "t02",
+      "file": "t02.parquet",
+      "locator": {
+        "kind": "pdf-page",
+        "page": 1,
+        "bbox": [
+          0.0812,
+          0.3894,
+          0.9136,
+          0.688
+        ]
+      },
+      "provenance": "native-text",
+      "columns": [
+        {
+          "name": "id",
+          "header": "ID",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "category",
+          "header": "Category",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "finding",
+          "header": "Finding",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "action",
+          "header": "Action",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "owner",
+          "header": "Owner",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "due",
+          "header": "Due",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 5,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "source_id": "src-867a6c78f5b5",
+  "sensitivity": "public",
+  "tables": [
+    {
+      "id": "t01",
+      "file": "t01.parquet",
+      "locator": {
+        "kind": "pdf-page",
+        "page": 1,
+        "bbox": [
+          0.0821,
+          0.116,
+          0.9126,
+          0.2347
+        ]
+      },
+      "provenance": "native-text",
+      "columns": [
+        {
+          "name": "field",
+          "header": "Field",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "value",
+          "header": "Value",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 4,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005"
+      ]
+    },
+    {
+      "id": "t02",
+      "file": "t02.parquet",
+      "locator": {
+        "kind": "pdf-page",
+        "page": 1,
+        "bbox": [
+          0.082,
+          0.3108,
+          0.9131,
+          0.407
+        ]
+      },
+      "provenance": "native-text",
+      "columns": [
+        {
+          "name": "date",
+          "header": "Date",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "from",
+          "header": "From",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "to",
+          "header": "To",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "export_limit",
+          "header": "Export limit",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 3,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004"
+      ]
+    }
+  ]
+}

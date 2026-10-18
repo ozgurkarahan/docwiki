@@ -1,0 +1,14 @@
+FICTIONAL - NOT FOR OPERATIONAL USE
+SHIFT HANDOVER 2026-07-29 - day shift
+By: Callum Rydings
+
+WTG-02: the endoscope inspection on 23/07 found spalling on the HSS bearing
+  (generator side). WO-26-0439 raised on 24/07, waiting for the same bearing as
+  WTG-07 (FGT-P-22328). Turbine kept in operation, vibration reviewed weekly.
+WTG-11: small hydraulic oil leak at a yaw brake hose found today. The hose
+  AWI-10442 is not stocked, order to be raised. Leak contained with absorbent
+  pads and checked every shift.
+WTG-05: rescue kit inspection started (WO-26-0444), to finish next week.
+WTG-07: no oil temperature alarm since 24/06.
+Night: WTG-03, WTG-04 and WTG-05 bat curtailment expected again (low wind).
+FICTIONAL - NOT FOR OPERATIONAL USE

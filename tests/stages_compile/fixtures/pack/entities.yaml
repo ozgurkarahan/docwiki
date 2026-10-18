@@ -1,0 +1,27 @@
+types:
+  - key: asset
+    title: Asset
+    description: Turbines and major components.
+  - key: organisation
+    title: Organisation
+  - key: procedure
+    title: Procedure
+registry:
+  - type: asset
+    key: wtg-07
+    label: WTG-07
+    aliases:
+      - {text: turbine 7, lang: en}
+      - {text: éolienne 7, lang: fr}
+  - type: asset
+    key: wtg-12
+    label: WTG-12
+  - type: organisation
+    key: litware
+    label: Litware
+  - type: organisation
+    key: trey-research
+    label: Trey Research
+  - type: procedure
+    key: sop-gbx-010
+    label: SOP-GBX-010 gearbox oil change

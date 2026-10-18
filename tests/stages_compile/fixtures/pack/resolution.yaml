@@ -1,0 +1,2 @@
+order: [authority, recency]
+notes: Higher authority wins; at equal authority the most recent document wins.

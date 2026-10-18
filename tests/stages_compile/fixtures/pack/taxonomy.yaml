@@ -1,0 +1,32 @@
+categories:
+  - key: procedures
+    title: Procedures
+    description: Standard operating procedures and work instructions.
+  - key: oem-documentation
+    title: OEM documentation
+  - key: records
+    title: Records and data
+doc_types:
+  - key: sop
+    title: Standard operating procedure
+    category: procedures
+    authority: 7
+    rules:
+      - filename_regex: "(?i)^sop[-_ ]"
+  - key: service-bulletin
+    title: Service bulletin
+    category: oem-documentation
+    authority: 9
+    rules:
+      - text_regex: "(?i)service bulletin"
+        first_chars: 300
+  - key: maintenance-plan
+    title: Maintenance plan
+    category: records
+    authority: 5
+    rules:
+      - filename_regex: "(?i)plan.*\\.xlsx$"
+  - key: lab-report
+    title: Lab report
+    category: records
+    authority: 6

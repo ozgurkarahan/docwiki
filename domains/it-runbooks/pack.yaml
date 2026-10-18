@@ -1,0 +1,12 @@
+# Domain pack: IT operations runbooks (tiny fictional pack proving that DocWiki is generic).
+name: it-runbooks
+title: IT operations runbooks
+description: >-
+  Runbooks, procedures, on-call rules, postmortems and the service catalog of an IT platform
+  operations team.
+default_audience: internal
+languages: [en]
+wiki_title: Relecloud operations wiki
+fictional: true
+banner: >-
+  FICTIONAL SAMPLE - Relecloud, its services and people are invented. Not for operational use.

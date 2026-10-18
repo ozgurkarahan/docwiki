@@ -1,0 +1,43 @@
+From: Tomasz Lebrecht <tomasz.lebrecht@contoso-renewables.example>
+To: Dario Penwarden <dario.penwarden@contoso-renewables.example>
+Cc: Yusuf Arkwell <yusuf.arkwell@contoso-renewables.example>,
+ Maren Ellingsby <maren.ellingsby@contoso-renewables.example>
+Subject: Parts shortage - HSS bearing FGT-P-22328 below minimum stock
+Date: Wed, 22 Jul 2026 16:05:31 +0200
+Message-ID: <20260722160531.4471@contoso-renewables.example>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+MIME-Version: 1.0
+
+FICTIONAL - NOT FOR OPERATIONAL USE
+
+Hi Dario,
+
+the stock snapshot of 21 July shows that the HSS bearing FGT-P-22328
+(generator side) is below its minimum level:
+
+  on hand 0, minimum 1, on order 2 (PO-76994 to Fabrikam)
+
+The last bearing was used on WTG-10 in March (WO-26-0187). Fabrikam
+confirmed delivery of the two bearings in week 39 (21 to 25 September
+2026).
+
+Impact: WO-26-0412 (WTG-07, HSS bearing replacement) cannot start until
+the bearings arrive. WTG-07 keeps running with the vibration above the
+alarm level, so Yusuf asked for weekly vibration reviews.
+
+The oil cooler fan motor LWS-P-30418 is also below its minimum (1 on
+hand, minimum 2) after the WTG-07 repair. Two motors are on order
+(PO-77102, expected 14 August). No work order is waiting for this motor.
+
+Fabrikam offers air freight for EUR 2,300 extra, which would bring the
+bearings forward by about two weeks. Shall I accept?
+
+Thanks,
+Tomasz
+
+Tomasz Lebrecht
+Stores and Spare Parts Coordinator
+Contoso Renewables - Quellmoor Ridge Wind Farm
+
+FICTIONAL - NOT FOR OPERATIONAL USE

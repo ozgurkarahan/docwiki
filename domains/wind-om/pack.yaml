@@ -1,0 +1,15 @@
+# Domain pack: wind farm operations and maintenance (fictional public sample).
+name: wind-om
+title: Wind farm operations and maintenance
+description: >-
+  Operations and maintenance of an onshore wind farm: OEM manuals and service bulletins,
+  procedures and work instructions, incident and change records, maintenance, stock and SCADA
+  data, laboratory and inspection reports, permits and grid instructions, training decks,
+  correspondence, field notes and meeting records.
+default_audience: public
+languages: [en, fr, de]
+wiki_title: Quellmoor Ridge O&M wiki
+fictional: true
+banner: >-
+  FICTIONAL SAMPLE - Contoso Renewables, Quellmoor Ridge Wind Farm and every organisation,
+  person, product and value in this wiki are invented. Not for operational use.

@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Domain pack pack.yaml",
+  "additionalProperties": false,
+  "description": "``pack.yaml``.",
+  "properties": {
+    "name": {
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "title": "Name",
+      "type": "string"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "description": {
+      "default": "",
+      "title": "Description",
+      "type": "string"
+    },
+    "default_audience": {
+      "enum": [
+        "public",
+        "internal",
+        "restricted"
+      ],
+      "title": "Default Audience",
+      "type": "string"
+    },
+    "languages": {
+      "items": {
+        "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Languages",
+      "type": "array"
+    },
+    "wiki_title": {
+      "minLength": 1,
+      "title": "Wiki Title",
+      "type": "string"
+    },
+    "fictional": {
+      "default": false,
+      "title": "Fictional",
+      "type": "boolean"
+    },
+    "banner": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Banner"
+    }
+  },
+  "required": [
+    "name",
+    "title",
+    "default_audience",
+    "languages",
+    "wiki_title"
+  ],
+  "type": "object"
+}

@@ -1,0 +1,6 @@
+service,description,owner_team,tier,on_call_rotation,runbook,slo_availability_pct,depends_on
+ticketing-api,Ticket booking API,platform operations,1,sre-primary,RB-TKT-002,99.9,orders-db notification-worker
+checkout-web,Checkout web front end,web,1,sre-primary,RB-CHK-001,99.9,ticketing-api orders-db
+orders-db,"Orders database (PostgreSQL, primary and standby)",data platform,1,dba-primary,PRC-DB-007,99.95,
+notification-worker,E-mail and push notifications,platform operations,2,sre-secondary,RB-NTF-003,99.5,ticketing-api
+reporting-batch,Nightly sales reporting,data platform,3,business-hours,RB-RPT-001,99.0,orders-db

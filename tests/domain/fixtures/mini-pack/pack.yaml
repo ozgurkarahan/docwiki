@@ -1,0 +1,8 @@
+name: mini-wind
+title: Mini wind O&M test pack
+description: Tiny fictional domain pack used by the contract tests.
+default_audience: internal
+languages: [en, fr, de]
+wiki_title: Contoso Renewables test wiki
+fictional: true
+banner: FICTIONAL - NOT FOR OPERATIONAL USE

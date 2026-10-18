@@ -1,0 +1,412 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Locator (discriminated on kind)",
+  "$defs": {
+    "CsvRowsLocator": {
+      "additionalProperties": false,
+      "description": "CSV rows (1-based, header = row 1).",
+      "properties": {
+        "kind": {
+          "const": "csv-rows",
+          "default": "csv-rows",
+          "title": "Kind",
+          "type": "string"
+        },
+        "row_start": {
+          "minimum": 1,
+          "title": "Row Start",
+          "type": "integer"
+        },
+        "row_end": {
+          "minimum": 1,
+          "title": "Row End",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "row_start",
+        "row_end"
+      ],
+      "title": "CsvRowsLocator",
+      "type": "object"
+    },
+    "DocxParagraphLocator": {
+      "additionalProperties": false,
+      "description": "DOCX body paragraph, 1-based index over body paragraphs.",
+      "properties": {
+        "kind": {
+          "const": "docx-paragraph",
+          "default": "docx-paragraph",
+          "title": "Kind",
+          "type": "string"
+        },
+        "paragraph": {
+          "minimum": 1,
+          "title": "Paragraph",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "paragraph"
+      ],
+      "title": "DocxParagraphLocator",
+      "type": "object"
+    },
+    "DocxTableLocator": {
+      "additionalProperties": false,
+      "description": "DOCX table (1-based) and row range (1-based, header row = 1).",
+      "properties": {
+        "kind": {
+          "const": "docx-table",
+          "default": "docx-table",
+          "title": "Kind",
+          "type": "string"
+        },
+        "table": {
+          "minimum": 1,
+          "title": "Table",
+          "type": "integer"
+        },
+        "row_start": {
+          "minimum": 1,
+          "title": "Row Start",
+          "type": "integer"
+        },
+        "row_end": {
+          "minimum": 1,
+          "title": "Row End",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "table",
+        "row_start",
+        "row_end"
+      ],
+      "title": "DocxTableLocator",
+      "type": "object"
+    },
+    "EmlPartLocator": {
+      "additionalProperties": false,
+      "description": "E-mail part (``headers``, ``body`` or ``attachment:<name>``) and optional line range.",
+      "properties": {
+        "kind": {
+          "const": "eml-part",
+          "default": "eml-part",
+          "title": "Kind",
+          "type": "string"
+        },
+        "part": {
+          "minLength": 1,
+          "title": "Part",
+          "type": "string"
+        },
+        "line_start": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line Start"
+        },
+        "line_end": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line End"
+        }
+      },
+      "required": [
+        "part"
+      ],
+      "title": "EmlPartLocator",
+      "type": "object"
+    },
+    "ImageRegionLocator": {
+      "additionalProperties": false,
+      "description": "Region of a scanned image or photo (``page`` is always 1).",
+      "properties": {
+        "kind": {
+          "const": "image-region",
+          "default": "image-region",
+          "title": "Kind",
+          "type": "string"
+        },
+        "page": {
+          "const": 1,
+          "default": 1,
+          "title": "Page",
+          "type": "integer"
+        },
+        "region": {
+          "minimum": 1,
+          "title": "Region",
+          "type": "integer"
+        },
+        "bbox": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Bbox",
+          "type": "array"
+        }
+      },
+      "required": [
+        "region",
+        "bbox"
+      ],
+      "title": "ImageRegionLocator",
+      "type": "object"
+    },
+    "PdfPageLocator": {
+      "additionalProperties": false,
+      "description": "PDF page (text layer or scan). ``bbox`` is normalised, origin top-left.",
+      "properties": {
+        "kind": {
+          "const": "pdf-page",
+          "default": "pdf-page",
+          "title": "Kind",
+          "type": "string"
+        },
+        "page": {
+          "minimum": 1,
+          "title": "Page",
+          "type": "integer"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        }
+      },
+      "required": [
+        "page"
+      ],
+      "title": "PdfPageLocator",
+      "type": "object"
+    },
+    "PptxSlideLocator": {
+      "additionalProperties": false,
+      "description": "PPTX slide (1-based) and optional shape name/id.",
+      "properties": {
+        "kind": {
+          "const": "pptx-slide",
+          "default": "pptx-slide",
+          "title": "Kind",
+          "type": "string"
+        },
+        "slide": {
+          "minimum": 1,
+          "title": "Slide",
+          "type": "integer"
+        },
+        "shape": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Shape"
+        }
+      },
+      "required": [
+        "slide"
+      ],
+      "title": "PptxSlideLocator",
+      "type": "object"
+    },
+    "TextLinesLocator": {
+      "additionalProperties": false,
+      "description": "Line range of a Markdown or plain-text file (1-based).",
+      "properties": {
+        "kind": {
+          "const": "text-lines",
+          "default": "text-lines",
+          "title": "Kind",
+          "type": "string"
+        },
+        "line_start": {
+          "minimum": 1,
+          "title": "Line Start",
+          "type": "integer"
+        },
+        "line_end": {
+          "minimum": 1,
+          "title": "Line End",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "line_start",
+        "line_end"
+      ],
+      "title": "TextLinesLocator",
+      "type": "object"
+    },
+    "VttCueLocator": {
+      "additionalProperties": false,
+      "description": "Transcript cue range, ``HH:MM:SS`` (milliseconds truncated by the extractor).",
+      "properties": {
+        "kind": {
+          "const": "vtt-cue",
+          "default": "vtt-cue",
+          "title": "Kind",
+          "type": "string"
+        },
+        "cue_start": {
+          "pattern": "^\\d{2,}:[0-5]\\d:[0-5]\\d$",
+          "title": "Cue Start",
+          "type": "string"
+        },
+        "cue_end": {
+          "pattern": "^\\d{2,}:[0-5]\\d:[0-5]\\d$",
+          "title": "Cue End",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cue_start",
+        "cue_end"
+      ],
+      "title": "VttCueLocator",
+      "type": "object"
+    },
+    "XlsxRowsLocator": {
+      "additionalProperties": false,
+      "description": "XLSX sheet rows (1-based, header = row 1).\n\n``sheet_slug`` is the collision-free slug assigned per workbook by the extractor\n(``assign_unique_slugs(sheet_names, max_len=40, fallback=\"sheet\")``); when omitted the slug is\nderived from ``sheet``.",
+      "properties": {
+        "kind": {
+          "const": "xlsx-rows",
+          "default": "xlsx-rows",
+          "title": "Kind",
+          "type": "string"
+        },
+        "sheet": {
+          "minLength": 1,
+          "title": "Sheet",
+          "type": "string"
+        },
+        "sheet_slug": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sheet Slug"
+        },
+        "row_start": {
+          "minimum": 1,
+          "title": "Row Start",
+          "type": "integer"
+        },
+        "row_end": {
+          "minimum": 1,
+          "title": "Row End",
+          "type": "integer"
+        },
+        "cols": {
+          "anyOf": [
+            {
+              "items": {
+                "pattern": "^[A-Z]{1,3}$",
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cols"
+        }
+      },
+      "required": [
+        "sheet",
+        "row_start",
+        "row_end"
+      ],
+      "title": "XlsxRowsLocator",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "csv-rows": "#/$defs/CsvRowsLocator",
+      "docx-paragraph": "#/$defs/DocxParagraphLocator",
+      "docx-table": "#/$defs/DocxTableLocator",
+      "eml-part": "#/$defs/EmlPartLocator",
+      "image-region": "#/$defs/ImageRegionLocator",
+      "pdf-page": "#/$defs/PdfPageLocator",
+      "pptx-slide": "#/$defs/PptxSlideLocator",
+      "text-lines": "#/$defs/TextLinesLocator",
+      "vtt-cue": "#/$defs/VttCueLocator",
+      "xlsx-rows": "#/$defs/XlsxRowsLocator"
+    },
+    "propertyName": "kind"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/PdfPageLocator"
+    },
+    {
+      "$ref": "#/$defs/DocxParagraphLocator"
+    },
+    {
+      "$ref": "#/$defs/DocxTableLocator"
+    },
+    {
+      "$ref": "#/$defs/XlsxRowsLocator"
+    },
+    {
+      "$ref": "#/$defs/CsvRowsLocator"
+    },
+    {
+      "$ref": "#/$defs/PptxSlideLocator"
+    },
+    {
+      "$ref": "#/$defs/EmlPartLocator"
+    },
+    {
+      "$ref": "#/$defs/VttCueLocator"
+    },
+    {
+      "$ref": "#/$defs/ImageRegionLocator"
+    },
+    {
+      "$ref": "#/$defs/TextLinesLocator"
+    }
+  ]
+}

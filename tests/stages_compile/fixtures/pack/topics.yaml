@@ -1,0 +1,15 @@
+topics:
+  - slug: gearbox-oil
+    title: Gearbox oil
+    description: Oil grade, change intervals and oil analysis.
+    keywords: [gearbox oil, oil grade, ISO VG]
+    aliases:
+      - {text: huile de boîte, lang: fr}
+  - slug: cold-weather
+    title: Cold-weather operation
+    keywords: [cold weather, cold site, cold sites]
+    min_score: 2
+    min_sources: 1
+  - slug: blade-inspection
+    title: Blade inspection
+    keywords: [blade inspection, leading edge]

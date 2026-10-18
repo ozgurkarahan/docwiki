@@ -1,0 +1,28 @@
+FICTIONAL - NOT FOR OPERATIONAL USE
+Fabrikam Getriebetechnik GmbH - Lieferantenhinweis
+Datum: 03.08.2026
+An: Contoso Renewables, Quellmoor Ridge Wind Farm (Tomasz Lebrecht, Dario Penwarden)
+Von: Katrin Ostermeier, Field Service
+Betreff: Bestellung PO-76994 - HSS-Lager FGT-P-22328 / Hinweise nach der Ölumstellung
+
+1. Liefertermin
+Die zwei HSS-Lager FGT-P-22328 aus der Bestellung PO-76994 können nicht in KW 39 geliefert werden.
+Neuer bestätigter Liefertermin: KW 40 (28.09.2026 bis 02.10.2026).
+Grund: Verzögerung bei der Wärmebehandlung der Außenringe. Eine Luftfracht verkürzt die Lieferzeit nicht mehr.
+
+2. Hinweis nach der Umstellung auf PWG 220
+Nach der Umstellung von PWG 320 auf PWG 220 ist das Ölfilterelement FGT-P-11872 nach 500 Betriebsstunden ein zweites Mal zu wechseln, da sich gelöste Ablagerungen im Filter sammeln.
+Zum gleichen Zeitpunkt empfehlen wir eine Ölprobe.
+
+3. Einbau der HSS-Lager
+Das neue Lager vor der Montage induktiv auf 110 °C erwärmen (maximal 120 °C).
+Anzugsmoment der Lagerdeckelschrauben M16: 210 Nm.
+Nach dem Einbau eine Ölprobe nach 500 Betriebsstunden nehmen.
+
+Für Rückfragen stehe ich gerne zur Verfügung.
+
+Mit freundlichen Grüßen
+Katrin Ostermeier
+Field Service Engineer, Fabrikam Getriebetechnik GmbH
+katrin.ostermeier@fabrikam-getriebe.example
+FICTIONAL - NOT FOR OPERATIONAL USE

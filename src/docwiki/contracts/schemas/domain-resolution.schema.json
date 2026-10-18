@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Domain pack resolution.yaml",
+  "additionalProperties": false,
+  "description": "``resolution.yaml``: contradiction policy, stated on topic pages (never silently applied).",
+  "properties": {
+    "order": {
+      "default": [
+        "authority",
+        "recency"
+      ],
+      "items": {
+        "enum": [
+          "authority",
+          "recency"
+        ],
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Order",
+      "type": "array"
+    },
+    "notes": {
+      "default": "",
+      "title": "Notes",
+      "type": "string"
+    }
+  },
+  "type": "object"
+}

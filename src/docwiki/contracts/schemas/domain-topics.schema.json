@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Domain pack topics.yaml",
+  "$defs": {
+    "EntityAlias": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "lang": {
+          "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
+          "title": "Lang",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "lang"
+      ],
+      "title": "EntityAlias",
+      "type": "object"
+    },
+    "TopicDef": {
+      "additionalProperties": false,
+      "properties": {
+        "slug": {
+          "maxLength": 64,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Slug",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "keywords": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Keywords",
+          "type": "array"
+        },
+        "aliases": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/EntityAlias"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "min_score": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Score"
+        },
+        "min_sources": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Sources"
+        }
+      },
+      "required": [
+        "slug",
+        "title"
+      ],
+      "title": "TopicDef",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "``topics.yaml``.",
+  "properties": {
+    "topics": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/TopicDef"
+      },
+      "title": "Topics",
+      "type": "array"
+    }
+  },
+  "type": "object"
+}

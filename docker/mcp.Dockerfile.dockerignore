@@ -1,0 +1,14 @@
+# Build-context allowlist for docker/mcp.Dockerfile.
+# azd remote builds (and BuildKit) read <Dockerfile>.dockerignore before the root .dockerignore.
+*
+!pyproject.toml
+!README.md
+!LICENSE
+!src
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.env
+**/.env.*

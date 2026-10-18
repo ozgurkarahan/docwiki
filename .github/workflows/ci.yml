@@ -1,0 +1,78 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: lint and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: uv sync --all-extras --no-extra evals
+      - name: Lint
+        run: uv run ruff check .
+      - name: Test
+        run: uv run pytest
+      - name: Leak guard (public rules, no deny-list)
+        run: uv run python tools/leakguard/leakguard.py scan --root .
+      - name: Validate the committed sample wiki (wiki contract and quality gates)
+        run: |
+          if [ -f samples/wiki/.docwiki/manifest.json ]; then
+            uv run docwiki lint --release samples/wiki
+          else
+            echo "::notice title=sample wiki::samples/wiki is not committed yet; skipping"
+          fi
+
+  secrets:
+    name: secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  bicep:
+    name: bicep build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build Bicep
+        run: |
+          az bicep install
+          az bicep build --file infra/main.bicep --stdout > /dev/null
+
+  site:
+    name: site build (mock release)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: uv sync --all-extras --no-extra evals
+      - name: Build, link-check and scan the mock release site
+        env:
+          DOCWIKI_SITE_BUILD: "1"
+        run: uv run pytest tests/site -q

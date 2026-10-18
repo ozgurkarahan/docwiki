@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Node / Quartz
+node_modules/
+.cache/
+site/.quartz/
+site/public/
+
+# Local runs and private material (never commit)
+.local/
+.env
+.env.*
+*.local.*
+.azure/
+.foundry/results/
+*.log
+.playwright-mcp/
+.impeccable/
+
+# Private evaluation holdout and private tooling
+evals/holdout/
+private/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/mcp.json
+!.vscode/extensions.json
+
+# Lock file is resolved per environment (local mirrors must never leak into the repo)
+uv.lock
+package-lock.json

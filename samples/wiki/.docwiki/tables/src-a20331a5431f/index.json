@@ -1,0 +1,117 @@
+{
+  "schema": 1,
+  "source_id": "src-a20331a5431f",
+  "sensitivity": "public",
+  "tables": [
+    {
+      "id": "t01",
+      "file": "t01.parquet",
+      "locator": {
+        "kind": "docx-table",
+        "table": 1,
+        "row_start": 1,
+        "row_end": 7
+      },
+      "provenance": "deterministic-table",
+      "columns": [
+        {
+          "name": "field",
+          "header": "Field",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "value",
+          "header": "Value",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 6,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006",
+        "r0007"
+      ]
+    },
+    {
+      "id": "t02",
+      "file": "t02.parquet",
+      "locator": {
+        "kind": "docx-table",
+        "table": 2,
+        "row_start": 1,
+        "row_end": 6
+      },
+      "provenance": "deterministic-table",
+      "columns": [
+        {
+          "name": "hazard",
+          "header": "Hazard",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "risk",
+          "header": "Risk",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "control",
+          "header": "Control",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 5,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006"
+      ]
+    },
+    {
+      "id": "t03",
+      "file": "t03.parquet",
+      "locator": {
+        "kind": "docx-table",
+        "table": 3,
+        "row_start": 1,
+        "row_end": 7
+      },
+      "provenance": "deterministic-table",
+      "columns": [
+        {
+          "name": "no",
+          "header": "No.",
+          "type": "BIGINT"
+        },
+        {
+          "name": "action",
+          "header": "Action",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "owner",
+          "header": "Owner",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "due",
+          "header": "Due",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 6,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006",
+        "r0007"
+      ]
+    }
+  ]
+}

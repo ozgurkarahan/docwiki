@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "source_id": "src-a7e8d332dafd",
+  "sensitivity": "public",
+  "tables": [
+    {
+      "id": "t01",
+      "file": "t01.parquet",
+      "locator": {
+        "kind": "pdf-page",
+        "page": 1,
+        "bbox": [
+          0.082,
+          0.1155,
+          0.9136,
+          0.2815
+        ]
+      },
+      "provenance": "native-text",
+      "columns": [
+        {
+          "name": "field",
+          "header": "Field",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "value",
+          "header": "Value",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 6,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006",
+        "r0007"
+      ]
+    }
+  ]
+}

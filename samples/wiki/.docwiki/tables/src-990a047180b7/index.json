@@ -1,0 +1,163 @@
+{
+  "schema": 1,
+  "source_id": "src-990a047180b7",
+  "sensitivity": "public",
+  "tables": [
+    {
+      "id": "t01",
+      "file": "t01.parquet",
+      "locator": {
+        "kind": "pdf-page",
+        "page": 1,
+        "bbox": [
+          0.0821,
+          0.1158,
+          0.9136,
+          0.3052
+        ]
+      },
+      "provenance": "native-text",
+      "columns": [
+        {
+          "name": "field",
+          "header": "Field",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "value",
+          "header": "Value",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 7,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006",
+        "r0007",
+        "r0008"
+      ]
+    },
+    {
+      "id": "t02",
+      "file": "t02.parquet",
+      "locator": {
+        "kind": "pdf-page",
+        "page": 1,
+        "bbox": [
+          0.0818,
+          0.3499,
+          0.9136,
+          0.6108
+        ]
+      },
+      "provenance": "native-text",
+      "columns": [
+        {
+          "name": "test",
+          "header": "Test",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "method",
+          "header": "Method",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "result",
+          "header": "Result",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "unit",
+          "header": "Unit",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "alert_limit",
+          "header": "Alert limit",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "status",
+          "header": "Status",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 10,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006",
+        "r0007",
+        "r0008",
+        "r0009",
+        "r0010",
+        "r0011"
+      ]
+    },
+    {
+      "id": "t03",
+      "file": "t03.parquet",
+      "locator": {
+        "kind": "pdf-page",
+        "page": 2,
+        "bbox": [
+          0.0825,
+          0.354,
+          0.9136,
+          0.4739
+        ]
+      },
+      "provenance": "native-text",
+      "columns": [
+        {
+          "name": "sample_date",
+          "header": "Sample date",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "report",
+          "header": "Report",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "oil",
+          "header": "Oil",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "fe_ppm",
+          "header": "Fe (ppm)",
+          "type": "BIGINT"
+        },
+        {
+          "name": "pq_index",
+          "header": "PQ index",
+          "type": "BIGINT"
+        },
+        {
+          "name": "viscosity_40_c",
+          "header": "Viscosity 40 °C",
+          "type": "BIGINT"
+        },
+        {
+          "name": "status",
+          "header": "Status",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 4,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+default: internal
+rules:
+  - tier: public
+    path_glob: "public/**"
+  - tier: restricted
+    path_glob: "**/contracts/**"
+  - tier: restricted
+    doc_type: maintenance-plan

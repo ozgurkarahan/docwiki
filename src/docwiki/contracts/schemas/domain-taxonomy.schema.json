@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Domain pack taxonomy.yaml",
+  "$defs": {
+    "Category": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "maxLength": 64,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Key",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "title"
+      ],
+      "title": "Category",
+      "type": "object"
+    },
+    "DocType": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "maxLength": 64,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Key",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "category": {
+          "maxLength": 64,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Category",
+          "type": "string"
+        },
+        "authority": {
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Authority",
+          "type": "integer"
+        },
+        "rules": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/DocTypeRule"
+          },
+          "title": "Rules",
+          "type": "array"
+        }
+      },
+      "required": [
+        "key",
+        "title",
+        "category",
+        "authority"
+      ],
+      "title": "DocType",
+      "type": "object"
+    },
+    "DocTypeRule": {
+      "additionalProperties": false,
+      "description": "A rule matches when every regex it defines matches (``filename_regex`` on the file name,\n``text_regex`` on the first ``first_chars`` characters of the extracted text).",
+      "properties": {
+        "filename_regex": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Filename Regex"
+        },
+        "text_regex": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text Regex"
+        },
+        "first_chars": {
+          "default": 2000,
+          "minimum": 1,
+          "title": "First Chars",
+          "type": "integer"
+        }
+      },
+      "title": "DocTypeRule",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "``taxonomy.yaml``.",
+  "properties": {
+    "categories": {
+      "items": {
+        "$ref": "#/$defs/Category"
+      },
+      "minItems": 1,
+      "title": "Categories",
+      "type": "array"
+    },
+    "doc_types": {
+      "items": {
+        "$ref": "#/$defs/DocType"
+      },
+      "minItems": 1,
+      "title": "Doc Types",
+      "type": "array"
+    }
+  },
+  "required": [
+    "categories",
+    "doc_types"
+  ],
+  "type": "object"
+}

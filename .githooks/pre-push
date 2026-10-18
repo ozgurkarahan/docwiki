@@ -1,0 +1,66 @@
+#!/bin/sh
+# DocWiki leak guard - pre-push hook. It fails closed: the push is blocked when the scanner
+# reports findings, when its configuration is invalid, or when it cannot run at all.
+#
+# Install once per clone (the repository keeps its hooks in .githooks/):
+#     git config core.hooksPath .githooks
+#
+# The scan runs with --strict on the tracked files of the working tree, so warnings and a
+# missing private deny-list block the push too: export DOCWIKI_DENYLIST=<file outside the repo>.
+# Optional: LEAKGUARD_PRE_PUSH_HISTORY=1 also scans the commits being pushed (patches, messages,
+# author/committer e-mails and binary blobs).
+# Bypassing the hook (git push --no-verify) must stay an explicit, reviewed exception.
+
+set -u
+
+fail() {
+    printf 'leakguard pre-push: %s\n' "$1" >&2
+    printf 'leakguard pre-push: push blocked (fail closed); see tools/leakguard/README.md\n' >&2
+    exit 1
+}
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || fail "not inside a git work tree"
+cd "$root" || fail "cannot enter the repository root"
+
+scanner="tools/leakguard/leakguard.py"
+[ -f "$scanner" ] || fail "the scanner ($scanner) is missing"
+command -v uv >/dev/null 2>&1 ||
+    fail "'uv' is not on PATH: install uv (https://docs.astral.sh/uv/), run 'uv sync', retry"
+
+commits=""
+if [ "${LEAKGUARD_PRE_PUSH_HISTORY:-0}" = "1" ]; then
+    while read -r _local_ref local_sha _remote_ref remote_sha; do
+        [ -n "${local_sha:-}" ] || continue
+        case "$local_sha" in
+            *[!0]*) ;;
+            *) continue ;; # branch deletion: nothing to scan
+        esac
+        new=""
+        case "${remote_sha:-0}" in
+            *[!0]*) new=$(git rev-list "$remote_sha..$local_sha" 2>/dev/null) || new="" ;;
+        esac
+        if [ -z "$new" ]; then
+            new=$(git rev-list "$local_sha" --not --remotes) ||
+                fail "cannot list the commits to push"
+        fi
+        commits="$commits
+$new"
+    done
+fi
+
+printf 'leakguard pre-push: scanning tracked files (strict)...\n' >&2
+if [ -n "$(printf '%s' "$commits" | tr -d '[:space:]')" ]; then
+    printf '%s\n' "$commits" |
+        uv run --quiet python "$scanner" scan --root . --strict --commits-from -
+    status=$?
+else
+    uv run --quiet python "$scanner" scan --root . --strict
+    status=$?
+fi
+
+case "$status" in
+    0) exit 0 ;;
+    1) fail "the leak guard reported findings: fix them or record a reviewed false positive" ;;
+    2) fail "the leak guard could not start or its configuration is invalid (exit 2)" ;;
+    *) fail "the leak guard could not run (exit $status)" ;;
+esac

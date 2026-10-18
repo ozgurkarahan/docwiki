@@ -1,0 +1,556 @@
+{
+  "format": "docwiki.evals.result/v1",
+  "system": "baseline-rag",
+  "split": "holdout",
+  "status": "ok",
+  "skipped": null,
+  "run": {
+    "started_at": "2026-10-18T09:35:33Z",
+    "finished_at": "2026-10-18T09:36:11Z",
+    "date": "2026-10-18",
+    "duration_s": 38.483,
+    "questions": 15,
+    "questions_total": 15,
+    "complete": true,
+    "limit": null,
+    "concurrency": 3
+  },
+  "questions_file": {
+    "file": "holdout.jsonl",
+    "sha256": "72d072f1a114af46faf686cf50262f3971e41c086432b75cc9bcfd8276a251cb",
+    "questions": 15,
+    "seal": null
+  },
+  "config": {
+    "system": {
+      "top_k": 8,
+      "chunk_tokens": 800,
+      "documents": 37,
+      "chunks": 175,
+      "max_output_tokens": 2000
+    },
+    "audience": "public",
+    "scope": "full",
+    "extract_mode": "azure",
+    "catalog": false,
+    "judge": false
+  },
+  "versions": {
+    "docwiki": "0.1.0",
+    "git_sha": "adf51bfe863f04af6867ead33f836d72f66dd015",
+    "git_dirty": true,
+    "metrics": "evals-metrics-v1",
+    "release_id": null,
+    "release_audience": null,
+    "corpus_manifest_sha256": "30abad65021a09837816e3a8b14ce876c990d2631a28ea37fe7bea9147806951",
+    "extraction": "azure-1.0.0+cu.2025-11-01",
+    "extractors": {
+      "local": "1.0.0",
+      "content-understanding": "1.0.0+cu.2025-11-01",
+      "pypdfium2": "5.14.0",
+      "python-docx": "1.2.0",
+      "openpyxl": "3.1.5",
+      "python-pptx": "1.0.2",
+      "pillow": "12.3.0"
+    },
+    "system": {
+      "tier": "smart",
+      "prompt_version": "baseline-rag-v1",
+      "deployment": "smart",
+      "model": "gpt-5.5",
+      "model_version": "2026-04-24",
+      "model_source": "service",
+      "price_table": {
+        "name": "prices.yaml (packaged)",
+        "sha256": "4734ff62848bcc0c8d22899b3fe058f0866d01f997f7a19390364c464e2c2810",
+        "verified": false,
+        "source": "placeholder - verify at https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/"
+      }
+    },
+    "judge": null
+  },
+  "aggregates": {
+    "overall": {
+      "questions": 15,
+      "errors": 0,
+      "answer_accuracy": {
+        "value": 0.6667,
+        "n": 15,
+        "passed": 10
+      },
+      "must_include_coverage": {
+        "value": 0.8718,
+        "n": 13,
+        "passed": 8
+      },
+      "numeric_exactness": {
+        "value": 0.5,
+        "n": 2,
+        "passed": 1
+      },
+      "citation_precision": {
+        "value": 0.9692,
+        "n": 13,
+        "passed": 12
+      },
+      "citation_recall": {
+        "value": 0.8652,
+        "n": 13,
+        "passed": 7
+      },
+      "abstention_accuracy": {
+        "value": 1.0,
+        "n": 15,
+        "passed": 15
+      },
+      "injection_resistance": {
+        "value": 1.0,
+        "n": 1,
+        "passed": 1
+      },
+      "restricted_exclusion": {
+        "value": 1.0,
+        "n": 15,
+        "passed": 15
+      },
+      "retrieval_recall": {
+        "value": 0.8762,
+        "n": 13,
+        "passed": 7
+      }
+    },
+    "by_category": {
+      "abstain": {
+        "questions": 2,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 1.0,
+          "n": 2,
+          "passed": 2
+        },
+        "must_include_coverage": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_recall": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 2,
+          "passed": 2
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 2,
+          "passed": 2
+        },
+        "retrieval_recall": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        }
+      },
+      "contradiction": {
+        "questions": 1,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.0,
+          "n": 1,
+          "passed": 0
+        },
+        "must_include_coverage": {
+          "value": 0.5,
+          "n": 1,
+          "passed": 0
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "citation_recall": {
+          "value": 0.8,
+          "n": 1,
+          "passed": 0
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "retrieval_recall": {
+          "value": 0.8,
+          "n": 1,
+          "passed": 0
+        }
+      },
+      "injection": {
+        "questions": 1,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "must_include_coverage": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "citation_recall": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "injection_resistance": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "retrieval_recall": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        }
+      },
+      "multi-hop": {
+        "questions": 4,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.5,
+          "n": 4,
+          "passed": 2
+        },
+        "must_include_coverage": {
+          "value": 0.8333,
+          "n": 4,
+          "passed": 2
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 1.0,
+          "n": 4,
+          "passed": 4
+        },
+        "citation_recall": {
+          "value": 0.6952,
+          "n": 4,
+          "passed": 0
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 4,
+          "passed": 4
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 4,
+          "passed": 4
+        },
+        "retrieval_recall": {
+          "value": 0.731,
+          "n": 4,
+          "passed": 0
+        }
+      },
+      "multilingual": {
+        "questions": 1,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.0,
+          "n": 1,
+          "passed": 0
+        },
+        "must_include_coverage": {
+          "value": 0.75,
+          "n": 1,
+          "passed": 0
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "citation_recall": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "retrieval_recall": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        }
+      },
+      "numeric": {
+        "questions": 3,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.6667,
+          "n": 3,
+          "passed": 2
+        },
+        "must_include_coverage": {
+          "value": 0.9167,
+          "n": 3,
+          "passed": 2
+        },
+        "numeric_exactness": {
+          "value": 0.5,
+          "n": 2,
+          "passed": 1
+        },
+        "citation_precision": {
+          "value": 0.8667,
+          "n": 3,
+          "passed": 2
+        },
+        "citation_recall": {
+          "value": 0.8889,
+          "n": 3,
+          "passed": 2
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 3,
+          "passed": 3
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 3,
+          "passed": 3
+        },
+        "retrieval_recall": {
+          "value": 0.8889,
+          "n": 3,
+          "passed": 2
+        }
+      },
+      "ocr": {
+        "questions": 2,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 1.0,
+          "n": 2,
+          "passed": 2
+        },
+        "must_include_coverage": {
+          "value": 1.0,
+          "n": 2,
+          "passed": 2
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 1.0,
+          "n": 2,
+          "passed": 2
+        },
+        "citation_recall": {
+          "value": 1.0,
+          "n": 2,
+          "passed": 2
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 2,
+          "passed": 2
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 2,
+          "passed": 2
+        },
+        "retrieval_recall": {
+          "value": 1.0,
+          "n": 2,
+          "passed": 2
+        }
+      },
+      "supersession": {
+        "questions": 1,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "must_include_coverage": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "citation_recall": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "retrieval_recall": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        }
+      }
+    }
+  },
+  "cost": {
+    "currency": "USD",
+    "input_tokens": 102507,
+    "cached_input_tokens": 0,
+    "output_tokens": 8410,
+    "reasoning_tokens": 5617,
+    "estimated_cost_usd": 0.764835,
+    "per_question_usd": 0.050989,
+    "priced_questions": 15,
+    "prices_verified": false,
+    "receipt_totals": {
+      "calls": 15,
+      "failed_calls": 0,
+      "attempts": 15,
+      "retries": 0,
+      "input_tokens": 102507,
+      "cached_input_tokens": 0,
+      "output_tokens": 8410,
+      "reasoning_tokens": 5617,
+      "latency_s": 93.37,
+      "wait_s": 0.0,
+      "estimated_cost_usd": 0.764835,
+      "unpriced_calls": 0
+    }
+  },
+  "latency": {
+    "mean_s": 6.247,
+    "p50_s": 6.316,
+    "p95_s": 9.364,
+    "max_s": 9.364,
+    "total_s": 93.702
+  },
+  "judge": {
+    "enabled": false,
+    "notice": null,
+    "notices": [],
+    "summary": null
+  },
+  "privacy": "aggregates only: per-question records of non-dev splits are written to --private-out"
+}

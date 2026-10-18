@@ -1,0 +1,239 @@
+{
+  "schema": 1,
+  "source_id": "src-42566abae6ef",
+  "sensitivity": "public",
+  "tables": [
+    {
+      "id": "t01",
+      "file": "t01.parquet",
+      "locator": {
+        "kind": "xlsx-rows",
+        "sheet": "Stock",
+        "sheet_slug": null,
+        "row_start": 1,
+        "row_end": 24,
+        "cols": null
+      },
+      "provenance": "deterministic-table",
+      "columns": [
+        {
+          "name": "part_number",
+          "header": "Part number",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "description",
+          "header": "Description",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "supplier",
+          "header": "Supplier",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "category",
+          "header": "Category",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "unit",
+          "header": "Unit",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "on_hand",
+          "header": "On hand",
+          "type": "BIGINT"
+        },
+        {
+          "name": "minimum",
+          "header": "Minimum",
+          "type": "BIGINT"
+        },
+        {
+          "name": "reorder_qty",
+          "header": "Reorder qty",
+          "type": "BIGINT"
+        },
+        {
+          "name": "on_order",
+          "header": "On order",
+          "type": "BIGINT"
+        },
+        {
+          "name": "po_number",
+          "header": "PO number",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "expected_delivery",
+          "header": "Expected delivery",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "bin",
+          "header": "Bin",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "critical",
+          "header": "Critical",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 23,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006",
+        "r0007",
+        "r0008",
+        "r0009",
+        "r0010",
+        "r0011",
+        "r0012",
+        "r0013",
+        "r0014",
+        "r0015",
+        "r0016",
+        "r0017",
+        "r0018",
+        "r0019",
+        "r0020",
+        "r0021",
+        "r0022",
+        "r0023",
+        "r0024"
+      ]
+    },
+    {
+      "id": "t02",
+      "file": "t02.parquet",
+      "locator": {
+        "kind": "xlsx-rows",
+        "sheet": "Movements",
+        "sheet_slug": null,
+        "row_start": 1,
+        "row_end": 10,
+        "cols": null
+      },
+      "provenance": "deterministic-table",
+      "columns": [
+        {
+          "name": "date",
+          "header": "Date",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "part_number",
+          "header": "Part number",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "quantity",
+          "header": "Quantity",
+          "type": "BIGINT"
+        },
+        {
+          "name": "reference",
+          "header": "Reference",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "turbine",
+          "header": "Turbine",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "by",
+          "header": "By",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 9,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006",
+        "r0007",
+        "r0008",
+        "r0009",
+        "r0010"
+      ]
+    },
+    {
+      "id": "t03",
+      "file": "t03.parquet",
+      "locator": {
+        "kind": "xlsx-rows",
+        "sheet": "Suppliers",
+        "sheet_slug": null,
+        "row_start": 1,
+        "row_end": 5,
+        "cols": null
+      },
+      "provenance": "deterministic-table",
+      "columns": [
+        {
+          "name": "supplier",
+          "header": "Supplier",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "supplies",
+          "header": "Supplies",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "typical_lead_time_weeks",
+          "header": "Typical lead time (weeks)",
+          "type": "BIGINT"
+        },
+        {
+          "name": "ordering_e_mail",
+          "header": "Ordering e-mail",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 4,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005"
+      ]
+    },
+    {
+      "id": "t04",
+      "file": "t04.parquet",
+      "locator": {
+        "kind": "xlsx-rows",
+        "sheet": "About",
+        "sheet_slug": null,
+        "row_start": 1,
+        "row_end": 5,
+        "cols": null
+      },
+      "provenance": "deterministic-table",
+      "columns": [
+        {
+          "name": "fictional_not_for_operational_use",
+          "header": "FICTIONAL - NOT FOR OPERATIONAL USE",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 4,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005"
+      ]
+    }
+  ]
+}

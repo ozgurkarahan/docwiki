@@ -1,0 +1,39 @@
+# Reviewed public GUIDs that the leak guard accepts (rule "guid", "azure-resource-id").
+# Format: <guid>  # why it is public  (the comment is mandatory; the scanner rejects lines without one)
+# Only add documented public constants, for example Azure built-in role definition IDs from
+# https://learn.microsoft.com/azure/role-based-access-control/built-in-roles
+# Never add subscription, tenant, object (principal), client (application) or resource IDs.
+
+00000000-0000-0000-0000-000000000000  # nil UUID (RFC 9562), placeholder value
+6ba7b810-9dad-11d1-80b4-00c04fd430c8  # RFC 9562 namespace UUID for DNS (uuid.NAMESPACE_DNS)
+6ba7b811-9dad-11d1-80b4-00c04fd430c8  # RFC 9562 namespace UUID for URLs (uuid.NAMESPACE_URL)
+6ba7b812-9dad-11d1-80b4-00c04fd430c8  # RFC 9562 namespace UUID for OIDs (uuid.NAMESPACE_OID)
+6ba7b814-9dad-11d1-80b4-00c04fd430c8  # RFC 9562 namespace UUID for X.500 (uuid.NAMESPACE_X500)
+
+# Azure built-in role definition IDs (public, identical in every tenant)
+8e3af657-a8ff-443c-a75c-2fe8c4bcb635  # Azure built-in role: Owner
+b24988ac-6180-42a0-ab88-20f7382dd24c  # Azure built-in role: Contributor
+acdd72a7-3385-48ef-bd42-f606fba81ae7  # Azure built-in role: Reader
+18d7d88d-d35e-4fb5-a5c3-7773c20a72d9  # Azure built-in role: User Access Administrator
+f58310d9-a9f6-439a-9e8d-f62e7b41a168  # Azure built-in role: Role Based Access Control Administrator
+2a2b9908-6ea1-4ae2-8e65-a410df84e7d1  # Azure built-in role: Storage Blob Data Reader
+ba92f5b4-2d11-453d-a403-e96b0029c9fe  # Azure built-in role: Storage Blob Data Contributor
+b7e6dc6d-f1e8-4753-8033-0f276bb0955b  # Azure built-in role: Storage Blob Data Owner
+19e7f393-937e-4f77-808e-94535e297925  # Azure built-in role: Storage Queue Data Reader
+974c5e8b-45b9-4653-ba55-5f855dd0fb88  # Azure built-in role: Storage Queue Data Contributor
+8a0f0c08-91a1-4084-bc3d-661d67233fed  # Azure built-in role: Storage Queue Data Message Processor
+c6a89b2d-59bc-44d0-9896-0f6e12d7b80a  # Azure built-in role: Storage Queue Data Message Sender
+7f951dda-4ed3-4680-a7ca-43fe172d538d  # Azure built-in role: AcrPull
+8311e382-0749-4cb8-b61a-304f252e45ec  # Azure built-in role: AcrPush
+a97b65f3-24c7-4388-baec-2e87135dc908  # Azure built-in role: Cognitive Services User
+25fbc0a9-bd7c-42a3-aa1a-3b75d497ee68  # Azure built-in role: Cognitive Services Contributor
+5e0bd9bd-7b93-4f28-af87-19fc36ad61bd  # Azure built-in role: Cognitive Services OpenAI User
+a001fd3d-188f-4b5d-821b-7da978bf7442  # Azure built-in role: Cognitive Services OpenAI Contributor
+53ca6127-db72-4b80-b1b0-d745d6d5456d  # Azure built-in role: Foundry User (formerly Azure AI User)
+eadc314b-1a2d-4efa-be10-5d325db5065e  # Azure built-in role: Foundry Project Manager
+c883944f-8b7b-4483-af10-35834be79c4a  # Azure built-in role: Foundry Owner
+e47c6f54-e4a2-4754-9501-8e0985b135e1  # Azure built-in role: Foundry Account Owner
+64702f94-c441-49e6-a78b-ef80e0188fee  # Azure built-in role: Azure AI Developer
+3913510d-42f4-4e42-8a64-420c390055eb  # Azure built-in role: Monitoring Metrics Publisher
+43d0d8ad-25c7-4714-9337-8ba259a9fe05  # Azure built-in role: Monitoring Reader
+73c42c96-874c-492b-b04d-ab87d138a893  # Azure built-in role: Log Analytics Reader

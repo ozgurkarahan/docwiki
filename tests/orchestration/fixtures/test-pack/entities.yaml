@@ -1,0 +1,19 @@
+types:
+  - key: asset
+    title: Assets
+    description: Turbines and major components.
+  - key: organisation
+    title: Organisations
+registry:
+  - type: asset
+    key: wtg-07
+    label: WTG-07
+    aliases:
+      - {text: turbine 7, lang: en}
+      - {text: éolienne 7, lang: fr}
+  - type: asset
+    key: wtg-12
+    label: WTG-12
+  - type: organisation
+    key: litware
+    label: Litware

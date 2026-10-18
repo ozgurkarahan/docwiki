@@ -1,0 +1,170 @@
+{
+  "schema": 1,
+  "source_id": "src-b342a2d5bfdf",
+  "sensitivity": "public",
+  "tables": [
+    {
+      "id": "t01",
+      "file": "t01.parquet",
+      "locator": {
+        "kind": "xlsx-rows",
+        "sheet": "Turbines",
+        "sheet_slug": null,
+        "row_start": 1,
+        "row_end": 13,
+        "cols": null
+      },
+      "provenance": "deterministic-table",
+      "columns": [
+        {
+          "name": "turbine",
+          "header": "Turbine",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "serial_number",
+          "header": "Serial number",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "model",
+          "header": "Model",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "variant",
+          "header": "Variant",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "gearbox_model",
+          "header": "Gearbox model",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "gearbox_serial",
+          "header": "Gearbox serial",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "commissioned",
+          "header": "Commissioned",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "hub_height_m",
+          "header": "Hub height (m)",
+          "type": "BIGINT"
+        },
+        {
+          "name": "rotor_diameter_m",
+          "header": "Rotor diameter (m)",
+          "type": "BIGINT"
+        },
+        {
+          "name": "easting_m",
+          "header": "Easting (m)",
+          "type": "BIGINT"
+        },
+        {
+          "name": "northing_m",
+          "header": "Northing (m)",
+          "type": "BIGINT"
+        },
+        {
+          "name": "elevation_m",
+          "header": "Elevation (m)",
+          "type": "BIGINT"
+        },
+        {
+          "name": "notes",
+          "header": "Notes",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 12,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006",
+        "r0007",
+        "r0008",
+        "r0009",
+        "r0010",
+        "r0011",
+        "r0012",
+        "r0013"
+      ]
+    },
+    {
+      "id": "t02",
+      "file": "t02.parquet",
+      "locator": {
+        "kind": "xlsx-rows",
+        "sheet": "Other assets",
+        "sheet_slug": null,
+        "row_start": 1,
+        "row_end": 4,
+        "cols": null
+      },
+      "provenance": "deterministic-table",
+      "columns": [
+        {
+          "name": "asset",
+          "header": "Asset",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "description",
+          "header": "Description",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "location",
+          "header": "Location",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "notes",
+          "header": "Notes",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 3,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004"
+      ]
+    },
+    {
+      "id": "t03",
+      "file": "t03.parquet",
+      "locator": {
+        "kind": "xlsx-rows",
+        "sheet": "About",
+        "sheet_slug": null,
+        "row_start": 1,
+        "row_end": 5,
+        "cols": null
+      },
+      "provenance": "deterministic-table",
+      "columns": [
+        {
+          "name": "fictional_not_for_operational_use",
+          "header": "FICTIONAL - NOT FOR OPERATIONAL USE",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 4,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005"
+      ]
+    }
+  ]
+}

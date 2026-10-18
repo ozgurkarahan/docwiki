@@ -1,0 +1,8 @@
+name: compile-test
+title: Compile lane test pack
+description: Fictional wind O&M domain used by the compile-lane tests.
+default_audience: internal
+languages: [en, fr, de]
+wiki_title: Contoso Renewables compile test wiki
+fictional: true
+banner: FICTIONAL - NOT FOR OPERATIONAL USE

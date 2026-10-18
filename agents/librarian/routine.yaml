@@ -1,0 +1,34 @@
+# Optional Foundry routine: a daily health report by the Librarian.
+# Disabled by default. Deployed only on request:
+#   uv run python agents/deploy.py --routine enable     (or --routine disable)
+# Schema: docwiki.agents_client.definitions.RoutineDefinition. The prompt may only use tools that
+# never need approval: nobody is there to approve a call when the routine fires.
+name: docwiki-librarian-daily-health
+description: Daily wiki health report written by the Librarian with tools that need no approval.
+enabled: false
+agent: docwiki-librarian
+trigger:
+  type: schedule
+  cron: "0 6 * * *"
+  time_zone: UTC
+tools:
+  - run_status
+  - quality_report
+  - list_sources
+  - list_proposals
+  - write_health_report
+authorization:
+  identity: agent
+input: |
+  Scheduled daily health check. Nobody can approve tool calls during this run.
+  Use only these tools: run_status, quality_report, list_sources, list_proposals and
+  write_health_report. Do not call any other tool.
+  1. Call run_status for the last run.
+  2. Call quality_report for the current release.
+  3. Call list_sources and count the sources by status.
+  4. Call list_proposals with status "open".
+  5. Write today's health report with write_health_report, in the format of your instructions.
+  When a result has "ok": false, put its error code and message in the report instead of guessing;
+  repeat a call only when error.retryable is true.
+  Recommend actions for a human in the report; do not perform them. Then reply with a two-line
+  summary.

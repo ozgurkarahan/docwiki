@@ -1,0 +1,11 @@
+# Supersession rules of the wind-om pack.
+# A later revision of the same document number supersedes the earlier one; a document that
+# explicitly says "supersedes <number>" or "replaces <number>" supersedes that document.
+# The document number must start the candidate (file name first, then text head) so that a
+# document merely mentioning another document's number is never grouped with it.
+# "amends" (used by service bulletins that change one manual section) is NOT a supersession:
+# the manual stays current and the difference is handled as a contradiction.
+doc_number_regex: '^(SOP-[A-Z]{3,4}-\d{3}|WI-[A-Z]{3}-\d{3}|SPL-\d{3}|SB-LWS-\d{4}-\d{2}|LWS-MM-[A-Z]{3}-\d{2})(?![0-9])'
+revision_regex: '(?:\bRev(?:ision)?\.?\s*|_Rev)([A-H])(?![A-Za-z])'
+revision_order: [A, B, C, D, E, F, G, H]
+explicit_reference_regex: '(?i)\b(?:supersedes|replaces)\s+((?:SOP|WI|SPL|SB-LWS|LWS-MM|MOC)-[A-Z0-9]+(?:-[A-Z0-9]+)*)'

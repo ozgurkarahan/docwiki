@@ -1,0 +1,13 @@
+terms:
+  - term: ISO VG
+    definition: ISO viscosity grade of an industrial oil, for example ISO VG 220.
+    synonyms:
+      fr: [grade de viscosité ISO]
+      de: [ISO-Viskositätsklasse]
+    see_also: [topic:gearbox-oil]
+  - term: WTG
+    definition: Wind turbine generator; turbines are identified as WTG-NN.
+    synonyms:
+      en: [wind turbine generator]
+      fr: [éolienne]
+    see_also: [asset:wtg-07]

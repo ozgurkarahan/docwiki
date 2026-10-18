@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SKILL.md frontmatter",
+  "additionalProperties": false,
+  "description": "``SKILL.md`` frontmatter (Agent Skills): kebab ``name`` ≤ 64, ``description`` ≤ 1024.",
+  "properties": {
+    "name": {
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "title": "Name",
+      "type": "string"
+    },
+    "description": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "title": "Description",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "description"
+  ],
+  "type": "object"
+}

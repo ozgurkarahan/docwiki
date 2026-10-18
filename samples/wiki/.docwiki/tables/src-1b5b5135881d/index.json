@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "source_id": "src-1b5b5135881d",
+  "sensitivity": "public",
+  "tables": [
+    {
+      "id": "t01",
+      "file": "t01.parquet",
+      "locator": {
+        "kind": "pptx-slide",
+        "slide": 4,
+        "shape": "Table 2"
+      },
+      "provenance": "native-text",
+      "columns": [
+        {
+          "name": "acronym",
+          "header": "Acronym",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "meaning",
+          "header": "Meaning",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 5,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+# Contoso Renewables mock wiki
+
+> Hand-made, fictional mock release of the DocWiki sample (CC BY 4.0) about the operator Contoso Renewables. Every fact is cited to an evidence sidecar.
+
+## Start here
+
+- [Home](index.md): how to navigate this wiki
+- [Agent guide](AGENTS.md): page types, citation rules, skills and tools
+- [Glossary](glossary.md): acronyms and multilingual synonyms
+
+## Topics
+
+- [Gearbox oil](topics/gearbox-oil.md): oil grade requirements, a contradiction and a superseded claim
+
+## Entities
+
+- [WTG-07](entities/asset/wtg-07.md): first turbine to switch to the cold-site oil grade
+- [WTG-12](entities/asset/wtg-12.md): gearbox oil change planned for 2026-05
+- [Litware](entities/organisation/litware.md): fictional turbine OEM
+
+## Sources
+
+- [Gearbox oil change SOP rev B](sources/sop-gbx-010-rev-b.md): current oil change procedure
+- [Gearbox oil change SOP rev A](sources/sop-gbx-010-rev-a.md): superseded revision
+- [Maintenance plan 2026](sources/maintenance-plan-2026.md): planned tasks per turbine

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "releases/current.json",
+  "additionalProperties": false,
+  "description": "``releases/current.json``; ``created_at`` is when this pointer was written.",
+  "properties": {
+    "release_id": {
+      "pattern": "^(\\d{8}T\\d{6}Z)-([0-9a-f]{8})$",
+      "title": "Release Id",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "audience": {
+      "enum": [
+        "public",
+        "internal",
+        "restricted"
+      ],
+      "title": "Audience",
+      "type": "string"
+    },
+    "manifest_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Manifest Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "release_id",
+    "created_at",
+    "audience",
+    "manifest_sha256"
+  ],
+  "type": "object"
+}

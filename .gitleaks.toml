@@ -1,0 +1,12 @@
+title = "DocWiki gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "DocWiki evidence locator keys (e.g. msg-body-l0021-l0024) are identifiers, not secrets"
+regexTarget = "line"
+regexes = [
+  '''"locator_key"\s*:\s*"[a-z0-9\-\*]*"''',
+  '''locator_key:\s*[a-z0-9\-\*]+''',
+]

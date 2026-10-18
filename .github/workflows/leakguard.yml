@@ -1,0 +1,63 @@
+name: leakguard
+
+# Publication-safety scan with the private deny-list. It runs only in the private development
+# repository: the job is skipped unless the repository variable DOCWIKI_PRIVATE_REPO equals
+# "<owner>/<name>" of the current repository, so it never runs on the public repository.
+# It never runs on pull_request events (secrets must not be exposed to pull requests).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: leakguard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: leak guard (history, strict, redacted)
+    if: ${{ vars.DOCWIKI_PRIVATE_REPO != '' && github.repository == vars.DOCWIKI_PRIVATE_REPO }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install the scanner dependencies
+        run: uv sync --extra extract --extra mcp
+
+      - name: Write the private deny-list to a temporary file
+        env:
+          DENYLIST_CONTENT: ${{ secrets.DOCWIKI_DENYLIST_CONTENT }}
+        run: |
+          if [ -z "${DENYLIST_CONTENT}" ]; then
+            echo "::error::secret DOCWIKI_DENYLIST_CONTENT is missing or empty"
+            exit 1
+          fi
+          umask 077
+          denylist="${RUNNER_TEMP}/docwiki-denylist.txt"
+          printf '%s\n' "${DENYLIST_CONTENT}" > "${denylist}"
+          echo "DOCWIKI_DENYLIST=${denylist}" >> "${GITHUB_ENV}"
+
+      - name: Scan the working tree and the history of the pushed branch
+        env:
+          CI: "true"
+        # Only commits reachable from the pushed ref are scanned: bot branches (Dependabot release
+        # notes quote upstream maintainers' e-mail addresses) are never part of a publication.
+        run: |
+          git rev-list HEAD > "${RUNNER_TEMP}/commits.txt"
+          uv run python tools/leakguard/leakguard.py scan --root . \
+            --commits-from "${RUNNER_TEMP}/commits.txt" --strict --redact
+
+      - name: Remove the deny-list
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/docwiki-denylist.txt"

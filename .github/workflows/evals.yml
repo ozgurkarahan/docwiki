@@ -1,0 +1,162 @@
+name: evals
+
+# Live evaluation of the DocWiki Researcher and the baselines (docs/spec/evals.md, evals/README.md).
+# Manual only: it calls the deployed Foundry agent and models, which costs money, so it never runs
+# on push or pull request. PR CI runs the metric unit tests on recorded data instead.
+#
+# One-time setup by a repository administrator (no credential is created by this workflow):
+#   1. Repository secret DOCWIKI_FOUNDRY_PROJECT_ENDPOINT: the Foundry project endpoint
+#      (https://<account>.services.ai.azure.com/api/projects/<project>), a secret so that logs
+#      mask it.
+#   2. Repository variables: DOCWIKI_SMART_DEPLOYMENT (smart-tier deployment: baselines and
+#      judge), optionally DOCWIKI_FAST_DEPLOYMENT and DOCWIKI_SMART_MODEL (model id used to price
+#      the tokens).
+#   3. Azure sign-in with OpenID Connect: follow the comments of the "Azure login" step below.
+#      Until it is enabled, every Azure call of the run fails with an authentication error.
+#   4. Optional private holdout: repository secret DOCWIKI_HOLDOUT_JSONL_B64 (the holdout JSONL,
+#      base64-encoded). Its questions and per-question results stay on the runner; only the
+#      aggregate result file is uploaded.
+
+on:
+  workflow_dispatch:
+    inputs:
+      system:
+        description: System to evaluate
+        type: choice
+        options:
+          - all
+          - docwiki-researcher
+          - baseline-rag
+          - baseline-long-context
+        default: all
+      split:
+        description: Golden split (dev is public; holdout needs the DOCWIKI_HOLDOUT_JSONL_B64 secret)
+        type: choice
+        options:
+          - dev
+          - holdout
+        default: dev
+      limit:
+        description: Evaluate only the first N questions (empty = all)
+        type: string
+        default: ""
+      judge:
+        description: Also run the azure-ai-evaluation judge (smart deployment)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  # id-token: write   # required by the OIDC "Azure login" step; uncomment together with it
+
+concurrency:
+  group: evals
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    name: evaluate (${{ inputs.system }}, ${{ inputs.split }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      DOCWIKI_FOUNDRY_PROJECT_ENDPOINT: ${{ secrets.DOCWIKI_FOUNDRY_PROJECT_ENDPOINT }}
+      DOCWIKI_SMART_DEPLOYMENT: ${{ vars.DOCWIKI_SMART_DEPLOYMENT }}
+      DOCWIKI_FAST_DEPLOYMENT: ${{ vars.DOCWIKI_FAST_DEPLOYMENT }}
+      DOCWIKI_SMART_MODEL: ${{ vars.DOCWIKI_SMART_MODEL }}
+      DOCWIKI_LLM_MODE: foundry
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check the repository settings
+        run: |
+          missing=""
+          [ -n "$DOCWIKI_FOUNDRY_PROJECT_ENDPOINT" ] || missing="$missing secret DOCWIKI_FOUNDRY_PROJECT_ENDPOINT,"
+          [ -n "$DOCWIKI_SMART_DEPLOYMENT" ] || missing="$missing variable DOCWIKI_SMART_DEPLOYMENT,"
+          if [ -n "$missing" ]; then
+            echo "::error title=evals::Missing repository settings:${missing%,} (see the header of .github/workflows/evals.yml)"
+            exit 1
+          fi
+
+      # Azure login with OpenID Connect (no stored password or key). To enable it:
+      #   1. Create a user-assigned managed identity (or an app registration) with a federated
+      #      credential for this repository, for example subject
+      #      repo:<owner>/<repository>:ref:refs/heads/main (or a protected environment).
+      #   2. Grant it the "Azure AI User" role on the Foundry project (agents, models, judge).
+      #   3. Store its client id, the tenant id and the subscription id as repository secrets
+      #      AZURE_CLIENT_ID, AZURE_TENANT_ID and AZURE_SUBSCRIPTION_ID.
+      #   4. Uncomment "id-token: write" in the permissions above and the step below.
+      # DefaultAzureCredential (used by docwiki.llm, docwiki.agents_client and the judge) then
+      # picks up the Azure CLI session of the runner.
+      # - name: Azure login (OIDC)
+      #   uses: azure/login@v2
+      #   with:
+      #     client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      #     tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      #     subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install (evals, extract and azure extras)
+        run: uv sync --extra evals --extra extract --extra azure
+
+      - name: Select the questions
+        id: questions
+        env:
+          SPLIT: ${{ inputs.split }}
+          HOLDOUT_B64: ${{ secrets.DOCWIKI_HOLDOUT_JSONL_B64 }}
+        run: |
+          if [ "$SPLIT" = "dev" ]; then
+            echo "path=evals/golden/dev.jsonl" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "$HOLDOUT_B64" ]; then
+            echo "::error title=evals::The holdout split needs the DOCWIKI_HOLDOUT_JSONL_B64 secret"
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/holdout" "$RUNNER_TEMP/private"
+          printf '%s' "$HOLDOUT_B64" | base64 -d > "$RUNNER_TEMP/holdout/holdout.jsonl"
+          echo "path=$RUNNER_TEMP/holdout/holdout.jsonl" >> "$GITHUB_OUTPUT"
+
+      - name: Evaluate
+        env:
+          SYSTEM: ${{ inputs.system }}
+          SPLIT: ${{ inputs.split }}
+          LIMIT: ${{ inputs.limit }}
+          JUDGE: ${{ inputs.judge }}
+          QUESTIONS: ${{ steps.questions.outputs.path }}
+        run: |
+          if [ "$SYSTEM" = "all" ]; then
+            systems="docwiki-researcher baseline-rag baseline-long-context"
+          else
+            systems="$SYSTEM"
+          fi
+          args=(--questions "$QUESTIONS" --split-name "$SPLIT")
+          if [ -n "$LIMIT" ]; then args+=(--limit "$LIMIT"); fi
+          if [ "$JUDGE" = "true" ]; then args+=(--judge); fi
+          if [ "$SPLIT" != "dev" ]; then args+=(--private-out "$RUNNER_TEMP/private"); fi
+          status=0
+          for system in $systems; do
+            echo "::group::$system"
+            uv run python evals/run.py --system "$system" "${args[@]}" || status=1
+            echo "::endgroup::"
+          done
+          exit $status
+
+      - name: Scoreboard
+        if: always()
+        run: uv run python evals/scoreboard.py
+
+      # Public outputs only: dev results (per-question records) or holdout aggregates, and the
+      # scoreboard. Holdout questions and details in $RUNNER_TEMP are never uploaded.
+      - name: Upload the results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: eval-results-${{ inputs.split }}-${{ github.run_id }}
+          path: |
+            evals/results/
+            evals/SCOREBOARD.md
+          if-no-files-found: warn
+          retention-days: 30
