@@ -17,6 +17,7 @@
     "mcpMinReplicas": { "value": "${DOCWIKI_MCP_MIN_REPLICAS}" },
     "mcpTokenValidation": { "value": "${DOCWIKI_MCP_TOKEN_VALIDATION}" },
     "enablePortal": { "value": "${DOCWIKI_ENABLE_PORTAL}" },
+    "portalAccess": { "value": "${DOCWIKI_PORTAL_ACCESS}" },
     "enableEventTrigger": { "value": "${DOCWIKI_ENABLE_EVENT_TRIGGER}" },
     "reconcileCron": { "value": "${DOCWIKI_RECONCILE_CRON}" },
     "audience": { "value": "${DOCWIKI_AUDIENCE}" },

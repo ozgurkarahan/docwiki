@@ -126,7 +126,8 @@ azd env set DOCWIKI_MCP_MIN_REPLICAS 0
 | `DOCWIKI_SMART_MODEL` / `DOCWIKI_SMART_MODEL_VERSION` / `DOCWIKI_SMART_CAPACITY` | `gpt-5.5` / `2026-04-24` / `100` | `smart` deployment (pipeline compilation and both agents) |
 | `DOCWIKI_DEPLOYMENT_SKU` | `GlobalStandard` | Or `DataZoneStandard` to keep model processing in the EU or US data zone (smaller quota, about 10 % higher list price) |
 | `DOCWIKI_MCP_MIN_REPLICAS` | `0` | `1` keeps the MCP server warm for demos (from zero, a cold start adds about 30 s to an agent turn) |
-| `DOCWIKI_ENABLE_PORTAL` | `false` | Private portal with Entra sign-in |
+| `DOCWIKI_ENABLE_PORTAL` | `false` | Portal Container App serving the current release's site (Entra sign-in by default) |
+| `DOCWIKI_PORTAL_ACCESS` | `entra` | `public` serves the portal without sign-in; honoured only with `DOCWIKI_AUDIENCE=public`, otherwise the portal gets no ingress |
 | `DOCWIKI_ENABLE_EVENT_TRIGGER` | `true` | `false` makes the ingest job manual |
 | `DOCWIKI_RECONCILE_CRON` | `0 */6 * * *` | Reconcile schedule (UTC) |
 | `DOCWIKI_AUDIENCE` | `internal` | Build audience (`public`, `internal`, `restricted`) |

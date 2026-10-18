@@ -61,6 +61,7 @@ def test_spec_parameters_and_defaults() -> None:
         "mcpMinReplicas": "0",
         "mcpTokenValidation": "'required'",
         "enablePortal": "false",
+        "portalAccess": "'entra'",
         "enableEventTrigger": "true",
         "reconcileCron": "'0 */6 * * *'",
         "audience": "'internal'",
@@ -249,6 +250,33 @@ def test_disabled_portal_is_dormant_at_zero_replicas() -> None:
     # ingress: the HTTP default must apply then.
     mcp = main[main.index("module mcpApp") : main.index("module portalApp")]
     assert "dormant:" not in mcp
+
+
+def test_portal_without_sign_in_only_for_public_audience_builds() -> None:
+    """DOCWIKI_PORTAL_ACCESS=public serves the portal without sign-in, and only a public-audience
+    build; otherwise the portal gets ingress only once its Entra sign-in is declared."""
+    main = main_text()
+    assert re.search(
+        r"@allowed\(\[\s*'entra'\s*'public'\s*\]\)\s*@description\([^\n]*\)\s*"
+        r"param portalAccess string = 'entra'",
+        main,
+    )
+    assert (
+        "var portalAnonymous = enablePortal && portalAccess == 'public' && audience == 'public'"
+        in main
+    )
+    assert (
+        "var portalPublic = portalAnonymous || (enablePortal && portalAccess == 'entra' && "
+        "!empty(portalClientId))" in main
+    )
+    assert (
+        "module portalAuth 'modules/app-auth.bicep' = if (portalPublic && !portalAnonymous)" in main
+    )
+    portal = main[main.index("module portalApp") : main.index("module mcpAuth")]
+    assert "ingressMode: portalPublic ? 'external' : 'none'" in portal
+    assert "output DOCWIKI_PORTAL_ANONYMOUS bool = portalAnonymous" in main
+    parameters = json.loads((INFRA / "main.parameters.json").read_text(encoding="utf-8"))
+    assert parameters["parameters"]["portalAccess"] == {"value": "${DOCWIKI_PORTAL_ACCESS}"}
 
 
 def test_mcp_server_validates_the_forwarded_token() -> None:

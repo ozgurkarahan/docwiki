@@ -1066,6 +1066,29 @@ def test_portal_flow_configures_sign_in_then_ingress(runner: FakeRunner, tmp_pat
     assert not runner.commands(r"credential reset|secret"), "no client secret is ever created"
 
 
+@pytest.mark.parametrize(("anonymous", "expected"), [("true", "no sign-in"), ("false", "stays")])
+def test_public_portal_registers_nothing(
+    runner: FakeRunner,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    anonymous: str,
+    expected: str,
+) -> None:
+    code = postprovision.main(
+        ["--only", "portal"],
+        runner=runner,
+        environ=base_env(
+            DOCWIKI_ENABLE_PORTAL="true",
+            DOCWIKI_PORTAL_ACCESS="public",
+            DOCWIKI_PORTAL_ANONYMOUS=anonymous,
+        ),
+        root=tmp_path,
+    )
+    assert code == 0
+    assert not runner.calls, "no Entra registration, auth config or ingress change"
+    assert expected in capsys.readouterr().out
+
+
 # ---------------------------------------------------------------------------
 # postdeploy
 # ---------------------------------------------------------------------------

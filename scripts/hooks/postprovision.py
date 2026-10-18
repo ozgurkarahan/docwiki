@@ -18,6 +18,8 @@ select them by name):
                        ``DOCWIKI_MCP_TOKEN_VALIDATION``) and only then enable external ingress.
 3. ``portal``          Only with ``DOCWIKI_ENABLE_PORTAL=true``: sign-in app registration (ID
                        tokens, no client secret), built-in auth with ``RedirectToLoginPage``.
+                       With ``DOCWIKI_PORTAL_ACCESS=public`` (public-audience builds only) there
+                       is no sign-in and nothing to register: Bicep gives the portal its ingress.
 4. ``mcp-connection``  Foundry project connection of the agents' MCP tool: ``RemoteTool``,
                        ``AgenticIdentityToken``, target ``DOCWIKI_MCP_URL``, audience
                        ``api://<appId>`` (ARM, same properties as
@@ -457,6 +459,16 @@ def step_portal(ctx: Context) -> None:
     values = tools.require("DOCWIKI_PORTAL_APP_NAME", "DOCWIKI_CONTAINER_APPS_DEFAULT_DOMAIN")
     app_name = values["DOCWIKI_PORTAL_APP_NAME"]
     host = f"{app_name}.{values['DOCWIKI_CONTAINER_APPS_DEFAULT_DOMAIN']}"
+    if (tools.get("DOCWIKI_PORTAL_ACCESS") or "entra").strip().lower() == "public":
+        # Bicep gives the portal its ingress itself, and only for a public-audience build.
+        if is_true(tools.get("DOCWIKI_PORTAL_ANONYMOUS")):
+            info(f"portal ready at https://{host}/ (no sign-in: public-audience build)")
+        else:
+            warn(
+                "DOCWIKI_PORTAL_ACCESS=public needs DOCWIKI_AUDIENCE=public: the portal stays "
+                "without ingress (set DOCWIKI_PORTAL_ACCESS=entra for a signed-in portal)"
+            )
+        return
     suffix, tag = ctx.names()
     previous = ctx.state.get("portal_app") or {}
     owner, owner_type = ctx.principal()

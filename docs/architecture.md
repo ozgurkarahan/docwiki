@@ -28,7 +28,7 @@ flowchart LR
   jobs -->|"PDF and images"| cu["Content Understanding"]
   jobs -->|"publish, If-Match<br/>pointer swap"| releases[("Blob: releases<br/>immutable releases,<br/>current.json")]
   releases --> mcp["Container App: mcp<br/>MCP server,<br/>built-in auth"]
-  releases --> portal["Container App: portal<br/>optional, Entra sign-in"]
+  releases --> portal["Container App: portal<br/>optional, Entra sign-in or public build"]
   mcp -->|"read tools"| researcher["Foundry prompt agent<br/>Researcher"]
   mcp -->|"read and<br/>operations tools"| librarian["Foundry prompt agent<br/>Librarian"]
   mcp -.->|"ingest_start, recompile<br/>after approval"| queue

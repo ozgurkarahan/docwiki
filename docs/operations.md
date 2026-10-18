@@ -62,7 +62,7 @@ deployer holds Storage Queue Data Contributor on both queues). Save the message 
 {"schema": "docwiki.ingest/v1", "kind": "recompile",
  "scope": {"source_ids": ["src-0123456789ab"], "prefix": null},
  "hints": {"operator_notes": "Table 3 is continued on the next page."},
- "requested_by": "cli", "idempotency_key": "recompile-src-0123456789ab-1",
+ "requested_by": "cli", "idempotency_key": "recompile-1",
  "created_at": "2026-01-01T00:00:00Z"}
 ```
 
@@ -276,6 +276,10 @@ minute per capacity unit).
   groups assigned to the portal enterprise application get in. The hook assigns the deployer;
   add readers under Enterprise applications → `docwiki-portal-<env>-<token>` → Users and
   groups. No client secret exists (ID-token sign-in).
+- Public portal (`DOCWIKI_PORTAL_ACCESS=public`, only with `DOCWIKI_AUDIENCE=public`): no sign-in
+  and no app registration; Bicep gives the portal its ingress, so anyone with the URL can read the
+  public build. A portal that already had Entra sign-in keeps it until you run
+  `az containerapp auth update --name <portal app> --resource-group <rg> --enabled false`.
 - The hooks call Microsoft Graph with the Azure CLI sign-in. When continuous access evaluation
   revokes it, they stop with `the signed-in session needs a fresh sign-in`: run `az logout`,
   `az login` and `azd auth login`, then re-run the hook.

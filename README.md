@@ -49,8 +49,9 @@ MCP and Agent Skills).
 
 ### 1. Browse the sample wiki
 
-**<https://docwiki.ozgurkarahan.com>**: the public sample, a fictional wind-farm operator, with
-graph view, full-text search, backlinks and the evidence microscope.
+**<https://docwiki.ozgurkarahan.com>** (also <https://ozgurkarahan.github.io/docwiki/>): the public
+sample, a fictional wind-farm operator, with graph view, full-text search, backlinks and the
+evidence microscope.
 
 | Home | Topic synthesis |
 |---|---|
@@ -165,7 +166,7 @@ flowchart LR
 | Models | Microsoft Foundry deployments `fast` and `smart`; Content Understanding for PDFs and images | Classification fallback, figure descriptions and entity summaries (`fast`); compilation and topic synthesis (`smart`) |
 | MCP server | Container App `mcp` behind built-in authentication | Serves the current release; enforces `Wiki.Read` and `Wiki.Operate` per tool |
 | Agents | Foundry prompt agents `docwiki-researcher` and `docwiki-librarian` | Cited answers; operations with approvals |
-| Site | Quartz on GitHub Pages (public sample) or the optional `portal` Container App (Entra sign-in) | Human view and evidence microscope |
+| Site | Quartz on GitHub Pages (public sample) or the optional `portal` Container App (Entra sign-in, or no sign-in for a public-audience build) | Human view and evidence microscope |
 | Operations | Log Analytics, Application Insights, Foundry tracing, budget alerts | Spans per stage, model call and tool call; a cost receipt per run |
 
 Run control, release lifecycle and identities: [docs/architecture.md](docs/architecture.md).

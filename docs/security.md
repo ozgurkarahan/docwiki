@@ -63,8 +63,10 @@ ingress is enabled only once built-in authentication is verified. Revocation: re
 ID from the allowlist takes effect within about a minute; removing an app role only at the next
 token refresh.
 
-The optional private portal uses interactive Entra sign-in with ID tokens and no client secret;
-only users or groups assigned to its enterprise application get in.
+The optional portal uses interactive Entra sign-in with ID tokens and no client secret; only users
+or groups assigned to its enterprise application get in. A public-audience deployment may serve it
+without sign-in (`DOCWIKI_PORTAL_ACCESS=public`): it then exposes only the static site of a build
+that excludes internal and restricted sources; any other audience keeps the portal without ingress.
 
 ## Content safety in the pipeline
 

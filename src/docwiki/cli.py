@@ -39,7 +39,18 @@ def main(
     """DocWiki command group."""
     from docwiki.orchestration.settings import load_dotenv
 
+    _never_fail_on_output_encoding()
     load_dotenv(env_file)
+
+
+def _never_fail_on_output_encoding() -> None:
+    """Answers contain characters such as ``−``, ``°`` or ``✓``: a stream that cannot encode them
+    (a Windows pipe in the ANSI code page) prints a replacement character instead of crashing."""
+    for stream in (sys.stdout, sys.stderr):
+        encoding = (getattr(stream, "encoding", None) or "").lower().replace("-", "")
+        if encoding != "utf8" and hasattr(stream, "reconfigure"):
+            with contextlib.suppress(ValueError, OSError):
+                stream.reconfigure(errors="replace")
 
 
 @app.command()

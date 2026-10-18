@@ -236,3 +236,21 @@ def test_commands_work_on_an_empty_installation(cli_env, command):
     result = runner.invoke(app, command)
     assert result.exit_code == 0
     assert list_release_ids(FolderStorage(Path(cli_env["work"]))) == []
+
+
+def test_output_that_the_console_cannot_encode_never_crashes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import io
+
+    from docwiki.cli import _never_fail_on_output_encoding
+
+    buffer = io.BytesIO()
+    ansi = io.TextIOWrapper(buffer, encoding="cp1252")
+    monkeypatch.setattr(sys, "stdout", ansi)
+    _never_fail_on_output_encoding()
+    print("Minimum start temperature \u22125 \u00b0C \u2713")
+    ansi.flush()
+    assert buffer.getvalue().decode("cp1252").splitlines() == [
+        "Minimum start temperature ?5 \u00b0C ?"
+    ]

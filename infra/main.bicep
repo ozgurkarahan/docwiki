@@ -87,8 +87,15 @@ param mcpMinReplicas int = 0
 @description('Bearer-token validation by the MCP server behind built-in auth (DOCWIKI_MCP_TOKEN_VALIDATION). off trusts the platform principal header alone: only for a platform that does not forward the Authorization header (src/docwiki/mcp/README.md).')
 param mcpTokenValidation string = 'required'
 
-@description('Deploy the optional private portal (Entra sign-in).')
+@description('Deploy the optional portal (Entra sign-in, or no sign-in for a public-audience build: portalAccess).')
 param enablePortal bool = false
+
+@allowed([
+  'entra'
+  'public'
+])
+@description('Portal access (DOCWIKI_PORTAL_ACCESS): entra = Entra sign-in; public = no sign-in, honoured only when the audience is public (any other audience keeps the portal without ingress).')
+param portalAccess string = 'entra'
 
 @description('Wake the ingest job from the queue (KEDA); false makes it a manually started job.')
 param enableEventTrigger bool = true
@@ -219,7 +226,10 @@ var budgetContacts = filter(map(split(budgetContactEmails, ','), email => trim(e
 var allowedAddressPrefixes = filter(map(split(allowedIpRanges, ','), range => trim(range)), range => !empty(range))
 var deployBudget = budgetAmount > 0 && !empty(budgetContacts)
 var deployerPrincipalId = grantDeployerDataAccess ? principalId : ''
-var portalPublic = enablePortal && !empty(portalClientId)
+// The portal gets ingress once its Entra sign-in is declared, or without sign-in only for a
+// public-audience build (DOCWIKI_PORTAL_ACCESS=public); any other combination fails closed.
+var portalAnonymous = enablePortal && portalAccess == 'public' && audience == 'public'
+var portalPublic = portalAnonymous || (enablePortal && portalAccess == 'entra' && !empty(portalClientId))
 // Fail closed: the MCP app gets external ingress only once its built-in auth is declared here
 // (mcpApiClientId set). On the first provision the postprovision hook applies and verifies the
 // auth config, sets the token settings below and only then enables ingress.
@@ -727,7 +737,7 @@ module mcpConnection 'modules/mcp-connection.bicep' = if (!empty(mcpApiClientId)
   }
 }
 
-module portalAuth 'modules/app-auth.bicep' = if (portalPublic) {
+module portalAuth 'modules/app-auth.bicep' = if (portalPublic && !portalAnonymous) {
   name: 'portalAuth'
   scope: rg
   params: {
@@ -814,6 +824,7 @@ output DOCWIKI_MCP_URL string = mcpUrl
 output DOCWIKI_MCP_CONNECTION string = mcpConnectionName
 output DOCWIKI_PORTAL_APP_NAME string = portalApp.outputs.name
 output DOCWIKI_ENABLE_PORTAL bool = enablePortal
+output DOCWIKI_PORTAL_ANONYMOUS bool = portalAnonymous
 output DOCWIKI_PORTAL_URL string = enablePortal ? portalUrl : ''
 output DOCWIKI_CONTAINER_APPS_DEFAULT_DOMAIN string = containerAppsEnvironment.outputs.defaultDomain
 
