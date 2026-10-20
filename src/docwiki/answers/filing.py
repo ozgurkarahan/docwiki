@@ -42,6 +42,7 @@ from docwiki.stages.verify_citations import unsigned_values
 __all__ = [
     "APPROVED_BY",
     "HOW_HEADING",
+    "NOT_FOUND_RE",
     "FiledAnswer",
     "FilingError",
     "FolderRelease",
@@ -49,13 +50,14 @@ __all__ = [
     "StorageRelease",
     "build_query_page",
     "query_slug",
+    "tool_steps",
 ]
 
 APPROVED_BY = "owner"
 """``approved_by`` of every filed answer: a role, never a person's name or address."""
 HOW_HEADING = "How this answer was produced"
 
-_NOT_FOUND_RE = re.compile(r"\bnot found in the wiki\b", re.IGNORECASE)
+NOT_FOUND_RE = re.compile(r"\bnot found in the wiki\b", re.IGNORECASE)
 _SLUG_MAX = 60
 _INLINE_RE = re.compile(r"\[\^?c?(\d{1,3})\](?![(:])")
 _RENUMBER_RE = re.compile(r"[ \t]*\[\^?c?(\d{1,3})\](?![(:])")
@@ -224,7 +226,7 @@ def build_query_page(
     listed: list[Source] = list(getattr(answer, "sources", None) or parse_answer(text))
     by_number = {source.n: source for source in listed}
     used = _numbers_in_order(body)
-    not_found = not used and bool(_NOT_FOUND_RE.search(body))
+    not_found = not used and bool(NOT_FOUND_RE.search(body))
     if not used and not not_found:
         raise FilingError(
             "the answer cites nothing: only cited answers or an explicit "
@@ -288,7 +290,7 @@ def build_query_page(
             missing=len(missing),
         )
     )
-    steps = _steps(getattr(answer, "tool_calls", None) or [])
+    steps = tool_steps(getattr(answer, "tool_calls", None) or [])
     if steps:
         lines += ["", *(f"- {step}" for step in steps)]
     if citations:
@@ -531,7 +533,8 @@ def _provenance(
     return " ".join(parts)
 
 
-def _steps(calls: Sequence[Any]) -> list[str]:
+def tool_steps(calls: Sequence[Any]) -> list[str]:
+    """Tool calls as the plain steps of "How this answer was produced" (``search `query` ``)."""
     steps: list[str] = []
     for call in calls:
         name = re.sub(r"[^a-z0-9_]", "", str(getattr(call, "name", "") or "").lower())

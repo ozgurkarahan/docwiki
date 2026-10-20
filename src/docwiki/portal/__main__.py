@@ -4,6 +4,9 @@ Storage selection follows the shared settings: ``DOCWIKI_MODE=local`` reads rele
 folder storage at ``DOCWIKI_WORK_DIR`` (``--storage-root`` overrides it); ``DOCWIKI_MODE=azure``
 uses ``docwiki.storage.storage_from_settings()`` provided by the engine (Blob Storage with
 managed identity). ``--site-dir`` serves an already built site without any storage.
+
+``DOCWIKI_LIVE_ASK=1`` (with ``DOCWIKI_FOUNDRY_PROJECT_ENDPOINT``) turns on the visitors'
+questions to the Researcher agent (``docs/live-ask.md``).
 """
 
 from __future__ import annotations
@@ -21,6 +24,7 @@ from docwiki.contracts.settings import SETTINGS_DEFAULTS, SettingsKeys
 from docwiki.contracts.storage import FolderStorage, Storage
 from docwiki.logs import quiet_sdk_http_logs
 from docwiki.portal.app import create_app
+from docwiki.portal.live_ask import LiveAsk
 from docwiki.portal.sync import SiteSync
 
 
@@ -61,8 +65,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     quiet_sdk_http_logs(logging.INFO)
+    live_ask = LiveAsk.from_env(os.environ)
+    if live_ask is not None:
+        logging.getLogger("docwiki.portal").info("live ask is on (DOCWIKI_LIVE_ASK=1)")
     if args.site_dir is not None:
-        app = create_app(site_dir=args.site_dir)
+        app = create_app(site_dir=args.site_dir, live_ask=live_ask)
     else:
         storage = (
             FolderStorage(args.storage_root, fsync=False)
@@ -71,7 +78,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         cache_dir = args.cache_dir or Path(".local") / "portal-cache"
         app = create_app(
-            SiteSync(storage, cache_dir, prefix=args.prefix), poll_seconds=args.poll_seconds
+            SiteSync(storage, cache_dir, prefix=args.prefix),
+            poll_seconds=args.poll_seconds,
+            live_ask=live_ask,
         )
     uvicorn.run(app, host=args.host, port=args.port, server_header=False, log_level="info")
     return 0

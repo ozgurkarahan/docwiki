@@ -63,6 +63,7 @@ __all__ = [
     "Segment",
     "answer_for_page",
     "build_answers",
+    "markdown_paragraphs",
     "notice_kind",
     "query_pages",
     "write_answers",
@@ -306,6 +307,15 @@ def _paragraphs(block: Sequence[Token], cites: Collection[int]) -> list[list[Seg
         ):
             paragraphs.append([{"text": token.content}])
     return [trimmed for trimmed in (_trim(paragraph) for paragraph in paragraphs) if trimmed]
+
+
+def markdown_paragraphs(markdown: str, cites: Collection[int] = ()) -> list[list[Segment]]:
+    """The drawer's paragraphs of a Markdown text; footnote references ``[^cN]`` of ``cites``
+    become citation segments, other references are dropped."""
+    paragraphs: list[list[Segment]] = []
+    for block in _blocks(markdown_parser().parse(markdown)):
+        paragraphs.extend(_paragraphs(block, cites))
+    return paragraphs
 
 
 def _lead(body: str, cites: Collection[int]) -> tuple[list[str], list[list[Segment]]]:

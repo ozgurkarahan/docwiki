@@ -4,6 +4,9 @@ It serves the folder kept up to date by :class:`~docwiki.portal.sync.SiteSync` (
 maps Quartz's extensionless URLs to ``.html`` files, answers ``404.html`` for missing pages and sets
 security headers on every response. It is designed to run behind Azure Container Apps built-in
 authentication (interactive Entra sign-in): the app itself does no authentication.
+
+With ``live_ask`` (``DOCWIKI_LIVE_ASK=1``, see :mod:`docwiki.portal.live_ask`) it also answers the
+questions that anonymous visitors ask the Researcher agent from the wiki's drawer (``/api/ask``).
 """
 
 from __future__ import annotations
@@ -20,6 +23,7 @@ from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from starlette.routing import Route
 
+from docwiki.portal.live_ask import LiveAsk, live_ask_routes
 from docwiki.portal.sync import SiteState, SiteSync, site_state_from_dir
 
 __all__ = [
@@ -239,13 +243,17 @@ def create_app(
     site_dir: str | Path | None = None,
     poll_seconds: float = 30.0,
     headers: dict[str, str] | None = None,
+    live_ask: LiveAsk | None = None,
 ) -> Starlette:
     """Portal ASGI app serving ``sync``'s current site (polled every ``poll_seconds``) or, for a
-    local preview, an already built ``site_dir``."""
+    local preview, an already built ``site_dir``. ``live_ask`` adds the visitors' questions to the
+    Researcher; ``/api/ask/status`` reports whether it is enabled."""
     if (sync is None) == (site_dir is None):
         raise ValueError("pass exactly one of sync or site_dir")
     static = site_state_from_dir(Path(site_dir)) if site_dir is not None else None
     portal = _Portal(sync, static, poll_seconds)
+    if live_ask is not None:
+        live_ask.site_root = lambda: portal.state.root if portal.state else None
 
     @contextlib.asynccontextmanager
     async def lifespan(_app: Starlette) -> AsyncIterator[None]:
@@ -254,6 +262,8 @@ def create_app(
         try:
             yield
         finally:
+            if live_ask is not None:
+                await live_ask.aclose()
             if task is not None:
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
@@ -261,6 +271,7 @@ def create_app(
 
     app = Starlette(
         routes=[
+            *live_ask_routes(live_ask),
             Route("/healthz", portal.health, methods=["GET", "HEAD"]),
             Route("/livez", portal.live, methods=["GET", "HEAD"]),
             Route("/{path:path}", portal.page, methods=["GET", "HEAD"]),
@@ -270,4 +281,3 @@ def create_app(
     app.add_middleware(SecurityHeadersMiddleware, headers=headers)
     app.state.portal = portal
     return app
-
