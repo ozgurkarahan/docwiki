@@ -364,3 +364,163 @@ def test_drawer_provenance_line_and_narrow_collapse() -> None:
         "labels": ["Back to the answer", "Ask this wiki", "Ask this wiki", "Ask this wiki"],
         "query": "(max-width: 1200px)",
     }
+
+
+# ----- Live questions (ADR 0008): the pure side of the drawer's Ask form -----
+
+LIVE_ANSWER = {
+    "id": "live:0123456789abcdef0123456789abcdef",
+    "slug": "index",
+    "question": "When are the windows delivered?",
+    "date": "2026-10-21",
+    "banners": ["Live answer from the Researcher agent — not reviewed by the owner."],
+    "paragraphs": [[{"text": "Delivery is due in April"}, {"cite": 1}, {"text": "."}]],
+    "citations": [
+        {
+            "n": 1,
+            "title": "Site meeting minutes",
+            "label": "¶ 7",
+            "href": "evidence/src-165f1d3a109c/para-0007",
+            "badge": "paraphrase",
+        }
+    ],
+    "steps": ["search `window delivery`"],
+    "provenance": "Answered live by the Researcher agent.",
+    "pages": [],
+    "live": True,
+}
+
+
+def test_live_status_questions_job_ids_and_messages() -> None:
+    result = run_helpers(
+        """
+        console.log(JSON.stringify({
+          status: [{enabled: true}, {enabled: false}, {enabled: "yes"}, {}, null, "x", []]
+            .map(m.parseLiveStatus),
+          questions: ["", "  ab ", "abc", "  When is it?  ", "x".repeat(500), "x".repeat(501),
+            " ".repeat(10) + "x".repeat(500)].map(m.liveQuestion),
+          jobs: ["0123456789abcdef0123456789abcdef", "../../etc", "0123", "", 7, null]
+            .map((id) => { try { return m.parseJobId({job_id: id}) } catch { return null } }),
+          noJob: (() => { try { return m.parseJobId(null) } catch { return "throws" } })(),
+          refusals: [
+            {message: "  Your previous question is still being answered. "},
+            {message: ""},
+            {message: 7},
+            {message: "x".repeat(400)},
+            null,
+          ].map(m.refusalMessage),
+          waiting: [0, 3.9, 61, -2].map(m.waitingLabel),
+          paths: [m.LIVE_STATUS_PATH, m.LIVE_ASK_PATH, m.LIVE_POLL_MS, m.LIVE_QUESTION_MAX],
+        }))
+        """
+    )
+    assert isinstance(result, dict)
+    assert result["status"] == [True, False, False, False, False, False, False]
+    assert result["questions"] == [
+        {"error": "Please ask a complete question."},
+        {"error": "Please ask a complete question."},
+        {"question": "abc"},
+        {"question": "When is it?"},
+        {"question": "x" * 500},
+        {"error": "Please keep the question under 500 characters."},
+        {"question": "x" * 500},
+    ]
+    assert result["jobs"] == ["0123456789abcdef0123456789abcdef", None, None, None, None, None]
+    assert result["noJob"] == "throws"
+    generic = "The live agent could not be reached. Please try again later."
+    assert result["refusals"] == [
+        "Your previous question is still being answered.",
+        generic,
+        generic,
+        "x" * 300,
+        generic,
+    ]
+    assert result["waiting"] == [
+        "The Researcher is reading the wiki… 0 s",
+        "The Researcher is reading the wiki… 3 s",
+        "The Researcher is reading the wiki… 61 s",
+        "The Researcher is reading the wiki… 0 s",
+    ]
+    assert result["paths"] == ["api/ask/status", "api/ask", 2000, 500]
+
+
+def test_live_poll_replies_are_parsed_as_data() -> None:
+    unverified = {
+        **LIVE_ANSWER,
+        "banners": [LIVE_ANSWER["banners"][0]],
+    }
+    replies = [
+        {"status": "running", "elapsed_s": 4.2},
+        {"status": "running"},
+        {"status": "busy", "elapsed_s": 1, "message": "The live agent has reached its limit."},
+        {"status": "error", "message": "  "},
+        {"status": "done", "elapsed_s": 30, "answer": LIVE_ANSWER},
+        {
+            "status": "done",
+            "answer": {**LIVE_ANSWER, "live": False, "slug": "index", "id": "live:x"},
+        },
+        {
+            "status": "unverified",
+            "message": "This answer could not be checked against the sources.",
+            "answer": unverified,
+        },
+        {"status": "unverified", "answer": {**unverified, "paragraphs": [[{"cite": 1}]]}},
+    ]
+    broken = [
+        None,
+        "done",
+        {},
+        {"status": "finished"},
+        {"status": "done"},
+        {"status": "done", "answer": {"id": ""}},
+        {"status": "done", "answer": {**LIVE_ANSWER, "slug": "https://example.org/x"}},
+    ]
+    result = run_helpers(
+        f"""
+        const parsed = {json.dumps(replies)}.map(m.parseLivePoll)
+        const errors = {json.dumps(broken)}.map((payload) => {{
+          try {{ m.parseLivePoll(payload); return null }} catch (error) {{ return error.message }}
+        }})
+        console.log(JSON.stringify({{parsed, errors}}))
+        """
+    )
+    assert isinstance(result, dict)
+    running, running_bare, busy, error, done, forced, unchecked, citation_only = result["parsed"]
+    assert running == {"state": "running", "elapsed": 4.2}
+    assert running_bare == {"state": "running", "elapsed": 0}
+    assert busy == {
+        "state": "failed",
+        "status": "busy",
+        "message": "The live agent has reached its limit.",
+    }
+    assert error == {
+        "state": "failed",
+        "status": "error",
+        "message": "The live agent could not be reached. Please try again later.",
+    }
+    assert done == {"state": "answer", "status": "done", "answer": LIVE_ANSWER}
+    assert forced["answer"]["live"] is True  # the client marks every live answer, whatever it says
+    assert unchecked["status"] == "unverified"
+    answer = unchecked["answer"]
+    assert answer["citations"] == []  # no citation links, even if the server sent them
+    assert answer["paragraphs"] == [[{"text": "Delivery is due in April"}, {"text": "."}]]
+    assert answer["banners"] == [
+        LIVE_ANSWER["banners"][0],
+        "This answer could not be checked against the sources.",
+    ]
+    assert answer["live"] is True
+    assert citation_only["answer"]["paragraphs"] == []
+    assert all(isinstance(message, str) for message in result["errors"])
+
+
+def test_live_flag_survives_the_answers_parser_only_when_true() -> None:
+    result = run_helpers(
+        f"""
+        const base = {json.dumps(LIVE_ANSWER)}
+        const answers = m.parseAnswers({{schema: 1, answers: [
+          base, {{...base, id: "a", live: "yes"}}, {{...base, id: "b", live: false}},
+        ]}})
+        console.log(JSON.stringify(answers.map((item) => item.live ?? null)))
+        """
+    )
+    assert result == [True, None, None]

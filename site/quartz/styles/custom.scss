@@ -529,6 +529,8 @@ $askDrawerWidth: 440px;
     background: var(--tertiary);
   }
 
+  // Hidden until the client knows there are filed answers or a live agent.
+  &[hidden],
   &[aria-expanded="true"] {
     display: none;
   }
@@ -545,7 +547,7 @@ $askDrawerWidth: 440px;
 }
 
 // Room for the floating button under the last line of the page.
-.page:has(.docwiki-ask-fab) footer.docwiki-footer {
+.page:has(.docwiki-ask-fab:not([hidden])) footer.docwiki-footer {
   margin-bottom: 5.5rem;
 }
 
@@ -756,6 +758,100 @@ $askDrawerWidth: 440px;
       border-color: var(--secondary);
       background: var(--highlight);
     }
+  }
+
+  // The live question: a labelled textarea, "Ask" and a status line above the question list.
+  .docwiki-ask-form {
+    margin: 0 0 1.4rem;
+    padding-bottom: 1.1rem;
+    border-bottom: 1px solid var(--lightgray);
+  }
+
+  .docwiki-ask-form-label {
+    display: block;
+    margin: 0 0 0.4rem;
+    font-size: 0.88rem;
+    font-weight: $semiBoldWeight;
+    color: var(--dark);
+  }
+
+  .docwiki-ask-input {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--lightgray);
+    border-radius: 8px;
+    background: var(--light);
+    color: var(--dark);
+    font: inherit;
+    line-height: 1.45;
+    resize: vertical;
+
+    &:focus-visible {
+      outline: 2px solid var(--secondary);
+      outline-offset: 1px;
+    }
+
+    &:disabled {
+      opacity: 0.7;
+    }
+  }
+
+  .docwiki-ask-submit {
+    margin: 0.55rem 0 0;
+    padding: 0.4rem 1.1rem;
+    border: 1px solid var(--secondary);
+    border-radius: 6px;
+    background: var(--secondary);
+    color: var(--light);
+    font: inherit;
+    font-weight: $semiBoldWeight;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      border-color: var(--tertiary);
+      background: var(--tertiary);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: progress;
+    }
+  }
+
+  .docwiki-ask-live-status {
+    margin: 0.55rem 0 0;
+    font-size: 0.88rem;
+    color: var(--darkgray);
+
+    &:empty {
+      display: none;
+    }
+
+    &:focus {
+      outline: none;
+    }
+  }
+
+  .docwiki-ask-live-error {
+    margin: 0.55rem 0 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--dw-superseded-border);
+    border-radius: 6px;
+    background: var(--dw-superseded-bg);
+    color: var(--dw-superseded-fg);
+    font-size: 0.88rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+
+  .docwiki-ask-hint {
+    margin: 0.55rem 0 0;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: var(--gray);
   }
 
   .docwiki-ask-back,

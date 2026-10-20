@@ -1,6 +1,8 @@
-// "Ask this wiki" (ADR 0007): a floating button and a non-modal drawer listing the research
-// answers filed as queries/ pages. The drawer is filled on the client from
-// static/docwiki/answers.json with DOM nodes and textContent only (scripts/askPanel.inline.ts).
+// "Ask this wiki" (ADR 0007, 0008): a floating button and a non-modal drawer. It lists the research
+// answers filed as queries/ pages (static/docwiki/answers.json) and, where the portal enables it,
+// lets a visitor ask the Researcher agent (/api/ask). Both are filled on the client with DOM nodes
+// and textContent only (scripts/askPanel.inline.ts). The button is part of every page and stays
+// hidden until the client knows there is something to show: filed answers, or a live agent.
 import { classNames } from "../../util/lang"
 import { QuartzComponent, QuartzComponentConstructor, QuartzComponentProps } from "../types"
 // @ts-ignore
@@ -12,7 +14,7 @@ const PANEL_ID = "docwiki-ask"
 export default (() => {
   const AskPanel: QuartzComponent = ({ fileData, displayClass }: QuartzComponentProps) => {
     // The 404 page is served at any path, where its relative links would not resolve.
-    if (!settings.answers || fileData.slug === "404") return null
+    if (fileData.slug === "404") return null
     return (
       <div class={classNames(displayClass, "docwiki-ask-root")}>
         <button
@@ -20,6 +22,7 @@ export default (() => {
           class="docwiki-ask-fab"
           aria-expanded="false"
           aria-controls={PANEL_ID}
+          hidden={settings.answers === 0}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M20.5 11.6a8.4 8.4 0 0 1-12.3 7.4L3.5 20.5l1.5-4.4a8.4 8.4 0 1 1 15.5-4.5z" />
@@ -33,6 +36,7 @@ export default (() => {
           class="docwiki-ask"
           aria-label="Ask this wiki"
           data-repo-url={settings.repoUrl}
+          data-filed-answers={String(settings.answers)}
           hidden
         ></aside>
       </div>

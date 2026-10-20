@@ -7,20 +7,34 @@
 import type { AskAnswer, AskCitation, AskState } from "../../../plugins/transformers/docwiki-text"
 import {
   ASK_STATE_KEY,
+  LIVE_ASK_PATH,
+  LIVE_FAILED,
+  LIVE_KEEP,
+  LIVE_POLL_MS,
+  LIVE_QUESTION_MAX,
+  LIVE_STATUS_PATH,
   NARROW_QUERY,
   badgeForText,
   citationText,
   fabLabel,
   followLink,
   groupAnswers,
+  liveQuestion,
   parseAnswers,
   parseAskState,
+  parseJobId,
+  parseLivePoll,
+  parseLiveStatus,
   provenanceLine,
+  refusalMessage,
   relativeHref,
   stepsLabel,
+  waitingLabel,
 } from "../../../plugins/transformers/docwiki-text"
 
 const PANEL_ID = "docwiki-ask"
+const INPUT_ID = "docwiki-ask-input"
+const HINT_ID = "docwiki-ask-hint"
 const ANSWERS_PATH = "static/docwiki/answers.json"
 const SVG_NS = "http://www.w3.org/2000/svg"
 /** Quartz overlays that close on Escape themselves (search, global graph). */
@@ -29,6 +43,29 @@ const OVERLAYS = ".search-container.active, .global-graph-outer.active"
 let answers: AskAnswer[] | null = null
 let loading: Promise<AskAnswer[]> | null = null
 let failed = false
+/** Filed answers of this build (`data-filed-answers`); a build without any has no answers.json. */
+let filedCount = 0
+/** Whether the portal answers live questions (`/api/ask/status`); `null` until it is known. */
+let liveEnabled: boolean | null = null
+let liveChecking: Promise<void> | null = null
+
+interface LiveRun {
+  question: string
+  started: number
+  /** `null` until the portal accepted the question. */
+  jobId: string | null
+  timer: number
+  /** Polls that failed in a row. */
+  failures: number
+}
+
+/** The question in flight (module state: the drawer is rebuilt on every page navigation). */
+let liveRun: LiveRun | null = null
+/** Why the last live question did not produce an answer, or what is wrong with the text. */
+let liveMessage: string | null = null
+let liveDraft = ""
+/** Live answers of this page load, oldest first: listed in the drawer, never persisted. */
+const liveAnswers = new Map<string, AskAnswer>()
 let memoryState: AskState = parseAskState(null)
 /** Focus to restore in the rebuilt drawer after a page navigation started from inside it. */
 let pendingFocus: string | null = null
@@ -79,6 +116,28 @@ function loadAnswers(slug: string): Promise<AskAnswer[]> {
   return loading
 }
 
+/** Asks the portal once per page load whether it answers live questions; failures mean "no". */
+function checkLive(slug: string): Promise<void> {
+  if (liveEnabled !== null) return Promise.resolve()
+  if (!liveChecking) {
+    liveChecking = fetch(relativeHref(slug, LIVE_STATUS_PATH), { credentials: "same-origin" })
+      .then((response) => (response.ok ? (response.json() as Promise<unknown>) : null))
+      .then(parseLiveStatus)
+      .catch(() => false)
+      .then((enabled) => {
+        liveEnabled = enabled
+      })
+      .finally(() => {
+        liveChecking = null
+      })
+  }
+  return liveChecking
+}
+
+function findAnswer(id: string): AskAnswer | undefined {
+  return liveAnswers.get(id) ?? answers?.find((item) => item.id === id)
+}
+
 function element<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   className?: string,
@@ -127,7 +186,9 @@ function header(): HTMLElement {
   const subtitle = element(
     "p",
     "docwiki-ask-subtitle",
-    "Answers by the Researcher agent, reviewed before publishing",
+    liveEnabled
+      ? "Ask the Researcher agent. Its citations are checked before they are shown."
+      : "Answers by the Researcher agent, reviewed before publishing",
   )
   titles.append(title, subtitle)
   const close = button("docwiki-ask-close", "", "close")
@@ -140,7 +201,7 @@ function header(): HTMLElement {
 }
 
 function footer(repoUrl: string | undefined): HTMLElement {
-  const foot = element("p", "docwiki-ask-footer", "To ask your own questions, ")
+  const foot = element("p", "docwiki-ask-footer", "You can also ")
   const text = "connect your coding agent to this wiki (MCP)"
   if (repoUrl && /^https?:\/\//.test(repoUrl)) {
     const anchor = element("a", undefined, text)
@@ -155,8 +216,12 @@ function footer(repoUrl: string | undefined): HTMLElement {
 
 function questionList(body: HTMLElement, list: readonly AskAnswer[], slug: string) {
   const groups = groupAnswers(list, slug)
+  const live = Array.from(liveAnswers.values()).reverse()
+  if (live.length > 0) groups.unshift({ title: "Your live questions", answers: live })
   if (groups.length === 0) {
-    body.append(element("p", "docwiki-ask-status", "No answers have been filed yet."))
+    if (!liveEnabled) {
+      body.append(element("p", "docwiki-ask-status", "No answers have been filed yet."))
+    }
     return
   }
   for (const group of groups) {
@@ -172,6 +237,155 @@ function questionList(body: HTMLElement, list: readonly AskAnswer[], slug: strin
     section.append(element("h3", "docwiki-ask-group-title", group.title), items)
     body.append(section)
   }
+}
+
+/** The Ask form above the question list: a labelled textarea, a button and a status line. */
+function liveForm(body: HTMLElement) {
+  const form = element("form", "docwiki-ask-form")
+  form.noValidate = true
+  const label = element("label", "docwiki-ask-form-label", "Ask the Researcher")
+  label.htmlFor = INPUT_ID
+  const input = element("textarea", "docwiki-ask-input")
+  input.id = INPUT_ID
+  input.rows = 3
+  input.maxLength = LIVE_QUESTION_MAX
+  input.value = liveDraft
+  input.disabled = liveRun !== null
+  input.dataset.focusKey = "ask-input"
+  input.setAttribute("aria-describedby", HINT_ID)
+  input.addEventListener("input", () => {
+    liveDraft = input.value
+  })
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault()
+      form.requestSubmit()
+    }
+  })
+  const submit = button("docwiki-ask-submit", "Ask", "ask-submit")
+  submit.type = "submit"
+  submit.disabled = liveRun !== null
+  const status = element("p", "docwiki-ask-live-status")
+  status.setAttribute("role", "status")
+  status.setAttribute("aria-live", "polite")
+  status.tabIndex = -1
+  status.dataset.focusKey = "live-status"
+  if (liveRun) status.textContent = waitingLabel((Date.now() - liveRun.started) / 1000)
+  form.append(label, input, submit, status)
+  if (liveMessage) {
+    const problem = element("p", "docwiki-ask-live-error", liveMessage)
+    problem.setAttribute("role", "alert")
+    form.append(problem)
+  }
+  const hint = element(
+    "p",
+    "docwiki-ask-hint",
+    "Live answers are checked against the sources before they are shown. " +
+      "The owner has not reviewed them.",
+  )
+  hint.id = HINT_ID
+  form.append(hint)
+  form.addEventListener("submit", (event) => {
+    event.preventDefault()
+    void startLive()
+  })
+  body.append(form)
+}
+
+function waiting() {
+  const status = document.querySelector<HTMLElement>(`#${PANEL_ID} .docwiki-ask-live-status`)
+  if (status && liveRun) status.textContent = waitingLabel((Date.now() - liveRun.started) / 1000)
+}
+
+type LiveOutcome = { answer: AskAnswer } | { message: string }
+
+/** The question is over: show its answer, or why there is none (the filed list stays). */
+function endLive(run: LiveRun, outcome: LiveOutcome) {
+  if (liveRun !== run) return
+  window.clearTimeout(run.timer)
+  liveRun = null
+  if ("answer" in outcome) {
+    const item = outcome.answer
+    liveAnswers.set(item.id, item)
+    while (liveAnswers.size > LIVE_KEEP) {
+      const oldest = liveAnswers.keys().next()
+      if (oldest.done) break
+      liveAnswers.delete(oldest.value)
+    }
+    liveDraft = ""
+    liveMessage = null
+    const state = readState()
+    // Not while the visitor reads another answer: it stays in "Your live questions".
+    if (!state.open) update({ answer: item.id, scroll: 0 }, null)
+    else if (state.answer === null) update({ answer: item.id, scroll: 0 }, "answer")
+    else paint(null)
+  } else {
+    liveMessage = outcome.message
+    paint("ask-input")
+  }
+}
+
+async function pollLive(run: LiveRun) {
+  if (liveRun !== run || run.jobId === null) return
+  try {
+    const target = relativeHref(currentSlug(), `${LIVE_ASK_PATH}/${run.jobId}`)
+    const response = await fetch(target, { credentials: "same-origin", cache: "no-store" })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const result = parseLivePoll(await response.json())
+    run.failures = 0
+    if (result.state === "running") {
+      waiting()
+      run.timer = window.setTimeout(() => void pollLive(run), LIVE_POLL_MS)
+    } else if (result.state === "answer") {
+      endLive(run, { answer: result.answer })
+    } else {
+      endLive(run, { message: result.message })
+    }
+  } catch (error) {
+    console.error("DocWiki: the live answer could not be read", error)
+    run.failures += 1
+    if (run.failures >= 3) endLive(run, { message: LIVE_FAILED })
+    else run.timer = window.setTimeout(() => void pollLive(run), LIVE_POLL_MS)
+  }
+}
+
+async function startLive() {
+  if (liveRun) return
+  const checked = liveQuestion(liveDraft)
+  if ("error" in checked) {
+    liveMessage = checked.error
+    paint("ask-input")
+    return
+  }
+  liveMessage = null
+  const run: LiveRun = {
+    question: checked.question,
+    started: Date.now(),
+    jobId: null,
+    timer: 0,
+    failures: 0,
+  }
+  liveRun = run
+  paint("live-status")
+  try {
+    const response = await fetch(relativeHref(currentSlug(), LIVE_ASK_PATH), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ question: run.question }),
+    })
+    const payload = await response.json().catch((): unknown => null)
+    if (!response.ok) {
+      endLive(run, { message: refusalMessage(payload) })
+      return
+    }
+    run.jobId = parseJobId(payload)
+  } catch (error) {
+    console.error("DocWiki: the question could not be sent", error)
+    endLive(run, { message: LIVE_FAILED })
+    return
+  }
+  run.timer = window.setTimeout(() => void pollLive(run), LIVE_POLL_MS)
 }
 
 function citeMark(
@@ -256,9 +470,11 @@ function answerView(body: HTMLElement, item: AskAnswer, slug: string) {
   const meta = element("div", "docwiki-ask-meta")
   const line = provenanceLine(item)
   if (line) meta.append(element("p", "docwiki-ask-provenance", line))
-  const open = element("p", "docwiki-ask-open")
-  open.append(link(slug, item.slug, "Open as a page", "page"))
-  meta.append(open)
+  if (!item.live) {
+    const open = element("p", "docwiki-ask-open")
+    open.append(link(slug, item.slug, "Open as a page", "page"))
+    meta.append(open)
+  }
   article.append(meta)
   body.append(back, article)
 }
@@ -267,10 +483,16 @@ function fill(body: HTMLElement, state: AskState) {
   body.replaceChildren()
   body.removeAttribute("aria-busy")
   const slug = currentSlug()
-  if (answers) {
-    const selected = state.answer ? answers.find((item) => item.id === state.answer) : undefined
-    if (selected) answerView(body, selected, slug)
-    else questionList(body, answers, slug)
+  const selected = state.answer ? findAnswer(state.answer) : undefined
+  if (selected) {
+    answerView(body, selected, slug)
+    body.scrollTop = state.scroll
+    return
+  }
+  if (liveEnabled) liveForm(body)
+  // A build without filed answers has no answers.json: only the live questions are left.
+  if (answers || filedCount === 0) {
+    questionList(body, answers ?? [], slug)
     body.scrollTop = state.scroll
     return
   }
@@ -444,6 +666,7 @@ document.addEventListener("nav", () => {
   const found = elements()
   if (!found) return
   const { fab, panel } = found
+  filedCount = Number(panel.dataset.filedAnswers) || 0
   fab.addEventListener("click", onFabClick)
   panel.addEventListener("click", onPanelClick)
   panel.addEventListener("scroll", onPanelScroll, { capture: true, passive: true })
@@ -456,7 +679,25 @@ document.addEventListener("nav", () => {
     document.removeEventListener("keydown", onKeydown, true)
     document.removeEventListener("prenav", onPrenav)
   })
-  const state = readState()
-  if (state.open) paint(focusKey)
-  else syncFab(fab, state)
+  // The button shows when there are filed answers or a live agent; the portal says which (a
+  // static host has no /api/ask/status, so a build without answers shows nothing there).
+  const known = liveEnabled !== null
+  const apply = () => {
+    fab.hidden = filedCount === 0 && liveEnabled !== true
+    syncFab(fab, readState())
+  }
+  apply()
+  if (readState().open && !fab.hidden) paint(focusKey)
+  if (!known) {
+    void checkLive(currentSlug()).then(() => {
+      if (!fab.isConnected) return // another page replaced this one meanwhile
+      apply()
+      if (liveEnabled && !fab.hidden && readState().open) {
+        // The form joins a drawer that is already open: keep the focus where it was.
+        const active = document.activeElement
+        const inPanel = active instanceof HTMLElement && panel.contains(active)
+        paint(inPanel ? (active.dataset.focusKey ?? null) : null)
+      }
+    })
+  }
 })

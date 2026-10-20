@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 from datetime import date
 from pathlib import Path
@@ -478,3 +479,15 @@ def test_the_drawer_renders_with_dom_apis_only() -> None:
     # Quartz's inline-script loader deletes the first "export" of the file it bundles.
     assert "export" not in script
     assert "textContent" in script and "sessionStorage" in script
+
+
+def test_the_drawer_is_always_built_and_the_client_decides_whether_to_show_it() -> None:
+    """ADR 0008: the button is on every page, hidden when there is nothing to ask or read."""
+    script = (COMPONENT_DIR / "scripts" / "askPanel.inline.ts").read_text(encoding="utf-8")
+    component = (COMPONENT_DIR / "AskPanel.tsx").read_text(encoding="utf-8")
+    assert "return null" in component and component.count("return null") == 1  # the 404 page
+    assert "hidden={settings.answers === 0}" in component
+    assert "data-filed-answers={String(settings.answers)}" in component
+    # Every request of the drawer is relative to the current page: no absolute URL is fetched.
+    calls = re.findall(r"fetch\(([^,)]*)", script)
+    assert calls and all(call.startswith(("relativeHref(", "target")) for call in calls)

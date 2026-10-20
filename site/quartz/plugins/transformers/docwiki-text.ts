@@ -215,6 +215,8 @@ export interface AskAnswer {
   provenance: string
   /** Content slugs the answer is about: listed first on those pages. */
   pages: string[]
+  /** A live answer of the Researcher (ADR 0008): not filed, so there is no page to open. */
+  live?: boolean
 }
 
 const CONTENT_SLUG = /^[a-z0-9_][a-z0-9_.-]*(\/[a-z0-9_][a-z0-9_.-]*)*(#[A-Za-z0-9_-]+)?$/
@@ -269,7 +271,7 @@ function answer(value: unknown): AskAnswer | undefined {
   if (typeof question !== "string" || !question.trim()) return undefined
   const paragraphs = Array.isArray(value.paragraphs) ? value.paragraphs.map(segments) : []
   const citations = Array.isArray(value.citations) ? value.citations.map(citation) : []
-  return {
+  const parsed: AskAnswer = {
     id,
     slug,
     question,
@@ -281,6 +283,8 @@ function answer(value: unknown): AskAnswer | undefined {
     provenance: typeof value.provenance === "string" ? value.provenance : "",
     pages: strings(value.pages),
   }
+  if (value.live === true) parsed.live = true
+  return parsed
 }
 
 /**
@@ -401,4 +405,105 @@ export function parseAskState(raw: string | null | undefined): AskState {
     typeof scroll === "number" && Number.isFinite(scroll) && scroll > 0 ? Math.round(scroll) : 0
   state.resume = value.resume === true
   return state
+}
+
+// ----- Live questions to the Researcher (ADR 0008): /api/ask, served by the same portal -----
+
+export const LIVE_STATUS_PATH = "api/ask/status"
+export const LIVE_ASK_PATH = "api/ask"
+export const LIVE_QUESTION_MIN = 3
+export const LIVE_QUESTION_MAX = 500
+/** Delay between two polls of a running question. */
+export const LIVE_POLL_MS = 2000
+/** Live answers kept in the drawer for this page load. */
+export const LIVE_KEEP = 5
+/** Shown when the portal cannot be reached or answers in an unexpected way. */
+export const LIVE_FAILED = "The live agent could not be reached. Please try again later."
+
+const JOB_ID = /^[0-9a-f]{32}$/
+
+/** `{"enabled": true}` of `GET /api/ask/status`; anything else means "no live ask". */
+export function parseLiveStatus(payload: unknown): boolean {
+  return isRecord(payload) && payload.enabled === true
+}
+
+/** The visitor's text as a question (trimmed, 3 to 500 characters), or what to tell them. */
+export function liveQuestion(raw: string): { question: string } | { error: string } {
+  const question = raw.trim()
+  if (question.length < LIVE_QUESTION_MIN) return { error: "Please ask a complete question." }
+  if (question.length > LIVE_QUESTION_MAX) {
+    return { error: `Please keep the question under ${LIVE_QUESTION_MAX} characters.` }
+  }
+  return { question }
+}
+
+/** Job id of a `202` reply; throws on anything but 32 hexadecimal characters. */
+export function parseJobId(payload: unknown): string {
+  if (isRecord(payload) && typeof payload.job_id === "string" && JOB_ID.test(payload.job_id)) {
+    return payload.job_id
+  }
+  throw new Error("the live ask did not return a job id")
+}
+
+/** Message of a refused request (`{"message": …}`), else a generic one: never raw server text. */
+export function refusalMessage(payload: unknown): string {
+  if (isRecord(payload) && typeof payload.message === "string" && payload.message.trim()) {
+    return payload.message.trim().slice(0, 300)
+  }
+  return LIVE_FAILED
+}
+
+export type LivePoll =
+  | { state: "running"; elapsed: number }
+  | { state: "answer"; status: "done" | "unverified"; answer: AskAnswer }
+  | { state: "failed"; status: "error" | "busy"; message: string }
+
+/**
+ * A poll reply of `GET /api/ask/{job_id}`. The reply is data: the answer goes through the same
+ * parser as `answers.json`, is always marked live, and an `unverified` answer loses its citation
+ * links whatever the server sent, with the portal's message as an extra note. Throws when the
+ * reply is not of this shape.
+ */
+export function parseLivePoll(payload: unknown): LivePoll {
+  if (!isRecord(payload)) throw new Error("the live ask returned an unexpected reply")
+  const message = typeof payload.message === "string" ? payload.message.trim().slice(0, 300) : ""
+  const elapsed =
+    typeof payload.elapsed_s === "number" && payload.elapsed_s >= 0 ? payload.elapsed_s : 0
+  switch (payload.status) {
+    case "running":
+      return { state: "running", elapsed }
+    case "error":
+    case "busy":
+      return { state: "failed", status: payload.status, message: message || LIVE_FAILED }
+    case "done":
+    case "unverified": {
+      const parsed = answer(payload.answer)
+      if (!parsed) throw new Error("the live ask returned no answer")
+      const verified = payload.status === "done"
+      const paragraphs = verified
+        ? parsed.paragraphs
+        : parsed.paragraphs
+            .map((paragraph) => paragraph.filter((segment) => segment.cite === undefined))
+            .filter((paragraph) => paragraph.length > 0)
+      const banners = !verified && message ? [...parsed.banners, message] : parsed.banners
+      return {
+        state: "answer",
+        status: payload.status,
+        answer: {
+          ...parsed,
+          paragraphs,
+          banners,
+          citations: verified ? parsed.citations : [],
+          live: true,
+        },
+      }
+    }
+    default:
+      throw new Error("the live ask returned an unknown status")
+  }
+}
+
+/** "The Researcher is reading the wiki… 12 s" */
+export function waitingLabel(elapsedSeconds: number): string {
+  return `The Researcher is reading the wiki… ${Math.max(Math.floor(elapsedSeconds), 0)} s`
 }
