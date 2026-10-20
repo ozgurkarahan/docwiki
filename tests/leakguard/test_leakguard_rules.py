@@ -60,7 +60,7 @@ def test_subscription_resource_id_absorbs_its_guid() -> None:
         (f"contact {FAKE_EMAIL}", ["email"]),
         ("author 12345+octo@users.noreply.github.com", []),
         ("mail someone@example.com or team@sub.example.org", []),
-        ("fictional ops@contoso.example", []),
+        ("fictional chantier@lamna-batiment.example", []),
         ("retina logo@2x.png", []),
         ("package @azure/identity and actions/checkout@v4", []),
     ],
@@ -128,7 +128,7 @@ def test_secret_placeholders_are_ignored(text: str) -> None:
         ("http:" + "//host.docker." + "internal:5000", []),
         ("self.internal = True; threading.local()", []),
         ("from mypkg.internal.utils import x", []),
-        ("http:" + "//intranet.contoso.example/", []),
+        ("http:" + "//intranet.lamna-batiment.example/", []),
     ],
 )
 def test_internal_host_rule(text: str, expected: list[str]) -> None:

@@ -1,4 +1,4 @@
-dev.jsonl sha256=c63a5dffd1066d6cc5450fd9281054bfd594cc1a15f99b492a46a4b7c66d7b05
-questions=33
-sealed=2026-10-17
-corpus MANIFEST.json sha256=30abad65021a09837816e3a8b14ce876c990d2631a28ea37fe7bea9147806951
+dev.jsonl sha256=8b2d344b02a45210d2c5dbca1a200b92c0ce5abcc3ffc9e97a383c0ddb9e9f20
+questions=16
+sealed=2026-10-19
+corpus MANIFEST.json sha256=ff3a69089ff3dd905717eaa31d0452115f2a2b6209d88b72b5810a04ff2fb8e1

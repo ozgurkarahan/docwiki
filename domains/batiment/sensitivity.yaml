@@ -1,0 +1,8 @@
+# Sensitivity tiers of the batiment sample. Paths are relative to the input root (raw/), for
+# example "restricted/2026-02-02_etude-de-prix-interne.xlsx" when samples/corpus/full is the
+# input, or "full/restricted/..." when samples/corpus is. When several rules match, the highest
+# tier wins; a build for an audience leaves out every source above it.
+default: public
+rules:
+  - {tier: restricted, path_glob: "**/restricted/**"}
+  - {tier: restricted, doc_type: price-study}

@@ -1,0 +1,13 @@
+terms:
+  - term: revision
+    definition: A new issue of the same numbered document, identified by a letter.
+    synonyms:
+      en: [revision letter]
+      fr: [indice]
+    see_also: [topic:quotes-contract-and-amendment]
+  - term: windows and external doors
+    definition: The windows and the sliding bay windows of the extension.
+    synonyms:
+      en: [exterior joinery]
+      fr: [menuiseries extérieures]
+    see_also: [building-element:baie-f1]

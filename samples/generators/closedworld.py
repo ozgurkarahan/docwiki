@@ -1,7 +1,7 @@
 """Closed-world name scan: capitalised multi-word sequences must use known words only.
 
 A capitalised token starts with an upper-case letter and contains a lower-case letter, so IDs
-and acronyms (WTG-07, PWG, FICTIONAL) are ignored. Two or more capitalised tokens separated by
+and acronyms (BC-2026-009, TTC, FICTIONAL) are ignored. Two or more capitalised tokens separated by
 single spaces form a candidate name. Every token of a candidate must belong to an allowlisted
 name (samples/fiction/allowlist.txt), a technology name or the bible's generic vocabulary.
 """

@@ -15,10 +15,13 @@ from typing import Any
 import pytest
 from mcp_testkit import (
     FIXTURE_ROOT,
+    MINUTES,
     NOW,
-    PLAN,
+    PLAN_A,
+    PLAN_B,
     READ_CALLS,
     RELEASE_ID,
+    TOPIC_ID,
     check_read_results,
     stage_release,
     stdio_session,
@@ -64,12 +67,12 @@ def test_folder_source_serves_a_portable_folder(portable_wiki: Path) -> None:
     with pytest.raises(KeyError):
         source.manifest_for("20990101T000000Z-00000000")
     reads = ReadTools(source, McpConfig())
-    tables = json.loads(reads.query_table(PLAN, "SELECT count(*) AS n FROM t01"))
-    assert tables["rows"] == [[3]]
-    with pytest.raises(ToolInputError, match="sources with tables: src-43c97f7dfcde") as missing:
-        reads.query_table("src-4d9c65e05302", "SELECT 1")
+    tables = json.loads(reads.query_table(PLAN_B, "SELECT count(*) AS n FROM t01"))
+    assert tables["rows"] == [[23]]
+    with pytest.raises(ToolInputError, match=f"sources with tables: {PLAN_B}") as missing:
+        reads.query_table(MINUTES, "SELECT 1")
     assert missing.value.code == "not_found"
-    assert missing.value.details == {"sources_with_tables": [PLAN]}
+    assert missing.value.details == {"sources_with_tables": [PLAN_B]}
     assert _files(portable_wiki) == before, "serving never writes to the folder"
 
 
@@ -81,7 +84,7 @@ def test_reexported_portable_folder_is_reloaded(tmp_path: Path) -> None:
     source = FolderReleaseSource(folder, ttl_s=30, clock=lambda: now[0])
     reads = ReadTools(source, McpConfig())
     first = source.current()
-    assert json.loads(reads.search("gearbox"))["release_id"] == RELEASE_ID
+    assert json.loads(reads.search("menuiseries"))["release_id"] == RELEASE_ID
     staged = stage_release(
         tmp_path / "staged", created_at=NOW + timedelta(days=1), topic_note="Re-exported note."
     )
@@ -89,7 +92,7 @@ def test_reexported_portable_folder_is_reloaded(tmp_path: Path) -> None:
     assert source.current() is first, "re-checked at most every ttl_s"
     now[0] += 31
     assert source.current().release_id == staged.release_id
-    assert "Re-exported note." in json.loads(reads.read_page("topic:gearbox-oil"))["markdown"]
+    assert "Re-exported note." in json.loads(reads.read_page(TOPIC_ID))["markdown"]
     assert json.loads(reads.search("re-exported note"))["hits"]
 
 
@@ -134,10 +137,8 @@ async def test_portable_folder_over_stdio(portable_wiki: Path) -> None:
             for name, arguments in READ_CALLS.items()
         }
         pdf = tool_payload(
-            await client.call_tool(
-                "get_evidence", {"source_id": "src-f2750f41f3fa", "locator_key": "p0001"}
-            )
+            await client.call_tool("get_evidence", {"source_id": PLAN_A, "locator_key": "p0001"})
         )
     check_read_results(results)
     assert pdf["provenance"] == "native-text" and "img/p0001.png" in pdf["content"]
-    assert (portable_wiki / "evidence" / "src-f2750f41f3fa" / "img" / "p0001.png").is_file()
+    assert (portable_wiki / "evidence" / PLAN_A / "img" / "p0001.png").is_file()

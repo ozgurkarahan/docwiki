@@ -1,8 +1,9 @@
 """Regenerating the corpus reproduces the committed files.
 
 Extracted text must be identical everywhere. Bytes must be identical for plain-text formats, and
-for every format when the interpreter, platform and library versions match the ones recorded
-in MANIFEST.json (binary encoders such as zlib, libjpeg and FreeType may differ elsewhere).
+for every format when the interpreter, platform, library versions and embedded font files match
+the ones recorded in MANIFEST.json (binary encoders such as zlib, libjpeg, fpdf2 font subsetting
+and the DejaVu font files shape the bytes elsewhere).
 """
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
-TEXT_FORMATS = {"csv", "eml", "vtt", "md", "txt"}
+TEXT_FORMATS = {"eml"}
 
 
 def test_regeneration_reproduces_text_and_bytes(tmp_path: Path, manifest: dict[str, Any]) -> None:

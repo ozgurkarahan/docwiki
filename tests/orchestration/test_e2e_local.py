@@ -31,32 +31,39 @@ async def test_end_to_end_release_validates_with_zero_violations(make_harness, o
     reader = ReleaseReader.open(harness.settings.work_dir)
     assert reader.release_id == outcome.release_id
     sources = {page.title: page for page in reader.list_pages("source")}
-    assert set(sources) == {"SOP-GBX-010 rev A", "SOP-GBX-010 rev B", "Oil plan", "Supplier note"}
-    rev_a = reader.read_page(sources["SOP-GBX-010 rev A"].id)
+    assert set(sources) == {
+        "DEV-2026-014 indice A",
+        "DEV-2026-014 indice B",
+        "Purchase plan",
+        "Supplier note",
+    }
+    rev_a = reader.read_page(sources["DEV-2026-014 indice A"].id)
     assert rev_a.frontmatter.status == "superseded"
     assert "**Superseded** by" in rev_a.body
     assert "## Related" in rev_a.body
     assert "docwiki:backlinks:start" in rev_a.body
-    assert rev_a.frontmatter.topics == ["topic:gearbox-oil"]
+    assert rev_a.frontmatter.topics == ["topic:schedule-and-window-delivery"]
     assert {page.id for page in reader.list_pages("entity")} == {
-        "asset:wtg-07",
-        "asset:wtg-12",
-        "organisation:litware",
+        "building-element:baie-f1",
+        "building-element:fenetre-f2",
+        "organisation:vanarsdel-menuiseries",
     }
-    assert [page.id for page in reader.list_pages("topic")] == ["topic:gearbox-oil"]
-    assert reader.tables(sources["Oil plan"].id).tables[0].row_count == 2
+    assert [page.id for page in reader.list_pages("topic")] == [
+        "topic:schedule-and-window-delivery"
+    ]
+    assert reader.tables(sources["Purchase plan"].id).tables[0].row_count == 2
     assert {skill.name for skill in reader.list_skills()} == {
         "cite-sources",
         "deep-research",
-        "troubleshoot-alarm",
+        "prepare-site-meeting",
         "wiki-maintainer",
         "wiki-navigator",
     }
-    hits = reader.open_search().search("ISO VG 220")
+    hits = reader.open_search().search("sliding window")
     assert any(hit.kind == "source-block" and hit.source_id for hit in hits)
     assert any(hit.page_id == "glossary" for hit in hits)
-    # the restricted rate card never reaches an internal build
-    assert all("rate" not in page.path for page in reader.catalog.pages)
+    # the restricted price study never reaches an internal build
+    assert all("study" not in page.path for page in reader.catalog.pages)
     report = outcome.report
     assert report.status == "succeeded"
     assert report.counts.sources_total == 5
@@ -130,9 +137,9 @@ async def test_injection_source_is_contained_in_a_public_build(make_harness):
     root = harness.current_release()
     assert _problems(root) == []
     note = source_id_for("notes/supplier-note.txt")
-    sop = source_id_for("procedures/SOP-GBX-010 rev A.txt")
+    quote = source_id_for("devis/DEV-2026-014 indice A.txt")
     # originals are published for the fictional public sample, never for a flagged source
-    assert (root / "evidence" / sop / "original.txt").is_file()
+    assert (root / "evidence" / quote / "original.txt").is_file()
     assert not list((root / "evidence" / note).glob("original.*"))
     # the canary is nowhere in the release, whatever the file type (search.db included)
     needle = CANARY.encode("utf-8")

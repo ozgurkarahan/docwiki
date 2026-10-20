@@ -1,7 +1,7 @@
-# Use the sample wiki with your coding agent
+# Use a wiki with your coding agent
 
-You do not need Azure to explore DocWiki with an agent. The DocWiki MCP server runs locally over
-stdio, serves a release folder read-only, and works with any MCP client. This page gives the exact
+The DocWiki MCP server runs locally over stdio, serves a release read-only (from a folder, or from
+the Blob storage of your own deployment), and works with any MCP client. This page gives the exact
 configuration for GitHub Copilot (VS Code and CLI), Claude Code and Codex.
 
 ## Prerequisites
@@ -18,13 +18,14 @@ Check the server once by hand (it waits for an MCP client on stdin; stop it with
 uv run --extra mcp python -m docwiki.mcp.server --stdio --release samples/fixtures/mock-release
 ```
 
-> **Which release?** The committed configurations serve `samples/wiki/`, the sample release of the
-> fictional wind farm compiled on Azure (37 sources, 165 pages), committed as a portable wiki
-> folder. For a quicker smoke test, `samples/fixtures/mock-release` is a small hand-made release
-> (three sources, one topic, three entities) with the same contract.
-> `--release` accepts a release folder, a `releases/` folder with `current.json`, or a folder that
-> contains `releases/current.json`, so a release you compiled yourself works too
-> (`--release .local/releases`).
+> **Which release?** The committed VS Code and Claude Code configurations serve
+> `samples/fixtures/mock-release`, a small hand-made release (three sources, one topic, three
+> entities) with the same contract, so they work without Azure. To read the current release of
+> your own deployment instead, sign in with `az login`, set `DOCWIKI_MODE=azure` and
+> `DOCWIKI_STORAGE_ACCOUNT` to your storage account, and replace `--release ...` with
+> `--storage blob`. `--release` also accepts a release folder, a `releases/` folder with
+> `current.json`, or a folder that contains `releases/current.json`, so a release you compiled
+> yourself works too (`--release .local/releases`).
 
 In local mode the server exposes the **read tools only**: `search`, `read_page`, `get_index`,
 `get_links`, `glossary`, `get_evidence`, `query_table`, `get_skill`, `list_skills` and
@@ -48,9 +49,13 @@ The repository ships [`.vscode/mcp.json`](../.vscode/mcp.json):
         "-m",
         "docwiki.mcp.server",
         "--stdio",
-        "--release",
-        "samples/wiki"
+        "--storage",
+        "blob"
       ],
+      "env": {
+        "DOCWIKI_MODE": "azure",
+        "DOCWIKI_STORAGE_ACCOUNT": "${env:DOCWIKI_STORAGE_ACCOUNT}"
+      },
       "cwd": "${workspaceFolder}"
     }
   }
@@ -78,9 +83,13 @@ The repository ships [`.mcp.json`](../.mcp.json), a project-scoped server defini
         "-m",
         "docwiki.mcp.server",
         "--stdio",
-        "--release",
-        "samples/wiki"
-      ]
+        "--storage",
+        "blob"
+      ],
+      "env": {
+        "DOCWIKI_MODE": "azure",
+        "DOCWIKI_STORAGE_ACCOUNT": "${DOCWIKI_STORAGE_ACCOUNT}"
+      }
     }
   }
 }
@@ -101,7 +110,7 @@ Copilot CLI reads its servers from the user configuration (`~/.copilot/mcp-confi
       "type": "local",
       "command": "uv",
       "args": ["run", "--extra", "mcp", "python", "-m", "docwiki.mcp.server", "--stdio",
-               "--release", "samples/wiki"],
+               "--release", "samples/fixtures/mock-release"],
       "tools": ["*"]
     }
   }
@@ -118,38 +127,52 @@ set `cwd` to your clone and allow the first `uv` start some time:
 [mcp_servers.docwiki]
 command = "uv"
 args = ["run", "--extra", "mcp", "python", "-m", "docwiki.mcp.server", "--stdio",
-        "--release", "samples/wiki"]
+        "--release", "samples/fixtures/mock-release"]
 cwd = "<path to your docwiki clone>"
 startup_timeout_sec = 60
 ```
 
-The CLI equivalent is `codex mcp add docwiki -- uv run --extra mcp python -m docwiki.mcp.server --stdio --release samples/wiki`
+The CLI equivalent is `codex mcp add docwiki -- uv run --extra mcp python -m docwiki.mcp.server --stdio --release samples/fixtures/mock-release`
 (run Codex from the repository root then). Check your Codex version's MCP documentation if an
 option is not recognised.
 
 ## Skills
 
-The sample wiki carries its Agent Skills in three identical folders (`.agents/skills`,
+A wiki carries its Agent Skills in three identical folders (`.agents/skills`,
 `.claude/skills`, `.github/skills`; see [skills](skills.md)). Two ways to use them:
 
 - **Through MCP, from the repository root:** ask the agent to call `list_skills` and `get_skill`,
   for example *"Read the docwiki `deep-research` skill, then follow it"*.
 - **As native skills:** open the wiki folder of the release (for example
-  `samples/fixtures/mock-release/releases/20260215T090000Z-decd4b59/wiki/`) as the project or
+  `samples/fixtures/mock-release/releases/20260401T090000Z-7ce99a3f/wiki/`) as the project or
   working directory, so that the client discovers the skill folder it supports. Plain file reads
   then work too: `AGENTS.md`, `index.md` and the topic pages are ordinary Markdown.
 
 ## Prompts to try
 
-On the mock release:
+On a release compiled from the full sample corpus:
 
-- *"Use the docwiki tools: which gearbox oil grade applies to WTG-07 in winter? Cite the
-  evidence."* The topic page reports a contradiction between the current procedure and the 2026
-  maintenance plan; a good answer gives both claims and the resolution rule.
-- *"What did revision A of the gearbox oil change SOP say, and what replaced it?"* (supersession)
-- *"Query the maintenance plan table: which turbines have a gearbox oil change planned, and
-  when?"* (`query_table` with row ids)
-- *"What does WTG mean, and how is it called in French?"* (glossary synonyms)
+- *"Use the docwiki tools: which delivery date applies to the windows, and why do the documents
+  disagree? Cite the evidence."* The topic page reports a contradiction between the planning and
+  the window maker's e-mail; a good answer gives both claims and the resolution rule.
+- *"What did indice A of quote DEV-2026-014 say about the bay window, and what replaced it?"*
+  (supersession)
+- *"Query the Achats sheet of the planning workbook: how much has been ordered, and how much
+  invoiced to date?"* (`query_table` with row ids)
+- *"What does 'retenue de garantie' mean, and what is it called in English?"* (glossary
+  synonyms)
+
+The mock release holds only three sources (two revisions of the planning and the minutes of site
+meeting n°3). The questions above are written for a release of the full sample corpus and mostly get "not found"
+on the mock (the Achats one works). Try these on the mock instead:
+
+- *"Use the docwiki tools: when are the windows delivered, and what was the date before?"* The
+  answer is 2026-04-20 (indice B of the planning, minutes ¶ 11); indice A, now superseded, gave
+  2026-03-30.
+- *"How far along are the walls? Do the documents agree?"* The topic page reports a
+  contradiction, 100 % in indice B and 70 % in the minutes of 2026-03-24, and the minutes prevail
+  (authority 7 against 4).
+- *"What is an 'indice', in English?"* (glossary synonyms: "revision")
 
 The answers should end with sources in the Researcher's format,
 `[n] <source title> — <locator label> (<provenance>) — <sidecar path>`, and every sidecar path

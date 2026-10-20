@@ -1,19 +1,19 @@
 types:
-  - key: asset
-    title: Assets
-    description: Turbines and major components.
+  - key: building-element
+    title: Building elements
+    description: Windows and other parts of the extension.
   - key: organisation
     title: Organisations
 registry:
-  - type: asset
-    key: wtg-07
-    label: WTG-07
+  - type: building-element
+    key: baie-f1
+    label: Bay window F1
     aliases:
-      - {text: turbine 7, lang: en}
-      - {text: éolienne 7, lang: fr}
-  - type: asset
-    key: wtg-12
-    label: WTG-12
+      - {text: sliding window F1, lang: en}
+      - {text: baie coulissante F1, lang: fr}
+  - type: building-element
+    key: fenetre-f2
+    label: Window F2
   - type: organisation
-    key: litware
-    label: Litware
+    key: vanarsdel-menuiseries
+    label: VanArsdel Menuiseries

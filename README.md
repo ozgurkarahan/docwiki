@@ -15,9 +15,9 @@ people (a static site), Microsoft Foundry agents (an MCP server) and your own co
 MCP and Agent Skills).
 
 > **Status: demo / proof of concept.** DocWiki shows that the pattern works end to end on Azure;
-> it is not a production-ready product. The sample wiki, scores and costs below come from a live
-> run on 2026-10-18 (Sweden Central, Global Standard model deployments) over a fictional corpus of
-> 37 public documents.
+> it is not a production-ready product. The sample is a small fictional corpus (the paperwork of
+> one building job: 12 public documents in French). Scores and costs on this sample are pending
+> re-evaluation and are published here once measured.
 
 ![How DocWiki works: documents are compiled by an Azure Container Apps Job into an immutable release that serves a static site, Foundry agents and local coding agents](docs/assets/architecture.svg)
 
@@ -36,35 +36,58 @@ MCP and Agent Skills).
 
 | | |
 |---|---|
-| **Wiki pages** | One page per source (status `current`, `superseded` or `withdrawn`, revisions linked), entity pages (assets, components, parts, alarm codes, procedures, organisations…), topic syntheses with `## Contradictions` and `## Superseded information` sections, indexes, a multilingual glossary and an append-only log. Plain Markdown with YAML frontmatter that renders on GitHub, Quartz, Obsidian and VS Code. |
+| **Wiki pages** | One page per source (status `current`, `superseded` or `withdrawn`, revisions linked), entity pages (organisations, people, building elements, materials, quotes, invoices…), topic syntheses with `## Contradictions` and `## Superseded information` sections, indexes, a multilingual glossary and an append-only log. Plain Markdown with YAML frontmatter that renders on GitHub, Quartz, Obsidian and VS Code. |
 | **Evidence microscope** | Every footnote opens an evidence sidecar: the page image with highlight boxes, the exact spreadsheet rows, the slide, the e-mail lines, the transcript cue or the OCR crop, with an honest provenance badge: `✓ quote verified`, `paraphrase`, `table`, `OCR` or `generated description`. |
 | **Agent kit** | `AGENTS.md`, `llms.txt`, `catalog.json` (pages and typed edges), `search.db` (SQLite FTS5 over page sections **and** raw extracted blocks) and Agent Skills, projected identically for GitHub Copilot, Claude Code and Codex (`.github/skills`, `.claude/skills`, `.agents/skills`). |
 | **MCP server** | `docwiki-mcp`: 10 read tools (search, pages, indexes, links, glossary, evidence, read-only SQL over tables, skills, recent changes) and 9 operations tools, over stateless streamable HTTP or stdio. Roles are enforced by the server, not by tool visibility. |
 | **Two Foundry agents** | The **Researcher** answers with numbered citations and abstains when the wiki is silent; the **Librarian** runs and repairs ingests, with human approval for every change. |
-| **DocWiki Studio** | A signed-in web app on Container Apps: drop documents into the pipeline, follow each run (stages, gates, cost), ask the Researcher with clickable citations and approve or deny the Librarian's operations in the page. Owner only, fail closed ([docs/studio.md](docs/studio.md)). |
+| **Ask this wiki** | A button on every page of the site opens a drawer of reviewed Researcher answers: each answer's numbered citations open the evidence beside it, with the agent's steps and a provenance line. Visitors spend no model tokens and the site needs no backend: the answers are wiki pages (`queries/`) that the owner files from the Studio or with `docwiki file-answer` ([ADR 0007](docs/adr/0007-answers-in-the-wiki.md)). |
+| **DocWiki Studio** | A signed-in web app on Container Apps: drop documents into the pipeline, follow each run (stages, gates, cost), ask the Researcher with clickable citations, file a reviewed answer into the wiki, and approve or deny the Librarian's operations in the page. Owner only, fail closed ([docs/studio.md](docs/studio.md)). |
 | **Quality gates** | 15 gates (G01–G15): schemas, links and anchors, citations, quote verification, safe content, sidecars, audience, injection canaries, paths, supersession, skills… A failing blocking gate keeps the previous release online. |
 | **Immutable releases** | Each run publishes a complete, hashed release and swaps one pointer (`current.json`) with an ETag precondition. Readers never see a half-built wiki; rollback is a pointer change. |
-| **Domain packs** | Taxonomy, entity registry, topics, glossary, sensitivity, supersession and contradiction rules as YAML. Ships with a wind-farm operations pack and an IT-runbooks pack. |
+| **Domain packs** | Taxonomy, entity registry, topics, glossary, sensitivity, supersession and contradiction rules as YAML. Ships with one sample pack, `batiment` (the paperwork of a small French building contractor); small test packs exercise the engine with other domains. |
 
 ## Try it
 
 ### 1. Browse the sample wiki
 
-**<https://docwiki.ozgurkarahan.com>** (also <https://ozgurkarahan.github.io/docwiki/>): the public
-sample, a fictional wind-farm operator, with graph view, full-text search, backlinks and the
-evidence microscope.
+Live demo: deployed on Azure Container Apps (link coming with the single-app release). The sample
+site has a graph view, full-text search, backlinks and the evidence microscope.
+
+The sample stands in for *your* documents: the paperwork of one small building job, written in
+French and compiled into an English wiki. A general contractor (Lamna Bâtiment) builds a 30 m²
+extension and renovates the kitchen of a private household (the Moreau family) in the invented
+town of Valbrise, from January to April 2026, with a builders' merchant, a window maker and an
+electrician. The corpus holds 12 public documents (quotes, a works contract and its amendment, a
+planning workbook, an invoice, a scanned delivery note, site minutes, two e-mails, two photos), a
+restricted internal price study and one held-back planning revision. Everything is fictional and
+stamped as such, and the two site photos are AI-generated images (model and prompts in
+[`PROVENANCE.md`](samples/generators/assets/photos/PROVENANCE.md)). The documents hide the
+situations that make real document sets hard; the wiki handles each one visibly:
+
+| In the documents | In the wiki |
+|---|---|
+| Quote indice B cancels and replaces indice A | Indice A keeps its page, marked `superseded`; answers give the current price first |
+| The planning and the window maker's e-mail give different window delivery dates | A topic lists both claims with their citations and the resolution rule |
+| The invoice bills 10 pallets; a handwritten note on the scanned delivery note says 8 arrived | OCR evidence, cited next to the invoice line |
+| The total price needs two documents: the contract and amendment no. 1 | A multi-hop answer with both citations |
+| Purchases to date and task progress sit in a two-sheet workbook | `query_table` returns exact values with row ids |
+| An e-mail tells AI assistants to confirm an early payment | The instruction is dropped, filed as an injection proposal and replaced by a visible placeholder |
+| An internal price study with margins | Restricted: absent from the public build |
+| A question no document answers (who is the architect?) | "Not found in the wiki." |
+| A later planning revision, held back | Upload it in [Studio](docs/studio.md): it supersedes the first planning and the contradiction resolves |
 
 | Home | Topic synthesis |
 |---|---|
 | [![Home page of the sample wiki: purpose, navigation, categories and topics](docs/assets/screenshots/home.png)](docs/assets/screenshots/home.png) | [![Topic page: a cited synthesis across documents, with graph view and table of contents](docs/assets/screenshots/topic.png)](docs/assets/screenshots/topic.png) |
 | **Contradiction radar** | **Evidence microscope** |
-| [![Contradictions section: a maintenance manual and a later service bulletin disagree; the resolution rule picks the bulletin](docs/assets/screenshots/contradictions.png)](docs/assets/screenshots/contradictions.png) | [![Evidence sidecar: the cited PDF page with the quoted rows highlighted and a quote-verified badge](docs/assets/screenshots/evidence.png)](docs/assets/screenshots/evidence.png) |
+| [![Contradictions section: the planning and the window maker's e-mail give different delivery dates; both claims are shown with their citations and the resolution rule](docs/assets/screenshots/contradictions.png)](docs/assets/screenshots/contradictions.png) | [![Evidence sidecar: the cited page with the quoted text highlighted and a provenance badge](docs/assets/screenshots/evidence.png)](docs/assets/screenshots/evidence.png) |
 
-The site is built from [`samples/wiki/`](samples/wiki), the release compiled on Azure and committed
-as a plain folder. To build it locally (Node 22+ and git required):
+The site is built from a release. To build the hand-made mock release locally (Node 22+ and git
+required):
 
 ```bash
-uv run python -m docwiki.site samples/wiki --out .cache/site-sample
+uv run python -m docwiki.site samples/fixtures/mock-release --out .cache/site-sample
 uv run python -m docwiki.portal --site-dir .cache/site-sample     # http://127.0.0.1:8080
 ```
 
@@ -86,13 +109,13 @@ the DocWiki MCP server over stdio, with read tools only:
 | GitHub Copilot CLI | snippet for `~/.copilot/mcp-config.json` in [docs/local-agents.md](docs/local-agents.md#github-copilot-cli) |
 | Codex | snippet for `config.toml` in [docs/local-agents.md](docs/local-agents.md#codex) |
 
-Then ask, for example: *"Use the docwiki tools: which gearbox oil grade applies to WTG-07 in
-winter? Cite the evidence."* The agent can also read the wiki's own Agent Skills (`list_skills`,
-`get_skill`).
+Then ask, for example: *"Use the docwiki tools: what is the total contract amount including
+amendment no. 1? Cite the evidence."* The agent can also read the wiki's own Agent Skills
+(`list_skills`, `get_skill`).
 
-> The configurations serve [`samples/wiki/`](samples/wiki), the sample release compiled on Azure:
-> 37 sources, 165 pages, 854 evidence pages and 66 extracted tables. Details:
-> [docs/local-agents.md](docs/local-agents.md).
+> The configurations serve a release folder on disk (the hand-made mock release in
+> [`samples/fixtures/mock-release`](samples/fixtures/mock-release) until you compile your own).
+> Details: [docs/local-agents.md](docs/local-agents.md).
 
 ### 3. Deploy your own on Azure
 
@@ -124,7 +147,7 @@ sign in. Try the interface without Azure on canned data:
 
 | Cited answer, with the agent's tool trace | Human approval of a Librarian operation |
 |---|---|
-| [![DocWiki Studio: documents with their pipeline status and a Researcher answer whose citations open the change record, a work-order row, a service bulletin page and a transcript cue](docs/assets/screenshots/studio.png)](docs/assets/screenshots/studio.png) | [![DocWiki Studio: the Librarian asks for approval before starting an ingest run; Approve and Deny buttons](docs/assets/screenshots/studio-approval.png)](docs/assets/screenshots/studio-approval.png) |
+| [![DocWiki Studio: documents with their pipeline status and a Researcher answer whose citations open spreadsheet rows, e-mail lines and a document paragraph](docs/assets/screenshots/studio.png)](docs/assets/screenshots/studio.png) | [![DocWiki Studio: the Librarian asks for approval before starting an ingest run; Approve and Deny buttons](docs/assets/screenshots/studio-approval.png)](docs/assets/screenshots/studio-approval.png) |
 
 ### Compile your own documents
 
@@ -135,13 +158,14 @@ project you can reach with `az login`:
 export DOCWIKI_FOUNDRY_PROJECT_ENDPOINT="https://<account>.services.ai.azure.com/api/projects/<project>"
 export DOCWIKI_FAST_DEPLOYMENT="<fast deployment>"
 export DOCWIKI_SMART_DEPLOYMENT="<smart deployment>"
-uv run docwiki run --input samples/corpus/quickstart --domain wind-om --audience public --work-dir .local
+uv run docwiki run --input samples/corpus/full --domain batiment --audience public --work-dir .local
 uv run docwiki status --work-dir .local
 uv run docwiki serve --stdio --release .local/releases
 ```
 
 Values can also live in a git-ignored `.env` file (in PowerShell, set them with
-`$env:NAME = "value"`). The command line at a glance:
+`$env:NAME = "value"`). The command above compiles the sample; `--audience public` leaves out the
+restricted document of `full/restricted/`. The command line at a glance:
 
 | Command | What it does |
 |---|---|
@@ -151,6 +175,7 @@ Values can also live in a git-ignored `.env` file (in PowerShell, set them with
 | `docwiki site [--release …] [--out <dir>]` | Build the Quartz site of a release (Node 22+ and git) |
 | `docwiki serve --stdio \| --http <host:port> [--release <dir>]` | Run the MCP server; `docwiki-mcp` is the same entry point |
 | `docwiki ask "<question>" [--agent researcher\|librarian] [--approve prompt\|deny] [--json]` | Ask a deployed Foundry agent; prints the answer, its sources and a receipt |
+| `docwiki file-answer "<question>" [--from-json <answer.json>] [--dry-run] [--yes]` | File a reviewed Researcher answer into the wiki: the next run publishes it as a `queries/` page ([docs/agents.md](docs/agents.md#filing-an-answer-into-the-wiki)) |
 | `docwiki studio [--local] [--port N]` | Run DocWiki Studio; `--local` serves 127.0.0.1 with your `az login` ([docs/studio.md](docs/studio.md)) |
 | `docwiki export obsidian --out <vault>` | Copy a release into an Obsidian vault with `[[wikilinks]]` |
 | `docwiki release list`, `docwiki release rollback <release_id>` | List releases; point `current.json` back at an earlier one |
@@ -168,7 +193,7 @@ flowchart LR
   job -->|"structured outputs, no tools"| foundry["Microsoft Foundry<br/>fast and smart models<br/>Content Understanding"]
   job -->|"publish, then If-Match pointer swap"| releases[("Blob container releases<br/>immutable releases + current.json")]
   releases --> mcp["Container App: MCP server<br/>built-in auth, roles per tool"]
-  releases --> site["Quartz site<br/>GitHub Pages or private portal"]
+  releases --> site["Quartz site<br/>served by the portal Container App"]
   mcp -->|"MCP, Wiki.Read"| researcher["Researcher agent<br/>own Entra agent identity"]
   mcp -->|"MCP, Wiki.Read + Wiki.Operate"| librarian["Librarian agent<br/>own Entra agent identity"]
   librarian -.->|"ingest_start, recompile<br/>human approval"| queue
@@ -184,7 +209,7 @@ flowchart LR
 | Models | Microsoft Foundry deployments `fast` and `smart`; Content Understanding for PDFs and images | Classification fallback, figure descriptions and entity summaries (`fast`); compilation and topic synthesis (`smart`) |
 | MCP server | Container App `mcp` behind built-in authentication | Serves the current release; enforces `Wiki.Read` and `Wiki.Operate` per tool |
 | Agents | Foundry prompt agents `docwiki-researcher` and `docwiki-librarian` | Cited answers; operations with approvals |
-| Site | Quartz on GitHub Pages (public sample) or the optional `portal` Container App (Entra sign-in, or no sign-in for a public-audience build) | Human view and evidence microscope |
+| Site | Quartz served by the optional `portal` Container App (Entra sign-in, or no sign-in for a public-audience build) | Human view and evidence microscope |
 | Studio | Optional `studio` Container App (Entra sign-in, owner only, one replica) | Uploads, run timeline, agent questions and approvals in one page |
 | Operations | Log Analytics, Application Insights, Foundry tracing, budget alerts | Spans per stage, model call and tool call; a cost receipt per run |
 
@@ -211,8 +236,8 @@ optional daily routine (disabled by default) writes a health report with approva
 **Per-agent identity, enforced by the server.** Each agent calls the MCP server with its own Entra
 agent identity. Entra issues a token only to identities holding an app role on the MCP API;
 Container Apps built-in authentication accepts only that audience from the two allow-listed agent
-client IDs; the server checks the role of every tool and hides the tools a caller may not use. A
-forbidden call returns `{"ok": false, "error": {"code": "forbidden"}}`, so the agent turn
+client IDs; the server checks the role on every call (the tool list is not filtered per role,
+decision D9). A forbidden call returns `{"ok": false, "error": {"code": "forbidden"}}`, so the agent turn
 continues. The design was validated end to end before it was adopted
 ([ADR 0003](docs/adr/0003-mcp-agent-identity.md), [identity spike](docs/spikes/identity-spike.md)).
 More: [docs/agents.md](docs/agents.md).
@@ -221,56 +246,21 @@ More: [docs/agents.md](docs/agents.md).
 
 DocWiki is measured against a naive RAG baseline (BM25 top-8 over about 800-token chunks, same
 `smart` model, same answer format) and a long-context baseline, on a golden set sealed before the
-first wiki generation: 33 public dev questions in 12 categories (single-hop, multi-hop, numeric,
+first wiki generation: a public dev split in 12 categories (single-hop, multi-hop, numeric,
 tables, contradictions, supersession, multilingual, OCR, abstention, injection, restricted
 content, skills) plus a private holdout. Dev and holdout scores are published separately, with
-denominators, versions and the ids of failed questions. Method: [docs/evaluation.md](docs/evaluation.md).
+denominators, versions and the ids of failed questions. **Pending re-evaluation on the new
+sample:** the Researcher and both baselines are re-run on the 12-document corpus, and the
+scoreboard below is generated from those results. Method: [docs/evaluation.md](docs/evaluation.md).
 
 <!-- scoreboard:start -->
-Each cell gives the score and its denominator: 0/1 metrics show passed / applicable questions, share metrics (coverage, citation precision and recall) the mean over the n applicable questions. Definitions, systems and honesty rules: `evals/README.md`.
-
-### Dev split (`evals/golden/dev.jsonl`, 33 questions)
-
-| System | Answer accuracy | Numeric exactness | Citation precision | Citation recall | Abstention accuracy | Injection resistance | Restricted exclusion | Cost (USD) | Latency p50 |
-|---|---|---|---|---|---|---|---|---|---|
-| `docwiki-researcher` | 90.6 % (29/32) | 80.0 % (4/5) | 79.5 % (n=30) | 77.3 % (n=30) | 100.0 % (33/33) | 100.0 % (2/2) | 100.0 % (33/33) | $0.118/q* | 22.6 s |
-| `baseline-rag` | 75.0 % (24/32) | 100.0 % (5/5) | 91.8 % (n=27) | 75.8 % (n=30) | 90.9 % (30/33) | 100.0 % (2/2) | 100.0 % (33/33) | $0.046/q* | 7.0 s |
-| `baseline-long-context` | 50.0 % (16/32) | 40.0 % (2/5) | 75.2 % (n=22) | 44.5 % (n=30) | 72.7 % (24/33) | 100.0 % (2/2) | 93.9 % (31/33) | $0.145/q* | 120.6 s |
-
-### Holdout split (private questions, aggregates only, 15 questions)
-
-| System | Answer accuracy | Numeric exactness | Citation precision | Citation recall | Abstention accuracy | Injection resistance | Restricted exclusion | Cost (USD) | Latency p50 |
-|---|---|---|---|---|---|---|---|---|---|
-| `docwiki-researcher` | 93.3 % (14/15) | 100.0 % (2/2) | 86.5 % (n=13) | 84.3 % (n=13) | 100.0 % (15/15) | 100.0 % (1/1) | 100.0 % (15/15) | $0.165/q* | 44.7 s |
-| `baseline-rag` | 66.7 % (10/15) | 50.0 % (1/2) | 96.9 % (n=13) | 86.5 % (n=13) | 100.0 % (15/15) | 100.0 % (1/1) | 100.0 % (15/15) | $0.051/q* | 6.3 s |
-| `baseline-long-context` | 46.7 % (7/15) | 0.0 % (0/2) | 71.7 % (n=9) | 37.8 % (n=13) | 66.7 % (10/15) | 100.0 % (1/1) | 80.0 % (12/15) | $0.169/q* | 117.5 s |
-
-Must-include coverage, tokens per question, p95 latency, versions, release ids and the ids of failed questions per metric and category: [evals/SCOREBOARD.md](evals/SCOREBOARD.md).
-
-\* Estimated with unverified prices (the packaged `prices.yaml` holds placeholders; see `src/docwiki/llm/README.md`).
-
-Dev and holdout scores are reported separately and prompts are never tuned on holdout results. The baselines measure trade-offs; DocWiki is not presented as a replacement for retrieval systems.
+No evaluation results yet. Run `uv run python evals/run.py --system <system> --questions evals/golden/dev.jsonl`, then `uv run python evals/scoreboard.py` (see `evals/README.md`).
 <!-- scoreboard:end -->
 
-**Reading the scores.**
-
-- The Researcher answered 29 of 32 answerable dev questions (90.6 %) and 14 of 15 holdout
-  questions (93.3 %), against 75.0 % and 66.7 % for naive RAG with the same model, and its
-  abstention was right on every dev and holdout question. The difference is in multi-hop,
-  multilingual and skill questions (RAG missed q011, q014, q021, q022, q031 and q033, the
-  Researcher answered them), where entity pages, the glossary and topic syntheses connect facts
-  across documents and languages. RAG answered one supersession question the Researcher missed
-  (q019).
-- Naive RAG is a strong baseline: its citations are more precise (91.8 % against 79.5 % on dev),
-  it passed every numeric-exactness check on dev (5/5), and each answer is about 2.6 times cheaper
-  and 3 times faster.
-- Long context only fits the 12 quickstart documents (about 111k tokens in a 120k budget), so it
-  cannot answer questions about the other 25; its scores show the limit of the approach on this
-  corpus, not of the model.
-- One fictional corpus of 37 documents, 33 + 15 questions, one run per system: a difference of one
-  or two questions is noise. The Researcher was measured on release `20261018T092417Z-d2186573`;
-  the committed sample is the next release, `20261018T104207Z-650d6d98`, rebuilt from the same
-  cached model outputs with corrected navigation labels.
+**Reading the scores.** Pending re-evaluation on the new sample: the Researcher and both baselines
+are re-run on the 12-document corpus, and this section is rewritten from the generated scoreboard
+above. No comparison between the systems is claimed until then. On a corpus this small, a
+difference of one or two questions is noise.
 
 ## Cost
 
@@ -285,18 +275,10 @@ Dev and holdout scores are reported separately and prompts are never tuned on ho
   duration). The packaged price table holds Global Standard list prices and is marked
   `verified: false`: check the prices of your region and deployment type before relying on it.
 
-| Measured on the sample corpus (2026-10-18, Sweden Central) | Value |
-|---|---|
-| Full ingest of 37 sources, cold cache | 20.4 min, 16.76 USD |
-| Recompile one source (the 600-row SCADA alarm log), entities and topics rebuilt | 15.3 min, 10.37 USD |
-| Rebuild with no source changed (every model call served from cache) | 2.9 min, 0 USD (no model or Content Understanding call) |
-| Researcher answer, 33 dev questions | median 22.6 s (p95 75 s), 0.12 USD per answer |
-| Naive RAG answer, same questions and model | median 7.0 s, 0.05 USD per answer |
-| Idle environment, one month (estimate) | about 6 to 10 USD, mostly the Basic container registry |
-
-Costs are receipt estimates (tokens × the unverified price table). Both ingest runs used Data Zone
-deployments: the full ingest is priced with the Global Standard table (about 20 USD at Data Zone
-prices), the recompile with the Data Zone table.
+**Figures for the new sample are pending re-measurement.** After the first cold compile and the
+evaluation on Azure, [docs/cost.md](docs/cost.md) reports, from the run receipts: a full ingest
+with a cold cache, a recompile of one source, a rebuild with no source changed, the cost of a
+Researcher answer and of a naive RAG answer, and an estimate of an idle month.
 
 Cost model and levers: [docs/cost.md](docs/cost.md).
 
@@ -304,17 +286,15 @@ Cost model and levers: [docs/cost.md](docs/cost.md).
 
 DocWiki is a proof of concept. Known limits of this version:
 
-- **One corpus, one run.** Measured once on a fictional corpus of 37 documents; larger corpora,
-  other domains and repeated runs are untested.
-- **Document stamps read as content.** Compilation sometimes lists the `FICTIONAL — NOT FOR
-  OPERATIONAL USE` stamp as a fact of a source page, and one topic reports it as a contradiction.
-  A prompt rule would fix it, at the cost of a full recompile.
-- **Coarse invalidation.** Any changed source rebuilds every entity summary and topic synthesis
-  (about 10 USD on the sample).
-- **Citation precision.** The Researcher's citations are less precise than naive RAG's (79.5 %
-  against 91.8 % on dev).
-- **Unverified prices and no judge.** Cost receipts use an unverified price table; the built-in
-  judge evaluators were not run, so every published score is a deterministic check.
+- **One small corpus.** The sample has 12 public documents; larger corpora, other domains and
+  repeated runs are untested, and scores and costs are pending re-evaluation on it.
+- **Document stamps read as content.** Compilation can list the `FICTIONAL — NOT FOR
+  OPERATIONAL USE` stamp as a fact of a source page, or report it as a contradiction in a topic.
+  A prompt rule would fix it, at the cost of a full recompile; to be re-checked on the new sample.
+- **Coarse invalidation.** Any changed source rebuilds every entity summary and topic synthesis,
+  which dominates the cost of a small change.
+- **Unverified prices, optional judge.** Cost receipts use an unverified price table; the built-in
+  judge evaluators are optional, and a score is a deterministic check unless it says otherwise.
 - **Preview dependencies.** The per-agent identity relies on a preview API surface (the
   `AgenticIdentityToken` MCP connection, [ADR 0003](docs/adr/0003-mcp-agent-identity.md)); it may
   change.
@@ -341,10 +321,13 @@ DocWiki is a proof of concept. Known limits of this version:
 - **Publication safety.** A leak guard scans the tree, the git history and binary metadata, and a
   fail-closed pre-push hook runs it.
 
-> **FICTIONAL — NOT FOR OPERATIONAL USE.** The sample corpus describes an invented operator,
-> Contoso Renewables, and an invented site, Quellmoor Ridge Wind Farm. Every organisation, person,
-> product, procedure and value in it is fictional. Procedure-like documents carry this stamp and
-> must never be used as real operating, maintenance or safety guidance.
+> **FICTIONAL — NOT FOR OPERATIONAL USE.** The sample corpus describes an invented building
+> contractor, its client household, its suppliers and an invented works site in an invented town.
+> Every organisation, person, product, price, date and value in it is fictional, and the two site
+> photos are AI-generated images, not photographs of a real site
+> ([provenance](samples/generators/assets/photos/PROVENANCE.md)). Documents that look like
+> quotes, contracts, schedules or invoices carry this stamp and must never be used as real
+> commercial, legal or construction guidance.
 
 Threat model and publication process: [docs/security.md](docs/security.md). Report
 vulnerabilities privately: [SECURITY.md](SECURITY.md).
@@ -358,7 +341,7 @@ vulnerabilities privately: [SECURITY.md](SECURITY.md).
 | [Agents](docs/agents.md) | Researcher and Librarian: behaviour, tools, approvals, routine |
 | [Studio](docs/studio.md) | The web app: documents, pipeline, agents; access model; demo script |
 | [Skills and agent kit](docs/skills.md) | `AGENTS.md`, `llms.txt`, catalog, search index, skill projections |
-| [Local agents](docs/local-agents.md) | GitHub Copilot (VS Code and CLI), Claude Code and Codex on the sample wiki |
+| [Local agents](docs/local-agents.md) | GitHub Copilot (VS Code and CLI), Claude Code and Codex on a release |
 | [Security](docs/security.md) | Threat model, identity model, leak guard, publication process |
 | [Evaluation](docs/evaluation.md) | Golden set, systems, metrics, honesty rules |
 | [Cost](docs/cost.md) | Cost model and levers |
@@ -373,8 +356,8 @@ vulnerabilities privately: [SECURITY.md](SECURITY.md).
 | [`src/docwiki/`](src/docwiki) | The Python package: `extract`, `evidence`, `stages`, `orchestration`, `llm`, `mcp`, `agents_client`, `release`, `search`, `storage`, `site`, `portal`, `studio`, `domain`, `contracts` |
 | [`agents/`](agents/README.md) | Researcher and Librarian definitions, instructions, routine and deployment script |
 | [`skills/templates/`](skills/templates) | Reviewed templates of `AGENTS.md` and the four core skills |
-| [`domains/`](domains) | Domain packs: `wind-om` (sample) and `it-runbooks` |
-| [`samples/`](samples) | Fictional world bible, deterministic generators, sample corpus, mock release |
+| [`domains/`](domains) | The domain pack of the sample, `batiment` |
+| [`samples/`](samples) | Fictional world bible, deterministic generators, sample corpus (its two site photos are AI-generated), mock release |
 | [`evals/golden/`](evals/golden/README.md) | Sealed public dev split of the golden set |
 | [`site/`](site/README.md) | Quartz overlay (pinned Quartz v4.5.2) |
 | [`infra/`](infra), [`azure.yaml`](azure.yaml), [`docker/`](docker), [`scripts/`](scripts) | Bicep, azd hooks, images, preflight and teardown |
@@ -406,7 +389,7 @@ Contributions are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.m
 ## License
 
 - Code: [MIT](LICENSE).
-- Sample content (fictional world, corpus, sample wiki, fixtures, golden set, images and diagrams
+- Sample content (fictional world, corpus, fixtures, golden set, images and diagrams
   under `docs/`): [CC BY 4.0](LICENSE-CONTENT.md). Attribution: "DocWiki sample corpus by Ozgur
   Karahan, CC BY 4.0".
 
@@ -416,9 +399,8 @@ Contributions are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.m
 - The open-source projects DocWiki builds on, among them [Quartz](https://github.com/jackyzha0/quartz),
   the Model Context Protocol Python SDK, Microsoft Agent Framework, DuckDB, SQLite FTS5, pypdfium2,
   python-docx, openpyxl, python-pptx, Pillow, Jinja2, pydantic and Typer.
-- Microsoft's fictitious brand names (Contoso, Litware, Fabrikam, Proseware, Trey Research,
-  Tailspin, Wingtip, Adventure Works, Relecloud, City Power & Light), which populate the sample
-  world.
+- Microsoft's fictitious brand names (Lamna, VanArsdel, Zava, Adatum), which name the companies of
+  the sample world.
 
 ---
 

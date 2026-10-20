@@ -1,0 +1,104 @@
+# Document taxonomy of the batiment pack.
+#
+# Doc types are tried in this order and the first rule that matches wins: `filename_regex` is
+# searched in the file name (no folders), `text_regex` in the first `first_chars` characters of
+# the extracted text, and every regex of a rule must match. Every sample file matches a filename
+# rule (naming convention of samples/fiction/bible.yaml). The text rules are fallbacks for renamed
+# files: each matches only the title of its own type at the start of a line (the title word and
+# the number may be on two lines), never a reference to that document inside another one
+# ("Bon de livraison : BL-..." in an invoice does not match). The restricted price study comes
+# first; types that only have filename rules come next; documents that cite other documents
+# (minutes, amendment, contract) are tried before the types they cite.
+#
+# Authority (1-10) says which document prevails when two current sources disagree
+# (resolution.yaml): the amendment over the works contract, the contract over the quote, the
+# signed site records (minutes, then delivery notes with their reserves) over supplier invoices,
+# and the schedule and the supplier correspondence at the same level, so that the more recent of
+# the two prevails until a new schedule revision supersedes the old one.
+categories:
+  - {key: contract-documents, title: "Quotes and contract", description: "Quotes (devis) and their revisions (indices), the works contract and its amendments (avenants)."}
+  - {key: schedule-and-purchases, title: "Schedule and purchase tracking", description: "The works schedule and the purchase tracking workbook (planning et suivi des achats)."}
+  - {key: purchasing, title: "Invoices and delivery notes", description: "Supplier invoices (factures) and delivery notes (bons de livraison)."}
+  - {key: site-records, title: "Site records", description: "Site meeting minutes (comptes rendus de chantier) and site photos."}
+  - {key: correspondence, title: "Correspondence", description: "E-mails exchanged with the client and with the suppliers."}
+  - {key: internal-costing, title: "Internal costing", description: "Internal price studies with costs and margins (restricted)."}
+
+doc_types:
+  # --- restricted first ------------------------------------------------------------------------
+  - key: price-study
+    title: Internal price study (étude de prix)
+    category: internal-costing
+    authority: 3
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])etude[_ -]de[_ -]prix'}
+      - {filename_regex: '(?i)\.xlsx$', text_regex: '(?im)^[ \t]*[ée]tude de prix\b', first_chars: 1000}
+  # --- filename rules only ---------------------------------------------------------------------
+  - key: client-email
+    title: Client e-mail
+    category: correspondence
+    authority: 3
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])mail[_ -]client[^/]*\.eml$'}
+  - key: supplier-email
+    title: Supplier e-mail
+    category: correspondence
+    authority: 4
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])mail[_ -](?!client)[^/]*\.eml$'}
+  - key: site-photo
+    title: Site photo
+    category: site-records
+    authority: 2
+    rules:
+      - {filename_regex: '(?i)\.(?:jpe?g|png|tiff?|heic)$'}
+  - key: schedule
+    title: Schedule and purchase tracking (planning)
+    category: schedule-and-purchases
+    authority: 4
+    rules:
+      - {filename_regex: '^PLN-\d{4}-\d{3}(?!\d)'}
+      - {filename_regex: '(?i)(?:^|[_ -])planning(?:[_ .-]|$)'}
+  # --- filename rules, then title-line text rules ----------------------------------------------
+  - key: site-meeting-minutes
+    title: Site meeting minutes (compte rendu de chantier)
+    category: site-records
+    authority: 7
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])compte[_ -]rendu'}
+      - {filename_regex: '(?i)\.(?:pdf|docx)$', text_regex: '(?im)^[ \t]*compte rendu de (?:la )?(?:réunion de )?chantier\s+n°\s*\d+', first_chars: 1000}
+  - key: contract-amendment
+    title: Contract amendment (avenant)
+    category: contract-documents
+    authority: 10
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])avenant(?:[_ .-]|$)'}
+      - {filename_regex: '(?i)\.(?:pdf|docx)$', text_regex: '(?im)^[ \t]*avenant\s+n°\s*\d+\s+au\s+contrat\s+de\s+travaux\b', first_chars: 1000}
+  - key: works-contract
+    title: Works contract (contrat de travaux)
+    category: contract-documents
+    authority: 9
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])contrat[_ -]de[_ -]travaux'}
+      - {filename_regex: '(?i)\.(?:pdf|docx)$', text_regex: '(?im)^[ \t]*contrat de travaux[ \t]*(?:[-–—][ \t]*\S|$)', first_chars: 1000}
+  - key: quote
+    title: Quote (devis)
+    category: contract-documents
+    authority: 8
+    rules:
+      - {filename_regex: '^DEV-\d{4}-\d{3}(?!\d)'}
+      - {filename_regex: '(?i)(?:^|[_ -])devis(?:[_ .-]|$)'}
+      - {filename_regex: '(?i)\.(?:pdf|docx)$', text_regex: '(?im)^[ \t]*devis\s+(?:n°\s*)?DEV-\d{4}-\d{3}(?!\d)', first_chars: 1000}
+  - key: supplier-invoice
+    title: Supplier invoice (facture)
+    category: purchasing
+    authority: 5
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])(?:facture|FA-\d{4}-\d{4})'}
+      - {filename_regex: '(?i)\.pdf$', text_regex: '(?im)^[ \t]*facture\s+(?:n°\s*)?FA-\d{4}-\d{4}(?!\d)', first_chars: 1000}
+  - key: delivery-note
+    title: Delivery note (bon de livraison)
+    category: purchasing
+    authority: 6
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])(?:bon[_ -]de[_ -]livraison|BL-\d{4}-\d{4})'}
+      - {filename_regex: '(?i)\.pdf$', text_regex: '(?im)^[ \t]*bon\s+de\s+livraison\s+(?:n°\s*)?BL-\d{4}-\d{4}(?!\d)', first_chars: 1000}

@@ -1,27 +1,29 @@
 types:
-  - key: asset
-    title: Asset
-    description: Turbines and major components.
+  - key: building-element
+    title: Building element
+    description: Windows, openings and other parts of the building.
   - key: organisation
     title: Organisation
-  - key: procedure
-    title: Procedure
+  - key: commercial-document
+    title: Commercial document
 registry:
-  - type: asset
-    key: wtg-07
-    label: WTG-07
+  - type: building-element
+    key: baie-f1
+    label: Baie coulissante F1
     aliases:
-      - {text: turbine 7, lang: en}
-      - {text: éolienne 7, lang: fr}
-  - type: asset
-    key: wtg-12
-    label: WTG-12
+      - {text: bay window F1, lang: en}
+      - {text: baie F1, lang: fr}
+  - type: building-element
+    key: fenetre-f2
+    label: Fenêtre F2
+    aliases:
+      - {text: window F2, lang: en}
   - type: organisation
-    key: litware
-    label: Litware
+    key: vanarsdel-menuiseries
+    label: VanArsdel Menuiseries
   - type: organisation
-    key: trey-research
-    label: Trey Research
-  - type: procedure
-    key: sop-gbx-010
-    label: SOP-GBX-010 gearbox oil change
+    key: zava-materiaux
+    label: Zava Matériaux
+  - type: commercial-document
+    key: dev-2026-014
+    label: Devis DEV-2026-014

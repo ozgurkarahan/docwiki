@@ -22,24 +22,24 @@ async def test_unchanged_sources_are_not_downloaded_again(harness, corpus):
     # a new job execution starts with an empty scratch folder
     shutil.rmtree(harness.settings.work_dir / ".scratch", ignore_errors=True)
     remote.raw_reads.clear()
-    (corpus / "notes" / "extra.txt").write_text("Gearbox oil note for WTG-12.\n", encoding="utf-8")
+    (corpus / "notes" / "extra.txt").write_text("Note about window F2.\n", encoding="utf-8")
     second = await harness.run()
     assert second.status == "succeeded", second.errors
     assert set(remote.raw_reads) == {"raw/notes/extra.txt"}
 
 
 def test_evidence_reads_the_raw_file_only_when_it_needs_it():
-    sid = source_id_for("manuals/gearbox.pdf")
+    sid = source_id_for("devis/devis-extension.pdf")
     block = Block(
         id="b0001",
         kind="paragraph",
-        text="Torque the bolts to 12 Nm.",
+        text="La dalle de l'extension couvre 30,00 m².",
         locator=PdfPageLocator(page=1),
         provenance="native-text",
     )
     doc = ExtractedDoc(
         source_id=sid,
-        source_path="manuals/gearbox.pdf",
+        source_path="devis/devis-extension.pdf",
         source_hash="sha256:" + "0" * 64,
         media_type="application/pdf",
         lang="en",

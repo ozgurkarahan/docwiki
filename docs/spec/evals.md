@@ -7,7 +7,7 @@
 | `docwiki-researcher` | The deployed Foundry Researcher agent using the MCP server over the current release |
 | `docwiki-local` | Same instructions, run through a local loop with the stdio MCP server (for development) |
 | `baseline-rag` | Naive RAG: extracted text split into ~800-token chunks, BM25 top-8, same `smart` model, same answer format |
-| `baseline-long-context` | All extracted text of the quickstart subset in the prompt (only if it fits the model budget), same model |
+| `baseline-long-context` | All extracted text of the public documents of `full/` in the prompt (only if it fits the model budget), same model |
 
 ## 2. Metrics (per category and overall, with denominators)
 

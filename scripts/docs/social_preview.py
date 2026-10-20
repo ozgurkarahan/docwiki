@@ -262,11 +262,11 @@ def draw_citation(draw: ImageDraw.ImageDraw, fonts: Fonts) -> None:
     body = fonts.get("regular", 18)
     small = fonts.get("mono", 15)
     badge = fonts.get("bold", 15)
-    draw_text(draw, x0 + 22, y0 + 38, "Gearbox oil", title, INK)
-    end = draw_text(draw, x0 + 22, y0 + 72, "Cold sites use ISO VG 220.", body, INK_SOFT)
+    draw_text(draw, x0 + 22, y0 + 38, "Contract terms", title, INK)
+    end = draw_text(draw, x0 + 22, y0 + 72, "The retention is 5 %.", body, INK_SOFT)
     draw_text(draw, end + 2, y0 + 64, "[1]", fonts.get("bold", 13), SAGE)
     draw.line(box(x0 + 22, y0 + 92, x0 + 270, y0 + 92), fill=FRAME, width=s(2))
-    footnote = draw_text(draw, x0 + 22, y0 + 120, "[1] SOP rev B — ¶ 4", small, INK_SOFT)
+    footnote = draw_text(draw, x0 + 22, y0 + 120, "[1] Works contract — ¶ 12", small, INK_SOFT)
     bx, by = x0 + 22, y0 + 136
     label = "✓ quote verified"
     bw = width_of(badge, label) + 24
@@ -293,7 +293,7 @@ def draw_citation(draw: ImageDraw.ImageDraw, fonts: Fonts) -> None:
             radius=s(2),
             fill=HIGHLIGHT if cited else FRAME,
         )
-    draw_text(draw, (px0 + px1) / 2, py1 + 22, "¶ 4", fonts.get("regular", 15), MUTED, anchor="ms")
+    draw_text(draw, (px0 + px1) / 2, py1 + 22, "¶ 12", fonts.get("regular", 15), MUTED, anchor="ms")
     # The footnote points at the exact paragraph it cites.
     start = (footnote + 10, y0 + 114)
     target = (px0 - 6, py0 + 16 + 4 * 11)

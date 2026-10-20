@@ -28,20 +28,16 @@ def test_local_agent_configs_launch_the_stdio_server(relative: str, key: str) ->
     module = args.index("-m")
     assert args[module + 1] == "docwiki.mcp.server"
     parsed = _parser().parse_args(args[module + 2 :])
-    assert parsed.stdio and parsed.release == "samples/wiki" and not parsed.allow_ops
+    assert parsed.stdio and not parsed.allow_ops
+    # Clone-and-ask works without Azure: the shipped configs serve the committed mock release.
+    assert parsed.release == "samples/fixtures/mock-release"
+    assert (REPO_ROOT / parsed.release / "releases" / "current.json").is_file() or (
+        REPO_ROOT / parsed.release / "manifest.json"
+    ).is_file() or any((REPO_ROOT / parsed.release).glob("**/manifest.json"))
 
 
-SAMPLE_WIKI = REPO_ROOT / "samples" / "wiki"
-
-
-@pytest.mark.skipif(
-    not (SAMPLE_WIKI / ".docwiki" / "manifest.json").is_file(),
-    reason="the committed sample wiki is not generated yet",
-)
-def test_configured_sample_wiki_is_servable() -> None:
-    source = FolderReleaseSource(SAMPLE_WIKI)
-    snapshot = source.current()
-    assert snapshot.reader.portable
+def test_mock_release_is_servable_by_the_documented_local_command() -> None:
+    source = FolderReleaseSource(REPO_ROOT / "samples" / "fixtures" / "mock-release")
     reads = ReadTools(source, McpConfig())
     assert json.loads(reads.list_skills())["skills"]
     assert json.loads(reads.get_index("home"))["ok"] is True

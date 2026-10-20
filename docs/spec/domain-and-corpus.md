@@ -25,12 +25,11 @@ overlay (`work/state/overlay.yaml`), never by editing the pack at runtime.
 1. **Closed world**: `samples/fiction/bible.yaml` lists every organisation, person, site, asset,
    product, document number scheme and date used in the samples. `samples/fiction/allowlist.txt`
    is generated from it and used by the leak guard.
-2. Prefer Microsoft's documented fictitious brand names (Contoso, Fabrikam, Litware, Proseware,
-   Trey Research, Tailspin, Wingtip, Alpine Ski House, City Power & Light, Relecloud, …) for
-   organisations. Every new name must be checked (web search) not to match a real wind farm,
-   turbine manufacturer, lubricant or component brand, or a real person in the energy sector.
+2. Prefer Microsoft's documented fictitious brand names for organisations. Every new name must be
+   checked (web search) not to match a real construction company, builders' merchant, window or
+   joinery maker, electrical contractor, building-product brand, French commune or real person.
 3. No real manufacturer, product, standard-body document content, or copyrighted text. Generic
-   industry terms (gearbox, pitch system, SCADA, lockout/tagout, ISO viscosity grade) are fine.
+   industry terms (devis, avenant, retenue de garantie, gros œuvre, menuiseries, …) are fine.
 4. Every procedure-like document carries "FICTIONAL — NOT FOR OPERATIONAL USE" in its header and
    footer; values are plausible but invented.
 5. Neutral file metadata: author "DocWiki sample generator", organisation from the bible,
@@ -39,63 +38,112 @@ overlay (`work/state/overlay.yaml`), never by editing the pack at runtime.
    format allows it (otherwise identical text and hashes are recorded in the manifest).
 7. Content license CC BY 4.0.
 
-## 3. The `wind-om` sample domain
+## 3. The `batiment` sample domain
 
-Fictional operator **Contoso Renewables** runs the operations and maintenance of a fictional onshore
-wind farm (about a dozen turbines of a fictional OEM model). The corpus covers operations,
-maintenance, safety, compliance, supply chain and training.
+A small fictional French general contractor builds a 30 m² house extension and renovates the
+kitchen of one private household in an invented town: one client, one chantier. The third parties
+are a builders' merchant, a window maker and an electrical subcontractor. The timeline runs from
+January to April 2026; the works are still in progress. This specification names roles only: the
+names of the company, its staff, the household, the town and the third parties live in
+`samples/fiction/bible.yaml`. The documents are written in French and the wiki is compiled in
+English (D10 in the [decision log](README.md#4-decision-log-v1)); questions are asked in English and
+in French.
 
-### 3.1 Corpus composition (target ~38 documents; ★ = 12-document quickstart subset)
+### 3.1 Corpus composition (12 public documents, 1 restricted, 1 held back)
 
-| Kind | Formats | Examples (illustrative) |
-|---|---|---|
-| OEM documentation | PDF (with vector diagrams) | ★ gearbox maintenance manual excerpt (multi-page, tables, exploded diagram); ★ service bulletin changing the gearbox oil viscosity grade for cold sites; service bulletin on pitch bearing bolt re-torque |
-| Procedures | DOCX | ★ gearbox oil change SOP **rev B** (current) and rev A (superseded); lockout/tagout SOP; working-at-height and rescue SOP; ★ French work instruction for generator brush replacement |
-| Incidents | DOCX, PDF | ★ incident report (8D / 5 Whys) on repeated gearbox over-temperature of one turbine; dropped-object near-miss report |
-| Change management | DOCX | ★ management-of-change record adopting the new oil grade |
-| Records and data | XLSX, CSV | ★ multi-sheet maintenance plan; ★ spare parts and stock (with minimum levels); ★ SCADA alarm log (≈ 1–3k rows); work-order export; vibration trend for one gearbox; KPI export |
-| Lab and inspection | PDF | ★ oil-analysis lab report; blade inspection report with drawn defect figures; ★ **image-only scanned PDF** (crane lift plan) |
-| Compliance | PDF | environmental permit with night-time curtailment conditions; grid operator curtailment instruction; internal safety audit report |
-| Training | PPTX | ★ onboarding and site-rules deck; gearbox fundamentals deck; single-point lesson on oil-level checks |
-| Correspondence | EML | ★ OEM support e-mail about bulletin applicability (contains the **injection canary**); internal e-mail about a parts shortage |
-| Field capture | JPG/PNG, TXT/MD | ★ photographed handwritten daily checklist with one hand-written value; site layout plan; shift handover notes in English, one French note, one German supplier note |
-| Meetings | VTT, DOCX | toolbox-talk transcript about cold-weather start-up; monthly O&M review minutes |
-| Restricted | XLSX or PDF | contractor rate card (sensitivity `restricted`) — must never appear in the public build |
-| Held back | PDF | a later service bulletin (not in the initial corpus) used for the "knowledge time travel" demo |
+| # | Document (in French) | Format | Demonstrates |
+|---|---|---|---|
+| 1 | Devis (quotation) indice A | PDF | Superseded revision |
+| 2 | Devis indice B, with a revised scope and price | PDF | Supersession |
+| 3 | Contrat de travaux (signed works contract) | DOCX | Price, payment schedule, retention, start date, duration |
+| 4 | Avenant n°1 (contract amendment) | DOCX | Multi-hop total (contract plus amendment); amends, never supersedes |
+| 5 | Planning et suivi des achats (schedule and purchase tracking, two sheets), indice A | XLSX | Tables, progress, `query_table` |
+| 6 | Facture fournisseur matériaux (builders' merchant invoice) | PDF | Numbers; discrepancy with #7 |
+| 7 | Bon de livraison (delivery note), scanned, with a handwritten remark about missing pallets | Image-only PDF, one page | OCR |
+| 8 | Compte rendu de chantier n°3 (site meeting minutes) | DOCX | Progress, decisions |
+| 9 | E-mail from the client (change request) | EML | Multilingual questions |
+| 10 | E-mail from the window maker (delivery delay; the injection canary in a paragraph of its own) | EML | Contradiction with the planning; injection containment |
+| 11–12 | Two site photos (slab poured; delivered pallets) | JPG | Generated-description provenance |
+| 13 | Étude de prix interne (internal cost study with margins), under `full/restricted/` | XLSX | Sensitivity `restricted`: never in the public build |
+| Held back | Planning indice B (new window delivery date), under `held-back/` | XLSX | Time travel (§3.2) |
 
-### 3.2 Planted scenarios (each must be answerable only by combining documents)
+The sample uses PDF (text and image-only), DOCX, XLSX, EML and JPG; the other supported formats
+(CSV, PPTX, VTT, PNG, Markdown and text) are covered by the generated fixtures of the extraction
+tests.
 
-1. **Oil grade change**: manual says grade X; later bulletin changes it to grade Y for cold sites;
-   MOC adopts it; SOP rev B reflects it, rev A does not → supersession + contradiction handling.
-2. **Recurring alarm**: one turbine raises a gearbox over-temperature alarm repeatedly in the SCADA
-   log; the vibration trend rises; the incident report gives the root cause and the corrective action.
-3. **Night curtailment**: stops at night in summer are explained by the environmental permit
-   conditions, visible in the SCADA log as curtailment status codes.
-4. **Parts shortage**: an e-mail and the stock sheet show a part below minimum that blocks open work
-   orders (table join across XLSX and CSV).
-5. **Multilingual**: the French work instruction and the German supplier note contain facts asked
-   in English, and one question is asked in French.
-6. **Scanned evidence**: a value written by hand on the checklist photo (OCR provenance).
-7. **Acronyms**: several acronyms used across documents; some defined only in the training deck.
-8. **Restricted exclusion**: the rate card exists in the corpus but must not leak into the public wiki.
-9. **Injection canary**: the OEM e-mail contains an instruction addressed to AI assistants with a
-   unique canary token (defined in the bible); it must be neutralised and flagged.
-10. **Time travel**: adding the held-back bulletin creates a new supersession and changes one
-    answer.
+### 3.2 Planted scenarios
+
+Several scenarios can only be answered by combining documents. The exact facts, their sources and
+the acceptance matrix are recorded in `samples/fiction/PLANTED.md`.
+
+1. **Supersession**: devis indice B replaces indice A with a revised scope and price; indice A keeps
+   its page, marked `superseded`.
+2. **Contradiction**: the planning and the window maker's e-mail give different delivery dates for
+   the windows; both claims are shown with the resolution rule.
+3. **Delivery discrepancy**: the merchant's invoice bills 10 pallets, while only 8 were delivered
+   according to the scanned delivery note.
+4. **Amounts**: amounts before and after VAT (HT/TTC), the deposit, the 5 % retention (retenue de
+   garantie), the amendment and the purchases to date are exact numbers in text and tables.
+5. **Multi-hop total**: the total contract amount is the contract price plus the avenant.
+6. **Scanned evidence**: the handwritten remark on the delivery note is only readable through OCR
+   (OCR provenance).
+7. **Multilingual**: every document is in French; questions are asked in English and in French, and
+   the glossary carries the French synonyms of English terms.
+8. **Restricted exclusion**: the internal cost study exists in the corpus but must not leak into the
+   public wiki or into public answers.
+9. **Injection canary**: the window maker's e-mail contains an instruction addressed to AI
+   assistants with a unique canary token (defined in the bible); it must be neutralised and flagged.
+10. **Abstain**: no architect takes part in the project; a question about one must be answered as
+    not found.
+11. **Time travel**: adding the held-back planning indice B creates a new supersession (planning
+    indice A → B) whose new delivery date resolves the contradiction of scenario 2.
 
 ### 3.3 Files
 
 ```
 samples/fiction/bible.yaml           # world definition (closed world)
 samples/fiction/allowlist.txt        # generated proper-noun allowlist
+samples/fiction/PLANTED.md           # planted facts, their sources and the acceptance matrix
 samples/generators/                  # deterministic generators (python), one module per format
-samples/corpus/full/...              # generated corpus (sub-folders by kind)
-samples/corpus/quickstart/...        # the 12 quickstart documents (copies or a manifest list)
-samples/corpus/held-back/...         # time-travel bulletin
-samples/corpus/MANIFEST.json         # path, sha256, format, pages/rows, quickstart flag, sensitivity
-domains/wind-om/                     # domain pack for the sample
-domains/it-runbooks/                 # tiny second pack (≈5 fictional IT runbooks) proving genericity
+samples/corpus/full/...              # the 12 public documents (sub-folders by kind)
+samples/corpus/full/restricted/...   # the restricted document
+samples/corpus/held-back/...         # the held-back planning revision (time travel)
+samples/corpus/MANIFEST.json         # path, sha256, format, pages/rows, sensitivity, held-back flag
+domains/batiment/                    # domain pack for the sample
 ```
+
+Pack genericity is covered by the small test packs under `tests/` since the second sample pack was
+removed in v1.2 ([changelog](CHANGELOG.md#v12)).
+
+### 3.4 Document contract
+
+Properties of the sample documents that supersession, verification, containment and the
+evaluation rely on; tests under `tests/samples/` enforce them.
+
+1. **File names** are ASCII and every corpus path passes the Studio upload check (segments matching
+   `^[A-Za-z0-9][A-Za-z0-9 ._()+-]{0,99}$`). Devis and planning files start with their document
+   number and carry their indice (`_indice-A`, `_indice-B`), for example
+   `DEV-2026-014_indice-B.pdf`; no other file name starts with `DEV-` or `PLN-`.
+2. **Revision groups**: the pack's `doc_number_regex` is anchored at the start of the candidate
+   (file name first, then the text head), so a document that merely cites a devis or planning
+   number never joins its revision group. `explicit_reference_regex` only matches "annule et
+   remplace" followed by a devis or planning number. The avenant amends the contract and never
+   supersedes it.
+3. **Supersession pairs**: exactly one on `full/` (devis indice B supersedes indice A); a second one
+   (planning indice B supersedes indice A) once `held-back/` is added.
+4. **Amounts** are printed without thousands separators (for example `12500,00 €`): citation
+   verification joins digit groups only across non-breaking or thin spaces and apostrophes. PDFs
+   embed a Unicode TrueType font, because the PDF core fonts cannot encode `€` or `œ`.
+5. **Canary**: the AI-directed text of the window maker's e-mail stands in a paragraph of its own,
+   apart from the delay fact, so containment withholds it while the delay stays citable.
+6. **Restricted-only values**: the restricted document contains at least two values of four or more
+   digits that appear in no other document; they feed the evaluation's restricted-exclusion
+   fingerprint. Shorter values, such as the margin percentage, go into the `forbidden` list of the
+   restricted question.
+7. **Photos**: no golden answer depends on reading a photo; generated descriptions are not evidence
+   of counts.
+8. **Stamp**: every document carries the stamp of §2 rule 4; the photos carry it as a small overlay
+   caption.
 
 ## 4. Skill templates
 
@@ -108,8 +156,8 @@ Core skills (shipped with every wiki, templates under `skills/templates/`):
 | `deep-research` | Multi-step research protocol with bounded steps, contradiction and supersession handling, report format |
 | `wiki-maintainer` | Conventions for adding sources, reading quality reports, proposals and log entries |
 
-Domain skills (≤ 3 per pack, e.g. for `wind-om`: `troubleshoot-alarm`, `prepare-maintenance-task`,
-`audit-readiness`). Each has an evaluation task in the golden set.
+Domain skills (≤ 3 per pack; for `batiment`, for example, checking a supplier invoice against the
+delivery notes). Each has an evaluation task in the golden set.
 
 Template rules: Jinja2 with `StrictUndefined`; allowed variables come only from validated catalog
 values (counts, page paths, entity types, topic titles from the pack) and the domain pack; values
@@ -118,17 +166,26 @@ are escaped; no free text from documents. SKILL.md frontmatter: `name` (kebab-ca
 
 ## 5. Golden set
 
-`evals/golden/dev.jsonl` (public) and a private holdout (not in the repository). Line format:
+`evals/golden/dev.jsonl` (public) and a private holdout (not in the repository). Line format (path
+and values illustrative):
 
 ```json
 {"id": "q001", "split": "dev", "category": "single-hop|multi-hop|numeric|table|contradiction|supersession|multilingual|ocr|abstain|injection|restricted|skill",
- "question": "...", "lang": "en|fr", "expected_answer": "...", "must_include": ["...", "12 Nm"],
- "required_citations": [{"source_path": "full/...", "locator_key": "p0003"}],
+ "question": "...", "lang": "en|fr", "expected_answer": "...", "must_include": ["...", "30 m²"],
+ "required_citations": [{"source_path": "full/devis/DEV-2026-014_indice-B.pdf", "locator_key": "p0001"}],
  "forbidden": ["..."], "abstain": false, "notes": "..."}
 ```
 
+Size: the dev split has 12 to 20 questions covering the 12 categories; the private holdout has
+about 5 questions (about a quarter of all questions).
+
+Language: a question asked in English about French documents uses only language-neutral
+`must_include` items (numbers with units, dates, document numbers, names from the bible), so a
+correct English answer never needs a French word; French words appear in `must_include` only for
+`lang: fr` questions.
+
 Sequencing: bible → generators → corpus frozen (MANIFEST hashes committed) → golden set written
 against the frozen corpus and sealed (sha256 of the file recorded in `evals/golden/SEAL`) → only then
-the first full wiki generation. The holdout (~30 % of questions) is authored by a separate agent that
-sees only the corpus, never the generators' planted-facts notes; only aggregate holdout scores are
-published.
+the first full wiki generation. The holdout is authored by a separate agent that sees only the
+corpus, never the planted-facts notes (`samples/fiction/PLANTED.md`), the generators or the dev set;
+only aggregate holdout scores are published.

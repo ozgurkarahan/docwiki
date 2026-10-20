@@ -35,10 +35,10 @@ def test_folder_storage_basic_operations(tmp_path: Path) -> None:
     assert storage.exists("work/state/sources/a.json")
     assert not storage.exists("work/state/sources/b.json")
     assert storage.etag("missing/key") is None
-    storage.write_bytes("raw/Procédures/SOP rev B.docx", b"doc")
+    storage.write_bytes("raw/Réunions/Compte rendu chantier.docx", b"doc")
     storage.write_bytes("releases/current.json", b"{}")
     assert storage.list() == [
-        "raw/Procédures/SOP rev B.docx",
+        "raw/Réunions/Compte rendu chantier.docx",
         "releases/current.json",
         "work/state/sources/a.json",
     ]

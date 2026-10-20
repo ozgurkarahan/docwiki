@@ -125,12 +125,12 @@ Sidecars inherit the sensitivity of their source and are excluded with it.
   UTF-8 with BOM handling); PPTX via python-pptx (slide text, notes, tables); EML via `email`
   (headers, text/plain preferred, HTML converted to text safely, attachments listed);
   VTT parsed by cue; MD/TXT by line.
-- **Content Understanding adapter**: `prebuilt-layout` by default for PDF, images and Office files
+- **Content Understanding adapter**: `prebuilt-layout` by default for PDF and images only
   (markdown + layout + tables + figure regions with page numbers and bounding boxes); figure
   descriptions are produced by DocWiki's own `fast` model call on figure crops (provenance
   `model-description`); `prebuilt-documentSearch` and `prebuilt-audioSearch` are opt-in per
-  domain pack. XLSX and CSV are **always** parsed by the local deterministic parsers, even in
-  Azure mode.
+  domain pack. DOCX, PPTX, XLSX, CSV, EML, VTT and text are **always** parsed by the local
+  deterministic parsers, even in Azure mode.
 - **Parity tests**: both adapters run on the same fixtures; tests compare block counts per
   locator, table cells and locators (text may differ in whitespace).
 - **Recorded fixtures**: Content Understanding responses are recorded for the fixtures and

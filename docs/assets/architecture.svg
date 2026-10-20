@@ -145,7 +145,7 @@
 <text x="976" y="133" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#22231f">Humans</text>
 <text x="976" y="158" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#363732">Quartz site: graph, search, backlinks</text>
 <text x="976" y="180" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#363732">Evidence microscope on every footnote</text>
-<text x="976" y="202" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#363732">GitHub Pages or a private portal</text>
+<text x="976" y="202" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#363732">Served by the portal Container App</text>
 <rect x="960" y="248" width="280" height="184" rx="12" fill="#ffffff" stroke="#d6d3c8" stroke-width="1.2"/>
 <text x="976" y="277" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#22231f">Foundry agents</text>
 <text x="976" y="301" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#363732">MCP server on Container Apps</text>

@@ -61,7 +61,7 @@ async def test_pages_pass_the_release_page_gates(tmp_path: Path, pack: DomainPac
         ),
     )
     stamp = writer.stamp
-    corpus = await build_corpus(pack, include_contract=False, stamp=stamp)
+    corpus = await build_corpus(pack, include_study=False, stamp=stamp)
     results = list(corpus.results.values())
     entity_pages, entity_cited = await build_entity_pages(
         results,

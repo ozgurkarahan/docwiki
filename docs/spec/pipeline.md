@@ -47,9 +47,9 @@ per deployment honouring `Retry-After`, max 3 retries with exponential backoff a
 - `CompiledSource` schema (structured output):
   ```json
   {"title": "...", "summary": "...",
-   "key_facts": [{"text": "...", "citations": [{"block_id": "b0042", "quote": "..."}], "numbers": ["12 Nm"]}],
+   "key_facts": [{"text": "...", "citations": [{"block_id": "b0042", "quote": "..."}], "numbers": ["30 m²"]}],
    "sections": [{"heading": "...", "body": "markdown with [[cite:b0042]] markers", "table_refs": ["t03"]}],
-   "entity_mentions": [{"entity_id": "asset:wtg-07", "block_ids": ["b0010"]}],
+   "entity_mentions": [{"entity_id": "organisation:window-maker", "block_ids": ["b0010"]}],
    "unknown_entities": [{"label": "...", "type_guess": "...", "block_ids": []}],
    "glossary_candidates": [{"term": "...", "definition": "...", "block_ids": []}],
    "injection_flags": [{"block_id": "...", "reason": "..."}]}

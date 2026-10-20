@@ -24,7 +24,7 @@ def build(**overrides: object) -> LlmRequest:
     arguments: dict[str, object] = {
         "tier": "fast",
         "system": "You classify documents.",
-        "user": "Gearbox inspection report",
+        "user": "Site meeting report",
         "output": Answer,
         "schema_name": "classify",
         "prompt_version": "classify-v1",
@@ -40,7 +40,7 @@ def test_request_hash_is_sha256_of_the_canonical_payload() -> None:
     payload = {
         "tier": "fast",
         "system": "You classify documents.",
-        "user": [{"type": "text", "text": "Gearbox inspection report"}],
+        "user": [{"type": "text", "text": "Site meeting report"}],
         "schema_name": "classify",
         "output_schema": to_strict_json_schema(Answer),
         "prompt_version": "classify-v1",
@@ -59,12 +59,12 @@ def test_request_hash_has_a_stable_golden_value() -> None:
         '"required":["answer"],"type":"object"}'
     )
     assert build().request_hash == (
-        "c771e622a8dba8f4993329fe00db91f13950731183142659927f0118f80425a2"
+        "33e02395ea4e4dc592e40faa7bf399c50389b64679ffd229f7a159ac91434e41"
     )
 
 
 def test_string_user_equals_single_text_part() -> None:
-    assert build().request_hash == build(user=[TextPart("Gearbox inspection report")]).request_hash
+    assert build().request_hash == build(user=[TextPart("Site meeting report")]).request_hash
 
 
 def test_line_endings_do_not_change_the_hash() -> None:

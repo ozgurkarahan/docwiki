@@ -1,0 +1,19 @@
+types:
+  - key: building-element
+    title: Building elements
+    description: Windows, slab and other parts of the extension.
+  - key: organisation
+    title: Organisations
+registry:
+  - type: building-element
+    key: baie-f1
+    label: baie F1
+    aliases:
+      - {text: bay window F1, lang: en}
+      - {text: baie coulissante, lang: fr}
+  - type: building-element
+    key: baie-de-liaison
+    label: baie de liaison
+  - type: organisation
+    key: vanarsdel-menuiseries
+    label: VanArsdel Menuiseries

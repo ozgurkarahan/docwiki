@@ -1,4 +1,4 @@
-"""Corpus manifest: hashes, formats, counts, quickstart / held-back flags and sensitivity."""
+"""Corpus manifest: hashes, formats, counts, extracted-text hashes, held-back flag, sensitivity."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import Any
 
+from .fonts import font_hashes
 from .textdump import MEDIA_TYPES, Extracted, extract
 from .world import BIBLE_PATH, World
 
@@ -23,7 +24,6 @@ LIBRARIES = (
     "pillow",
     "pypdfium2",
     "python-docx",
-    "python-pptx",
 )
 
 
@@ -32,16 +32,21 @@ def sha256_file(path: Path) -> str:
 
 
 def environment() -> dict[str, Any]:
-    """Interpreter, platform and library versions; byte-identical regeneration needs a match."""
+    """Interpreter, platform, library versions and embedded fonts.
+
+    Byte-identical regeneration of binary formats needs a match (zlib, libjpeg, fpdf2 and the
+    font files shape the bytes); the extracted-text hashes must match everywhere.
+    """
     return {
         "python": ".".join(str(v) for v in sys.version_info[:3]),
         "platform": f"{sys.platform}-{platform.machine().lower()}",
         "libraries": {name: importlib_metadata.version(name) for name in LIBRARIES},
+        "fonts": font_hashes(),
     }
 
 
 def text_digest(extracted: Extracted) -> str | None:
-    """sha256 of the extracted text (NFC), or None for files without text (images)."""
+    """sha256 of the extracted text (NFC), or None for files without text units (images)."""
     if not extracted.units:
         return None
     text = unicodedata.normalize("NFC", extracted.text())
@@ -61,21 +66,15 @@ def build_manifest(out_root: Path, world: World) -> dict[str, Any]:
     )
     for file in files:
         rel = file.relative_to(out_root).as_posix()
-        copy_of = None
-        if rel.startswith("quickstart/"):
-            copy_of = "full/" + rel.removeprefix("quickstart/")
-            doc = docs[copy_of]
-        elif rel in docs:
-            doc = docs[rel]
-        else:
+        if rel not in docs:
             raise ValueError(f"file not described in the bible document catalog: {rel}")
+        doc = docs[rel]
         fmt = file.suffix.lower().lstrip(".")
         extracted = extract(file)
         entries.append(
             {
                 "path": rel,
                 "id": doc["id"],
-                "domain": doc.get("domain", "wind-om"),
                 "sha256": sha256_file(file),
                 "bytes": file.stat().st_size,
                 "format": fmt,
@@ -86,8 +85,6 @@ def build_manifest(out_root: Path, world: World) -> dict[str, Any]:
                 "date": doc["date"],
                 "doc_number": doc.get("doc_number"),
                 "revision": doc.get("revision"),
-                "quickstart": bool(doc.get("quickstart")),
-                "copy_of": copy_of,
                 "held_back": bool(doc.get("held_back")),
                 "sensitivity": doc["sensitivity"],
                 "procedure_like": bool(doc["procedure_like"]),
@@ -98,9 +95,7 @@ def build_manifest(out_root: Path, world: World) -> dict[str, Any]:
         )
     by_format: dict[str, int] = {}
     for entry in entries:
-        if entry["copy_of"] is None:
-            by_format[entry["format"]] = by_format.get(entry["format"], 0) + 1
-    quickstart = sorted(e["path"] for e in entries if e["quickstart"] and e["copy_of"] is None)
+        by_format[entry["format"]] = by_format.get(entry["format"], 0) + 1
     return {
         "schema": 1,
         "description": (
@@ -114,10 +109,10 @@ def build_manifest(out_root: Path, world: World) -> dict[str, Any]:
             "environment": environment(),
         },
         "bible_sha256": sha256_file(BIBLE_PATH),
-        "quickstart": quickstart,
         "totals": {
             "files": len(entries),
-            "unique_documents": sum(1 for e in entries if e["copy_of"] is None),
+            "documents": sum(1 for e in entries if not e["held_back"]),
+            "held_back": sum(1 for e in entries if e["held_back"]),
             "bytes": sum(e["bytes"] for e in entries),
             "by_format": dict(sorted(by_format.items())),
         },

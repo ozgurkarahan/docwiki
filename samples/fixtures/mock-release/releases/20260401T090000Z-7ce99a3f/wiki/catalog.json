@@ -1,0 +1,603 @@
+{
+  "schema": 1,
+  "release_id": "20260401T090000Z-7ce99a3f",
+  "audience": "public",
+  "generated_at": "2026-04-01T09:00:00Z",
+  "pages": [
+    {
+      "id": "meta:agents",
+      "type": "meta",
+      "path": "AGENTS.md",
+      "title": "Agent guide",
+      "summary": "How agents should use this wiki: page types, navigation, citations, skills and safety.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [],
+      "entities": [],
+      "topics": [],
+      "sources": [],
+      "lang": "en"
+    },
+    {
+      "id": "meta:quality",
+      "type": "meta",
+      "path": "_meta/quality.md",
+      "title": "Quality report",
+      "summary": "Gate results of this release.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [],
+      "entities": [],
+      "topics": [],
+      "sources": [],
+      "lang": "en"
+    },
+    {
+      "id": "index:entities",
+      "type": "index",
+      "path": "entities/index.md",
+      "title": "Entities",
+      "summary": "Entity types of this wiki and their pages.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [],
+      "entities": [],
+      "topics": [],
+      "sources": [],
+      "lang": "en"
+    },
+    {
+      "id": "index:entities/organisation",
+      "type": "index",
+      "path": "entities/organisation/index.md",
+      "title": "Organisations",
+      "summary": "The contractor, the client household and the third parties of the job.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [],
+      "entities": [],
+      "topics": [],
+      "sources": [],
+      "lang": "en"
+    },
+    {
+      "id": "organisation:vanarsdel-menuiseries",
+      "type": "entity",
+      "path": "entities/organisation/vanarsdel-menuiseries.md",
+      "title": "VanArsdel Menuiseries",
+      "summary": "VanArsdel Menuiseries, the company in charge of the delivery of the windows, which postponed it.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [
+        "organisation",
+        "window-maker"
+      ],
+      "entities": [],
+      "topics": [],
+      "sources": [
+        "src-165f1d3a109c",
+        "src-86eabe3d6d0d",
+        "src-c6436ec50050"
+      ],
+      "lang": "en"
+    },
+    {
+      "id": "index:entities/work-package",
+      "type": "index",
+      "path": "entities/work-package/index.md",
+      "title": "Work packages",
+      "summary": "The lots of the quote, which structure prices, the schedule and who does the work.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [],
+      "entities": [],
+      "topics": [],
+      "sources": [],
+      "lang": "en"
+    },
+    {
+      "id": "work-package:lot-3-gros-oeuvre",
+      "type": "entity",
+      "path": "entities/work-package/lot-3-gros-oeuvre.md",
+      "title": "Lot 3 - Gros œuvre",
+      "summary": "Work package 3, the structural work of the extension, whose walls the schedule and the minutes follow.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [
+        "masonry",
+        "work-package"
+      ],
+      "entities": [],
+      "topics": [],
+      "sources": [
+        "src-165f1d3a109c",
+        "src-86eabe3d6d0d",
+        "src-c6436ec50050"
+      ],
+      "lang": "en"
+    },
+    {
+      "id": "work-package:lot-5-menuiseries-exterieures",
+      "type": "entity",
+      "path": "entities/work-package/lot-5-menuiseries-exterieures.md",
+      "title": "Lot 5 - Menuiseries extérieures",
+      "summary": "Work package 5, the windows of the extension, with the postponed delivery and the installation dates.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [
+        "windows",
+        "work-package"
+      ],
+      "entities": [],
+      "topics": [],
+      "sources": [
+        "src-165f1d3a109c",
+        "src-86eabe3d6d0d",
+        "src-c6436ec50050"
+      ],
+      "lang": "en"
+    },
+    {
+      "id": "glossary",
+      "type": "glossary",
+      "path": "glossary.md",
+      "title": "Glossary",
+      "summary": "Terms with definitions, multilingual synonyms and links.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [],
+      "entities": [],
+      "topics": [],
+      "sources": [],
+      "lang": "en"
+    },
+    {
+      "id": "index:home",
+      "type": "index",
+      "path": "index.md",
+      "title": "Chantier Moreau mock wiki",
+      "summary": "Home of the hand-made mock release: purpose, navigation, topics, stats and recent changes.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [],
+      "entities": [],
+      "topics": [],
+      "sources": [],
+      "lang": "en"
+    },
+    {
+      "id": "log",
+      "type": "log",
+      "path": "log.md",
+      "title": "Log",
+      "summary": "Append-only change log of this wiki.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [],
+      "entities": [],
+      "topics": [],
+      "sources": [],
+      "lang": "en"
+    },
+    {
+      "id": "query:2026-03-31-window-delivery-date",
+      "type": "query",
+      "path": "queries/2026-03-31-window-delivery-date.md",
+      "title": "When are the windows of the extension delivered?",
+      "summary": "On 2026-04-20; indice A of the schedule, now superseded, gave 2026-03-30.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [
+        "schedule",
+        "windows"
+      ],
+      "entities": [],
+      "topics": [],
+      "sources": [
+        "src-165f1d3a109c",
+        "src-86eabe3d6d0d",
+        "src-c6436ec50050"
+      ],
+      "lang": "en"
+    },
+    {
+      "id": "src-165f1d3a109c",
+      "type": "source",
+      "path": "sources/2026-03-24-compte-rendu-de-chantier-n3.md",
+      "title": "Site meeting minutes n°3",
+      "summary": "Minutes of site meeting n°3 with the progress of the walls and the postponed window delivery.",
+      "sensitivity": "public",
+      "status": "current",
+      "tags": [
+        "minutes",
+        "site-meeting"
+      ],
+      "entities": [
+        "organisation:vanarsdel-menuiseries",
+        "work-package:lot-3-gros-oeuvre",
+        "work-package:lot-5-menuiseries-exterieures"
+      ],
+      "topics": [
+        "topic:schedule-and-window-delivery"
+      ],
+      "sources": [
+        "src-165f1d3a109c"
+      ],
+      "lang": "en"
+    },
+    {
+      "id": "index:sources",
+      "type": "index",
+      "path": "sources/index.md",
+      "title": "Sources",
+      "summary": "All sources grouped by category, with status and sensitivity.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [],
+      "entities": [],
+      "topics": [],
+      "sources": [],
+      "lang": "en"
+    },
+    {
+      "id": "src-c6436ec50050",
+      "type": "source",
+      "path": "sources/pln-2026-003-indice-a-planning-et-suivi-des-achats.md",
+      "title": "Planning and purchase tracking, indice A",
+      "summary": "Superseded indice A of the schedule PLN-2026-003, printed as a PDF page, with the first window delivery date.",
+      "sensitivity": "public",
+      "status": "superseded",
+      "tags": [
+        "planning",
+        "schedule"
+      ],
+      "entities": [
+        "organisation:vanarsdel-menuiseries",
+        "work-package:lot-3-gros-oeuvre",
+        "work-package:lot-5-menuiseries-exterieures"
+      ],
+      "topics": [
+        "topic:schedule-and-window-delivery"
+      ],
+      "sources": [
+        "src-c6436ec50050"
+      ],
+      "lang": "en"
+    },
+    {
+      "id": "src-86eabe3d6d0d",
+      "type": "source",
+      "path": "sources/pln-2026-003-indice-b-planning-et-suivi-des-achats.md",
+      "title": "Planning and purchase tracking, indice B",
+      "summary": "Current indice B of the schedule PLN-2026-003, a workbook that postpones the window delivery.",
+      "sensitivity": "public",
+      "status": "current",
+      "tags": [
+        "planning",
+        "schedule",
+        "windows"
+      ],
+      "entities": [
+        "organisation:vanarsdel-menuiseries",
+        "work-package:lot-3-gros-oeuvre",
+        "work-package:lot-5-menuiseries-exterieures"
+      ],
+      "topics": [
+        "topic:schedule-and-window-delivery"
+      ],
+      "sources": [
+        "src-86eabe3d6d0d"
+      ],
+      "lang": "en"
+    },
+    {
+      "id": "index:topics",
+      "type": "index",
+      "path": "topics/index.md",
+      "title": "Topics",
+      "summary": "Curated multi-source syntheses.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [],
+      "entities": [],
+      "topics": [],
+      "sources": [],
+      "lang": "en"
+    },
+    {
+      "id": "topic:schedule-and-window-delivery",
+      "type": "topic",
+      "path": "topics/schedule-and-window-delivery.md",
+      "title": "Schedule and window delivery",
+      "summary": "Delivery and installation of the windows of the extension and the progress of the masonry, compiled from the schedule and the site meeting minutes.",
+      "sensitivity": "public",
+      "status": null,
+      "tags": [
+        "schedule",
+        "windows"
+      ],
+      "entities": [],
+      "topics": [],
+      "sources": [
+        "src-165f1d3a109c",
+        "src-86eabe3d6d0d",
+        "src-c6436ec50050"
+      ],
+      "lang": "en"
+    }
+  ],
+  "edges": [
+    {
+      "from": "organisation:vanarsdel-menuiseries",
+      "to": "src-165f1d3a109c",
+      "kind": "cites"
+    },
+    {
+      "from": "organisation:vanarsdel-menuiseries",
+      "to": "src-86eabe3d6d0d",
+      "kind": "cites"
+    },
+    {
+      "from": "organisation:vanarsdel-menuiseries",
+      "to": "src-c6436ec50050",
+      "kind": "cites"
+    },
+    {
+      "from": "organisation:vanarsdel-menuiseries",
+      "to": "topic:schedule-and-window-delivery",
+      "kind": "related"
+    },
+    {
+      "from": "query:2026-03-31-window-delivery-date",
+      "to": "src-165f1d3a109c",
+      "kind": "cites"
+    },
+    {
+      "from": "query:2026-03-31-window-delivery-date",
+      "to": "src-86eabe3d6d0d",
+      "kind": "cites"
+    },
+    {
+      "from": "query:2026-03-31-window-delivery-date",
+      "to": "src-c6436ec50050",
+      "kind": "cites"
+    },
+    {
+      "from": "query:2026-03-31-window-delivery-date",
+      "to": "topic:schedule-and-window-delivery",
+      "kind": "related"
+    },
+    {
+      "from": "query:2026-03-31-window-delivery-date",
+      "to": "work-package:lot-5-menuiseries-exterieures",
+      "kind": "related"
+    },
+    {
+      "from": "src-165f1d3a109c",
+      "to": "organisation:vanarsdel-menuiseries",
+      "kind": "mentions"
+    },
+    {
+      "from": "src-165f1d3a109c",
+      "to": "topic:schedule-and-window-delivery",
+      "kind": "related"
+    },
+    {
+      "from": "src-165f1d3a109c",
+      "to": "work-package:lot-3-gros-oeuvre",
+      "kind": "mentions"
+    },
+    {
+      "from": "src-165f1d3a109c",
+      "to": "work-package:lot-5-menuiseries-exterieures",
+      "kind": "mentions"
+    },
+    {
+      "from": "src-86eabe3d6d0d",
+      "to": "organisation:vanarsdel-menuiseries",
+      "kind": "mentions"
+    },
+    {
+      "from": "src-86eabe3d6d0d",
+      "to": "src-c6436ec50050",
+      "kind": "supersedes"
+    },
+    {
+      "from": "src-86eabe3d6d0d",
+      "to": "topic:schedule-and-window-delivery",
+      "kind": "related"
+    },
+    {
+      "from": "src-86eabe3d6d0d",
+      "to": "work-package:lot-3-gros-oeuvre",
+      "kind": "mentions"
+    },
+    {
+      "from": "src-86eabe3d6d0d",
+      "to": "work-package:lot-5-menuiseries-exterieures",
+      "kind": "mentions"
+    },
+    {
+      "from": "src-c6436ec50050",
+      "to": "organisation:vanarsdel-menuiseries",
+      "kind": "mentions"
+    },
+    {
+      "from": "src-c6436ec50050",
+      "to": "src-86eabe3d6d0d",
+      "kind": "related"
+    },
+    {
+      "from": "src-c6436ec50050",
+      "to": "topic:schedule-and-window-delivery",
+      "kind": "related"
+    },
+    {
+      "from": "src-c6436ec50050",
+      "to": "work-package:lot-3-gros-oeuvre",
+      "kind": "mentions"
+    },
+    {
+      "from": "src-c6436ec50050",
+      "to": "work-package:lot-5-menuiseries-exterieures",
+      "kind": "mentions"
+    },
+    {
+      "from": "topic:schedule-and-window-delivery",
+      "to": "organisation:vanarsdel-menuiseries",
+      "kind": "related"
+    },
+    {
+      "from": "topic:schedule-and-window-delivery",
+      "to": "src-165f1d3a109c",
+      "kind": "cites"
+    },
+    {
+      "from": "topic:schedule-and-window-delivery",
+      "to": "src-165f1d3a109c",
+      "kind": "topic-of"
+    },
+    {
+      "from": "topic:schedule-and-window-delivery",
+      "to": "src-86eabe3d6d0d",
+      "kind": "cites"
+    },
+    {
+      "from": "topic:schedule-and-window-delivery",
+      "to": "src-86eabe3d6d0d",
+      "kind": "topic-of"
+    },
+    {
+      "from": "topic:schedule-and-window-delivery",
+      "to": "src-c6436ec50050",
+      "kind": "cites"
+    },
+    {
+      "from": "topic:schedule-and-window-delivery",
+      "to": "src-c6436ec50050",
+      "kind": "topic-of"
+    },
+    {
+      "from": "topic:schedule-and-window-delivery",
+      "to": "work-package:lot-3-gros-oeuvre",
+      "kind": "related"
+    },
+    {
+      "from": "topic:schedule-and-window-delivery",
+      "to": "work-package:lot-5-menuiseries-exterieures",
+      "kind": "related"
+    },
+    {
+      "from": "work-package:lot-3-gros-oeuvre",
+      "to": "src-165f1d3a109c",
+      "kind": "cites"
+    },
+    {
+      "from": "work-package:lot-3-gros-oeuvre",
+      "to": "src-86eabe3d6d0d",
+      "kind": "cites"
+    },
+    {
+      "from": "work-package:lot-3-gros-oeuvre",
+      "to": "src-c6436ec50050",
+      "kind": "cites"
+    },
+    {
+      "from": "work-package:lot-3-gros-oeuvre",
+      "to": "topic:schedule-and-window-delivery",
+      "kind": "related"
+    },
+    {
+      "from": "work-package:lot-5-menuiseries-exterieures",
+      "to": "src-165f1d3a109c",
+      "kind": "cites"
+    },
+    {
+      "from": "work-package:lot-5-menuiseries-exterieures",
+      "to": "src-86eabe3d6d0d",
+      "kind": "cites"
+    },
+    {
+      "from": "work-package:lot-5-menuiseries-exterieures",
+      "to": "src-c6436ec50050",
+      "kind": "cites"
+    },
+    {
+      "from": "work-package:lot-5-menuiseries-exterieures",
+      "to": "topic:schedule-and-window-delivery",
+      "kind": "related"
+    }
+  ],
+  "sources": [
+    {
+      "source_id": "src-165f1d3a109c",
+      "path": "chantier/2026-03-24_compte-rendu-de-chantier-n3.docx",
+      "hash": "sha256:d1680f5808d731ebc8698e83096f12935be3c0c56701c4197ee93945c023594b",
+      "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "status": "current",
+      "doc_number": null,
+      "revision": null
+    },
+    {
+      "source_id": "src-86eabe3d6d0d",
+      "path": "planning/PLN-2026-003_indice-B_planning-et-suivi-des-achats.xlsx",
+      "hash": "sha256:2fa175dd45fd653f9071a481a2bc9f084da04d00fe72fceb31aadf23a63795cd",
+      "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "status": "current",
+      "doc_number": "PLN-2026-003",
+      "revision": "B"
+    },
+    {
+      "source_id": "src-c6436ec50050",
+      "path": "planning/PLN-2026-003_indice-A_planning-et-suivi-des-achats.pdf",
+      "hash": "sha256:e480ef58a7bc1a2b772c299fbfcf0dc0c077c0d9b06a9dfe281ae64ee6479eb4",
+      "media_type": "application/pdf",
+      "status": "superseded",
+      "doc_number": "PLN-2026-003",
+      "revision": "A"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "revision",
+      "synonyms": {
+        "en": [
+          "revision letter"
+        ],
+        "fr": [
+          "indice"
+        ]
+      },
+      "page": "glossary.md#revision"
+    },
+    {
+      "term": "schedule",
+      "synonyms": {
+        "en": [
+          "works schedule",
+          "programme"
+        ],
+        "fr": [
+          "planning",
+          "planning de travaux",
+          "calendrier des travaux"
+        ]
+      },
+      "page": "glossary.md#schedule"
+    },
+    {
+      "term": "windows and external doors",
+      "synonyms": {
+        "en": [
+          "exterior joinery",
+          "joinery"
+        ],
+        "fr": [
+          "menuiseries extérieures",
+          "menuiseries"
+        ]
+      },
+      "page": "glossary.md#windows-and-external-doors"
+    }
+  ]
+}

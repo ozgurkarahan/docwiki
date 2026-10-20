@@ -34,13 +34,13 @@ def meta(extraction: Extraction) -> dict[str, str]:
 
 def test_docx_text_tables_metadata_and_company() -> None:
     data = make_docx(
-        ["Gearbox oil change for " + FAKE_TERM, "Contact " + FAKE_EMAIL],
+        ["Window delivery for " + FAKE_TERM, "Contact " + FAKE_EMAIL],
         author="Jane Quillon",
         last_modified_by="jquillon",
         table=[["Supplier", "Zorblax"]],
         company="Zorblax Holdings",
     )
-    extraction = extract_bytes(data, "sop.docx")
+    extraction = extract_bytes(data, "devis.docx")
     assert extraction.kind == "office"
     body = texts(extraction)
     assert FAKE_TERM in body and FAKE_EMAIL in body
@@ -75,23 +75,25 @@ def test_docx_hidden_parts_are_extracted() -> None:
 
 def test_xlsx_cells_formulas_and_metadata() -> None:
     data = make_xlsx(
-        [["Part", "Supplier"], ["Gearbox oil", "Zorblax"], ["Filter", FAKE_GUID]],
+        [["Article", "Supplier"], ["Concrete blocks", "Zorblax"], ["Filter", FAKE_GUID]],
         creator="Jane Quillon",
         formula="=HYPERLINK(\"" + FAKE_INTERNAL_URL + "\")",
     )
-    extraction = extract_bytes(data, "stock.xlsx")
+    extraction = extract_bytes(data, "achats.xlsx")
     locations = {chunk.text: chunk.location for chunk in extraction.chunks}
-    assert locations["Zorblax"] == "Plan!B2"
-    assert locations[FAKE_GUID] == "Plan!B3"
+    assert locations["Zorblax"] == "Planning!B2"
+    assert locations[FAKE_GUID] == "Planning!B3"
     formula = next(c for c in extraction.chunks if c.kind == "formula")
     assert FAKE_INTERNAL_URL in formula.text and not formula.closed_world
     assert meta(extraction)["creator"] == "Jane Quillon"
 
 
 def test_pptx_text_and_default_last_modified_by() -> None:
-    extraction = extract_bytes(make_pptx("Site Rules", "Escort by Zorblax staff"), "deck.pptx")
+    extraction = extract_bytes(
+        make_pptx("Site Meeting", "Delivery by Zorblax staff"), "deck.pptx"
+    )
     body = texts(extraction)
-    assert "Site Rules" in body and "Escort by Zorblax staff" in body
+    assert "Site Meeting" in body and "Delivery by Zorblax staff" in body
     assert meta(extraction)["creator"] == "DocWiki sample generator"
     library_default = extract_bytes(make_pptx("T", "B", last_modified_by=None), "deck.pptx")
     assert meta(library_default).get("lastModifiedBy")  # python-pptx ships a person's name
@@ -105,23 +107,23 @@ def test_pptx_table_style_reference_is_not_scanned() -> None:
     presentation = pptx.Presentation()
     slide = presentation.slides.add_slide(presentation.slide_layouts[5])
     table = slide.shapes.add_table(2, 2, Inches(1), Inches(1), Inches(4), Inches(1)).table
-    table.cell(0, 0).text = "Asset"
+    table.cell(0, 0).text = "Order"
     buffer = io.BytesIO()
     presentation.save(buffer)
     raw = buffer.getvalue()
     assert b"tableStyleId" in zipfile.ZipFile(buffer).read("ppt/slides/slide1.xml")
     extraction = extract_bytes(raw, "deck.pptx")
-    assert "Asset" in texts(extraction)
+    assert "Order" in texts(extraction)
     assert not [chunk.text for chunk in extraction.chunks if GUID_RE.search(chunk.text)]
 
 
 def test_pdf_text_metadata_and_links() -> None:
     data = make_pdf(
-        ["Lab report for " + FAKE_TERM, "Sample id " + FAKE_GUID],
+        ["Site report for " + FAKE_TERM, "Order id " + FAKE_GUID],
         {"Author": "jquillon", "Creator": "Quillon Writer 2", "Producer": "fpdf2"},
         uri=FAKE_INTERNAL_URL,
     )
-    extraction = extract_bytes(data, "lab.pdf")
+    extraction = extract_bytes(data, "report.pdf")
     assert extraction.kind == "pdf", extraction.problems
     body = texts(extraction)
     assert FAKE_TERM in body and FAKE_GUID in body and FAKE_INTERNAL_URL in body
@@ -149,7 +151,7 @@ def test_jpeg_exif_detection() -> None:
 
 
 def test_sqlite_text_columns(tmp_path: Path) -> None:
-    database = make_sqlite(tmp_path / "search.db", [("Gearbox", "Owner " + FAKE_EMAIL)])
+    database = make_sqlite(tmp_path / "search.db", [("Delivery", "Owner " + FAKE_EMAIL)])
     extraction = extract_bytes(database.read_bytes(), "search.db")
     assert extraction.kind == "sqlite", extraction.problems
     chunk = next(c for c in extraction.chunks if FAKE_EMAIL in c.text)
@@ -160,38 +162,38 @@ def test_sqlite_text_columns(tmp_path: Path) -> None:
 def test_parquet_rows(tmp_path: Path) -> None:
     import duckdb
 
-    target = tmp_path / "kpi.parquet"
+    target = tmp_path / "achats.parquet"
     connection = duckdb.connect()
     connection.execute(
-        f"COPY (SELECT 'Turbine 7' AS asset, '{FAKE_TERM}' AS vendor) TO '{target.as_posix()}' "
+        f"COPY (SELECT 'Window F1' AS item, '{FAKE_TERM}' AS vendor) TO '{target.as_posix()}' "
         "(FORMAT parquet)"
     )
     connection.close()
-    extraction = extract_bytes(target.read_bytes(), "kpi.parquet", path_on_disk=target)
+    extraction = extract_bytes(target.read_bytes(), "achats.parquet", path_on_disk=target)
     assert FAKE_TERM in texts(extraction)
-    detached = extract_bytes(target.read_bytes(), "kpi.parquet")
+    detached = extract_bytes(target.read_bytes(), "achats.parquet")
     assert detached.chunks == [] and detached.notices[0].startswith("unscanned")
 
 
 def test_eml_headers_body_and_attachment() -> None:
     data = make_eml(
-        "Please ask " + FAKE_EMAIL + " about the bulletin.",
+        "Please ask " + FAKE_EMAIL + " about the delivery.",
         attachment=("ids.txt", ("subscription " + FAKE_GUID).encode()),
     )
     extraction = extract_bytes(data, "mail.eml")
     body = texts(extraction)
-    assert "Subject: Bulletin applicability" in body
+    assert "Subject: Window delivery date" in body
     assert FAKE_EMAIL in body and FAKE_GUID in body
     attached = next(c for c in extraction.chunks if FAKE_GUID in c.text)
     assert attached.location.startswith("attachment ids.txt")
 
 
 def test_unicode_escapes_are_decoded_for_every_rule() -> None:
-    source = '{"term": "Generatorb\\u00fcrsten", "vendor": "Z\\u00f6rblax"}\n'
+    source = '{"term": "Mat\\u00e9riaux", "vendor": "Z\\u00f6rblax"}\n'
     extraction = extract_bytes(source.encode("ascii"), "glossary.json")
-    decoded = [c for c in extraction.chunks if "Generatorb\u00fcrsten" in c.text]
+    decoded = [c for c in extraction.chunks if "Mat\u00e9riaux" in c.text]
     assert len(decoded) == 1 and decoded[0].closed_world and decoded[0].identifiers
-    escaped = [c for c in extraction.chunks if "\\u00fc" in c.text]
+    escaped = [c for c in extraction.chunks if "\\u00e9" in c.text]
     assert len(escaped) == 1 and not escaped[0].closed_world and escaped[0].identifiers
     assert decoded[0].location == escaped[0].location == "line 1"
     surrogate = extract_bytes(b'"smile \\ud83d\\ude00"', "x.json")

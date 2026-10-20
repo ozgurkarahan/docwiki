@@ -34,7 +34,7 @@ from typer.testing import CliRunner
 from docwiki.agents_client import AgentAnswer
 from docwiki.cli import app
 
-QUESTION = "Which gearbox oil grade applies to WTG-07 in winter?"
+QUESTION = "When are the windows of the extension delivered?"
 
 
 class Foundry:
@@ -109,11 +109,13 @@ def test_ask_prints_the_answer_sources_and_receipt(
         monkeypatch,
         response(
             list_tools("search", "get_evidence"),
-            mcp_call("search", {"query": "gearbox oil WTG-07"}, output='{"ok": true, "hits": []}'),
+            mcp_call(
+                "search", {"query": "window delivery date"}, output='{"ok": true, "hits": []}'
+            ),
             mcp_call(
                 "get_evidence",
-                {"source_id": "src-4d9c65e05302", "locator_key": "para-0004"},
-                output='{"ok": true, "locator_label": "¶ 4"}',
+                {"source_id": "src-165f1d3a109c", "locator_key": "para-0007"},
+                output='{"ok": true, "locator_label": "¶ 7"}',
                 item_id="mcp_2",
             ),
             message(ANSWER_TEXT),
@@ -150,8 +152,8 @@ def test_ask_json_with_conversation_and_pinned_version(
         "conv_7",
     )
     assert [source.locator_key for source in answer.sources] == [
-        "para-0004",
-        "sheet-plan-r0002-r0004",
+        "para-0007",
+        "sheet-planning-r0006-r0009",
     ]
     assert foundry.lookups == []
     assert foundry.script.bodies[0] == {

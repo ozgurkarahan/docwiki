@@ -231,14 +231,14 @@ releases/current.json  # CurrentPointer
 
 **Tables** (not in the spec): one Parquet file per extracted table, `tables/<source_id>/t01.parquet`,
 written with DuckDB `COPY … (FORMAT parquet)`. Columns: `row_id` (VARCHAR, `r0012`) then the table
-columns renamed to unique ASCII snake_case (`Oil grade` → `oil_grade`, empty → `col_<n>`, leading
-digit → `c_…`). Types are inferred conservatively: `BIGINT`/`DOUBLE` only when every non-empty
-cell is a plain number without leading zeros, otherwise `VARCHAR` with the exact cell text; empty
-numeric cells are `NULL`. `index.json` = `SourceTablesIndex{schema: 1, source_id, sensitivity,
-tables[{id, file, locator, provenance, columns[{name, header, type}], row_count, row_ids}]}`.
-`connect_tables(release_root, source_id)` loads them as tables `t01…` into an in-memory DuckDB with
-external access disabled and configuration locked; `query_tables(…, sql, max_rows=200)` accepts a
-single `SELECT` and returns `TableQueryResult(columns, rows, truncated)`.
+columns renamed to unique ASCII snake_case (`Prix unitaire HT` → `prix_unitaire_ht`, empty →
+`col_<n>`, leading digit → `c_…`). Types are inferred conservatively: `BIGINT`/`DOUBLE` only when
+every non-empty cell is a plain number without leading zeros, otherwise `VARCHAR` with the exact
+cell text; empty numeric cells are `NULL`. `index.json` = `SourceTablesIndex{schema: 1, source_id,
+sensitivity, tables[{id, file, locator, provenance, columns[{name, header, type}], row_count,
+row_ids}]}`. `connect_tables(release_root, source_id)` loads them as tables `t01…` into an
+in-memory DuckDB with external access disabled and configuration locked; `query_tables(…, sql,
+max_rows=200)` accepts a single `SELECT` and returns `TableQueryResult(columns, rows, truncated)`.
 
 ## 11. Release I/O (`docwiki.release`)
 
@@ -425,7 +425,7 @@ warnings and never fails on them). `dump_overlay(overlay)` gives stable YAML.
 17. **Validator gate mapping** (§14), file-relative line numbers, orphans ignore backlinks blocks.
 18. **Domain packs**: required/optional files, unknown files rejected, alias languages must be
     declared, reserved entity types, regex/glob/scoring semantics of §15, overlay merge rules.
-19. **Portable wiki folder** (§19) for the committed sample wiki and local use: the content
+19. **Portable wiki folder** (§19) for local use and export: the content
     namespace as the folder root with machine files in `.docwiki/`; `site/` is not exported.
 20. **Run report `warnings`** (§8) for problems that do not fail a run; `RunContext.notices`
     adds the problems noticed by the queue worker (a refused visibility renewal).
@@ -445,7 +445,7 @@ warnings and never fails on them). `dump_overlay(overlay)` gives stable YAML.
 - Define the release-id hash input (decision 1) in architecture §3.
 - Add the `paraphrase` badge (decision 4) to wiki-contract §5 and site.md §2.
 - Add the tables layout (decision 10) to architecture §3 and the `query_table` description.
-- Describe the portable wiki folder (§19) as the layout of `samples/wiki` in site.md and
+- Describe the portable wiki folder (§19) as a plain-folder layout in site.md and
   mcp-and-agents.md §3.
 - Add `work/state/domain-pack.json`, the state shard retry fields and the run report `warnings`
   (decisions 20–22) to architecture §3–§5 and §7, and the transient-quarantine rule to pipeline
@@ -458,8 +458,8 @@ warnings and never fails on them). `dump_overlay(overlay)` gives stable YAML.
 
 A portable wiki folder is the content namespace (§4) written as a plain folder, so every relative
 link (`../evidence/<source_id>/<locator_key>.md`, `../../sources/x.md`…) resolves as a file path on
-GitHub, in Obsidian or VS Code and for agents that only read files. The committed sample wiki uses
-this layout; published releases keep the release layout (§10).
+GitHub, in Obsidian or VS Code and for agents that only read files. Published releases keep
+the release layout (§10).
 
 ```
 <folder>/

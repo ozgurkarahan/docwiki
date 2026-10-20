@@ -9,6 +9,31 @@ Microsoft Foundry models and two Foundry agents (Librarian and Researcher).
 If code and spec disagree, the spec wins; propose spec changes in your summary instead of
 silently diverging.
 
+## Owner decisions (2026-10-21, apply now; they win over older spec text until the spec is updated)
+
+DocWiki is a **public proof of concept**. Its job is to show one pattern clearly: messy documents
+become a cited wiki that is served on Azure Container Apps, with Microsoft Foundry agents working
+*inside* that wiki. It must be easy to understand and easy to present.
+
+1. **One experience, one app.** The wiki and the agents are one product: the agent lives in the
+   wiki page (the drawer), never in a separate app. Anonymous readers get the Researcher (read-only,
+   public tier). A signed-in owner gets the Librarian, approvals, uploads, the run status and
+   "File to wiki" in the same drawer. ADR 0007's split into a separate Studio is being superseded
+   by ADR 0008; do not add new features to the standalone Studio or portal.
+2. **A public LLM endpoint is allowed.** The old invariant "no public endpoint calls an LLM"
+   (`docs/spec/architecture.md` §8, D13) is dropped. It is replaced by: per-IP rate limits, a token
+   budget and a daily cost cut-off that falls back to the filed answers. Limits run in an existing,
+   shared Azure API Management instance, passed in as a deployment parameter; never create a new
+   one, and never commit its name or URL. Live answers go through the same quote verification and
+   leak checks as filed answers before they are shown.
+3. **One public repository, no GitHub Pages.** This repository is the only one. The demo is served
+   from Azure; there is no Pages site or committed `samples/wiki`.
+4. **GlobalStandard model deployments are the default.** This PoC has no data-residency requirement.
+5. **Small, reviewable steps.** Prefer short slices and small pull requests over long runs.
+6. **Decisions live here.** When the owner makes a new decision, record it in this section (and in
+   an ADR when it changes the design), so every coding agent, including GitHub Copilot sessions,
+   works from the same facts.
+
 ## Hard rules (non-negotiable)
 
 1. **Closed world.** Every organisation, person, product, brand, site, asset and place name in

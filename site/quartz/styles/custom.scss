@@ -1,3 +1,4 @@
+@use "sass:map";
 @use "./base.scss";
 @use "./variables.scss" as *;
 
@@ -221,8 +222,38 @@ article blockquote.docwiki-notice {
 .preview-inner {
   .breadcrumb-container,
   .tags,
-  .docwiki-notice--fictional {
+  .docwiki-notice--fictional,
+  .docwiki-ask-root {
     display: none;
+  }
+}
+
+// Phones: Quartz's header row (menu, title, search, theme and reader buttons) must fit 320 px
+// whatever the wiki's title, so the title shrinks and wraps instead of widening the page (the
+// link needs `anywhere` too: Quartz's `break-word` keeps the longest word as the minimum width).
+@media all and ($mobile) {
+  .sidebar.left .page-title {
+    min-width: 0;
+    font-size: clamp(1.2rem, 5vw, 1.75rem);
+
+    &,
+    a {
+      overflow-wrap: anywhere;
+    }
+  }
+
+  // The open menu: Quartz positions it against the sticky header, which the page's 1rem padding
+  // insets, so it overflowed the screen by 1rem. It covers the screen instead, and the menu button
+  // sits at the top of the header row so that the list (4rem down) never starts under it, however
+  // many lines the title wraps to.
+  .sidebar.left .explorer {
+    margin-top: 0;
+  }
+
+  .explorer .explorer-content {
+    position: fixed;
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 }
 
@@ -411,19 +442,451 @@ a.docwiki-original::after {
   content: " ↗";
 }
 
-// ----- Landing page: About DocWiki -----
+// ----- Home page: About this wiki (provenance line, collapsible About DocWiki) -----
 
 .docwiki-about {
-  margin-top: 0.5rem;
+  margin: 0.75rem 0 0.5rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--lightgray);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--darkgray);
 
-  h2 {
-    margin-top: 0;
-    font-size: 1.15rem;
+  .docwiki-provenance {
+    margin: 0;
   }
 
-  p,
-  ul {
+  details {
+    margin-top: 0.3rem;
+  }
+
+  summary {
+    cursor: pointer;
+    width: fit-content;
+    color: var(--secondary);
+    font-weight: $semiBoldWeight;
+  }
+
+  details p,
+  details ul {
     max-width: 72ch;
+    margin: 0.4rem 0;
+  }
+
+  details ul {
+    padding-left: 1.25rem;
+  }
+
+  @media all and ($mobile) {
+    padding: 0.5rem 0.7rem;
+    font-size: 0.85rem;
+  }
+}
+
+// ----- "Ask this wiki": filed research answers (ADR 0007) -----
+// A floating button and a non-modal drawer filled by the component script: a panel on the right
+// of wide screens, a full-screen sheet on phones. Colours come from the theme variables.
+
+$askDrawerWidth: 440px;
+
+.docwiki-ask-fab {
+  position: fixed;
+  right: max(1.25rem, env(safe-area-inset-right));
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+  z-index: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.6rem 1.1rem 0.6rem 0.9rem;
+  border: 1px solid var(--secondary);
+  border-radius: 999px;
+  background: var(--secondary);
+  color: var(--light);
+  font-family: var(--bodyFont);
+  font-size: 0.92rem;
+  font-weight: $semiBoldWeight;
+  line-height: 1.2;
+  cursor: pointer;
+  box-shadow:
+    0 12px 28px -14px var(--dw-shadow),
+    0 2px 6px -2px var(--dw-shadow);
+
+  svg {
+    flex: none;
+    width: 1.15rem;
+    height: 1.15rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  &:hover {
+    border-color: var(--tertiary);
+    background: var(--tertiary);
+  }
+
+  &[aria-expanded="true"] {
+    display: none;
+  }
+
+  @media all and ($mobile) {
+    right: max(1rem, env(safe-area-inset-right));
+    bottom: max(1rem, env(safe-area-inset-bottom));
+
+    // Not over Quartz's full-screen explorer menu.
+    html.mobile-no-scroll & {
+      display: none;
+    }
+  }
+}
+
+// Room for the floating button under the last line of the page.
+.page:has(.docwiki-ask-fab) footer.docwiki-footer {
+  margin-bottom: 5.5rem;
+}
+
+// Three-column layout (wider than Quartz's tablet range, which ends at 1200 px included): the open
+// drawer takes the place of the right-hand panel and the page gives up the drawer's extra width, so
+// the article stays readable beside the answer. Quartz's page spans 100vw, under the scrollbar,
+// hence the 2rem. Narrower layouts overlay the drawer instead and collapse it once a link of the
+// answer is followed (NARROW_QUERY in docwiki-text.ts).
+@media screen and (min-width: #{map.get($breakpoints, desktop) + 1px}) {
+  .page:has(.docwiki-ask:not([hidden])) {
+    margin-right: max(
+      calc(#{$askDrawerWidth - $sidePanelWidth} + 2rem),
+      calc((100% - #{map.get($breakpoints, desktop) + 300px}) / 2)
+    );
+  }
+}
+
+.docwiki-ask {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 810;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: min(#{$askDrawerWidth}, 100vw);
+  border-left: 1px solid var(--lightgray);
+  background: var(--light);
+  box-shadow: -18px 0 42px -30px var(--dw-shadow);
+  color: var(--darkgray);
+  font-family: var(--bodyFont);
+  font-size: 0.95rem;
+  line-height: 1.55;
+
+  &[hidden] {
+    display: none;
+  }
+
+  @media all and ($mobile) {
+    left: 0;
+    width: auto;
+    border-left: 0;
+    box-shadow: none;
+  }
+
+  // Quartz sets a rem line height on every paragraph and list item.
+  p,
+  li {
+    line-height: 1.55;
+  }
+
+  // Headings receive the focus when the drawer opens and when an answer is selected.
+  .docwiki-ask-title,
+  .docwiki-ask-question-title {
+    &:focus {
+      outline: none;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--secondary);
+      outline-offset: 2px;
+      border-radius: 3px;
+    }
+  }
+
+  .docwiki-ask-header {
+    flex: none;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: max(1rem, env(safe-area-inset-top)) 0.85rem 0.85rem 1.25rem;
+    border-bottom: 1px solid var(--lightgray);
+  }
+
+  .docwiki-ask-titles {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .docwiki-ask-title {
+    margin: 0;
+    font-size: 1.15rem;
+    line-height: 1.3;
+    color: var(--dark);
+  }
+
+  .docwiki-ask-subtitle {
+    margin: 0.2rem 0 0;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    color: var(--gray);
+  }
+
+  .docwiki-ask-close {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    margin: -0.3rem 0 0;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--darkgray);
+    cursor: pointer;
+
+    svg {
+      width: 1.1rem;
+      height: 1.1rem;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+    }
+
+    &:hover {
+      border-color: var(--lightgray);
+      background: var(--highlight);
+    }
+  }
+
+  .docwiki-ask-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.9rem 1.25rem 1.5rem;
+  }
+
+  .docwiki-ask-footer {
+    flex: none;
+    margin: 0;
+    padding: 0.7rem 1.25rem max(0.75rem, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--lightgray);
+    font-size: 0.82rem;
+    line-height: 1.45;
+    color: var(--gray);
+  }
+
+  .docwiki-ask-status {
+    margin: 0.25rem 0 0.75rem;
+    color: var(--gray);
+  }
+
+  .docwiki-ask-group + .docwiki-ask-group {
+    margin-top: 1.4rem;
+  }
+
+  .docwiki-ask-group-title,
+  .docwiki-ask-sources-title {
+    margin: 0 0 0.55rem;
+    font-size: 0.78rem;
+    font-weight: $semiBoldWeight;
+    letter-spacing: 0.04em;
+    line-height: 1.3;
+    text-transform: uppercase;
+    color: var(--gray);
+  }
+
+  .docwiki-ask-questions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    > li {
+      margin: 0;
+    }
+  }
+
+  .docwiki-ask-question {
+    position: relative;
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0;
+    padding: 0.65rem 2.1rem 0.65rem 0.85rem;
+    border: 1px solid var(--lightgray);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--dark);
+    font: inherit;
+    font-weight: $semiBoldWeight;
+    line-height: 1.45;
+    text-align: left;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+
+    &::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      right: 0.95rem;
+      width: 0.42rem;
+      height: 0.42rem;
+      border-top: 1.5px solid var(--gray);
+      border-right: 1.5px solid var(--gray);
+      transform: translateY(-50%) rotate(45deg);
+    }
+
+    &:hover {
+      border-color: var(--secondary);
+      background: var(--highlight);
+    }
+  }
+
+  .docwiki-ask-back,
+  .docwiki-ask-retry {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0 0 0.85rem -0.45rem;
+    padding: 0.3rem 0.6rem 0.3rem 0.45rem;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--secondary);
+    font: inherit;
+    font-size: 0.88rem;
+    font-weight: $semiBoldWeight;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--highlight);
+    }
+  }
+
+  .docwiki-ask-back::before {
+    content: "";
+    width: 0.4rem;
+    height: 0.4rem;
+    margin-left: 0.25rem;
+    border-bottom: 1.5px solid currentColor;
+    border-left: 1.5px solid currentColor;
+    transform: rotate(45deg);
+  }
+
+  .docwiki-ask-retry {
+    margin-left: 0;
+    padding-left: 0.6rem;
+    border-color: var(--lightgray);
+  }
+
+  .docwiki-ask-question-title {
+    margin: 0 0 0.85rem;
+    font-size: 1.12rem;
+    line-height: 1.35;
+    color: var(--dark);
+    overflow-wrap: anywhere;
+  }
+
+  .docwiki-ask-banner {
+    margin: 0 0 0.85rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--dw-superseded-border);
+    border-radius: 6px;
+    background: var(--dw-superseded-bg);
+    color: var(--dw-superseded-fg);
+    font-size: 0.88rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+
+  .docwiki-ask-text p {
+    margin: 0 0 0.75rem;
+    color: var(--darkgray);
+    overflow-wrap: break-word;
+  }
+
+  .docwiki-ask-cite {
+    margin-left: 0.1em;
+    font-size: 0.72em;
+    line-height: 0;
+
+    a {
+      padding: 0 0.2em;
+      border-radius: 3px;
+      background: var(--highlight);
+    }
+  }
+
+  .docwiki-ask-sources-title {
+    margin-top: 1.1rem;
+  }
+
+  .docwiki-ask-sources {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+      margin: 0 0 0.5rem;
+      font-size: 0.88rem;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .docwiki-ask-steps {
+    margin: 1.1rem 0 0;
+    font-size: 0.88rem;
+
+    summary {
+      width: fit-content;
+      cursor: pointer;
+      color: var(--secondary);
+      font-weight: $semiBoldWeight;
+    }
+
+    ol {
+      margin: 0.5rem 0 0;
+      padding-left: 1.4rem;
+    }
+
+    li {
+      margin: 0.2rem 0;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .docwiki-ask-meta {
+    margin: 1.1rem 0 0;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--lightgray);
+    font-size: 0.84rem;
+
+    p {
+      margin: 0;
+      line-height: 1.45;
+      color: var(--gray);
+    }
+
+    .docwiki-ask-provenance + .docwiki-ask-open {
+      margin-top: 0.4rem;
+    }
   }
 }
 
@@ -450,7 +913,8 @@ footer.docwiki-footer {
 
   .left.sidebar,
   .right.sidebar,
-  .docwiki-badge-legend {
+  .docwiki-badge-legend,
+  .docwiki-ask-root {
     display: none;
   }
 }

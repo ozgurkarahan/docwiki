@@ -9,6 +9,15 @@ export interface DocwikiSource {
   original: string | null
 }
 
+export interface DocwikiQuality {
+  gates: number
+  passed: number
+  warned: number
+  failed: number
+  skipped: number
+  blockingFailed: number
+}
+
 export interface DocwikiSettings {
   schema: 1
   pageTitle: string
@@ -19,7 +28,20 @@ export interface DocwikiSettings {
   releaseDate: string | null
   audience: string | null
   quartzVersion: string
+  /** Sources of this build by status (withdrawn sources have no page). */
+  documents: { current: number; superseded: number }
+  runId: string | null
+  /** Content slugs of the run receipt and the quality report, when the release has them. */
+  runPage: string | null
+  qualityPage: string | null
+  /** Gate counts from the release manifest, or from the run for a staged release. */
+  quality: DocwikiQuality | null
   sources: Record<string, DocwikiSource>
+  /**
+   * Filed research answers published in `static/docwiki/answers.json` (ADR 0007); the "Ask this
+   * wiki" drawer is rendered only when there is at least one.
+   */
+  answers: number
 }
 
 export const settings = raw as DocwikiSettings

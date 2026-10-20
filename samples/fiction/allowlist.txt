@@ -1,387 +1,289 @@
-Ablagerungen
-Abregelung
-Abschaltung
-Acknowledged
-Action
-Adventure Works
-Adventure Works Industrial Supply
-Alarm
-Alert
-Amara Teodorescu
-Anlage
-Anzugsmoment
-Append-only
+Accord
+Achats
+Achèvement
+Acier
+Acier HA 10 pour chaînages
+Acompte
+Actions
+Adaptation
+Adatum
+Adatum Électricité
+Adresse
+Agence
+Ajout
+Annexe
+Applique
 Approuvé
-Arbeiten
-Arbeitsauftrag
-Arbeitssicherheit
-At
-AUD
-Außenringe
-Authoring
-AWI
-Azimutsystem
+Après
+Article
+Articles
+Assurances
+Au
+Autorisation
+Aux
+Avancement
+Avant
+Avec
+Avenant
+Aymeric Moreau
 Azure
-Beinaheunfall
-Betriebsstunden
-BIGINT
-Bin
-Blameless
-Blattlager
-Blattlagerschrauben
-Bram Okkerse
-Bullet
-Callum Rydings
-CANARY-B08DE0CB
-Category
-Champ
-Check
-CHK
-City Power & Light
-Classification
+Baie
+Baie coulissante aluminium
+baie de liaison
+baie F1
+Baies
+Barre
+Barres
+BC
+Bertrand Sauzede
+Bertrand Sauzède
+Bien
+BL
+Bloc
+Bloc béton creux 20 x 20 x 50 cm
+Blocs
+Bois
+Bon
+Bonjour
+BTP
+CANARY-1EC861DF
+Carrelage
+Cc
+Ce
+Ces
+Cet
+Cette
+Chantier
+Chantier Moreau
+chantier Moreau
+Charpente
+Chef
+Chef d'équipe maçonnerie
+chemin des Vergers
+Chevêtre
 Client
-Climate
-Closure
-Coating
+Cliente
+Clients
 Code
-Cold
-Commissioned
-Compliance
-Contoso
-Contoso Renewables
-Control
-Coordinates
+Commande
+Commandes
+Commandé
+Compte
+Conditions
+Conductrice
+Conductrice de travaux
+Confirmer
+Contrat
+Cordialement
 coreProperties
-Corporate HSE Auditor
-Cosmetic
-CPL-CI
-Cr
-Cu
-Curated
-Curtailed
-Customer
-Dario Penwarden
-Database Administrator
+Couverture
+CR
+Cuisine
+Dallage
+Dalle
+dalle de l'extension
+Damien Pradere
+Damien Pradère
+Dans
 Date
-degC
-Deliberate
-Description
-DN
+De
+Demande
+Des
+DEV
+Devis
+Diffusion
 docProps
 DocWiki
-Draining
-Drone
-Due
-Easting
-Ecology
-Einbau
-Eine
-Einlaufen
-Elevation
-Elise Ternaux
-Engineering Manager
-English
-Entry
-EP
-Erosion
-Ersatzteil
+Doublage
+Du
+Durée
+Déboursé
+Début
+Décapage
+Décisions
+Délai
+Délais
+Démarrage
+Dépose
+Désignation
+Elle
+En
+Ensemble
+Entreprise
+Erwan Gouzelin
 EUR
-Expected
-Exploded
-Export
-Fabrikam
-Fabrikam FGT-3200
-Fabrikam Getriebetechnik GmbH
-Fasteners
-Fe
-FGT-P
-Field Service Engineer
-Filed
-Finding
-Fledermaus
-Freischaltung
+Excusé
+Excusés
+FA
+Facture
+Facturé
+Fait
+Famille Moreau
+Faïence
+Fenêtre
+Fenêtre de toit 78 x 98 cm avec raccord d'étanchéité
+fenêtre de toit FT1
+fenêtre F2
+fenêtre F3
+Fenêtre PVC double vitrage
+Fenêtres
+Fermeture
+Fin
+Finitions
+Fonction
+Fondations
+Forfait
+Fournisseur
+Fourniture
+Frais
 From
-Für
-GBX
-Gelcoat
-Generatorbürste
-Generatorbürsten
-Getriebe
-Getriebeöl
-Getriebeölwechsel
-Greta Vollan
-GS
-Hebeplan
-Hello
-Henrik Saltvedt
-Hi
-Highest
-HSE Coordinator
-HSS
-Hydrauliksystem
-Höhe
-ICP
-Imogen Thackwray
-IMS
-Indexation
+Gros
+Gérant
+HA
+Heure
+Heures
+HT
+Hypothèses
+IA
+Il
+Indice
+Ines Roux
 Installation
-Intermediate
-Interval
-Investigated
-Item
-January
-Joint
-Jun Hallgarth
-Katrin Ostermeier
-KOH
-Kohlebürste
-Kubernetes
-Lager
-Lagerdeckelschrauben
-Language
-Last
-LB
-Lead Blade Inspector
-Lead Wind Technician
-Leading
-Leilani Hartfield
-LF
-Lieferantenhinweis
-Liefertermin
-Lieferzeit
-Lift Planner (Appointed Person)
-Litware
-Litware LT-32
-Litware Wind Systems
-LP
-LSS
-LT-32 CCV
-Lubricant
-Luftfracht
-LWS-MM-GBX
-LWS-P
-LWS-TS
-Lüftermotor
-Mal
-Mandatory
-Maren Ellingsby
+Intervenant
+Inès Roux
+Isolation
+Je
+La
+Lamna
+Lamna Bâtiment
+Le
+Les
+Linteau
+Linteau béton préfabriqué 3,40 m
+Livraison
+Livré
+Lot
+Lots
+Lu
+Madame
+Main
+Marge
 Markdown
-Meaning
+Mathis Ancelin
+Matériaux
+Menuiseries
+Merci
 Message
-Method
-MIN
-Mindestbestand
-Mixing
-MM-01 met mast
-MOD
-Modification
-Movements
-MP-BLD
-MP-GBX
-MP-GEN
-MP-HSE
-MP-HYD
-MP-PIT
-MP-YAW
-Near
-Network
-Netzbetreiber
-Nightly
-Nitrile
-Northing
-O&M Supervisor
-Obtenir
-Oil
-Ordering
-Oskar Vennholm
-OT
-Owner
-PAO
-Parameter
-Payment
-Permitting Officer
-Planetenstufe
-Planned
-Pollution
-Possible
-PostgreSQL
-Postmortem
-PQ
-PRC-DB
-Proseware
-Proseware Lubricants
-Proseware PWG 220
-Proseware PWG 320
-PWS
+Mme
+Modifications
+Monsieur
+Montant
+Moreau
+Mortier
+Mortier de montage
+Motif
+Murs
+Nadia Ferrandon
+Nettoyage
+Nom
+Note
+Nous
+Nouveau
+Objet
+Observations
+Ouverture
+Paiement
+Palette
+Palettes
+Par
+Parties
+Photo
+Plafond
+Planning
+PLN
+Plâtrerie
+Pose
+Pour
+Pourcentage
+Prise
+Prix
+Prochaine
+Présents
+PU
+PVC
 Python
-Quantity
-Quellmoor
-Quellmoor Ridge
-Quellmoor Ridge O&M building
-Quellmoor Ridge substation
-Quellmoor Ridge Wind Farm
-RB-CHK
-RB-NTF
-RB-RPT
-RB-TKT
-re:A\d{4}
-re:AUD-\d{4}-\d{2}
-re:AWI-\d{5}
-re:CHK-\d{2}
-re:CPL-CI-\d{4}-\d{3}
-re:EP-\d{4}-\d{4}
-re:FGT-3200-\d{2}-\d{5}
-re:FGT-P-\d{5}
-re:GBX_TMIN_START
-re:INC-\d{4}-\d{3}
-re:LB575-\d{2}-\d{4}
-re:LP-\d{4}-\d{3}
-re:LT32-\d{2}-\d{4}
-re:LWS-MM-[A-Z]{3}-\d{2}
-re:LWS-P-\d{5}
-re:LWS-TS-\d{5}
-re:MM-\d{2}
-re:MOC-\d{4}-\d{3}
-re:MP-[A-Z]{3}-\d{2}
-re:PM-\d{4}-\d{3}
-re:PO-\d{5}
-re:PRC-[A-Z]{2}-\d{3}
-re:PWS-\d{3}-D\d{3}
-re:RB-[A-Z]{3}-\d{3}
-re:S\d{3}
-re:SB-LWS-\d{4}-\d{2}
-re:SEV[1-4]
-re:SOP-[A-Z]{3,4}-\d{3}
-re:SPL-\d{3}
-re:TR-\d{2}-\d{5}
-re:TR-OA-\d{4}-\d{4}
-re:TS-600C-\d{2}
-re:WBS-\d{4}-\d{3}
-re:WI-[A-Z]{3}-\d{3}
-re:WO-\d{2}-\d{4}
-re:WTG-\d{2}
-Reason
-Recommended
-Reconstruct
-Recurring
-Relecloud
-Reliability Engineer
-Relief
-Reorder
-Replace
-Replaceable
+Qté
+Quantité
+re:BC-\d{4}-\d{3}
+re:BL-\d{4}-\d{4}
+re:DEV-\d{4}-\d{3}
+re:FA-\d{4}-\d{4}
+re:FT?\d
+re:PLN-\d{4}-\d{3}
+re:T\d{2}
+re:VIR-\d{5}
+re:ZM-\d{5}
+Rendu
 Report
-Reporting
-Required
-Result
-Rettungsset
-Rev
-RevA
-RevB
-RevC
-RevD
-Revise
-Rotations
-Rotorblatt
-RPO
-RTO
-Runbook
-Ruth Kessington
-Rédigé
-Rédigée
-Rückfragen
-Sampled
-SB-LWS
-Schichtübergabe
-Schleifring
-Schulung
-Schwinggeschwindigkeit
-SDEA
-Sealing
-Semantics
-Senior Lubrication Analyst
-Serviceaufzug
-SEV
-Shortest
-Sicherheitsunterweisung
-Silicon
-Siobhan Carrick
-Site Manager
-Site Reliability Engineering Lead
-Skelvane
-Skelvane 132 kV substation
-Skelvane District Environmental Authority
-Skelvane Wood
-Slip
-SLO
-SOP-GBX
-SOP-LOTO
-SOP-WAH
-Specification
-Sperrbereich
-Standardarbeitsanweisung
-Status
-Stores and Spare Parts Coordinator
-Summarise
-Supervisory
-SW
+Reprise
+Responsable
+Responsable planification
+Retenue
+Reçu
+rue des Artisans
+Règlement
+Réception
+Réf
+Rénovation
+Réserves
+Réunion
+Sablières
+Sac
+Sacs
+Second
+Selon
+Semelles
+Severine Moreau
+Si
+Signature
+Signé
+Sous-total
+Sous-traitance
+Statut
+Subject
+Suite
+Suivi
+Sur
+Séverine Moreau
 tableStyleId
-Tailspin
-Tailspin Heavy Lift
-Task
-TBT
-Technical Support Engineer
-Test
-The
-Thread
-Thunderstorm
-TicketingApiDown
-TicketingApiErrorRate
-TicketingApiHighLatency
-TicketingApiPoolSaturation
-Tightening
-TMIN
+Taux
+Technico-commerciale
+Terrassement
 To
-Tomasz Lebrecht
-TR-OA
-Trey Research
-Trey Research Laboratories
-TS-600C
-TTL
-Turbine
-TXT
-Umstellung
-Umweltgenehmigung
-Undefined
-Uninterruptible
-Unit
-Valeur
-Validity
-Value
-VARCHAR
-Vereisung
-Verfügung
-Version
-Viskositätsklasse
-Vorderkantenerosion
-WBS
-WI-GEN
-Wind Technician
-Windpark
-Wingtip
-Wingtip Blade Services
-WTG-NN
-Wärmebehandlung
-Yusuf Arkwell
-Zeitpunkt
-Änderungsmanagement
-Élise Ternaux
-Ölanalyse
-Ölfilter
-Ölfilterelement
-Ölheizung
-Ölkühler
-Ölkühlers
-Ölprobe
-Ölumstellung
-Ölwechsel
+Total
+Toute
+Travaux
+TTC
+TVA
+Tâche
+Un
+Une
+Unité
+Valbrise
+Validité
+VanArsdel
+VanArsdel Menuiseries
+Vente
+VIR
+Vous
+Zava
+Zava Matériaux
+ZM
+zone d'activités des Sablières
+À
+Échéance
+Échéancier
+Électricien
+Électricité
+Élévation
+Étude

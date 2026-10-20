@@ -9,7 +9,13 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MOCK_RELEASE = REPO_ROOT / "samples" / "fixtures" / "mock-release"
-MOCK_RELEASE_DIR = MOCK_RELEASE / "releases" / "20260215T090000Z-decd4b59"
+MOCK_RELEASE_ID = "20260401T090000Z-7ce99a3f"
+MOCK_RELEASE_DIR = MOCK_RELEASE / "releases" / MOCK_RELEASE_ID
+MOCK_TITLE = "Chantier Moreau mock wiki"
+PLAN_A, PLAN_B, MINUTES = "src-c6436ec50050", "src-86eabe3d6d0d", "src-165f1d3a109c"
+PLAN_A_PAGE = "sources/pln-2026-003-indice-a-planning-et-suivi-des-achats"
+PLAN_B_PAGE = "sources/pln-2026-003-indice-b-planning-et-suivi-des-achats"
+MINUTES_PAGE = "sources/2026-03-24-compte-rendu-de-chantier-n3"
 OVERLAY = REPO_ROOT / "site"
 
 

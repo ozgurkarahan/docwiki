@@ -7,7 +7,16 @@ import shutil
 from pathlib import Path
 
 import pytest
-from site_testkit import MOCK_RELEASE, MOCK_RELEASE_DIR, FakeTools, make_portable
+from site_testkit import (
+    MOCK_RELEASE,
+    MOCK_RELEASE_DIR,
+    MOCK_RELEASE_ID,
+    MOCK_TITLE,
+    PLAN_A,
+    PLAN_B,
+    FakeTools,
+    make_portable,
+)
 
 import docwiki.release
 from docwiki.release import ReleaseReader
@@ -59,14 +68,14 @@ def test_open_portable(portable: Path) -> None:
     assert release.layout == "portable"
     assert release.root == release.wiki_dir == portable
     assert release.evidence_dir == portable / "evidence"
-    assert release.release_id == "20260215T090000Z-decd4b59"
-    assert release.release_date == "2026-02-15"
+    assert release.release_id == MOCK_RELEASE_ID
+    assert release.release_date == "2026-04-01"
     assert release.audience == "public"
 
 
 def test_catalog_falls_back_to_the_machine_folder(portable: Path) -> None:
     shutil.move(portable / "catalog.json", portable / PORTABLE_DIR / "catalog.json")
-    assert open_release(portable).release_id == "20260215T090000Z-decd4b59"
+    assert open_release(portable).release_id == MOCK_RELEASE_ID
     (portable / PORTABLE_DIR / "catalog.json").unlink()
     with pytest.raises(SiteBuildError, match=r"no catalog\.json in portable"):
         open_release(portable)
@@ -79,7 +88,7 @@ def test_portable_content_equals_the_release_content(portable: Path, tmp_path: P
     assemble_content(MOCK_RELEASE_DIR, from_release)
     assert files(from_portable) == files(from_release)
     assert count == len(files(from_portable))
-    assert "evidence/src-f2750f41f3fa/img/p0001.png" in files(from_portable)
+    assert f"evidence/{PLAN_A}/img/p0001.png" in files(from_portable)
     assert not (from_portable / PORTABLE_DIR).exists()
     for hidden in (".agents", ".claude", ".github"):
         assert (portable / hidden).is_dir() and not (from_portable / hidden).exists()
@@ -87,10 +96,10 @@ def test_portable_content_equals_the_release_content(portable: Path, tmp_path: P
 
 def test_portable_settings_equal_the_release_settings(portable: Path) -> None:
     assert settings_of(portable) == settings_of(MOCK_RELEASE)
-    (portable / "evidence" / "src-f2750f41f3fa" / "original.pdf").write_bytes(b"%PDF-")
+    (portable / "evidence" / PLAN_A / "original.pdf").write_bytes(b"%PDF-")
     sources = settings_of(portable)["sources"]
     assert isinstance(sources, dict)
-    assert sources["src-f2750f41f3fa"]["original"] == "evidence/src-f2750f41f3fa/original.pdf"
+    assert sources[PLAN_A]["original"] == f"evidence/{PLAN_A}/original.pdf"
 
 
 def test_build_site_from_a_portable_folder(
@@ -102,11 +111,11 @@ def test_build_site_from_a_portable_folder(
     checkout = cache / "v4.5.2"
     content = checkout / "content"
     assert (content / "index.md").is_file()
-    assert (content / "evidence" / "src-43c97f7dfcde" / "sheet-plan-r0002-r0004.md").is_file()
+    assert (content / "evidence" / PLAN_B / "sheet-planning-r0006-r0009.md").is_file()
     assert not (content / PORTABLE_DIR).exists()
     settings = json.loads((checkout / "docwiki-site.json").read_text(encoding="utf-8"))
-    assert settings["pageTitle"] == "Contoso Renewables mock wiki"
-    assert any("portable 20260215T090000Z-decd4b59" in message for message in messages)
+    assert settings["pageTitle"] == MOCK_TITLE
+    assert any(f"portable {MOCK_RELEASE_ID}" in message for message in messages)
     assert (out / "index.html").is_file()
 
 
@@ -137,7 +146,7 @@ def test_export_portable_when_available(tmp_path: Path, tools: FakeTools) -> Non
     assert is_portable_wiki(exported)
     release = open_release(exported)
     assert release.layout == "portable"
-    assert release.release_id == "20260215T090000Z-decd4b59"
+    assert release.release_id == MOCK_RELEASE_ID
     content = tmp_path / "content"
     assemble_content(release, content)
     assert files(content) == files(_release_content(tmp_path))

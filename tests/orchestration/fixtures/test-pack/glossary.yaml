@@ -1,13 +1,12 @@
 terms:
-  - term: ISO VG
-    definition: ISO viscosity grade of an industrial oil, for example ISO VG 220.
+  - term: sliding window
+    definition: Window whose sash slides sideways, for example the sliding window F1 of the extension.
     synonyms:
-      fr: [grade de viscosité ISO]
-      de: [ISO-Viskositätsklasse]
-    see_also: [topic:gearbox-oil]
-  - term: WTG
-    definition: Wind turbine generator; turbines are identified as WTG-NN.
+      fr: [baie coulissante]
+    see_also: [topic:schedule-and-window-delivery]
+  - term: BC
+    definition: Purchase order (bon de commande); orders are numbered BC-YYYY-NNN.
     synonyms:
-      en: [wind turbine generator]
-      fr: [éolienne]
-    see_also: [asset:wtg-07]
+      en: [purchase order]
+      fr: [bon de commande]
+    see_also: [building-element:baie-f1]

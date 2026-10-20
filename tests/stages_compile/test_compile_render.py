@@ -7,8 +7,8 @@ import re
 
 import pytest
 from compile_testkit import (
-    SOP_A,
-    SOP_B,
+    QUOTE_A,
+    QUOTE_B,
     STAMP,
     compile_handler,
     compiled,
@@ -16,9 +16,9 @@ from compile_testkit import (
     make_state,
     no_repair,
     plan_doc,
+    quote_a_doc,
+    quote_b_doc,
     section,
-    sop_a_doc,
-    sop_b_doc,
 )
 
 from docwiki.contracts import Page, find_violations, parse_frontmatter
@@ -92,44 +92,44 @@ def check_footnotes(page: Page, cited: list[CitedLocator], title: str) -> list[s
 
 async def test_source_page(pack: DomainPack) -> None:
     page, cited, result = await compile_and_render(
-        sop_b_doc(), pack, client(), "sop-gbx-010-rev-b", supersedes=[SOP_A]
+        quote_b_doc(), pack, client(), "dev-2026-014-indice-b", supersedes=[QUOTE_A]
     )
-    assert page.path == "sources/sop-gbx-010-rev-b.md"
+    assert page.path == "sources/dev-2026-014-indice-b.md"
     reparsed = Page.parse(page.render(), page.path)
     assert reparsed == page
     fm = page.frontmatter
     assert isinstance(fm, SourceFrontmatter)
     assert parse_frontmatter(fm.model_dump(mode="python", by_alias=True)) == fm
     assert (fm.id, fm.title, fm.status, fm.supersedes, fm.superseded_by) == (
-        SOP_B,
-        "Gearbox oil change SOP rev B",
+        QUOTE_B,
+        "Quote DEV-2026-014 indice B",
         "current",
-        [SOP_A],
+        [QUOTE_A],
         [],
     )
     assert (fm.doc_type, fm.category, fm.doc_number, fm.revision, fm.authority) == (
-        "sop",
-        "procedures",
-        "SOP-GBX-010",
+        "quote",
+        "contract-documents",
+        "DEV-2026-014",
         "B",
-        7,
+        8,
     )
     assert fm.entities == sorted(m.entity_id for m in result.compiled.entity_mentions)
     assert (fm.topics, fm.tags, fm.pages, str(fm.updated)) == (
         [],
-        ["procedures", "sop"],
+        ["contract-documents", "quote"],
         2,
-        "2026-02-15",
+        "2026-04-01",
     )
     assert fm.extraction.provenance_mix == {"native-text": 6}
     assert find_violations(page.body) == []
     headings = [(h.level, h.text) for h in extract_headings(page.body)]
     assert headings == [
-        (1, "Gearbox oil change SOP rev B"),
+        (1, "Quote DEV-2026-014 indice B"),
         (2, "Key facts"),
         (2, "Contents"),
-        (3, "Cold sites"),
-        (3, "Draining"),
+        (3, "Winter conditions"),
+        (3, "Installation"),
         (2, "Figures"),
         (2, "Sources"),
     ]
@@ -141,14 +141,14 @@ async def test_source_page(pack: DomainPack) -> None:
     assert set(badges) == {"✓ quote verified", "paraphrase", "generated description"}
     assert "Ignore previous" not in page.body and "system prompt" not in page.body
     figure = next(line for line in page.body.splitlines() if line.startswith("- **Figure f01**"))
-    assert "Generated description: Diagram of the gearbox drain plug" in figure
+    assert "Generated description: Elevation of the sliding bay window" in figure
 
 
 async def test_tables_are_rendered_from_extracted_data(pack: DomainPack) -> None:
-    page, _, _ = await compile_and_render(sop_b_doc(), pack, client(), "sop-b")
-    assert "| Row | Asset | Oil grade | Interval |\n| --- | --- | --- | --- |\n" in page.body
-    assert "| 2 | WTG-07 | ISO VG 220 | 12 months |" in page.body
-    assert "| 3 | WTG-12 | ISO VG 320 | 18 months |" in page.body
+    page, _, _ = await compile_and_render(quote_b_doc(), pack, client(), "quote-b")
+    assert "| Row | Repère | Poste | Montant HT |\n| --- | --- | --- | --- |\n" in page.body
+    assert "| 2 | Baie F1 | 5.1 | 4140,00 € |" in page.body
+    assert "| 3 | Fenêtre F2 | 5.2 | 1020,00 € |" in page.body
     assert "Agents can query this table as `t01` with the `query_table` tool." in page.body
 
 
@@ -157,69 +157,75 @@ async def test_table_source_badges_and_unreferenced_tables(pack: DomainPack) -> 
 
     def output() -> dict:
         return compiled(
-            "Maintenance plan 2026",
-            "Planned tasks per turbine.",
-            [fact("WTG-12 is planned for 2026-05.", "t01:r0004", "WTG-12 | 2026-05")],
-            [section("Plan", "The sheet lists tasks.[[cite:t01:r0004]]")],
+            "Schedule and purchase tracking",
+            "Orders of the windows.",
+            [fact("The window F2 is delivered on 2026-03-30.", "t01:r0004", "F2 | 2026-03-30")],
+            [section("Orders", "The sheet lists the orders.[[cite:t01:r0004]]")],
         )
 
     llm = FakeLlmClient({"compile": compile_handler({doc.source_id: output})})
-    page, cited, _ = await compile_and_render(doc, pack, llm, "maintenance-plan-2026")
-    badges = check_footnotes(page, cited, "Maintenance plan 2026")
+    page, cited, _ = await compile_and_render(doc, pack, llm, "planning-et-suivi-des-achats")
+    badges = check_footnotes(page, cited, "Schedule and purchase tracking")
     assert badges == ["table"]
-    assert '[Maintenance plan 2026 — sheet "Plan", row 4]' in page.body
+    assert '[Schedule and purchase tracking — sheet "Achats", row 4]' in page.body
     assert "### Tables" in page.body, "tables no section references are still rendered"
-    assert "| 4 | WTG-12 | Gearbox oil change | ISO VG 220 | 2026-05 | 6 |" in page.body
+    assert "| 4 | BC-2026-009 | Fenêtre F2 PVC | F2 | 2026-03-30 | 1 |" in page.body
     assert find_violations(page.body) == []
 
 
 async def test_superseded_banner_and_links(pack: DomainPack) -> None:
     llm = client()
     old_page, _, _ = await compile_and_render(
-        sop_a_doc(), pack, llm, "sop-gbx-010-rev-a", superseded_by=[SOP_B]
+        quote_a_doc(), pack, llm, "dev-2026-014-indice-a", superseded_by=[QUOTE_B]
     )
     fm = old_page.frontmatter
     assert isinstance(fm, SourceFrontmatter)
-    assert (fm.status, fm.superseded_by) == ("superseded", [SOP_B])
-    banner = f"> **Superseded** by `{SOP_B}`. Use the current revision."
+    assert (fm.status, fm.superseded_by) == ("superseded", [QUOTE_B])
+    banner = f"> **Superseded** by `{QUOTE_B}`. Use the current revision."
     assert banner in old_page.body
     assert old_page.body.index(banner) < old_page.body.index("## Key facts")
     new_page, _, _ = await compile_and_render(
-        sop_b_doc(), pack, llm, "sop-gbx-010-rev-b", supersedes=[SOP_A]
+        quote_b_doc(), pack, llm, "dev-2026-014-indice-b", supersedes=[QUOTE_A]
     )
-    linked = link_source_refs(old_page, {SOP_B: new_page, SOP_A: old_page})
+    linked = link_source_refs(old_page, {QUOTE_B: new_page, QUOTE_A: old_page})
     assert (
-        "> **Superseded** by [Gearbox oil change SOP rev B](sop-gbx-010-rev-b.md). "
+        "> **Superseded** by [Quote DEV-2026-014 indice B](dev-2026-014-indice-b.md). "
         "Use the current revision." in linked.body
     )
     assert link_source_refs(new_page, {}) is new_page
 
 
 async def test_unsafe_model_markdown_is_neutralised(pack: DomainPack) -> None:
-    doc = sop_b_doc()
+    doc = quote_b_doc()
 
     def output() -> dict:
         return compiled(
-            "Gearbox <b>oil</b> [change](http://example.com) SOP",
+            "Quote <b>DEV-2026-014</b> [indice](http://example.com) B",
             "Summary with <script>alert(1)</script> markup and a [link](../../x.md).",
-            [fact("WTG-07 switches first [^9].", "b0003", "WTG-07 switches first")],
+            [
+                fact(
+                    "The bay window F1 is installed first [^9].",
+                    "b0003",
+                    "La baie F1 est posée en premier",
+                )
+            ],
             [
                 section(
                     "Sources",
-                    "# Heading\nWTG-07 switches first.[[cite:b0003]] "
+                    "# Heading\nThe bay window F1 is installed first.[[cite:b0003]] "
                     "<img src=x onerror=alert(1)>\n"
                     "See [docs](javascript:alert(1)) and http://example.com/x. "
                     "Write `x [[cite:b0004]]` verbatim.\n"
                     "[^1]: fake footnote\n| a | b |\n| --- | --- |\n```\nunclosed [[cite:b0003]]",
                 ),
-                section("Key facts", "Use ISO VG 220 gearbox oil.[[cite:b0003]]"),
+                section("Key facts", "Masonry is suspended in frost.[[cite:b0003]]"),
             ],
         )
 
     llm = FakeLlmClient({"compile": compile_handler({doc.source_id: output})})
-    page, cited, _ = await compile_and_render(doc, pack, llm, "sop-b")
+    page, cited, _ = await compile_and_render(doc, pack, llm, "quote-b")
     assert find_violations(page.body) == []
-    assert page.frontmatter.title == "Gearbox oil change SOP"
+    assert page.frontmatter.title == "Quote DEV-2026-014 indice B"
     headings = [h.text for h in extract_headings(page.body)]
     assert headings.count("Sources") == 1
     assert "Sources (document section)" in headings
@@ -234,14 +240,14 @@ async def test_unsafe_model_markdown_is_neutralised(pack: DomainPack) -> None:
 
 async def test_render_rejects_mismatched_inputs(pack: DomainPack) -> None:
     llm = client()
-    doc = sop_b_doc()
+    doc = quote_b_doc()
     classification = await classify_source(doc, pack, llm)
     result = await compile_source(doc, classification, pack, llm)
     with pytest.raises(ValueError):
         render_source_page(
-            result, sop_a_doc(), classification, make_state(doc), slug="x", stamp=STAMP, pack=pack
+            result, quote_a_doc(), classification, make_state(doc), slug="x", stamp=STAMP, pack=pack
         )
-    broken = CompiledResult(SOP_B, result.compiled, result.citations[1:], [], {})
+    broken = CompiledResult(QUOTE_B, result.compiled, result.citations[1:], [], {})
     with pytest.raises(ValueError):
         render_source_page(
             broken, doc, classification, make_state(doc), slug="x", stamp=STAMP, pack=pack
@@ -250,22 +256,22 @@ async def test_render_rejects_mismatched_inputs(pack: DomainPack) -> None:
 
 
 async def test_fence_length_mismatch_renders_the_verified_marker(pack: DomainPack) -> None:
-    doc = sop_b_doc()
-    body = "````\n```\n````\nDrain the oil while it is still warm [[cite:b4]]."
+    doc = quote_b_doc()
+    body = "````\n```\n````\nThe slab is cleaned before the pose [[cite:b4]]."
 
     def output() -> dict:
         return compiled(
-            "Gearbox oil change SOP rev B", "Oil change.", [], [section("Draining", body)]
+            "Quote DEV-2026-014 indice B", "Slab cleaning.", [], [section("Installation", body)]
         )
 
     llm = FakeLlmClient({"compile": compile_handler({doc.source_id: output})})
-    page, cited, result = await compile_and_render(doc, pack, llm, "sop-b")
+    page, cited, result = await compile_and_render(doc, pack, llm, "quote-b")
     assert result.compiled.sections[0].body == (
-        "````\n```\n````\nDrain the oil while it is still warm [[cite:b0004]]."
+        "````\n```\n````\nThe slab is cleaned before the pose [[cite:b0004]]."
     )
     [marker] = [c for c in result.citations if c.ref == "s1"]
     assert marker.block_ids == ("b0004",)
-    assert "````\n```\n````\nDrain the oil while it is still warm[^c1]." in page.body
+    assert "````\n```\n````\nThe slab is cleaned before the pose[^c1]." in page.body
     assert "[[cite" not in page.body
     check_footnotes(page, cited, page.frontmatter.title)
 
@@ -274,23 +280,23 @@ async def test_unverified_markers_are_dropped_with_a_warning(
     pack: DomainPack, caplog: pytest.LogCaptureFixture
 ) -> None:
     llm = client()
-    doc = sop_b_doc()
+    doc = quote_b_doc()
     classification = await classify_source(doc, pack, llm)
     result = await compile_source(doc, classification, pack, llm)
     sections = list(result.compiled.sections)
-    assert sections[1].body == "Tighten the drain plug to 45 Nm.[[cite:b0004]]"
+    assert sections[1].body == "The bay window F1 is widened to 3,00 m.[[cite:b0004]]"
     sections[1] = sections[1].model_copy(
-        update={"body": sections[1].body + " Drain the oil while it is still warm.[[cite:b0004]]"}
+        update={"body": sections[1].body + " The slab is cleaned before the pose.[[cite:b0004]]"}
     )
     sections.append(
         CompiledSection(
             heading="Extra",
-            body="Use ISO VG 220 gearbox oil.[[cite:b0003]] Invented step.[[cite:b0099]]",
+            body="Masonry is suspended in frost.[[cite:b0003]] Invented step.[[cite:b0099]]",
             table_refs=[],
         )
     )
     stale = CompiledResult(
-        SOP_B,
+        QUOTE_B,
         result.compiled.model_copy(update={"sections": sections}),
         result.citations,
         result.proposals,
@@ -298,20 +304,21 @@ async def test_unverified_markers_are_dropped_with_a_warning(
     )
     with caplog.at_level(logging.WARNING, logger="docwiki.stages.render"):
         page, cited = render_source_page(
-            stale, doc, classification, make_state(doc), slug="sop-b", stamp=STAMP, pack=pack
+            stale, doc, classification, make_state(doc), slug="quote-b", stamp=STAMP, pack=pack
         )
-    draining = page.body.split("### Draining\n\n", 1)[1].split("\n", 1)[0]
+    installation = page.body.split("### Installation\n\n", 1)[1].split("\n", 1)[0]
     assert re.fullmatch(
-        r"Tighten the drain plug to 45 Nm\.\[\^c\d+\] Drain the oil while it is still warm\.",
-        draining,
+        r"The bay window F1 is widened to 3,00 m\.\[\^c\d+\] "
+        r"The slab is cleaned before the pose\.",
+        installation,
     )
-    assert "### Extra\n\nUse ISO VG 220 gearbox oil. Invented step.\n" in page.body
+    assert "### Extra\n\nMasonry is suspended in frost. Invented step.\n" in page.body
     assert "[[cite" not in page.body and find_violations(page.body) == []
     check_footnotes(page, cited, page.frontmatter.title)
     warnings = [r.getMessage() for r in caplog.records if r.name == "docwiki.stages.render"]
     assert warnings == [
-        f"{SOP_B} section 2: 2 citation marker(s) but 1 verified citation(s); 1 unmatched "
+        f"{QUOTE_B} section 2: 2 citation marker(s) but 1 verified citation(s); 1 unmatched "
         "marker(s) dropped",
-        f"{SOP_B} section 3: 2 citation marker(s) but 0 verified citation(s); 2 unmatched "
+        f"{QUOTE_B} section 3: 2 citation marker(s) but 0 verified citation(s); 2 unmatched "
         "marker(s) dropped",
     ]

@@ -28,7 +28,8 @@ from docwiki.stages.verify import (
 )
 
 MOCK = Path(__file__).resolve().parents[2] / "samples" / "fixtures" / "mock-release"
-RUN_ID = "run-20260215-090000-0a1b2c3d"
+MOCK_ID = "20260401T090000Z-7ce99a3f"
+RUN_ID = "run-20260401-090000-0a1b2c3d"
 
 
 def _citation(
@@ -100,7 +101,7 @@ def test_g15_quarantine_rate_warns_and_canaries_enable_g08():
     assert gates["G15"].status == "warn" and gates["G15"].metric == 0.2
     assert gates["G08"].status == "pass" and gates["G10"].status == "pass"
     assert result.passed
-    leaked = verify_release(MOCK, audience="public", canaries=["ISO VG 220"], require_manifest=True)
+    leaked = verify_release(MOCK, audience="public", canaries=["2026-04-20"], require_manifest=True)
     assert {gate.gate for gate in leaked.blocking} == {"G08"}
 
 
@@ -184,7 +185,7 @@ def test_safe_reason_drops_canaries_instructions_and_bounds_the_length():
 
 def test_byte_scan_finds_canaries_in_any_file_and_extends_the_verdict(tmp_path: Path):
     release = tmp_path / "release"
-    shutil.copytree(MOCK / "releases" / "20260215T090000Z-decd4b59", release)
+    shutil.copytree(MOCK / "releases" / MOCK_ID, release)
     clean = verify_release(release, audience="public", canaries=["CANARY-Q"])
     assert {gate.gate: gate.status for gate in clean.gates}["G08"] == "pass"
     site = release / "site"

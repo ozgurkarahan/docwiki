@@ -1,712 +1,419 @@
-"""Deterministic datasets shared by several generators (SCADA log, work orders, trends, stock).
+"""Document tables derived from the bible facts, with arithmetic checks.
 
-Every value is either planted (see ``samples/fiction/bible.yaml`` scenarios) or drawn from a
-seeded random stream, so regenerating the corpus always yields the same rows.
+Every number printed by the generators comes from ``samples/fiction/bible.yaml``. These helpers
+select the rows of one document and recompute the totals the bible states, so a typo in the
+bible fails the build instead of producing an inconsistent document (errors surface).
 """
 
 from __future__ import annotations
 
-import math
+import re
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
-from functools import cache
+from datetime import date
+from decimal import ROUND_HALF_UP, Decimal
+from typing import Any
 
-from .common import rng
+from .common import dec, parse_day
+from .world import World
 
-TURBINES = [f"WTG-{i:02d}" for i in range(1, 13)]
-BAT_TURBINES = ("WTG-03", "WTG-04", "WTG-05")
+CENT = Decimal("0.01")
 
-SCADA_START = datetime(2026, 4, 1)
-SCADA_END = datetime(2026, 9, 1)
 
-SCADA_COLUMNS = [
-    "timestamp",
-    "turbine",
-    "event_type",
-    "code",
-    "description",
-    "state",
-    "value",
-    "unit",
-    "wind_speed_ms",
-    "ambient_temp_c",
-]
+def cents(value: Decimal) -> Decimal:
+    return value.quantize(CENT, rounding=ROUND_HALF_UP)
 
-ALARM_TEXT = {
-    "A1001": "Emergency stop activated",
-    "A2101": "Gearbox oil sump temperature high",
-    "A2102": "Gearbox oil sump temperature trip",
-    "A2110": "Gearbox HSS bearing temperature high",
-    "A2120": "Gearbox oil pressure low",
-    "A2140": "Gearbox oil filter differential pressure high",
-    "A3201": "Generator winding temperature high",
-    "A3210": "Generator brush wear limit reached",
-    "A4105": "Pitch system fault",
-    "A5001": "Yaw misalignment",
-    "A6101": "Grid voltage out of range",
-    "A7001": "Ice detected on rotor blades",
-}
-STATUS_TEXT = {
-    "S200": "Ready - low wind",
-    "S310": "Maintenance mode",
-    "S420": "Curtailed - environmental condition",
-    "S430": "Curtailed - grid operator setpoint",
-    "S510": "Stopped - fault",
-    "S600": "Stopped - icing",
-}
 
-# Planted: 27 A2101 warnings on WTG-07 between 2026-04-09 and 2026-06-21.
-WTG07_A2101_DAYS = [
-    "2026-04-09", "2026-04-14", "2026-04-18", "2026-04-23", "2026-04-27", "2026-04-30",
-    "2026-05-04", "2026-05-07", "2026-05-11", "2026-05-14", "2026-05-18", "2026-05-21",
-    "2026-05-25", "2026-05-27", "2026-05-29", "2026-05-30",
-    "2026-06-02", "2026-06-04", "2026-06-06", "2026-06-08", "2026-06-10", "2026-06-12",
-    "2026-06-14", "2026-06-16", "2026-06-18", "2026-06-19", "2026-06-21",
-]  # fmt: skip
+def share(base: Decimal, rate: int | float | Decimal) -> Decimal:
+    """``rate`` percent of ``base``, rounded half up to the cent."""
+    return cents(base * dec(rate) / 100)
+
+
+def expect(label: str, stated: Any, computed: Decimal) -> Decimal:
+    """The bible value, after checking that it equals the computed one."""
+    value = dec(stated)
+    if value != computed:
+        raise ValueError(f"bible arithmetic: {label} is {value}, computed {computed}")
+    return value
+
+
+def lot_label(numbers: list[int]) -> str:
+    """``lot 8`` or ``lots 1 à 7`` (contiguous) or ``lots 2, 5 et 7``."""
+    numbers = sorted(numbers)
+    if len(numbers) == 1:
+        return f"lot {numbers[0]}"
+    if numbers == list(range(numbers[0], numbers[-1] + 1)):
+        return f"lots {numbers[0]} à {numbers[-1]}"
+    return "lots " + ", ".join(str(n) for n in numbers[:-1]) + f" et {numbers[-1]}"
+
+
+# ------------------------------------------------------------------------------------------
+# Quote (devis), indice A and B
 
 
 @dataclass(frozen=True)
-class Weather:
-    wind: list[float]
-    temp: list[float]
-
-    def at(self, moment: datetime) -> tuple[float, float]:
-        index = int((moment - SCADA_START).total_seconds() // 3600)
-        index = max(0, min(index, len(self.wind) - 1))
-        return self.wind[index], self.temp[index]
-
-
-@cache
-def weather() -> Weather:
-    """Hourly hub-height wind speed (m/s) and ambient temperature (degC), April-August 2026."""
-    r = rng("weather-2026")
-    hours = int((SCADA_END - SCADA_START).total_seconds() // 3600)
-    days = hours // 24
-    anomalies: list[float] = []
-    previous = 0.0
-    for _ in range(days):
-        previous = 0.6 * previous + r.gauss(0.0, 1.8)
-        anomalies.append(previous)
-    month_mean = {4: 6.0, 5: 10.0, 6: 13.5, 7: 16.0, 8: 15.5}
-    wind: list[float] = []
-    temp: list[float] = []
-    w = 7.0
-    for h in range(hours):
-        moment = SCADA_START + timedelta(hours=h)
-        w = 0.92 * w + 0.08 * 7.0 + r.gauss(0.0, 0.85)
-        w = max(0.4, min(23.5, w))
-        diurnal = 4.5 * math.sin((moment.hour - 9) / 24 * 2 * math.pi)
-        heat = 9.0 if date(2026, 7, 19) <= moment.date() <= date(2026, 7, 23) else 0.0
-        t = month_mean[moment.month] + diurnal + anomalies[h // 24] + heat
-        wind.append(round(w, 1))
-        temp.append(round(t, 1))
-    return Weather(wind=wind, temp=temp)
+class QuoteLine:
+    ref: str
+    lot: int
+    designation: str
+    unit: str
+    qty: int | float
+    unit_price: Decimal
+    total: Decimal
 
 
-def _fmt(moment: datetime) -> str:
-    return moment.strftime("%Y-%m-%d %H:%M:%S")
+@dataclass(frozen=True)
+class VatLine:
+    rate: int
+    lots: list[int]
+    base: Decimal
+    amount: Decimal
 
 
-def _row(
-    moment: datetime,
-    turbine: str,
-    code: str,
-    state: str,
-    value: str = "",
-    unit: str = "",
-    wind_override: float | None = None,
-) -> dict[str, str]:
-    wind, temp = weather().at(moment)
-    if wind_override is not None:
-        # High-load events (over-temperature) happen in strong wind, whatever the weather model.
-        wind = wind_override
-    is_status = code.startswith("S")
-    return {
-        "timestamp": _fmt(moment),
-        "turbine": turbine,
-        "event_type": "STATUS" if is_status else "ALARM",
-        "code": code,
-        "description": STATUS_TEXT[code] if is_status else ALARM_TEXT[code],
-        "state": state,
-        "value": value,
-        "unit": unit,
-        "wind_speed_ms": f"{wind:.1f}",
-        "ambient_temp_c": f"{temp:.1f}",
-    }
+@dataclass(frozen=True)
+class Quote:
+    indice: str
+    date: str
+    lines: list[QuoteLine]
+    lot_subtotals: dict[int, Decimal]
+    ht: Decimal
+    vat: list[VatLine]
+    vat_total: Decimal
+    ttc: Decimal
+
+    def lines_of(self, lot: int) -> list[QuoteLine]:
+        return [line for line in self.lines if line.lot == lot]
 
 
-def _night_curtailment() -> list[dict[str, str]]:
-    rows: list[dict[str, str]] = []
-    day = date(2026, 6, 1)
-    while day <= date(2026, 8, 31):
-        start = datetime(day.year, day.month, day.day, 22, 0, 0)
-        wind, temp = weather().at(start)
-        if wind < 6.0 and temp >= 10.0:
-            end = start + timedelta(hours=7)
-            for offset, turbine in enumerate(BAT_TURBINES):
-                begin = start + timedelta(seconds=4 + 3 * offset)
-                rows.append(_row(begin, turbine, "S420", "START"))
-                rows.append(_row(end + timedelta(seconds=6 + 3 * offset), turbine, "S420", "END"))
-        day += timedelta(days=1)
-    return rows
-
-
-def night_curtailment_nights() -> list[str]:
-    """Dates (evening of the night) with environmental curtailment, for documentation."""
-    nights = {row["timestamp"][:10] for row in _night_curtailment() if row["state"] == "START"}
-    return sorted(nights)
-
-
-def _grid_curtailment() -> list[dict[str, str]]:
-    rows: list[dict[str, str]] = []
-    for day in (14, 15, 16):
-        for index, turbine in enumerate(TURBINES):
-            start = datetime(2026, 7, day, 8, 0, 5 + index)
-            end = datetime(2026, 7, day, 18, 0, 8 + index)
-            rows.append(_row(start, turbine, "S430", "START", "20.0", "MW"))
-            rows.append(_row(end, turbine, "S430", "END", "20.0", "MW"))
-    return rows
-
-
-def _wtg07_overtemperature() -> list[dict[str, str]]:
-    r = rng("wtg07-a2101")
-    rows: list[dict[str, str]] = []
-    for day in WTG07_A2101_DAYS:
-        d = date.fromisoformat(day)
-        if day == "2026-05-30":
-            raised = datetime(2026, 5, 30, 13, 58, 41)
-            rows.append(_row(raised, "WTG-07", "A2101", "RAISED", "75.3", "°C", 11.4))
-            trip = datetime(2026, 5, 30, 14, 12, 37)
-            rows.append(_row(trip, "WTG-07", "A2102", "RAISED", "82.6", "°C", 11.8))
-            rows.append(_row(trip + timedelta(seconds=1), "WTG-07", "S510", "START"))
-            rows.append(_row(datetime(2026, 5, 30, 15, 31, 2), "WTG-07", "A2102", "CLEARED",
-                             "79.4", "°C"))
-            rows.append(_row(datetime(2026, 5, 30, 15, 58, 20), "WTG-07", "A2101", "CLEARED",
-                             "72.8", "°C"))
-            rows.append(_row(datetime(2026, 5, 30, 16, 5, 44), "WTG-07", "S510", "END"))
+def quote(w: World, indice: str) -> Quote:
+    facts = w.facts["devis"]
+    key = indice.lower()
+    data = facts[f"indice_{key}"]
+    lines: list[QuoteLine] = []
+    for raw in facts["lines"]:
+        values = raw.get(key)
+        if values is None:
             continue
-        if day == "2026-06-19":
-            raised = datetime(2026, 6, 19, 15, 21, 9)
-            rows.append(_row(raised, "WTG-07", "A2101", "RAISED", "75.6", "°C", 12.1))
-            trip = datetime(2026, 6, 19, 15, 47, 12)
-            rows.append(_row(trip, "WTG-07", "A2102", "RAISED", "83.4", "°C", 12.6))
-            rows.append(_row(trip + timedelta(seconds=1), "WTG-07", "S510", "START"))
-            rows.append(_row(datetime(2026, 6, 19, 17, 2, 31), "WTG-07", "A2102", "CLEARED",
-                             "79.1", "°C"))
-            rows.append(_row(datetime(2026, 6, 19, 17, 24, 55), "WTG-07", "A2101", "CLEARED",
-                             "72.6", "°C"))
-            rows.append(_row(datetime(2026, 6, 19, 17, 40, 3), "WTG-07", "S510", "END"))
-            continue
-        raised = datetime(
-            d.year, d.month, d.day, r.randint(12, 16), r.randint(0, 59), r.randint(0, 59)
+        designation = raw.get(f"designation_{key}") or raw["designation"]
+        total = expect(
+            f"devis {key} line {raw['ref']}",
+            values["total"],
+            cents(dec(values["qty"]) * dec(values["unit_price"])),
         )
-        peak = round(r.uniform(75.1, 79.8), 1)
-        cleared = raised + timedelta(minutes=r.randint(14, 68), seconds=r.randint(0, 59))
-        strong = round(r.uniform(9.5, 14.5), 1)
-        rows.append(_row(raised, "WTG-07", "A2101", "RAISED", f"{peak:.1f}", "°C", strong))
-        cleared_value = f"{r.uniform(72.0, 73.4):.1f}"
-        rows.append(_row(cleared, "WTG-07", "A2101", "CLEARED", cleared_value, "°C"))
-    # Corrective maintenance on 2026-06-24 (fan motor and radiator, WO-26-0398/WO-26-0399).
-    rows.append(_row(datetime(2026, 6, 24, 8, 12, 30), "WTG-07", "S310", "START"))
-    rows.append(_row(datetime(2026, 6, 24, 15, 36, 10), "WTG-07", "S310", "END"))
-    return rows
+        lines.append(QuoteLine(str(raw["ref"]), int(raw["lot"]), designation, str(raw["unit"]),
+                               values["qty"], dec(values["unit_price"]), total))
+    subtotals: dict[int, Decimal] = {}
+    for lot in w.lots:
+        number = int(lot["lot"])
+        computed = sum((line.total for line in lines if line.lot == number), Decimal(0))
+        subtotals[number] = expect(f"devis {key} lot {number}", data["lot_subtotals"][number],
+                                   computed)
+    totals = data["totals"]
+    ht = expect(f"devis {key} HT", totals["ht"], sum(subtotals.values(), Decimal(0)))
+    vat: list[VatLine] = []
+    for rate in sorted({int(lot["vat_rate"]) for lot in w.lots}, reverse=True):
+        numbers = [int(lot["lot"]) for lot in w.lots if int(lot["vat_rate"]) == rate]
+        base = expect(f"devis {key} VAT {rate} base", totals[f"vat_{rate}_base"],
+                      sum((subtotals[n] for n in numbers), Decimal(0)))
+        amount = expect(f"devis {key} VAT {rate}", totals[f"vat_{rate}"], share(base, rate))
+        vat.append(VatLine(rate, numbers, base, amount))
+    vat_total = expect(f"devis {key} VAT total", totals["vat_total"],
+                       sum((line.amount for line in vat), Decimal(0)))
+    ttc = expect(f"devis {key} TTC", totals["ttc"], ht + vat_total)
+    return Quote(key, str(data["date"]), lines, subtotals, ht, vat, vat_total, ttc)
 
 
-def _other_planted() -> list[dict[str, str]]:
+def check_quote_difference(w: World) -> None:
+    a, b = quote(w, "a"), quote(w, "b")
+    diff = w.facts["devis"]["indice_b"]["difference_from_a"]
+    expect("devis difference HT", diff["ht"], b.ht - a.ht)
+    expect("devis difference TTC", diff["ttc"], b.ttc - a.ttc)
+
+
+# ------------------------------------------------------------------------------------------
+# Works contract and amendment
+
+
+def check_contract(w: World) -> None:
+    facts = w.facts["contrat"]
+    b = quote(w, "b")
+    expect("contract HT", facts["price"]["ht"], b.ht)
+    ttc = expect("contract TTC", facts["price"]["ttc"], b.ttc)
+    schedule = facts["payment_schedule"]
+    if sum(int(item["percent"]) for item in schedule) != 100:
+        raise ValueError("bible arithmetic: the payment schedule does not add up to 100 %")
+    for item in schedule:
+        expect(f"payment {item['n']}", item["amount"], share(ttc, item["percent"]))
+    expect("payment schedule total", ttc, sum((dec(i["amount"]) for i in schedule), Decimal(0)))
+    first, last = schedule[0], schedule[-1]
+    expect("deposit", facts["deposit"]["amount"], dec(first["amount"]))
+    expect("retention", facts["retention"]["amount"], dec(last["amount"]))
+    if int(facts["deposit"]["percent"]) != int(first["percent"]):
+        raise ValueError("bible: deposit percent differs from the payment schedule")
+    if int(facts["retention"]["percent"]) != int(last["percent"]):
+        raise ValueError("bible: retention percent differs from the payment schedule")
+    start = parse_day(str(facts["start"]))
+    end = parse_day(str(facts["planned_completion"]))
+    if (end - start).days > int(facts["duration_weeks"]) * 7:
+        raise ValueError("bible: the planned completion is later than the contract duration")
+
+
+def check_amendment(w: World) -> None:
+    facts = w.facts["avenant"]
+    total = Decimal(0)
+    for line in facts["lines"]:
+        total += expect(f"avenant {line['ref']}", line["total"],
+                        cents(dec(line["qty"]) * dec(line["unit_price"])))
+    totals = facts["totals"]
+    ht = expect("avenant HT", totals["ht"], total)
+    vat = expect("avenant VAT", totals["vat"], share(ht, totals["vat_rate"]))
+    ttc = expect("avenant TTC", totals["ttc"], ht + vat)
+    initial = facts["initial_contract"]
+    expect("avenant initial HT", initial["ht"], dec(w.facts["contrat"]["price"]["ht"]))
+    expect("avenant initial TTC", initial["ttc"], dec(w.facts["contrat"]["price"]["ttc"]))
+    expect("new contract HT", facts["new_contract_total"]["ht"], dec(initial["ht"]) + ht)
+    expect("new contract TTC", facts["new_contract_total"]["ttc"], dec(initial["ttc"]) + ttc)
+    retention = int(w.facts["contrat"]["retention"]["percent"])
+    derived = facts["derived_not_printed"]
+    on_amendment = expect("retention on the amendment", derived["retention_on_amendment"],
+                          share(ttc, retention))
+    expect("total retention", derived["total_retention_after_amendment"],
+           dec(w.facts["contrat"]["retention"]["amount"]) + on_amendment)
+
+
+# ------------------------------------------------------------------------------------------
+# Planning and purchase tracking (PLN), indice A and B
+
+
+def org_label(w: World, value: str) -> str:
+    """An organisation key, optionally followed by words (``lamna-batiment et clients``)."""
+    key, _, rest = value.partition(" ")
+    name = w.org_name(key)
+    return f"{name} {rest}" if rest else name
+
+
+@dataclass(frozen=True)
+class Task:
+    id: str
+    task: str
+    lot: str
+    by: str
+    start: date
+    end: date
+    progress: int
+    note: str
+
+
+@dataclass(frozen=True)
+class Purchase:
+    order: str
+    date: date
+    supplier: str
+    object: str
+    ordered_ht: Decimal
+    invoiced_ht: Decimal
+    status: str
+
+
+def planning_tasks(w: World, indice: str) -> list[Task]:
+    facts = w.facts["planning"]
+    key = indice.lower()
+    by_id = {str(task["id"]): task for task in facts["tasks"]}
+    tasks: list[Task] = []
+    for task_id in facts[f"indice_{key}"]["row_order"]:
+        raw = by_id[str(task_id)]
+        values = raw[key]
+        start, end = parse_day(str(values["start"])), parse_day(str(values["end"]))
+        if end < start:
+            raise ValueError(f"bible: task {task_id} ends before it starts")
+        note = str(values.get("note") or raw.get("note") or "")
+        tasks.append(Task(str(task_id), str(raw["task"]), str(raw["lot"]),
+                          org_label(w, str(raw["by"])), start, end, int(values["progress"]),
+                          note))
+    expected = {str(t["id"]) for t in facts["tasks"] if key in t}
+    if {task.id for task in tasks} != expected:
+        raise ValueError(f"bible: row_order of planning indice {key} misses tasks")
+    data = facts[f"indice_{key}"]
+    windows = next(task for task in tasks if task.id == "T07")
+    install = next(task for task in tasks if task.id == "T08")
+    handover = next(task for task in tasks if task.id == "T17")
+    if windows.start.isoformat() != str(data["windows_delivery"]):
+        raise ValueError(f"bible: planning {key} window delivery differs from task T07")
+    if (install.start.isoformat(), install.end.isoformat()) != (
+        str(data["windows_installation"]["start"]), str(data["windows_installation"]["end"])
+    ):
+        raise ValueError(f"bible: planning {key} window installation differs from task T08")
+    if handover.start.isoformat() != str(data["planned_handover"]):
+        raise ValueError(f"bible: planning {key} handover differs from task T17")
+    return tasks
+
+
+def purchases(w: World, indice: str) -> tuple[list[Purchase], Decimal, Decimal]:
+    facts = w.facts["planning"]
+    key = indice.lower()
     rows = [
-        _row(datetime(2026, 7, 21, 15, 20, 44), "WTG-03", "A2101", "RAISED", "75.4", "°C", 10.4),
-        _row(datetime(2026, 7, 21, 15, 33, 2), "WTG-03", "A2101", "CLEARED", "72.9", "°C"),
-        _row(datetime(2026, 8, 12, 16, 5, 2), "WTG-11", "A2101", "RAISED", "75.1", "°C", 10.9),
-        _row(datetime(2026, 8, 12, 16, 14, 40), "WTG-11", "A2101", "CLEARED", "72.7", "°C"),
-        _row(datetime(2026, 7, 19, 14, 40, 18), "WTG-02", "A2110", "RAISED", "91.2", "°C", 11.2),
-        _row(datetime(2026, 7, 19, 15, 2, 51), "WTG-02", "A2110", "CLEARED", "88.4", "°C"),
-        _row(datetime(2026, 7, 22, 15, 5, 26), "WTG-02", "A2110", "RAISED", "90.6", "°C", 10.7),
-        _row(datetime(2026, 7, 22, 15, 19, 7), "WTG-02", "A2110", "CLEARED", "88.1", "°C"),
-        _row(datetime(2026, 7, 23, 7, 45, 0), "WTG-02", "S310", "START"),
-        _row(datetime(2026, 7, 23, 13, 20, 15), "WTG-02", "S310", "END"),
-        _row(datetime(2026, 7, 16, 11, 2, 37), "WTG-09", "A3210", "RAISED"),
-        _row(datetime(2026, 7, 18, 7, 58, 12), "WTG-09", "S310", "START"),
-        _row(datetime(2026, 7, 18, 11, 41, 5), "WTG-09", "A3210", "CLEARED"),
-        _row(datetime(2026, 7, 18, 11, 52, 40), "WTG-09", "S310", "END"),
+        Purchase(str(raw["order"]), parse_day(str(raw["date"])), w.org_name(str(raw["supplier"])),
+                 str(raw["object"]), dec(raw["ordered_ht"]), dec(raw[key]["invoiced_ht"]),
+                 str(raw[key]["status"]))
+        for raw in facts["purchases"]
     ]
-    return rows
+    totals = facts[f"indice_{key}"]["purchase_totals"]
+    ordered = expect(f"planning {key} ordered", totals["ordered_ht"],
+                     sum((row.ordered_ht for row in rows), Decimal(0)))
+    invoiced = expect(f"planning {key} invoiced", totals["invoiced_ht"],
+                      sum((row.invoiced_ht for row in rows), Decimal(0)))
+    return rows, ordered, invoiced
 
 
-def _low_wind() -> list[dict[str, str]]:
-    """S200 periods when the hub-height wind stays below cut-in for at least four hours."""
-    w = weather()
-    rows: list[dict[str, str]] = []
-    run_start: int | None = None
-    for hour, speed in enumerate([*w.wind, 99.0]):
-        if speed < 3.0:
-            if run_start is None:
-                run_start = hour
-            continue
-        if run_start is not None and hour - run_start >= 4:
-            start = SCADA_START + timedelta(hours=run_start)
-            end = SCADA_START + timedelta(hours=hour)
-            for index, turbine in enumerate(TURBINES):
-                begin = start + timedelta(seconds=11 + 7 * index)
-                rows.append(_row(begin, turbine, "S200", "START"))
-                rows.append(_row(end + timedelta(seconds=13 + 7 * index), turbine, "S200", "END"))
-        run_start = None
-    return rows
+# ------------------------------------------------------------------------------------------
+# Builders' merchant: invoice and delivery note
 
 
-def _icing() -> list[dict[str, str]]:
-    r = rng("icing-april")
-    rows: list[dict[str, str]] = []
-    for day in (1, 2, 3, 6, 7):
-        affected = sorted(r.sample(TURBINES, r.randint(2, 5)))
-        for turbine in affected:
-            start = datetime(2026, 4, day, r.randint(4, 6), r.randint(0, 59), r.randint(0, 59))
-            end = start + timedelta(hours=r.randint(2, 5), minutes=r.randint(0, 59))
-            rows.append(_row(start, turbine, "A7001", "RAISED"))
-            rows.append(_row(start + timedelta(seconds=2), turbine, "S600", "START"))
-            rows.append(_row(end, turbine, "A7001", "CLEARED"))
-            rows.append(_row(end + timedelta(seconds=40), turbine, "S600", "END"))
-    return rows
+@dataclass(frozen=True)
+class InvoiceLine:
+    code: str | None
+    designation: str
+    qty: int | float
+    unit: str
+    unit_price: Decimal
+    total: Decimal
 
 
-def _background() -> list[dict[str, str]]:
-    """Seeded background alarms that make the log realistic."""
-    r = rng("scada-background")
-    rows: list[dict[str, str]] = []
-    span = int((SCADA_END - SCADA_START).total_seconds())
+def invoice(w: World) -> tuple[list[InvoiceLine], Decimal, Decimal, Decimal]:
+    facts = w.facts["zava_invoice"]
+    lines = [
+        InvoiceLine(raw.get("code"), str(raw["designation"]), raw["qty"], str(raw["unit"]),
+                    dec(raw["unit_price"]),
+                    expect(f"invoice line {raw['designation']}", raw["total"],
+                           cents(dec(raw["qty"]) * dec(raw["unit_price"]))))
+        for raw in facts["lines"]
+    ]
+    totals = facts["totals"]
+    ht = expect("invoice HT", totals["ht"], sum((line.total for line in lines), Decimal(0)))
+    vat = expect("invoice VAT", totals["vat"], share(ht, totals["vat_rate"]))
+    ttc = expect("invoice TTC", totals["ttc"], ht + vat)
+    expect(f"invoice vs order {facts['order']}", ht, _ordered(w, str(facts["order"])))
+    derived = facts["derived_not_printed"]
+    delivery = w.facts["zava_delivery"]
+    missing = int(delivery["missing_pallets"])
+    if int(derived["overbilled_pallets"]) != missing:
+        raise ValueError("bible: overbilled pallets differ from the missing pallets")
+    pallets = next(line for line in lines if line.unit == "palette")
+    if int(pallets.qty) - missing != int(delivery["delivered_pallets"]):
+        raise ValueError("bible: delivered pallets do not match the billed and missing pallets")
+    over_ht = expect("overbilled HT", derived["overbilled_ht"], pallets.unit_price * missing)
+    over_vat = expect("overbilled VAT", derived["overbilled_vat"],
+                      share(over_ht, totals["vat_rate"]))
+    expect("overbilled TTC", derived["overbilled_ttc"], over_ht + over_vat)
+    expect("corrected HT", derived["corrected_ht"], ht - over_ht)
+    expect("corrected TTC", derived["corrected_ttc"], ttc - over_ht - over_vat)
+    return lines, ht, vat, ttc
 
-    def when() -> datetime:
-        return SCADA_START + timedelta(seconds=r.randint(0, span - 7200))
 
-    for _ in range(250):
-        turbine = r.choice(TURBINES)
-        start = when()
-        error = r.uniform(10.5, 19.5)
-        rows.append(_row(start, turbine, "A5001", "RAISED", f"{error:.1f}", "deg"))
-        rows.append(
-            _row(start + timedelta(seconds=r.randint(40, 600)), turbine, "A5001", "CLEARED", "4.2",
-                 "deg")
+def _ordered(w: World, order: str) -> Decimal:
+    rows = [raw for raw in w.facts["planning"]["purchases"] if raw["order"] == order]
+    if len(rows) != 1:
+        raise ValueError(f"bible: order {order} is not in the purchase tracking")
+    return dec(rows[0]["ordered_ht"])
+
+
+def check_delivery(w: World) -> None:
+    delivery = w.facts["zava_delivery"]
+    invoice_lines = {line["code"]: line for line in w.facts["zava_invoice"]["lines"]}
+    for line in delivery["printed_lines"]:
+        billed = invoice_lines[line["code"]]
+        if (billed["qty"], billed["unit"]) != (line["qty"], line["unit"]):
+            raise ValueError(f"bible: delivery line {line['code']} differs from the invoice")
+    pallet = next(line for line in delivery["printed_lines"] if line["unit"] == "palette")
+    product = next(p for p in w.data["products"] if p.get("code") == pallet["code"])
+    match = re.search(r"\d+", str(product["attributes"]["sale_unit"]))
+    if match is None:
+        raise ValueError("bible: the block sale unit does not state the blocks per pallet")
+    blocks_per_pallet = int(match.group())
+    if int(delivery["blocks_delivered"]) != int(delivery["delivered_pallets"]) * blocks_per_pallet:
+        raise ValueError("bible: delivered blocks differ from the blocks per delivered pallet")
+    if int(pallet["qty"]) != int(delivery["delivered_pallets"]) + int(
+        delivery["missing_pallets"]
+    ):
+        raise ValueError("bible: printed pallets differ from delivered plus missing pallets")
+
+
+# ------------------------------------------------------------------------------------------
+# Restricted internal price study
+
+
+@dataclass(frozen=True)
+class StudyLot:
+    lot: int
+    title: str
+    sale_ht: Decimal
+    materials_ht: Decimal
+    hours: int
+    labour_ht: Decimal
+    subcontract_ht: Decimal
+    direct_cost_ht: Decimal
+    gross_margin_ht: Decimal
+
+
+def price_study(w: World) -> tuple[list[StudyLot], dict[str, Decimal]]:
+    facts = w.facts["etude_de_prix"]
+    hourly = dec(facts["hourly_cost"])
+    b = quote(w, "b")
+    lots: list[StudyLot] = []
+    for raw in facts["lots"]:
+        number = int(raw["lot"])
+        sale = expect(f"study lot {number} sale", raw["sale_ht"], b.lot_subtotals[number])
+        labour = expect(f"study lot {number} labour", raw["labour_ht"],
+                        cents(hourly * int(raw["hours"])))
+        direct = expect(
+            f"study lot {number} direct cost",
+            raw["direct_cost_ht"],
+            dec(raw["materials_ht"]) + labour + dec(raw["subcontract_ht"]),
         )
-    for _ in range(22):
-        turbine = r.choice(TURBINES)
-        start = when()
-        dp = r.uniform(2.5, 2.9)
-        rows.append(_row(start, turbine, "A2140", "RAISED", f"{dp:.2f}", "bar"))
-        rows.append(
-            _row(start + timedelta(minutes=r.randint(20, 240)), turbine, "A2140", "CLEARED", "1.90",
-                 "bar")
-        )
-    for _ in range(14):
-        turbine = r.choice([t for t in TURBINES if t != "WTG-07"])
-        start = when()
-        rows.append(_row(start, turbine, "A3201", "RAISED", f"{r.uniform(145.2, 149.0):.1f}", "°C"))
-        rows.append(
-            _row(start + timedelta(minutes=r.randint(10, 50)), turbine, "A3201", "CLEARED", "139.5",
-                 "°C")
-        )
-    for _ in range(11):
-        turbine = r.choice(TURBINES)
-        start = when()
-        axis = str(r.randint(1, 3))
-        rows.append(_row(start, turbine, "A4105", "RAISED", axis, "axis"))
-        rows.append(_row(start + timedelta(seconds=1), turbine, "S510", "START"))
-        end = start + timedelta(minutes=r.randint(25, 180))
-        rows.append(_row(end, turbine, "A4105", "CLEARED", axis, "axis"))
-        rows.append(_row(end + timedelta(seconds=30), turbine, "S510", "END"))
-    for _ in range(6):
-        start = when()
-        voltage = f"{r.uniform(86.0, 89.5):.1f}"
-        for index, turbine in enumerate(TURBINES):
-            moment = start + timedelta(seconds=index)
-            rows.append(_row(moment, turbine, "A6101", "RAISED", voltage, "%"))
-            rows.append(_row(moment + timedelta(seconds=1), turbine, "S510", "START"))
-            back = moment + timedelta(minutes=r.randint(3, 9))
-            rows.append(_row(back, turbine, "A6101", "CLEARED", "99.6", "%"))
-            rows.append(_row(back + timedelta(seconds=20), turbine, "S510", "END"))
-    for day in (2, 3, 7):
-        for turbine in r.sample(TURBINES, 2):
-            start = datetime(2026, 4, day, 7, r.randint(0, 40), r.randint(0, 59))
-            pressure = f"{r.uniform(0.55, 0.78):.2f}"
-            rows.append(_row(start, turbine, "A2120", "RAISED", pressure, "bar"))
-            back = start + timedelta(minutes=r.randint(6, 25))
-            rows.append(_row(back, turbine, "A2120", "CLEARED", "1.35", "bar"))
-    for _ in range(64):
-        turbine = r.choice([t for t in TURBINES if t != "WTG-07"])
-        start = when().replace(hour=r.randint(7, 9))
-        end = start + timedelta(hours=r.randint(2, 7), minutes=r.randint(0, 59))
-        rows.append(_row(start, turbine, "S310", "START"))
-        if r.random() < 0.08:
-            stop = start + timedelta(minutes=r.randint(5, 30))
-            rows.append(_row(stop, turbine, "A1001", "RAISED"))
-            reset = start + timedelta(minutes=r.randint(31, 60))
-            rows.append(_row(reset, turbine, "A1001", "CLEARED"))
-        rows.append(_row(end, turbine, "S310", "END"))
-    return rows
-
-
-@cache
-def scada_rows() -> list[dict[str, str]]:
-    rows = (
-        _night_curtailment()
-        + _grid_curtailment()
-        + _wtg07_overtemperature()
-        + _other_planted()
-        + _icing()
-        + _low_wind()
-        + _background()
+        margin = expect(f"study lot {number} margin", raw["gross_margin_ht"], sale - direct)
+        lots.append(StudyLot(number, str(w.lot(number)["title"]), sale,
+                             dec(raw["materials_ht"]), int(raw["hours"]), labour,
+                             dec(raw["subcontract_ht"]), direct, margin))
+    totals = facts["totals"]
+    sums: dict[str, Decimal] = {}
+    for field in ("sale_ht", "materials_ht", "labour_ht", "subcontract_ht", "direct_cost_ht",
+                  "gross_margin_ht"):
+        sums[field] = expect(f"study total {field}", totals[field],
+                             sum((getattr(lot, field) for lot in lots), Decimal(0)))
+    sums["hours"] = expect("study total hours", totals["hours"],
+                           Decimal(sum(lot.hours for lot in lots)))
+    overheads = expect("study overheads", totals["overheads_ht"],
+                       share(sums["direct_cost_ht"], facts["overheads_percent"]))
+    cost_price = expect("study cost price", totals["cost_price_ht"],
+                        sums["direct_cost_ht"] + overheads)
+    net = expect("study net margin", totals["net_margin_ht"], sums["sale_ht"] - cost_price)
+    rate = (net / sums["sale_ht"] * 100).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+    if f"{rate} %".replace(".", ",") != totals["net_margin_percent"]:
+        raise ValueError("bible arithmetic: net margin percent")
+    coefficient = (sums["sale_ht"] / sums["direct_cost_ht"]).quantize(
+        CENT, rounding=ROUND_HALF_UP
     )
-    rows.sort(key=lambda row: (row["timestamp"], row["turbine"], row["code"], row["state"]))
-    return rows
+    if str(coefficient).replace(".", ",") != totals["sale_coefficient"]:
+        raise ValueError("bible arithmetic: sale coefficient")
+    subcontractor = w.org_by_role("electrical-subcontractor")["key"]
+    orders = [p for p in w.facts["planning"]["purchases"] if p["supplier"] == subcontractor]
+    expect("study subcontracting vs the electrical order", sums["subcontract_ht"],
+           sum((dec(p["ordered_ht"]) for p in orders), Decimal(0)))
+    sums.update(overheads_ht=overheads, cost_price_ht=cost_price, net_margin_ht=net,
+                hourly_cost=hourly)
+    return lots, sums
 
 
-# --------------------------------------------------------------------------------------------
-# Vibration trend of the WTG-07 gearbox HSS bearing (generator side), weekly on Mondays.
-
-VIBRATION_COLUMNS = [
-    "date",
-    "turbine",
-    "sensor",
-    "velocity_rms_mm_s",
-    "envelope_ge",
-    "oil_temp_avg_c",
-    "power_avg_kw",
-]
-_VELOCITY = [
-    2.1, 2.2, 2.1, 2.3,
-    2.3, 2.4, 2.4, 2.6,
-    2.7, 2.8, 2.9, 3.1, 3.2,
-    3.4, 3.6, 3.7, 3.9,
-    4.1, 4.3, 4.4, 4.7,
-    4.9, 5.0, 5.2, 5.4, 5.1,
-    5.0, 5.2, 5.3, 5.3,
-    5.4, 5.5, 5.6, 5.6, 5.7,
-]  # fmt: skip
-
-
-@cache
-def vibration_rows() -> list[dict[str, str]]:
-    r = rng("vibration-wtg07")
-    rows: list[dict[str, str]] = []
-    day = date(2026, 1, 5)
-    for velocity in _VELOCITY:
-        envelope = max(0.3, 0.55 * velocity - 0.8 + r.uniform(-0.08, 0.08))
-        if day < date(2026, 4, 6):
-            oil = r.uniform(50.5, 56.0)
-        elif day < date(2026, 6, 29):
-            oil = r.uniform(64.0, 70.5)
-        else:
-            oil = r.uniform(57.0, 61.0)
-        if date(2026, 6, 1) <= day < date(2026, 6, 29):
-            power = r.uniform(780.0, 990.0)
-        else:
-            power = r.uniform(900.0, 1450.0) if day.month in (1, 2, 3) else r.uniform(620.0, 1100.0)
-        rows.append(
-            {
-                "date": day.isoformat(),
-                "turbine": "WTG-07",
-                "sensor": "GBX HSS GS radial",
-                "velocity_rms_mm_s": f"{velocity:.1f}",
-                "envelope_ge": f"{envelope:.2f}",
-                "oil_temp_avg_c": f"{oil:.1f}",
-                "power_avg_kw": f"{power:.0f}",
-            }
-        )
-        day += timedelta(days=7)
-    return rows
-
-
-# --------------------------------------------------------------------------------------------
-# Oil samples of WTG-07 (laboratory history).
-
-_OIL_SAMPLE_ROWS = [
-    ("2025-06-11", "TR-OA-2025-0388", "PWG 320", 22, 19, 318, "NORMAL"),
-    ("2025-12-09", "TR-OA-2025-0951", "PWG 220", 18, 21, 221, "NORMAL"),
-    ("2026-03-17", "TR-OA-2026-0241", "PWG 220", 31, 44, 224, "NORMAL"),
-    ("2026-06-10", "TR-OA-2026-0614", "PWG 220", 64, 112, 229, "ALERT"),
-]
-WTG07_OIL_SAMPLES = [
-    dict(zip(("date", "report", "oil", "fe", "pq", "visc40", "status"), row, strict=True))
-    for row in _OIL_SAMPLE_ROWS
-]
-
-
-# --------------------------------------------------------------------------------------------
-# Work orders (export of 2026-08-31).
-
-WORK_ORDER_COLUMNS = [
-    "wo_number",
-    "created",
-    "turbine",
-    "type",
-    "title",
-    "status",
-    "priority",
-    "part_number",
-    "part_qty",
-    "assigned_to",
-    "planned_date",
-    "completed_date",
-    "reference",
-    "remarks",
-]
-
-CONVERSION_DATES = {
-    "WTG-01": "2025-09-03",
-    "WTG-02": "2025-09-10",
-    "WTG-03": "2025-09-17",
-    "WTG-04": "2025-09-24",
-    "WTG-05": "2025-10-01",
-    "WTG-06": "2025-10-08",
-    "WTG-07": "2025-10-15",
-    "WTG-08": "2025-10-22",
-    "WTG-09": "2026-01-20",
-    "WTG-10": "2025-11-05",
-    "WTG-11": "2025-11-12",
-    "WTG-12": "2025-11-19",
-}
-
-TECHNICIANS = ("Callum Rydings", "\u00c9lise Ternaux")
-
-
-def _wo(
-    number: str,
-    created: str,
-    turbine: str,
-    wo_type: str,
-    title: str,
-    status: str,
-    priority: str = "Medium",
-    part: str = "",
-    qty: str = "",
-    assigned: str = "Callum Rydings",
-    planned: str = "",
-    completed: str = "",
-    reference: str = "",
-    remarks: str = "",
-) -> dict[str, str]:
-    return {
-        "wo_number": number,
-        "created": created,
-        "turbine": turbine,
-        "type": wo_type,
-        "title": title,
-        "status": status,
-        "priority": priority,
-        "part_number": part,
-        "part_qty": qty,
-        "assigned_to": assigned,
-        "planned_date": planned,
-        "completed_date": completed,
-        "reference": reference,
-        "remarks": remarks,
-    }
-
-
-def _number(row: dict[str, str]) -> int:
-    return int(row["wo_number"].split("-")[2])
-
-
-def _assign_numbers(year: str, planted: list[dict[str, str]], routine: list[dict[str, str]],
-                    first: int) -> list[dict[str, str]]:
-    """Give routine work orders numbers that increase with their creation date.
-
-    Planted work orders keep their fixed numbers; routine ones are numbered between them and
-    dropped when no free number is left before the next planted one.
-    """
-    r = rng(f"wo-numbers-{year}")
-    ordered = sorted(planted + routine, key=lambda row: (row["created"], row["wo_number"] or "~"))
-    result: list[dict[str, str]] = []
-    last = first
-    for index, row in enumerate(ordered):
-        if row["wo_number"]:
-            if _number(row) <= last:
-                raise ValueError(f"planted work order {row['wo_number']} is out of sequence")
-            last = _number(row)
-            result.append(row)
-            continue
-        upcoming = [_number(o) for o in ordered[index + 1 :] if o["wo_number"]]
-        limit = min(upcoming) if upcoming else 9999
-        candidate = last + r.randint(1, 4)
-        if candidate >= limit:
-            continue
-        row = dict(row, wo_number=f"WO-{year}-{candidate:04d}")
-        last = candidate
-        result.append(row)
-    return result
-
-
-@cache
-def work_order_rows() -> list[dict[str, str]]:
-    r = rng("work-orders")
-    planted_25: list[dict[str, str]] = []
-    # Oil conversion campaign (MOC-2025-012), WO-25-0301 to WO-25-0312.
-    for index, turbine in enumerate(TURBINES):
-        done = CONVERSION_DATES[turbine]
-        planned = done
-        remarks = ""
-        if turbine == "WTG-09":
-            planned = "2025-11-24"
-            remarks = "Deferred: access road closed by snow on 2025-11-24; completed 2026-01-20"
-        planted_25.append(
-            _wo(
-                f"WO-25-{301 + index:04d}",
-                "2025-08-27",
-                turbine,
-                "MOD",
-                "Gearbox oil conversion PWG 320 to PWG 220 incl. 60 L flush (SB-LWS-2025-07)",
-                "Completed",
-                "High",
-                "PWS-220-D208",
-                "3",
-                TECHNICIANS[index % 2],
-                planned,
-                done,
-                "MOC-2025-012",
-                remarks,
-            )
-        )
-    routine_tasks = [
-        ("MP-GBX-02", "Gearbox oil filter element replacement", "FGT-P-11872", "1"),
-        ("MP-GEN-01", "Generator brush inspection", "", ""),
-        ("MP-HSE-01", "Rescue kit inspection", "", ""),
-        ("MP-YAW-01", "Yaw brake pad inspection", "", ""),
-        ("MP-HYD-01", "Hydraulic accumulator pre-charge check", "", ""),
-        ("MP-GBX-05", "Gearbox visual inspection and leak check", "", ""),
-    ]
-    routine_25: list[dict[str, str]] = []
-    for month in (9, 10, 11, 12):
-        for task, title, part, qty in routine_tasks[:4]:
-            day = f"2025-{month:02d}-{r.randint(3, 26):02d}"
-            routine_25.append(
-                _wo("", day, r.choice(TURBINES), "PM", f"{title} ({task})", "Completed", "Low",
-                    part, qty, r.choice(TECHNICIANS), day, day, task)
-            )
-    routine_26: list[dict[str, str]] = []
-    for month in range(1, 9):
-        for task, title, part, qty in routine_tasks:
-            if r.random() < 0.3:
-                continue
-            day = f"2026-{month:02d}-{r.randint(2, 27):02d}"
-            status, completed = "Completed", day
-            if month == 8 and r.random() < 0.5:
-                status, completed = "Open", ""
-            routine_26.append(
-                _wo("", day, r.choice(TURBINES), "PM", f"{title} ({task})", status, "Low",
-                    part, qty, r.choice(TECHNICIANS), day, completed, task)
-            )
-    planted_26: list[dict[str, str]] = [
-        _wo("WO-26-0187", "2026-02-20", "WTG-10", "CM", "Replace HSS bearing, generator side",
-            "Completed", "High", "FGT-P-22328", "1", "Callum Rydings", "2026-03-11", "2026-03-12",
-            "CMS alarm 2026-02-20", "Last spare bearing used"),
-        _wo("WO-26-0203", "2026-03-26", "WTG-11", "CM",
-            "Install tool tether anchor points at yaw deck hatch", "Completed", "High",
-            "AWI-31007", "1", "\u00c9lise Ternaux", "2026-04-02", "2026-04-02", "INC-2026-003"),
-        _wo("WO-26-0355", "2026-06-05", "WTG-04", "CM",
-            "Replace rotor blade B (trailing-edge crack)",
-            "Planned", "High", "", "", "Dario Penwarden", "2026-09-08", "",
-            "WBS-2026-031; LP-2026-009"),
-        _wo("WO-26-0398", "2026-06-22", "WTG-07", "CM", "Replace oil cooler fan motor",
-            "Completed", "High", "LWS-P-30418", "1", "Callum Rydings", "2026-06-24", "2026-06-24",
-            "INC-2026-006"),
-        _wo("WO-26-0399", "2026-06-22", "WTG-07", "CM", "Clean oil cooler radiator",
-            "Completed", "High", "", "", "\u00c9lise Ternaux", "2026-06-24", "2026-06-24",
-            "INC-2026-006", "Fins about 40 % blocked by insects and pollen"),
-        _wo("WO-26-0412", "2026-06-26", "WTG-07", "CM", "Replace HSS bearing, generator side",
-            "Waiting for parts", "High", "FGT-P-22328", "1", "Callum Rydings", "", "",
-            "INC-2026-006", "Vibration above alarm level 4.5 mm/s"),
-        _wo("WO-26-0430", "2026-07-06", "WTG-01", "PM",
-            "Oil cooler radiator cleaning and fan current check (MP-GBX-07)", "Completed",
-            "Medium", "", "", "\u00c9lise Ternaux", "2026-07-07", "2026-07-07", "MP-GBX-07"),
-        _wo("WO-26-0431", "2026-07-06", "WTG-02", "PM",
-            "Oil cooler radiator cleaning and fan current check (MP-GBX-07)", "Completed",
-            "Medium", "", "", "\u00c9lise Ternaux", "2026-07-08", "2026-07-08", "MP-GBX-07"),
-        _wo("WO-26-0436", "2026-07-16", "WTG-09", "CM", "Replace generator brushes (A3210)",
-            "Completed", "Medium", "LWS-P-51207", "1", "\u00c9lise Ternaux", "2026-07-18",
-            "2026-07-18", "WI-GEN-014", "Shortest brush 16 mm"),
-        _wo("WO-26-0439", "2026-07-24", "WTG-02", "CM",
-            "Replace HSS bearing, generator side (spalling found at endoscopy 2026-07-23)",
-            "Waiting for parts", "High", "FGT-P-22328", "1", "Callum Rydings", "", "",
-            "Endoscope inspection 2026-07-23"),
-        _wo("WO-26-0444", "2026-07-27", "WTG-05", "PM", "Rescue kit inspection (MP-HSE-01)",
-            "In progress", "Medium", "", "", "Callum Rydings", "2026-08-03", "", "MP-HSE-01"),
-        _wo("WO-26-0450", "2026-07-30", "WTG-11", "CM",
-            "Replace leaking hydraulic hose, yaw brake circuit", "Waiting for parts", "Medium",
-            "AWI-10442", "1", "\u00c9lise Ternaux", "", "", "Shift handover 2026-07-29",
-            "Hose not stocked; ordered from distributor"),
-    ]
-    # Pitch bearing bolt re-torque per SB-LWS-2025-11 Rev. A (MP-PIT-01).
-    for index, turbine in enumerate(TURBINES[:6]):
-        day = f"2026-05-{4 + 2 * index:02d}"
-        planted_26.append(
-            _wo(f"WO-26-{301 + index:04d}", "2026-04-20", turbine, "PM",
-                "Pitch bearing bolt re-torque 1,450 Nm, 100 % of bolts (MP-PIT-01)", "Completed",
-                "Medium", "", "", TECHNICIANS[index % 2], day, day, "SB-LWS-2025-11 Rev. A")
-        )
-    for index, turbine in enumerate(TURBINES[6:]):
-        day = f"2026-09-{7 + 2 * index:02d}"
-        planted_26.append(
-            _wo(f"WO-26-{471 + index:04d}", "2026-08-24", turbine, "PM",
-                "Pitch bearing bolt re-torque 1,450 Nm, 100 % of bolts (MP-PIT-01)", "Planned",
-                "Medium", "", "", TECHNICIANS[index % 2], day, "", "SB-LWS-2025-11 Rev. A")
-        )
-    # Oil sampling campaign June 2026 (MP-GBX-01).
-    for index, turbine in enumerate(TURBINES):
-        day = f"2026-06-{8 + index // 3:02d}"
-        planted_26.append(
-            _wo(f"WO-26-{341 + index:04d}", "2026-05-28", turbine, "PM",
-                "Gearbox oil sampling (MP-GBX-01)", "Completed", "Low", "", "",
-                "Callum Rydings", day, day, "MP-GBX-01")
-        )
-    rows = _assign_numbers("25", planted_25, routine_25, 300)
-    rows += _assign_numbers("26", planted_26, routine_26, 0)
-    return rows
-
-
-# --------------------------------------------------------------------------------------------
-# KPI export (first half of 2026).
-
-KPI_COLUMNS = [
-    "month",
-    "turbine",
-    "availability_pct",
-    "energy_mwh",
-    "downtime_h",
-    "alarm_count",
-]
-_CAPACITY_FACTOR = {1: 0.41, 2: 0.38, 3: 0.35, 4: 0.30, 5: 0.25, 6: 0.22}
-_HOURS = {1: 744, 2: 672, 3: 744, 4: 720, 5: 744, 6: 720}
-_PLANTED_AVAILABILITY = {
-    ("2026-01", "WTG-09"): 96.1,
-    ("2026-03", "WTG-10"): 93.8,
-    ("2026-05", "WTG-07"): 95.2,
-    ("2026-06", "WTG-07"): 90.4,
-}
-
-
-@cache
-def kpi_rows() -> list[dict[str, str]]:
-    r = rng("kpi-2026-h1")
-    factors = {t: r.uniform(0.95, 1.05) for t in TURBINES}
-    rows: list[dict[str, str]] = []
-    for month in range(1, 7):
-        key = f"2026-{month:02d}"
-        for turbine in TURBINES:
-            drawn = round(r.uniform(97.4, 99.4), 1)
-            availability = _PLANTED_AVAILABILITY.get((key, turbine), drawn)
-            hours = _HOURS[month]
-            energy = 3.2 * hours * _CAPACITY_FACTOR[month] * factors[turbine] * availability / 100
-            if turbine == "WTG-07" and month == 6:
-                energy *= 0.86
-            alarms = r.randint(6, 26)
-            if turbine == "WTG-07" and month in (5, 6):
-                alarms = {5: 31, 6: 38}[month]
-            rows.append(
-                {
-                    "month": key,
-                    "turbine": turbine,
-                    "availability_pct": f"{availability:.1f}",
-                    "energy_mwh": f"{energy:.1f}",
-                    "downtime_h": f"{hours * (1 - availability / 100):.1f}",
-                    "alarm_count": str(alarms),
-                }
-            )
-    return rows
+def check_world(w: World) -> None:
+    """Recompute every total of the bible facts (raises ValueError on the first mismatch)."""
+    quote(w, "a")
+    quote(w, "b")
+    check_quote_difference(w)
+    check_contract(w)
+    check_amendment(w)
+    planning_tasks(w, "a")
+    planning_tasks(w, "b")
+    purchases(w, "a")
+    purchases(w, "b")
+    invoice(w)
+    check_delivery(w)
+    price_study(w)

@@ -12,11 +12,12 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp_testkit import (
     FIXTURE_ROOT,
     MINT,
+    MINUTES,
     NOW,
-    PLAN,
+    PLAN_B,
     RELEASE_ID,
-    SOP_B,
     TENANT_ID,
+    TOPIC_ID,
     bearer_headers,
     tool_payload,
 )
@@ -105,22 +106,22 @@ async def test_in_process_round_trip_with_every_read_tool() -> None:
     server = build_server(FolderReleaseSource(FIXTURE_ROOT), config=McpConfig())
     async with Client(server) as client:
         calls: dict[str, dict[str, Any]] = {
-            "search": {"query": "WTG-07 oil"},
-            "read_page": {"page": "topic:gearbox-oil", "section": "Contradictions"},
+            "search": {"query": "VanArsdel livraison"},
+            "read_page": {"page": TOPIC_ID, "section": "Contradictions"},
             "get_index": {"scope": "topics"},
-            "get_links": {"page": SOP_B},
-            "glossary": {"term": "SOP"},
-            "get_evidence": {"source_id": SOP_B, "locator_key": "para-0004"},
-            "query_table": {"source_id": PLAN, "sql": "SELECT row_id, due FROM t01"},
+            "get_links": {"page": PLAN_B},
+            "glossary": {"term": "schedule"},
+            "get_evidence": {"source_id": MINUTES, "locator_key": "para-0011"},
+            "query_table": {"source_id": PLAN_B, "sql": "SELECT row_id, debut FROM t01"},
             "get_skill": {"name": "cite-sources"},
             "list_skills": {},
-            "recent_changes": {"since": "2026-02-01", "limit": 3},
+            "recent_changes": {"since": "2026-03-01", "limit": 3},
         }
         for name, arguments in calls.items():
             data = _text(await client.call_tool(name, arguments))
             assert data["release_id"] == RELEASE_ID, name
         bad = tool_payload(
-            await client.call_tool("query_table", {"source_id": PLAN, "sql": "DROP TABLE t01"})
+            await client.call_tool("query_table", {"source_id": PLAN_B, "sql": "DROP TABLE t01"})
         )
         assert bad["error"]["code"] == "invalid_argument"
         assert "query rejected" in bad["error"]["message"]
@@ -166,7 +167,7 @@ async def test_streamable_http_round_trip_with_roles(tmp_path: Path, mode: str) 
             assert {tool.name for tool in listed.tools} == {*READ_TOOLS, *OPS_TOOLS}
             data = _text(
                 await researcher.call_tool(
-                    "get_evidence", {"source_id": SOP_B, "locator_key": "para-0004"}
+                    "get_evidence", {"source_id": MINUTES, "locator_key": "para-0011"}
                 )
             )
             assert data["badge"] == "✓ quote verified"
@@ -178,7 +179,7 @@ async def test_streamable_http_round_trip_with_roles(tmp_path: Path, mode: str) 
             status = _text(await librarian.call_tool("run_status", {}))
             assert status["runs"] == [] and status["served_release_id"] == RELEASE_ID
             report = _text(await librarian.call_tool("write_health_report", {"markdown": "# ok"}))
-            assert report["written"] == "work/reports/health-2026-03-01.md"
+            assert report["written"] == "work/reports/health-2026-04-03.md"
 
 
 def test_main_refuses_unsafe_or_invalid_configurations(

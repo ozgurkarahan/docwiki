@@ -1,10 +1,9 @@
 terms:
-  - term: LOTO
-    definition: Lockout/tagout, isolating energy sources before work starts.
+  - term: TTC
+    definition: Amount including VAT (toutes taxes comprises).
     synonyms:
-      en: [lockout/tagout]
-      fr: [consignation]
-      de: [Freischaltung]
-    see_also: [procedure:sop-gbx-010]
-  - term: SCADA
-    definition: Supervisory control and data acquisition system of the wind farm.
+      en: [including VAT]
+      fr: [toutes taxes comprises]
+    see_also: [commercial-document:dev-2026-014]
+  - term: HT
+    definition: Amount excluding VAT, before tax.

@@ -73,7 +73,7 @@ async def test_unchanged_quarantined_sources_are_not_retried(harness, corpus):
     quality = (harness.current_release() / "wiki" / "_meta" / "quality.md").read_text("utf-8")
     assert "## Quarantined sources" in quality
 
-    (corpus / "notes" / "extra.txt").write_text("Gearbox oil note for WTG-12.\n", encoding="utf-8")
+    (corpus / "notes" / "extra.txt").write_text("Note about window F2.\n", encoding="utf-8")
     second = await harness.run()
     assert second.status == "succeeded", second.errors
     assert second.report.counts.quarantined == 1
@@ -104,7 +104,7 @@ async def test_deleted_raw_file_becomes_a_tombstone_and_a_withdraw_entry(harness
     # dependent pages were rebuilt: the topic no longer lists the withdrawn source
     from docwiki.contracts.ids import source_id_for
 
-    topic = reader.read_page("topic:gearbox-oil")
+    topic = reader.read_page("topic:schedule-and-window-delivery")
     assert source_id_for("notes/supplier-note.txt") not in topic.frontmatter.sources
     assert len(topic.frontmatter.sources) == 3
     assert len(harness.llm.requests) > calls, "entity and topic pages are rebuilt"
@@ -115,7 +115,7 @@ async def test_recompile_with_operator_hints_forces_one_source(harness):
     assert first.status == "succeeded", first.errors
     from docwiki.contracts.ids import source_id_for
 
-    target = source_id_for("records/oil-plan.csv")
+    target = source_id_for("records/purchase-plan.csv")
     calls = len(harness.llm.requests)
     second = await harness.run(kind="recompile", recompile={target: "Use the row headers."})
     assert second.status == "succeeded", second.errors
@@ -137,9 +137,9 @@ async def test_accepted_glossary_proposal_flows_into_the_overlay(harness):
     proposal = new_proposal(
         "glossary",
         GlossaryProposalPayload(
-            term="SOP",
-            definition="Standard operating procedure.",
-            synonyms={"fr": ["procédure opératoire standard"]},
+            term="HT",
+            definition="Price excluding VAT.",
+            synonyms={"fr": ["hors taxes"]},
         ),
         created_at=datetime(2026, 2, 1, tzinfo=UTC),
     )
@@ -157,7 +157,7 @@ async def test_accepted_glossary_proposal_flows_into_the_overlay(harness):
     assert second.status == "succeeded", second.errors
     assert harness.storage.exists(StorageKeys.OVERLAY)
     glossary = (harness.current_release() / "wiki" / "glossary.md").read_text(encoding="utf-8")
-    assert "## SOP" in glossary and "procédure opératoire standard" in glossary
+    assert "## HT" in glossary and "hors taxes" in glossary
     assert _valid(harness.current_release()) == []
     third = await harness.run()
     assert third.status == "no-op"
@@ -174,7 +174,7 @@ async def test_public_build_excludes_internal_and_restricted_sources(make_harnes
     ] == []
     reader = ReleaseReader.open(harness.settings.work_dir)
     titles = {page.title for page in reader.list_pages("source")}
-    assert "Oil plan" not in titles  # internal maintenance plan
+    assert "Purchase plan" not in titles  # internal purchase plan
     assert all(page.sensitivity == "public" for page in reader.catalog.pages)
     assert not (root / "tables").exists()
     classify_targets = {
@@ -182,7 +182,7 @@ async def test_public_build_excludes_internal_and_restricted_sources(make_harnes
     }
     from docwiki.contracts.ids import source_id_for
 
-    assert source_id_for("contracts/rate-card.txt") not in classify_targets
+    assert source_id_for("restricted/price-study.txt") not in classify_targets
 
 
 async def test_doc_type_rules_below_the_default_tier_keep_sources_in_public_builds(
@@ -193,9 +193,9 @@ async def test_doc_type_rules_below_the_default_tier_keep_sources_in_public_buil
     (pack / "sensitivity.yaml").write_text(
         "default: internal\n"
         "rules:\n"
-        "  - tier: public\n    doc_type: sop\n"
+        "  - tier: public\n    doc_type: quote\n"
         "  - tier: public\n    doc_type: note\n"
-        '  - tier: restricted\n    path_glob: "**/contracts/**"\n',
+        '  - tier: restricted\n    path_glob: "**/restricted/**"\n',
         encoding="utf-8",
     )
     harness = make_harness(audience="public", pack=pack)
@@ -203,8 +203,8 @@ async def test_doc_type_rules_below_the_default_tier_keep_sources_in_public_buil
     assert outcome.status == "succeeded", outcome.errors
     reader = ReleaseReader.open(harness.settings.work_dir)
     titles = {page.title for page in reader.list_pages("source")}
-    assert {"SOP-GBX-010 rev A", "SOP-GBX-010 rev B", "Supplier note"} <= titles
-    assert not titles & {"Oil plan", "Rate card"}, "plan: default tier; rate card: restricted"
+    assert {"DEV-2026-014 indice A", "DEV-2026-014 indice B", "Supplier note"} <= titles
+    assert not titles & {"Purchase plan", "Price study"}, "plan: default tier; study: restricted"
     assert all(page.sensitivity == "public" for page in reader.catalog.pages)
 
 
@@ -248,7 +248,7 @@ async def test_systemic_errors_fail_the_run_without_publishing(make_harness):
     assert outcome.status == "failed"
     assert any("LlmRateLimited" in error for error in outcome.errors)
     assert read_current_pointer(harness.storage) is None
-    shard = _shard(harness, "records/oil-plan.csv")
+    shard = _shard(harness, "records/purchase-plan.csv")
     assert not shard.quarantined
 
 
@@ -263,6 +263,6 @@ async def test_quarantine_on_compile_failure_keeps_the_run_going(make_harness):
     harness = make_harness(engine=stub_engine(compile_source=picky))
     outcome = await harness.run()
     assert outcome.status == "succeeded", outcome.errors
-    shard = _shard(harness, "records/oil-plan.csv")
+    shard = _shard(harness, "records/purchase-plan.csv")
     assert shard.stages["compile"].status == "quarantined"
     assert _valid(harness.current_release()) == []

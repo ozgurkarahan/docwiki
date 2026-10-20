@@ -33,7 +33,7 @@ FAKE_ENV_SECRET = "DOCWIKI_CLIENT" + "_SECRET=" + "Qw8Er7Ty6Ui5Op4"
 FAKE_URL_CREDENTIALS = "https:" + "//builder:" + "Pa55wordValue" + "@git.zorblax-corp.com/repo"
 FAKE_INTERNAL_URL = "https:" + "//wiki." + "corp" + ".zorblax-corp.com/page"
 FAKE_SINGLE_LABEL_URL = "http:" + "//build01/job"
-FAKE_BARE_INTERNAL = "scada01." + "lan"
+FAKE_BARE_INTERNAL = "planning01." + "lan"
 FAKE_MIRROR_URL = "https:" + "//pkgs.dev.azure.com/zorblax/_packaging/feed/pypi/simple/"
 FAKE_INDEX_LINE = "--index" + "-url " + "https:" + "//packages.zorblax-corp.com/repo"
 PUBLIC_REGISTRY_URL = "https:" + "//pypi.org/simple/"
@@ -129,7 +129,7 @@ def make_xlsx(
     rows: list[list[object]],
     *,
     creator: str = "DocWiki sample generator",
-    sheet: str = "Plan",
+    sheet: str = "Planning",
     formula: str | None = None,
 ) -> bytes:
     import openpyxl
@@ -254,9 +254,9 @@ def make_eml(body: str, *, attachment: tuple[str, bytes] | None = None, sender: 
     from email.message import EmailMessage
 
     message = EmailMessage()
-    message["From"] = sender or "Mira Jensen <mira@contoso.example>"
-    message["To"] = "ops@contoso.example"
-    message["Subject"] = "Bulletin applicability"
+    message["From"] = sender or "Nadia Ferrandon <nadia.ferrandon@zava-materiaux.example>"
+    message["To"] = "ines.roux@lamna-batiment.example"
+    message["Subject"] = "Window delivery date"
     message.set_content(body)
     if attachment:
         name, content = attachment

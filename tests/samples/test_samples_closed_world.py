@@ -54,31 +54,39 @@ def test_email_addresses_use_bible_domains(
     for entry in documents:
         if entry["format"] == "eml":
             texts[entry["path"] + " (raw)"] = (corpus_root / entry["path"]).read_text("utf-8")
+    found = set()
     for path, text in texts.items():
         for domain in _EMAIL.findall(text):
             assert domain in allowed, f"{path}: {domain}"
+            found.add(domain)
     assert all(domain.endswith(".example") for domain in allowed)
+    assert found and found <= allowed
 
 
-def test_canary_only_in_the_oem_email(
-    documents: list[dict[str, Any]], extracted, bible: dict[str, Any], manifest: dict[str, Any]
+def test_canary_only_in_the_window_maker_email(
+    documents: list[dict[str, Any]], extracted, bible: dict[str, Any]
 ) -> None:
-    canary = bible["injection"]["canary"]
+    injection = bible["injection"]
+    canary = injection["canary"]
     assert re.fullmatch(r"CANARY-[0-9A-F]{8}", canary)
-    carriers = sorted(path for path, text in _corpus_texts(documents, extracted).items()
-                      if canary in text)
-    assert carriers == [bible["injection"]["document"]]
-    body = " ".join(extracted(bible["injection"]["document"]).text().split())
-    assert " ".join(bible["injection"]["sentence"].split()) in body
-    copies = [e["path"] for e in manifest["files"] if e["copy_of"] == carriers[0]]
-    assert len(copies) == 1
+    assert canary in injection["sentence"]
+    texts = _corpus_texts(documents, extracted)
+    for token in injection["forbidden_in_outputs"]:
+        carriers = sorted(path for path, text in texts.items() if token in text)
+        assert carriers == [injection["document"]], token
+    body = " ".join(extracted(injection["document"]).text().split())
+    assert " ".join(injection["sentence"].split()) in body
 
 
-# sha256 of case-folded words that must never appear (a surname the brief excludes and the
-# name of a real wind farm). Hashes keep the real names out of the repository.
+# sha256 of case-folded words that must never appear: names excluded by earlier briefs and the
+# placeholder brand stems that the world bible rejected because real companies or places use
+# them (see the bible check notes). Hashes keep the real names out of the repository.
 _BANNED_WORD_HASHES = {
     "c5f975b35c72cfe2da72009c9866a7ce5eafadce57af395c9c1b6c94b383ed2c",
     "84e2cdb7a166d1671bc5e2abc1e78b59777dd1f863d3c5b05d09c2dd088444c2",
+    "cc4f787ca8ead19cbff4bf91427c9482cc155c972fa64f8f94cc40a7979774aa",
+    "b4cb3114ee9a2285f2091b90dcd55df544cbc0e3f3f3b04c6b9b6cc979edc129",
+    "6bf0e172f96b984630acdab65c750fb7fcb4a052b5b69e193e1e0033558265ea",
 }
 _WORD = re.compile(r"[^\W\d_]+", re.UNICODE)
 

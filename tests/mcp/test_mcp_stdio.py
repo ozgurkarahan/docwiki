@@ -30,7 +30,9 @@ async def test_stdio_server_lists_read_tools_and_searches(mode: str) -> None:
         assert client.server_info is None or client.server_info.name == "docwiki"
         listed = await client.list_tools()
         assert {tool.name for tool in listed.tools} == set(READ_TOOLS)
-        data = tool_payload(await client.call_tool("search", {"query": "gearbox oil grade"}))
+        data = tool_payload(
+            await client.call_tool("search", {"query": "date de livraison des fenêtres"})
+        )
         assert data["release_id"] == RELEASE_ID and data["hits"]
         skills = tool_payload(await client.call_tool("list_skills", {}))
         assert "wiki-navigator" in {skill["name"] for skill in skills["skills"]}

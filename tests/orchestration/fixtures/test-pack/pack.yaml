@@ -1,8 +1,8 @@
-name: test-wind
+name: test-batiment
 title: Engine test pack
-description: Tiny fictional domain pack for the engine tests about the Contoso Renewables wind farm.
+description: Tiny fictional domain pack for the engine tests about the Chantier Moreau job of Lamna Bâtiment.
 default_audience: public
-languages: [en, fr, de]
-wiki_title: Contoso Renewables engine test wiki
+languages: [en, fr]
+wiki_title: Chantier Moreau engine test wiki
 fictional: true
 banner: FICTIONAL - NOT FOR OPERATIONAL USE

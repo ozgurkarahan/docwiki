@@ -1,0 +1,17 @@
+# Domain pack: the job file of a small general contractor (fictional public sample).
+# The names of the sample world come from samples/fiction/bible.yaml; this pack repeats them only
+# in the banner below and in the registry of entities.yaml.
+name: batiment
+title: Building works - general contractor job file
+description: >-
+  The job file of a small French general contractor for one client and one site: quotes and
+  their revisions, the works contract and its amendment, the schedule and purchase tracking,
+  supplier invoices and delivery notes, site meeting minutes, e-mails with the client and the
+  suppliers, site photos and an internal price study. The documents are in French.
+default_audience: public
+languages: [fr, en]
+wiki_title: Chantier Moreau job wiki
+fictional: true
+banner: >-
+  FICTIONAL SAMPLE - Lamna Bâtiment, the Moreau household, Valbrise and every organisation,
+  person, product, amount and date in this wiki are invented. Not for operational use.

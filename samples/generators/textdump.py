@@ -12,6 +12,7 @@ import io
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from datetime import date, datetime, time
 from email.policy import default as default_policy
 from pathlib import Path
 from typing import Any
@@ -63,8 +64,13 @@ def normalise(text: str) -> str:
 
 
 def _cell(value: object) -> str:
+    """Cell text as the engine's XLSX extractor writes it (ISO dates, integral floats)."""
     if value is None:
         return ""
+    if isinstance(value, datetime) and value.time() == time(0, 0):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
     if isinstance(value, float) and value.is_integer():
         return str(int(value))
     return str(value)
@@ -188,7 +194,9 @@ def _pptx(path: Path) -> Extracted:
 
 def _eml(path: Path) -> Extracted:
     msg = email.message_from_bytes(path.read_bytes(), policy=default_policy)
-    headers = [f"{name}: {value}" for name, value in msg.items()]
+    # Stripped: older Python 3.12 patch releases keep the fold's space when a value starts on a
+    # continuation line ("Subject:\n Report ..."), newer ones drop it.
+    headers = [f"{name}: {str(value).strip()}" for name, value in msg.items()]
     body_part = msg.get_body(preferencelist=("plain",))
     body = body_part.get_content() if body_part is not None else ""  # type: ignore[union-attr]
     lines = body.split("\n")

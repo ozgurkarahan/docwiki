@@ -12,8 +12,14 @@ from docwiki.release import validate_release
 
 FIXTURE_ROOT = Path(__file__).resolve().parents[2] / "samples" / "fixtures" / "mock-release"
 
-RELEASE = "20260215T090000Z-decd4b59"
-SOP_A, SOP_B, PLAN = "src-f2750f41f3fa", "src-4d9c65e05302", "src-43c97f7dfcde"
+RELEASE = "20260401T090000Z-7ce99a3f"
+PLAN_A, PLAN_B, MINUTES = "src-c6436ec50050", "src-86eabe3d6d0d", "src-165f1d3a109c"
+TOPIC = "topics/schedule-and-window-delivery.md"
+PLAN_A_PAGE = "sources/pln-2026-003-indice-a-planning-et-suivi-des-achats.md"
+PLAN_B_PAGE = "sources/pln-2026-003-indice-b-planning-et-suivi-des-achats.md"
+LOT_3 = "entities/work-package/lot-3-gros-oeuvre.md"
+QUERY_LINK = "(queries/2026-03-31-window-delivery-date.md)"
+QUERY_TITLE = "[When are the windows of the extension delivered?]"
 
 
 def png_pixels(path: Path) -> tuple[bytes, bytes]:
@@ -43,9 +49,9 @@ def test_fixture_rebuild_is_reproducible(builder: ModuleType, tmp_path: Path) ->
     assert builder.build(out) == []
     rebuilt = out / "releases" / RELEASE
     committed = FIXTURE_ROOT / "releases" / RELEASE
-    for rel in ("catalog.json", "wiki/catalog.json", f"tables/{PLAN}/index.json"):
+    for rel in ("catalog.json", "wiki/catalog.json", f"tables/{PLAN_B}/index.json"):
         assert (rebuilt / rel).read_bytes() == (committed / rel).read_bytes(), rel
-    image = f"evidence/{SOP_A}/img/p0001.png"
+    image = f"evidence/{PLAN_A}/img/p0001.png"
     assert png_pixels(rebuilt / image) == png_pixels(committed / image)
     rebuilt_files = ReleaseManifest.from_json((rebuilt / "manifest.json").read_bytes()).files
     committed_files = ReleaseManifest.from_json((committed / "manifest.json").read_bytes()).files
@@ -75,16 +81,18 @@ def release_file(root: Path, rel: str) -> Path:
 MUTATIONS: dict[str, tuple[Mutation, str, str]] = {
     "broken link": (
         lambda r: edit(
-            wiki(r, "topics/gearbox-oil.md"),
-            "(../entities/asset/wtg-12.md)",
-            "(../entities/asset/wtg-13.md)",
+            wiki(r, TOPIC),
+            "(../entities/work-package/lot-3-gros-oeuvre.md)",
+            "(../entities/work-package/lot-13-gros-oeuvre.md)",
         ),
         "G02",
         "link-unresolved",
     ),
     "broken anchor": (
         lambda r: edit(
-            wiki(r, "index.md"), "(topics/gearbox-oil.md)", "(topics/gearbox-oil.md#nope)"
+            wiki(r, "index.md"),
+            "(topics/schedule-and-window-delivery.md)",
+            "(topics/schedule-and-window-delivery.md#nope)",
         ),
         "G02",
         "anchor-unresolved",
@@ -95,64 +103,64 @@ MUTATIONS: dict[str, tuple[Mutation, str, str]] = {
         "link-invalid",
     ),
     "undefined footnote": (
-        lambda r: edit(wiki(r, "entities/asset/wtg-12.md"), "2026-05.[^c1]", "2026-05.[^c2]"),
+        lambda r: edit(wiki(r, LOT_3), "task T05, the walls.[^c1]", "task T05, the walls.[^c9]"),
         "G02",
         "footnote-undefined",
     ),
     "footnote order": (
         lambda r: edit(
-            wiki(r, "topics/gearbox-oil.md"), "below -20 °C.[^c1]", "below -20 °C.[^c3]"
+            wiki(r, TOPIC), '"Pose des menuiseries").[^c1]', '"Pose des menuiseries").[^c3]'
         ),
         "G03",
         "footnote-order",
     ),
     "citation label": (
-        lambda r: edit(wiki(r, "sources/sop-gbx-010-rev-a.md"), "rev A — p. 1](", "rev A — p. 2]("),
+        lambda r: edit(wiki(r, PLAN_A_PAGE), "indice A — p. 1](", "indice A — p. 2]("),
         "G03",
         "citation-label",
     ),
     "dishonest badge": (
-        lambda r: edit(
-            wiki(r, "sources/sop-gbx-010-rev-a.md"),
-            "p0001.md) · ✓ quote verified",
-            "p0001.md) · table",
-        ),
+        lambda r: edit(wiki(r, PLAN_A_PAGE), "p0001.md) · ✓ quote verified", "p0001.md) · table"),
         "G03",
         "citation-badge",
     ),
     "citation title": (
         lambda r: edit(
-            wiki(r, "sources/sop-gbx-010-rev-a.md"),
-            "[^c1]: [Gearbox oil change SOP rev A",
-            "[^c1]: [Old SOP",
+            wiki(r, PLAN_A_PAGE),
+            "[^c1]: [Planning and purchase tracking, indice A",
+            "[^c1]: [Old schedule",
         ),
         "G03",
         "citation-title",
     ),
     "uncited key fact": (
         lambda r: edit(
-            wiki(r, "sources/maintenance-plan-2026.md"),
-            "(6 hours).[^c1]\n- WTG-12",
-            "(6 hours).\n- WTG-12",
+            wiki(r, PLAN_B_PAGE),
+            "indice A of 2026-03-17.[^c1]\n- The reason",
+            "indice A of 2026-03-17.\n- The reason",
         ),
         "G03",
         "fact-uncited",
     ),
     "missing sidecar": (
-        lambda r: release_file(r, f"evidence/{SOP_B}/para-0004.md").unlink(),
+        lambda r: release_file(r, f"evidence/{MINUTES}/para-0011.md").unlink(),
         "G06",
         "sidecar-missing",
     ),
     "external link": (
         lambda r: edit(
-            wiki(r, "glossary.md"), "Standard operating procedure.", "See https://example.org/sop."
+            wiki(r, "glossary.md"),
+            "A new issue of the same numbered document",
+            "See https://example.org/revision. A new issue of the same numbered document",
         ),
         "G05",
         "bare-url",
     ),
     "raw html": (
         lambda r: edit(
-            wiki(r, "glossary.md"), "Standard operating procedure.", "<b>Standard</b> procedure."
+            wiki(r, "glossary.md"),
+            "A new issue of the same numbered document",
+            "<b>A new issue</b> of the same numbered document",
         ),
         "G05",
         "raw-html",
@@ -163,32 +171,24 @@ MUTATIONS: dict[str, tuple[Mutation, str, str]] = {
         "canary-present",
     ),
     "audience": (
-        lambda r: edit(
-            wiki(r, "entities/asset/wtg-12.md"), "sensitivity: public", "sensitivity: restricted"
-        ),
+        lambda r: edit(wiki(r, LOT_3), "sensitivity: public", "sensitivity: restricted"),
         "G07",
         "page-above-audience",
     ),
     "page tier": (
-        lambda r: edit(
-            wiki(r, "sources/maintenance-plan-2026.md"),
-            "sensitivity: public",
-            "sensitivity: internal",
-        ),
+        lambda r: edit(wiki(r, PLAN_B_PAGE), "sensitivity: public", "sensitivity: internal"),
         "G07",
         "page-tier",
     ),
     "tags": (
         lambda r: edit(
-            wiki(r, "topics/gearbox-oil.md"), "tags:\n- gearbox\n- oil", "tags:\n- oil\n- gearbox"
+            wiki(r, TOPIC), "tags:\n- schedule\n- windows", "tags:\n- windows\n- schedule"
         ),
         "G12",
         "frontmatter-invalid",
     ),
     "frontmatter": (
-        lambda r: edit(
-            wiki(r, "topics/gearbox-oil.md"), "confidence: medium", "confidence: certain"
-        ),
+        lambda r: edit(wiki(r, TOPIC), "confidence: medium", "confidence: certain"),
         "G01",
         "frontmatter-invalid",
     ),
@@ -200,22 +200,20 @@ MUTATIONS: dict[str, tuple[Mutation, str, str]] = {
         "stamp-mismatch",
     ),
     "path": (
-        lambda r: wiki(r, "topics/gearbox-oil.md").rename(wiki(r, "topics/Gearbox-oil.md")),
+        lambda r: wiki(r, TOPIC).rename(wiki(r, "topics/Schedule-and-window-delivery.md")),
         "G09",
         "path-invalid",
     ),
     "supersession": (
-        lambda r: edit(
-            wiki(r, "sources/sop-gbx-010-rev-b.md"), f"supersedes:\n- {SOP_A}", "supersedes: []"
-        ),
+        lambda r: edit(wiki(r, PLAN_B_PAGE), f"supersedes:\n- {PLAN_A}", "supersedes: []"),
         "G11",
         "supersession-asymmetric",
     ),
     "superseded banner": (
         lambda r: edit(
-            wiki(r, "sources/sop-gbx-010-rev-a.md"),
-            "> **Superseded** by [Gearbox oil change SOP rev B](sop-gbx-010-rev-b.md). "
-            "Use the current revision.\n",
+            wiki(r, PLAN_A_PAGE),
+            "> **Superseded** by [Planning and purchase tracking, indice B]"
+            "(pln-2026-003-indice-b-planning-et-suivi-des-achats.md). Use the current revision.\n",
             "",
         ),
         "G11",
@@ -255,7 +253,7 @@ MUTATIONS: dict[str, tuple[Mutation, str, str]] = {
     ),
     "catalog page": (
         lambda r: edit(
-            release_file(r, "catalog.json"), '"title": "WTG-12"', '"title": "WTG twelve"'
+            release_file(r, "catalog.json"), '"title": "Lot 3 - Gros œuvre"', '"title": "Lot three"'
         ),
         "G01",
         "catalog-page-mismatch",
@@ -275,29 +273,15 @@ MUTATIONS: dict[str, tuple[Mutation, str, str]] = {
     ),
     "unknown tables": (
         lambda r: shutil.copytree(
-            release_file(r, f"tables/{PLAN}"), release_file(r, "tables/src-000000000000")
+            release_file(r, f"tables/{PLAN_B}"), release_file(r, "tables/src-000000000000")
         ),
         "G07",
         "tables-unknown-source",
     ),
     "orphans": (
         lambda r: [
-            edit(
-                wiki(r, "entities/asset/index.md"),
-                "- [WTG-12](wtg-12.md): gearbox oil change planned for 2026-05\n",
-                "",
-            ),
-            edit(
-                wiki(r, "llms.txt"),
-                "- [WTG-12](entities/asset/wtg-12.md): gearbox oil change planned for 2026-05\n",
-                "",
-            ),
-            edit(
-                wiki(r, "sources/maintenance-plan-2026.md"),
-                ", [WTG-12](../entities/asset/wtg-12.md)",
-                "",
-            ),
-            edit(wiki(r, "topics/gearbox-oil.md"), ", [WTG-12](../entities/asset/wtg-12.md)", ""),
+            edit(wiki(r, "index.md"), f"- 2026-04-01 query: {QUERY_TITLE}{QUERY_LINK}\n", ""),
+            edit(wiki(r, "log.md"), f"- {QUERY_TITLE}{QUERY_LINK}\n", ""),
         ],
         "G13",
         "orphan-pages",
@@ -315,15 +299,19 @@ def test_validator_detects_mutation(fixture_copy: Path, name: str) -> None:
 
 
 def test_violation_lines_are_file_relative(fixture_copy: Path) -> None:
-    target = wiki(fixture_copy, "topics/gearbox-oil.md")
-    edit(target, "(../entities/asset/wtg-12.md)", "(../entities/asset/wtg-13.md)")
+    target = wiki(fixture_copy, TOPIC)
+    edit(
+        target,
+        "(../entities/work-package/lot-3-gros-oeuvre.md)",
+        "(../entities/work-package/lot-13-gros-oeuvre.md)",
+    )
     expected = next(
         n
         for n, line in enumerate(target.read_text(encoding="utf-8").split("\n"), 1)
-        if "wtg-13" in line
+        if "lot-13" in line
     )
     violation = next(v for v in validate_release(fixture_copy) if v.code == "link-unresolved")
-    assert violation.line == expected and violation.path == "wiki/topics/gearbox-oil.md"
+    assert violation.line == expected and violation.path == f"wiki/{TOPIC}"
     assert (
         next(v for v in validate_release(fixture_copy) if v.code == "file-hash-mismatch").gate
         == "G01"

@@ -1,130 +1,157 @@
-"""Image-only scanned PDF: Tailspin lift plan LP-2026-009 (no text layer, OCR needed)."""
+"""Image-only scanned PDF: the builders' merchant delivery note BL-2026-0391.
+
+The printed form and the handwritten remarks ("2 palettes manquantes", "reçu 8 pal.", the
+receiver's name and a signature) are drawn with Pillow, degraded like a scan and embedded as a
+single JPEG page: the PDF has no text layer, so the remarks are only readable through OCR. The
+stamp is printed at the top and bottom of the page image and the PDF Subject is the stamp.
+"""
 
 from __future__ import annotations
 
 import io
+import math
 
 import numpy as np
 from fpdf import FPDF
 from PIL import Image, ImageDraw, ImageFilter
 
-from .common import GENERATOR_AUTHOR, STAMP, latin1, meta_for
-from .diagrams import crane_setup, to_png
-from .gen_images import font, handwrite, scribble
+from .common import GENERATOR_AUTHOR, STAMP, fr_date, meta_for, quantity, rng
+from .fonts import pil_font
 from .world import World
 
-PAGE_W, PAGE_H = 1240, 1754
-BLACK = (20, 20, 20)
+PAGE_W, PAGE_H = 1240, 1754  # A4 at 150 dpi
+BLACK = (22, 22, 22)
+GREY = (215, 215, 215)
+INK = (24, 40, 120)
 
 
-def _page_header(d: ImageDraw.ImageDraw, page: int) -> None:
-    d.text((90, 50), STAMP, font=font(24, "bold"), fill=BLACK)
-    d.rectangle((90, 100, 380, 170), outline=BLACK, width=4)
-    d.text((108, 112), "TAILSPIN", font=font(30, "bold"), fill=BLACK)
-    d.text((108, 142), "HEAVY LIFT", font=font(20, "bold"), fill=BLACK)
-    d.text((440, 108), "LIFT PLAN  LP-2026-009", font=font(40, "bold"), fill=BLACK)
-    d.text((1000, 120), f"Page {page} of 2", font=font(22), fill=BLACK)
-    d.line((90, 195, 1150, 195), fill=BLACK, width=3)
+def handwrite(
+    img: Image.Image, xy: tuple[int, int], text: str, size: int, seed: str,
+    color: tuple[int, int, int] = INK,
+) -> int:
+    """Draw text character by character with jitter so it looks hand-written; returns end x."""
+    r = rng(f"hand-{seed}")
+    x, y = xy
+    for char in text:
+        if char == " ":
+            x += int(size * 0.42)
+            continue
+        scale = r.uniform(0.94, 1.08)
+        glyph_font = pil_font(int(size * scale), "oblique")
+        bbox = glyph_font.getbbox(char)
+        width = bbox[2] - bbox[0] + 8
+        height = int(size * 1.6)
+        glyph = Image.new("L", (width + 8, height), 0)
+        ImageDraw.Draw(glyph).text((4 - bbox[0], 4), char, font=glyph_font, fill=255,
+                                   stroke_width=1, stroke_fill=255)
+        glyph = glyph.rotate(r.uniform(-6, 6), resample=Image.Resampling.BICUBIC, expand=True)
+        glyph = glyph.filter(ImageFilter.GaussianBlur(0.5))
+        ink = Image.new("RGB", glyph.size, color)
+        img.paste(ink, (x, y + r.randint(-2, 2)), glyph)
+        x += int(width * r.uniform(0.84, 0.94))
+    return x
 
 
-def _rows(d: ImageDraw.ImageDraw, top: int, rows: list[tuple[str, str]], label_w: int = 330) -> int:
-    y = top
-    for label, value in rows:
-        d.text((95, y), label, font=font(24, "bold"), fill=BLACK)
-        d.text((95 + label_w, y), value, font=font(24), fill=BLACK)
-        y += 40
-    return y
+def scribble(draw: ImageDraw.ImageDraw, x: int, y: int, width: int, seed: str,
+             color: tuple[int, int, int] = INK) -> None:
+    """A signature-like scribble."""
+    r = rng(f"scribble-{seed}")
+    points = []
+    for i in range(32):
+        t = i / 31
+        px = x + t * width
+        py = y + 16 * math.sin(t * 10 + r.uniform(0, 1.5)) + r.uniform(-7, 7)
+        points.append((px, py))
+    draw.line(points, fill=color, width=3, joint="curve")
+    draw.line([(x + width * 0.1, y + 26), (x + width * 0.95, y + 18)], fill=color, width=2)
 
 
-def _section(d: ImageDraw.ImageDraw, y: int, title: str) -> int:
-    d.text((90, y), title, font=font(28, "bold"), fill=BLACK)
-    return y + 46
+def _labelled(d: ImageDraw.ImageDraw, x: int, y: int, label: str, value: str,
+              label_w: int = 290) -> None:
+    d.text((x, y), label, font=pil_font(25, "bold"), fill=BLACK)
+    d.text((x + label_w, y), value, font=pil_font(25), fill=BLACK)
 
 
-def _page_one() -> Image.Image:
+def _box(d: ImageDraw.ImageDraw, box: tuple[int, int, int, int], title: str) -> None:
+    d.rectangle(box, outline=BLACK, width=3)
+    d.text((box[0] + 14, box[1] + 10), title, font=pil_font(24, "bold"), fill=BLACK)
+
+
+def _page(w: World) -> Image.Image:
+    facts = w.facts["zava_delivery"]
+    doc = w.doc("bl-scan")
+    merchant = w.org(str(doc["organisation"]))
+    builder = w.builder
+    site = w.facts["site"]
     img = Image.new("RGB", (PAGE_W, PAGE_H), "white")
     d = ImageDraw.Draw(img)
-    _page_header(d, 1)
-    y = _rows(
-        d,
-        225,
-        [
-            ("Client:", "Contoso Renewables - Quellmoor Ridge Wind Farm"),
-            ("Job:", "WTG-04 rotor blade B replacement (single blade lift)"),
-            ("Lift window:", "2026-09-08 to 2026-09-10, daylight only"),
-            ("Plan date:", "2026-08-19"),
-            ("Appointed person:", "Bram Okkerse, Tailspin Heavy Lift"),
-            ("Client supervisor:", "Dario Penwarden, Contoso Renewables"),
-        ],
-    )
-    y = _section(d, y + 20, "1. Crane and rigging")
-    y = _rows(
-        d,
-        y,
-        [
-            ("Main crane:", "600 t crawler crane, fleet no. TS-600C-02, 102 m main boom"),
-            ("Assist crane:", "100 t mobile crane (tailing the blade root)"),
-            ("Blade:", "57.5 m, 14.6 t"),
-            ("Blade yoke:", "3.9 t"),
-            ("Rigging:", "0.6 t"),
-            ("Total hook load:", "19.1 t"),
-            ("Radius:", "26 m      capacity at radius 31.0 t      utilisation 62 %"),
-            ("Hook height:", "96 m"),
-        ],
-    )
-    y = _section(d, y + 20, "2. Weather limits")
-    for line in (
-        "Maximum 10-minute mean wind speed at hub height: 8 m/s",
-        "Maximum gust: 11 m/s",
-        "No lift in fog (visibility below 300 m), with lightning within 15 km or with icing.",
-        "Wind is read at the WTG-04 nacelle anemometer and at the boom tip anemometer.",
+    d.text((80, 40), STAMP, font=pil_font(24, "bold"), fill=BLACK)
+    # Letterhead and title
+    d.rectangle((80, 90, 640, 250), outline=BLACK, width=3)
+    d.text((100, 104), merchant["name"], font=pil_font(44, "bold"), fill=BLACK)
+    role = str(merchant["role_fr"])
+    d.text((100, 162), role[:1].upper() + role[1:], font=pil_font(24), fill=BLACK)
+    address = str(site["merchant_address"])
+    d.text((100, 198), address[:1].upper() + address[1:], font=pil_font(21), fill=BLACK)
+    d.text((690, 104), "BON DE LIVRAISON", font=pil_font(40, "bold"), fill=BLACK)
+    d.text((690, 162), f"N° {facts['number']}", font=pil_font(36, "bold"), fill=BLACK)
+    d.text((690, 214), "Exemplaire client", font=pil_font(22), fill=BLACK)
+    # Delivery details
+    y = 300
+    for label, value in (
+        ("Date de livraison :", f"{fr_date(str(facts['date']))} à {facts['time']}"),
+        ("Client :", f"{builder['name']}, {site['builder_address']}"),
+        ("Commande client :", str(facts["order"])),
+        ("Livré à :", str(facts["delivered_to"])),
+        ("Véhicule :", str(facts["vehicle"])),
     ):
-        d.text((95, y), line, font=font(24), fill=BLACK)
-        y += 40
-    y = _section(d, y + 20, "3. Exclusion zone")
-    for line in (
-        "Radius 150 m around WTG-04 during the lift.",
-        "Two tag lines of 120 m on the blade. Site gate closed by the banksman.",
-    ):
-        d.text((95, y), line, font=font(24), fill=BLACK)
-        y += 40
-    y = _section(d, y + 20, "4. Ground")
-    d.text((95, y), "Ground bearing pressure under crane mats: 180 kN/m2 (allowable 250 kN/m2).",
-           font=font(24), fill=BLACK)
-    d.text((90, PAGE_H - 80), STAMP, font=font(24, "bold"), fill=BLACK)
-    return img
-
-
-def _page_two() -> Image.Image:
-    img = Image.new("RGB", (PAGE_W, PAGE_H), "white")
-    d = ImageDraw.Draw(img)
-    _page_header(d, 2)
-    y = _section(d, 225, "5. Crane set-up (plan view)")
-    sketch = Image.open(io.BytesIO(to_png(crane_setup(), dpi=110))).convert("RGB")
-    sketch = sketch.resize((760, int(sketch.height * 760 / sketch.width)))
-    img.paste(sketch, (240, y))
-    y += sketch.height + 10
-    y = _section(d, y, "6. Sequence")
-    steps = (
-        "1. Pre-lift meeting; PTW signed by both parties.",
-        "2. Rotor locked with blade B pointing down; pitch system isolated.",
-        "3. Blade yoke fitted and load test at 0.5 m above the laydown area.",
-        "4. Blade B unbolted and lowered with both tag lines manned.",
-        "5. New blade lifted, bolted and torqued per Litware instruction.",
-        "6. Exclusion zone released only by the appointed person.",
-    )
-    for step in steps:
-        d.text((95, y), step, font=font(24), fill=BLACK)
-        y += 40
-    y = _section(d, y + 20, "7. Sign-off")
-    d.text((95, y), "Prepared: Bram Okkerse, Appointed Person", font=font(24), fill=BLACK)
-    scribble(d, 720, y + 18, 220, "okkerse", (30, 30, 30))
-    handwrite(img, (980, y - 2), "19/08/26", 30, "okkerse-date", (30, 30, 30))
-    y += 70
-    d.text((95, y), "Approved: Dario Penwarden, O&M Supervisor", font=font(24), fill=BLACK)
-    scribble(d, 720, y + 18, 220, "penwarden", (30, 30, 30))
-    handwrite(img, (980, y - 2), "21/08/26", 30, "penwarden-date", (30, 30, 30))
-    d.text((90, PAGE_H - 80), STAMP, font=font(24, "bold"), fill=BLACK)
+        _labelled(d, 80, y, label, value)
+        y += 46
+    # Printed lines
+    columns = [(80, "Code article"), (275, "Désignation"), (790, "Qté"), (875, "Unité")]
+    right = 990
+    top = 560
+    row_h = 74
+    d.rectangle((80, top, right, top + 56), fill=GREY, outline=BLACK, width=2)
+    for x, title in columns:
+        d.text((x + 12, top + 14), title, font=pil_font(24, "bold"), fill=BLACK)
+    lines = facts["printed_lines"]
+    for index, line in enumerate(lines):
+        y0 = top + 56 + index * row_h
+        d.rectangle((80, y0, right, y0 + row_h), outline=BLACK, width=2)
+        designation = str(line["designation"])
+        cells = [str(line["code"]), designation, quantity(line["qty"]), str(line["unit"])]
+        for (x, _), text in zip(columns, cells, strict=True):
+            size = 21 if len(text) > 34 else 23
+            if len(text) > 40:
+                first, _, rest = text.rpartition(" (")
+                if first:
+                    d.text((x + 12, y0 + 8), first, font=pil_font(size), fill=BLACK)
+                    d.text((x + 12, y0 + 38), f"({rest}", font=pil_font(size), fill=BLACK)
+                    continue
+                first, _, rest = text.rpartition(", ")
+                d.text((x + 12, y0 + 8), first + ",", font=pil_font(size), fill=BLACK)
+                d.text((x + 12, y0 + 38), rest, font=pil_font(size), fill=BLACK)
+                continue
+            d.text((x + 12, y0 + 22), text, font=pil_font(size), fill=BLACK)
+    for x, _ in columns[1:]:
+        d.line((x, top, x, top + 56 + len(lines) * row_h), fill=BLACK, width=2)
+    pallet_row = next(i for i, line in enumerate(lines) if line["unit"] == "palette")
+    hand = facts["handwritten"]
+    y_pallet = top + 56 + pallet_row * row_h
+    d.ellipse((782, y_pallet + 10, 862, y_pallet + 64), outline=INK, width=3)
+    handwrite(img, (1004, y_pallet + 14), str(hand["next_to_block_line"]), 34, "pallets")
+    # Reserves, receiver and signature boxes
+    boxes_top = top + 56 + len(lines) * row_h + 70
+    titles = [str(title) for title in facts["printed_boxes"]]
+    _box(d, (80, boxes_top, 1160, boxes_top + 220), titles[0])
+    handwrite(img, (130, boxes_top + 90), str(hand["reserves"]), 50, "reserves")
+    second = boxes_top + 260
+    _box(d, (80, second, 600, second + 170), titles[1])
+    handwrite(img, (130, second + 72), str(hand["received_by"]), 46, "received-by")
+    _box(d, (640, second, 1160, second + 170), titles[2])
+    scribble(d, 700, second + 102, 380, "receiver")
+    d.text((80, PAGE_H - 80), STAMP, font=pil_font(24, "bold"), fill=BLACK)
     return img
 
 
@@ -133,31 +160,34 @@ def _scan(page: Image.Image, angle: float, seed: int) -> bytes:
     gray = gray.rotate(angle, resample=Image.Resampling.BICUBIC, fillcolor=255)
     arr = np.asarray(gray).astype(float)
     gen = np.random.default_rng(seed)
-    arr = arr * 0.94 + 10 + gen.normal(0.0, 7.0, size=arr.shape)
-    shade = np.linspace(-26.0, 0.0, 60)
-    arr[:, :60] += shade[None, :]
-    specks = gen.integers(0, arr.size, size=260)
-    arr.flat[specks] = gen.uniform(40, 120, size=260)
+    arr = arr * 0.95 + 9 + gen.normal(0.0, 6.0, size=arr.shape)
+    shade = np.linspace(-22.0, 0.0, 50)
+    arr[:, :50] += shade[None, :]
+    specks = gen.integers(0, arr.size, size=240)
+    arr.flat[specks] = gen.uniform(40, 120, size=240)
     scanned = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), "L")
-    scanned = scanned.filter(ImageFilter.GaussianBlur(0.65))
+    scanned = scanned.filter(ImageFilter.GaussianBlur(0.6))
     buf = io.BytesIO()
-    scanned.save(buf, "JPEG", quality=62, optimize=True)
+    scanned.save(buf, "JPEG", quality=70, optimize=True)
     return buf.getvalue()
 
 
-def lift_plan_scan(w: World) -> bytes:
-    doc = w.doc("lift-plan-scan")
+def bl_scan(w: World) -> bytes:
+    doc = w.doc("bl-scan")
     meta = meta_for(doc, w.org_name(str(doc["organisation"])))
+    pages = int(w.facts["zava_delivery"]["pages"])
+    if pages != 1:
+        raise ValueError("the delivery note scan has exactly one page")
     pdf = FPDF(orientation="P", unit="mm", format="A4")
-    pdf.set_title(latin1(meta.title))
+    pdf.set_title(meta.title)
     pdf.set_subject(STAMP)
     pdf.set_author(GENERATOR_AUTHOR)
     pdf.set_creator(GENERATOR_AUTHOR)
     pdf.set_producer(GENERATOR_AUTHOR)
-    pdf.set_keywords(latin1(meta.keywords))
+    pdf.set_keywords(meta.keywords)
     pdf.set_creation_date(meta.created)
+    pdf.set_lang(meta.lang)
     pdf.set_auto_page_break(False)
-    for page, angle, seed in ((_page_one(), 0.6, 9001), (_page_two(), -0.45, 9002)):
-        pdf.add_page()
-        pdf.image(io.BytesIO(_scan(page, angle, seed)), x=0, y=0, w=210, h=297)
+    pdf.add_page()
+    pdf.image(io.BytesIO(_scan(_page(w), 0.45, 9001)), x=0, y=0, w=210, h=297)
     return bytes(pdf.output())

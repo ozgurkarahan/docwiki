@@ -38,7 +38,7 @@ from docwiki.agents_client import (
     format_answer,
 )
 
-QUESTION = "Which gearbox oil grade applies to WTG-07 in winter?"
+QUESTION = "When are the windows of the extension delivered?"
 SETTINGS = AgentClientSettings(project_endpoint=TEST_ENDPOINT, timeout_s=30.0)
 
 
@@ -72,11 +72,11 @@ async def test_normal_answer_pins_the_latest_version_and_parses_sources() -> Non
     client = _client(
         response(
             list_tools("search", "get_evidence"),
-            mcp_call("search", {"query": "gearbox oil WTG-07"}, item_id="mcp_1"),
+            mcp_call("search", {"query": "window delivery date"}, item_id="mcp_1"),
             mcp_call(
                 "get_evidence",
-                {"source_id": "src-4d9c65e05302", "locator_key": "para-0004"},
-                output="At cold sites ... use ISO VG 220 gearbox oil.",
+                {"source_id": "src-165f1d3a109c", "locator_key": "para-0011"},
+                output="Delivery of the windows postponed to 2026-04-20.",
                 item_id="mcp_2",
             ),
             message(ANSWER_TEXT),
@@ -110,19 +110,19 @@ async def test_normal_answer_pins_the_latest_version_and_parses_sources() -> Non
     )
     assert answer.text == ANSWER_TEXT
     assert [(s.n, s.title, s.locator_key) for s in answer.sources] == [
-        (1, "Gearbox oil change SOP rev B", "para-0004"),
-        (2, "Maintenance plan 2026", "sheet-plan-r0002-r0004"),
+        (1, "Site meeting minutes n°3", "para-0007"),
+        (2, "Planning and purchase tracking, indice B", "sheet-planning-r0006-r0009"),
     ]
     assert answer.body.endswith("(authority, then recency) [1][2].")
     assert [(t.name, t.status, t.arguments) for t in answer.tool_calls] == [
-        ("search", "completed", {"query": "gearbox oil WTG-07"}),
+        ("search", "completed", {"query": "window delivery date"}),
         (
             "get_evidence",
             "completed",
-            {"source_id": "src-4d9c65e05302", "locator_key": "para-0004"},
+            {"source_id": "src-165f1d3a109c", "locator_key": "para-0011"},
         ),
     ]
-    assert answer.tool_calls[1].output == "At cold sites ... use ISO VG 220 gearbox oil."
+    assert answer.tool_calls[1].output == "Delivery of the windows postponed to 2026-04-20."
     assert answer.usage.model_dump() == {
         "input_tokens": 900,
         "output_tokens": 120,
@@ -287,7 +287,7 @@ async def test_failed_mcp_calls_are_reported_not_raised() -> None:
             list_tools(error="HTTP 401 from MCP server"),
             mcp_call(
                 "query_table",
-                {"source_id": "src-43c97f7dfcde", "sql": "DELETE FROM t01"},
+                {"source_id": "src-86eabe3d6d0d", "sql": "DELETE FROM t01"},
                 output=None,
                 error={"type": "mcp_tool_execution_error", "content": "only SELECT is allowed"},
                 status=None,
@@ -312,8 +312,10 @@ async def test_ok_false_results_from_the_mcp_server_are_failed_tool_calls() -> N
     client = _client(
         response(
             mcp_call("ingest_start", {"reason": "x"}, output=forbidden, item_id="mcp_1"),
-            mcp_call("search", {"query": "oil"}, output=wrapped, item_id="mcp_2"),
-            mcp_call("search", {"query": "oil"}, output='{"ok": true, "hits": []}', item_id="m3"),
+            mcp_call("search", {"query": "delivery"}, output=wrapped, item_id="mcp_2"),
+            mcp_call(
+                "search", {"query": "delivery"}, output='{"ok": true, "hits": []}', item_id="m3"
+            ),
             mcp_call("get_index", {"scope": "home"}, output="# Home", item_id="mcp_4"),
             message("Not found in the wiki."),
         )

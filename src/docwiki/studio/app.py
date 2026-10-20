@@ -4,7 +4,8 @@
   status and a link to its wiki page.
 * **Pipeline**: the served release, recent run reports (stages, gates, cost) and the queue.
 * **Ask**: the Researcher (cited answers) and the Librarian (operations; every mutating tool call
-  waits for Approve / Deny in the browser).
+  waits for Approve / Deny in the browser). A Researcher answer can be filed to the wiki after a
+  preview: it becomes a query page in the answers inbox, which the next run publishes.
 
 It runs behind Azure Container Apps built-in authentication (Entra sign-in, owner only). The app
 checks it again: ``/api`` calls need the platform's principal headers and an allowed object ID;
@@ -30,10 +31,12 @@ from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
+from docwiki.answers import FilingError
 from docwiki.contracts.storage import StorageError
 from docwiki.extract.formats import SUPPORTED_EXTENSIONS
 from docwiki.portal.app import SECURITY_HEADERS, SecurityHeadersMiddleware
 from docwiki.studio.config import StudioConfig
+from docwiki.studio.filing import FilingConflictError, FilingQuotaError, FilingRefusedError
 from docwiki.studio.jobs import (
     AGENTS,
     AgentJobs,
@@ -188,6 +191,7 @@ def create_app(
                 "agents": list(AGENTS) if jobs is not None else [],
                 "questions_left": jobs.questions_left() if jobs is not None else 0,
                 "uploads_left": service.uploads_left(),
+                "filings_left": service.filing.filings_left(),
                 "max_upload_mb": config.max_upload_bytes // (1024 * 1024),
                 "extensions": list(SUPPORTED_EXTENSIONS),
                 "sign_out_url": "/.auth/logout" if config.require_sign_in else None,
@@ -253,7 +257,9 @@ def create_app(
         if request.method == "DELETE":
             jobs.cancel(job_id)
             return JSONResponse({"cancelled": job_id}, status_code=202, headers=NO_STORE)
-        return JSONResponse(jobs.view(jobs.get(job_id), config.wiki_url), headers=NO_STORE)
+        view = jobs.view(jobs.get(job_id), config.wiki_url)
+        view["filed"] = service.filing.filed(job_id)
+        return JSONResponse(view, headers=NO_STORE)
 
     async def job_list(_request: Request) -> JSONResponse:
         if jobs is None:
@@ -278,6 +284,37 @@ def create_app(
             job_id,
         )
         return JSONResponse({"approval_id": approval_id, "approved": approve}, headers=NO_STORE)
+
+    async def filing_preview(request: Request) -> JSONResponse:
+        if jobs is None:
+            return _error(404, "no agents")
+        job = jobs.get(request.path_params["job_id"])
+        try:
+            preview = await asyncio.to_thread(service.filing.preview, job)
+        except FilingError as exc:
+            return _error(422, f"this answer cannot be filed: {exc}")
+        return JSONResponse(preview, headers=NO_STORE)
+
+    async def file_answer(request: Request) -> JSONResponse:
+        if jobs is None:
+            return _error(404, "no agents")
+        body = await _json_body(request)
+        digest = body.get("digest")
+        if digest is not None and not isinstance(digest, str):
+            return _error(400, "digest must be the string returned by the preview")
+        job = jobs.get(request.path_params["job_id"])
+        try:
+            result = await asyncio.to_thread(service.filing.file, job, digest=digest)
+        except FilingError as exc:
+            return _error(422, f"this answer cannot be filed: {exc}")
+        except StorageError:
+            log.exception("filing the answer of question %s failed", job.id)
+            return _error(502, "the storage refused the filing; the Studio logs have the details")
+        if not result["repeated"]:
+            log.info("answer of question %s filed by %s: %s", job.id, user(request), result["path"])
+        return JSONResponse(
+            result, status_code=200 if result["repeated"] else 201, headers=NO_STORE
+        )
 
     async def not_found(_request: Request, exc: Exception) -> JSONResponse:
         return _error(404, str(exc))
@@ -317,6 +354,8 @@ def create_app(
             Route("/api/jobs", job_list, methods=["GET"]),
             Route("/api/jobs/{job_id}", job, methods=["GET", "DELETE"]),
             Route("/api/jobs/{job_id}/approvals/{approval_id}", approval, methods=["POST"]),
+            Route("/api/questions/{job_id}/filing", filing_preview, methods=["GET"]),
+            Route("/api/questions/{job_id}/file", file_answer, methods=["POST"]),
             Mount("/static", _RevalidatedStaticFiles(directory=static_dir), name="static"),
         ],
         exception_handlers={
@@ -325,6 +364,9 @@ def create_app(
             JobBusyError: conflict,
             QuestionError: bad_request,
             QuotaExceededError: too_many,
+            FilingRefusedError: bad_request,
+            FilingConflictError: conflict,
+            FilingQuotaError: too_many,
             StorageError: storage_failed,
         },
         lifespan=lifespan,

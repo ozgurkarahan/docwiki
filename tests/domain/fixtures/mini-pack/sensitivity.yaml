@@ -3,6 +3,6 @@ rules:
   - tier: public
     path_glob: "public/**"
   - tier: restricted
-    path_glob: "**/contracts/**"
+    path_glob: "**/restricted/**"
   - tier: restricted
-    doc_type: maintenance-plan
+    doc_type: etude-de-prix

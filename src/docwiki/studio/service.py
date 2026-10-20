@@ -1,9 +1,10 @@
 """What the Studio shows: the documents in ``raw/``, their pipeline state, the runs, the queue and
-the ingest job; and the one write it makes: an upload into ``raw/``.
+the ingest job; and the two writes it makes: an upload into ``raw/`` and a reviewed Researcher
+answer filed into the answers inbox ``work/inbox/queries/`` (:mod:`docwiki.studio.filing`).
 
 An upload is all it takes: Event Grid turns the new blob into a queue message and the ingest job
-compiles it, exactly as for any other file dropped into ``raw/``. The Studio never runs the
-pipeline itself.
+compiles it, exactly as for any other file dropped into ``raw/``; a filed answer wakes the job the
+same way. The Studio never runs the pipeline itself.
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ from docwiki.mcp.tools_ops import SOURCE_STATUSES, OpsTools, overall_status
 from docwiki.mcp.workstore import WorkStore
 from docwiki.release.publish import read_current_pointer
 from docwiki.studio.config import StudioConfig
+from docwiki.studio.filing import AnswerFiler
 from docwiki.studio.paths import check_upload_path, wiki_link
 
 __all__ = [
@@ -107,6 +109,7 @@ class StudioService:
         self._lock = threading.Lock()
         self._catalog: tuple[str, Catalog] | None = None
         self._cache: dict[str, tuple[float, Any]] = {}
+        self.filing = AnswerFiler(storage, daily_filings=config.daily_filings, today=today)
 
     # -- helpers -----------------------------------------------------------------------------
 

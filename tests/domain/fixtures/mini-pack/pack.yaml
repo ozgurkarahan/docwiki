@@ -1,8 +1,8 @@
-name: mini-wind
-title: Mini wind O&M test pack
+name: mini-batiment
+title: Mini building works test pack
 description: Tiny fictional domain pack used by the contract tests.
 default_audience: internal
-languages: [en, fr, de]
-wiki_title: Contoso Renewables test wiki
+languages: [en, fr]
+wiki_title: Lamna Bâtiment test wiki
 fictional: true
 banner: FICTIONAL - NOT FOR OPERATIONAL USE

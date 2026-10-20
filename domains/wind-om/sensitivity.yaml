@@ -1,7 +1,0 @@
-# Sensitivity tiers of the wind-om sample. Paths are relative to the input root (raw/), for
-# example "restricted/contractor-rate-card-2026.xlsx" when samples/corpus/full is the input.
-default: public
-rules:
-  - {tier: restricted, path_glob: "restricted/**"}
-  - {tier: restricted, path_glob: "**/restricted/**"}
-  - {tier: restricted, doc_type: rate-card}

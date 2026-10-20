@@ -6,7 +6,7 @@ from collections.abc import Callable
 from typing import Any
 
 import pytest
-from mcp_testkit import BROKEN_PATH, NOW, ODD_PATH, RELEASE_ID, SOP_B, load_builder
+from mcp_testkit import BROKEN_PATH, MINUTES, NOW, ODD_PATH, RELEASE_ID, load_builder
 
 from docwiki.contracts.layout import StorageKeys, proposal_key
 from docwiki.contracts.proposals import (
@@ -32,16 +32,16 @@ def _queued(storage: FolderStorage) -> list[str]:
 def test_ingest_start_enqueues_an_idempotent_message(
     ops: OpsTools, work_storage: FolderStorage, seeded: dict[str, Any], as_json: Json
 ) -> None:
-    data = as_json(ops.ingest_start("New maintenance plans were uploaded."))
+    data = as_json(ops.ingest_start("New schedule revisions were uploaded."))
     assert data["queued"] is True and data["kind"] == "ingest"
-    assert data["queue"] == "folder" and data["location"].startswith("work/queue/20260301T083000Z-")
+    assert data["queue"] == "folder" and data["location"].startswith("work/queue/20260403T083000Z-")
     keys = _queued(work_storage)
     assert keys == [data["location"]]
     message = parse_queue_message(work_storage.read_bytes(keys[0]))
     assert message.kind == "ingest" and message.requested_by == "librarian"
     assert message.idempotency_key == data["idempotency_key"]
-    assert message.hints == {"reason": "New maintenance plans were uploaded."}
-    again = as_json(ops.ingest_start("New maintenance plans were uploaded."))
+    assert message.hints == {"reason": "New schedule revisions were uploaded."}
+    again = as_json(ops.ingest_start("New schedule revisions were uploaded."))
     assert again["queued"] is False and again["duplicate"] is True
     assert _queued(work_storage) == keys
 
@@ -52,13 +52,13 @@ def test_ingest_start_scope_validation(
     data = as_json(
         ops.ingest_start(
             "re-run the two sources",
-            source_ids=[SOP_B, seeded["broken_id"]],
-            prefix="procedures/",
+            source_ids=[MINUTES, seeded["broken_id"]],
+            prefix="chantier/",
         )
     )
     assert data["scope"] == {
-        "source_ids": sorted([SOP_B, seeded["broken_id"]]),
-        "prefix": "procedures/",
+        "source_ids": sorted([MINUTES, seeded["broken_id"]]),
+        "prefix": "chantier/",
     }
     with pytest.raises(ToolInputError, match="unknown source_id") as unknown:
         ops.ingest_start("x", source_ids=["src-000000000000"])
@@ -125,8 +125,9 @@ def test_list_sources_orders_problems_first(
     assert failed["raw_path"] == BROKEN_PATH and failed["stage"] == "extract"
     assert failed["last_error"] == "extract: page 2 has no text layer"
     done = data["sources"][-1]
-    assert done["source_id"] == SOP_B and done["in_release"] is True
-    assert done["wiki_status"] == "current" and done["page_path"] == "sources/sop-gbx-010-rev-b.md"
+    assert done["source_id"] == MINUTES and done["in_release"] is True
+    assert done["wiki_status"] == "current"
+    assert done["page_path"] == "sources/2026-03-24-compte-rendu-de-chantier-n3.md"
     only = as_json(ops.list_sources(status="quarantined"))
     assert [row["raw_path"] for row in only["sources"]] == [ODD_PATH]
     page = as_json(ops.list_sources(limit=2, offset=1))
@@ -169,8 +170,8 @@ def test_explain_source_diagnoses_a_failed_extraction(
     assert data["release"]["in_release"] is False
     assert {p["kind"] for p in data["proposals"]} == {"injection"}
     assert "Extraction failed" in data["next_steps"][0]
-    in_release = as_json(ops.explain_source(SOP_B))
-    assert in_release["status"] == "done" and in_release["release"]["evidence_sidecars"] == 1
+    in_release = as_json(ops.explain_source(MINUTES))
+    assert in_release["status"] == "done" and in_release["release"]["evidence_sidecars"] == 2
     with pytest.raises(ToolInputError, match="unknown source"):
         ops.explain_source("src-000000000000")
 
@@ -218,12 +219,12 @@ def test_decide_proposal_merges_the_overlay_once(
     pid = seeded["proposals"]["glossary"]
     data = as_json(ops.decide_proposal(pid, "accept", "Common abbreviation.", actor="tester"))
     assert data["status"] == "accepted" and data["decided_by"] == "tester"
-    assert data["decided_at"] == "2026-03-01T08:30:00Z"
+    assert data["decided_at"] == "2026-04-03T08:30:00Z"
     assert data["effects"] == [
         "merged into work/state/overlay.yaml (applied by the next ingest run)"
     ]
     overlay, _ = WorkStore(work_storage).overlay()
-    assert [term.term for term in overlay.glossary] == ["GBX"]
+    assert [term.term for term in overlay.glossary] == ["chape"]
     again = as_json(ops.decide_proposal(pid, "accept", "again", actor="tester"))
     assert again["already_decided"] is True
     assert again["effects"] == ["already present in work/state/overlay.yaml"]
@@ -267,18 +268,18 @@ def test_decide_proposal_refuses_entities_the_pack_does_not_type(
     untyped = _file_proposal(
         work_storage,
         "entity",
-        EntityProposalPayload(type="unknown", key="pump-station", label="Pump station"),
+        EntityProposalPayload(type="unknown", key="echafaudage", label="Échafaudage"),
     )
     with pytest.raises(ToolInputError, match="entity type 'unknown'") as refused:
-        ops.decide_proposal(untyped, "accept", "Seen in the plan.", actor="tester")
+        ops.decide_proposal(untyped, "accept", "Seen in the schedule.", actor="tester")
     assert refused.value.code == "invalid_argument"
     assert "could not tell" in refused.value.message
-    assert "asset" in refused.value.details["known_types"]
+    assert "building-element" in refused.value.details["known_types"]
     invented = _file_proposal(
         work_storage, "entity", EntityProposalPayload(type="pump", key="p-07", label="P-07")
     )
     with pytest.raises(ToolInputError, match="does not define this entity type") as unknown:
-        ops.decide_proposal(invented, "accept", "Seen in the plan.", actor="tester")
+        ops.decide_proposal(invented, "accept", "Seen in the schedule.", actor="tester")
     assert unknown.value.code == "invalid_argument"
     for pid in (untyped, invented):
         found = store.proposal(pid)
@@ -287,11 +288,15 @@ def test_decide_proposal_refuses_entities_the_pack_does_not_type(
     rejected = as_json(ops.decide_proposal(untyped, "reject", "No type.", actor="tester"))
     assert rejected["status"] == "rejected"
     typed = _file_proposal(
-        work_storage, "entity", EntityProposalPayload(type="asset", key="wtg-30", label="WTG-30")
+        work_storage,
+        "entity",
+        EntityProposalPayload(type="building-element", key="fenetre-f3", label="fenêtre F3"),
     )
-    accepted = as_json(ops.decide_proposal(typed, "accept", "Seen in the plan.", actor="tester"))
+    accepted = as_json(
+        ops.decide_proposal(typed, "accept", "Seen in the schedule.", actor="tester")
+    )
     assert accepted["status"] == "accepted"
-    assert [entry.id for entry in store.overlay()[0].entities] == ["asset:wtg-30"]
+    assert [entry.id for entry in store.overlay()[0].entities] == ["building-element:fenetre-f3"]
 
 
 def test_decide_proposal_refuses_what_the_pack_would_not_apply(
@@ -301,7 +306,7 @@ def test_decide_proposal_refuses_what_the_pack_would_not_apply(
         work_storage,
         "glossary",
         GlossaryProposalPayload(
-            term="Yaw drive", definition="Turns the nacelle.", synonyms={"it": ["imbardata"]}
+            term="ragréage", definition="Thin levelling layer.", synonyms={"it": ["rasatura"]}
         ),
     )
     with pytest.raises(ToolInputError, match="would not apply") as refused:
@@ -328,11 +333,11 @@ def test_write_health_report_is_sanitised_and_bounded(
     ops: OpsTools, work_storage: FolderStorage, as_json: Json
 ) -> None:
     report = (
-        "# Health 2026-03-01\n\nRelease 20260215T090000Z-decd4b59: all gates pass.\n\n"
+        f"# Health 2026-04-03\n\nRelease {RELEASE_ID}: all gates pass.\n\n"
         "<script>alert(1)</script>See [the portal](https://example.org/x).\n"
     )
     data = as_json(ops.write_health_report(report))
-    assert data["written"] == "work/reports/health-2026-03-01.md"
+    assert data["written"] == "work/reports/health-2026-04-03.md"
     assert data["replaced"] is False and data["sanitized"] is True
     text = work_storage.read_bytes(data["written"]).decode("utf-8")
     assert "<script>" not in text and "https://example.org" not in text

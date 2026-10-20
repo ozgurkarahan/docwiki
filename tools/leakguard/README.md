@@ -61,7 +61,7 @@ merged (`count`).
 | Parquet | Rows and key-value metadata through `duckdb` (the `mcp` extra); without duckdb, or for historical versions, an "unscanned" notice is reported. |
 | ZIP archives | Entry names and entries recursively. |
 | Other binaries | Printable ASCII/UTF-16 strings, plus an `unscanned-binary` warning. Fonts are string-scanned without warning. |
-| Git history (`--history`) | `git log --all -p --raw` (added lines with their line numbers, file paths), commit messages, author/committer identities, annotated tags; binary blobs changed by any commit are extracted like working-tree files. History findings already present in the working tree are not repeated. Tool-generated commit trailers whose value is a random identifier (`Copilot-Session:`, `Change-Id:`) are skipped. |
+| Git history (`--history`) | `git log --all -p --raw` (added lines with their line numbers, file paths), commit messages, author/committer identities, annotated tags; binary blobs changed by any commit are extracted like working-tree files. History findings already present in the working tree are not repeated. Tool-generated commit trailers whose value is a random identifier (`Copilot-Session:`, `Change-Id:`) are skipped. Proper nouns are judged against every historical version of the word lists (see "Closed-world check"). |
 
 ## Rules
 
@@ -99,21 +99,20 @@ common in JSON and YAML) is decoded first, for every rule. These are not candida
 
 - a single capitalised word that only starts a sentence, or that opens a phrase (start of a cell,
   a line or a double-quoted value, or after a colon) **and** is followed by lower-case prose
-  ("Drain the oil", `"summary": "Curated syntheses"`). A capitalised word standing alone
+  ("Deliver the windows", `"summary": "Curated syntheses"`). A capitalised word standing alone
   ("Supplier: Zorblax", a cell holding "Zorblax"), parentheses and Markdown headings are always
   checked;
 - fragments of alphanumeric identifiers: compounds containing a digit or an underscore, such as
-  release ids (`20260215T090000Z-decd4b59`), ISO timestamps, source ids (`src-43c97f7dfcde`),
-  locators (`p0003`, `b0042`), asset tags (`WTG-07`), document numbers (`SOP-GBX-010`) and code
-  identifiers (`FIXTURE_DIR`). Product or model codes containing digits are therefore not checked:
-  real ones belong in the private deny-list;
-- format placeholders made of one repeated capital letter (`WTG-NN`, `YYYY-MM-DD`).
+  release ids (`20260401T090000Z-7ce99a3f`), ISO timestamps, source ids (`src-c6436ec50050`),
+  locators (`p0003`, `b0042`), delivery note numbers (`BL-2026-0391`), document numbers
+  (`DEV-2026-014`) and code identifiers (`FIXTURE_DIR`). Product or model codes containing digits
+  are therefore not checked: real ones belong in the private deny-list;
+- format placeholders made of one repeated capital letter (`BC-2026-NNN`, `YYYY-MM-DD`).
 
 A candidate is accepted when every word is known:
 
 1. `samples/fiction/allowlist.txt` (generated from `samples/fiction/bible.yaml`);
-2. `tools/leakguard/tech_allowlist.txt` (public technology, standard, unit, currency and chemical
-   element names);
+2. `tools/leakguard/tech_allowlist.txt` (public technology, standard, unit and currency names);
 3. `tools/leakguard/common_words.txt` (curated English, French and German words);
 4. words that the scanned sample content itself writes in lower case in prose.
 
@@ -121,6 +120,16 @@ Inflected forms of known words (plurals, possessives, "-ed", "-ing", "-ly", "-me
 known; agent nouns ("-er") are not inflected on purpose because many surnames would become common
 words. Camel-case compounds made only of known words (`ReleaseReader`, `PDFContext`) are treated as
 code identifiers; tokens with an unknown or one-letter hump (`ZorbView`, `iZorb`) stay candidates.
+
+History is judged against every version of the word lists it contains. A candidate found in
+history (`--history`, `--commits-from`) is accepted when the current lists know it, or when any
+version of `samples/fiction/allowlist.txt`, `tools/leakguard/common_words.txt` or
+`tools/leakguard/tech_allowlist.txt` in the scanned history (the scanned commits, their ancestors
+and `HEAD`) knew it. A sample world that has been replaced therefore does not turn into errors in
+the old commits that describe it: the names that were valid in their time stay valid there. The
+working tree and the `--site` folders are always judged against the current lists, so a retired
+name that is still used in a current file is still reported. A version of a list that cannot be
+parsed is skipped with a `config` notice.
 
 The check is a heuristic safety net, not a guarantee: a real name made only of common words, or a
 name opening a sentence or a value, is not detected. Real names that must never appear belong in

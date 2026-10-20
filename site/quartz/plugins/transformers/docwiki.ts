@@ -9,6 +9,7 @@ import {
   BadgeKind,
   BadgeSplit,
   CITATION_BADGES,
+  dropsSiteNotice,
   isDocumentHref,
   isIsoDay,
   noticeKind,
@@ -20,9 +21,11 @@ import {
 export interface Options {
   /** Release date (YYYY-MM-DD) used for pages without an `updated` date (evidence sidecars). */
   releaseDate: string | null
+  /** The site banner shows the fictional-sample notice on every page. */
+  siteBanner: boolean
 }
 
-const defaultOptions: Options = { releaseDate: null }
+const defaultOptions: Options = { releaseDate: null, siteBanner: false }
 
 /** mdast parents whose children are blocks (a raw HTML node there becomes a paragraph). */
 const FLOW_PARENTS = new Set(["root", "blockquote", "listItem", "footnoteDefinition"])
@@ -167,15 +170,27 @@ function badgeLegend(used: Set<BadgeKind>): Element {
   }
 }
 
-/** Notices before the first section (`> FICTIONAL …`, `> **Superseded** by …`). */
-function decorateNotices(tree: HtmlRoot, evidence: boolean) {
+/**
+ * Notices before the first section (`> FICTIONAL …`, `> **Superseded** by …`). A fictional notice
+ * that only repeats the site banner (the home page) is removed.
+ */
+function decorateNotices(
+  tree: HtmlRoot,
+  evidence: boolean,
+  slug: string | undefined,
+  banner: boolean,
+) {
   let beforeFirstSection = true
-  for (const node of tree.children) {
+  for (let index = 0; index < tree.children.length; index++) {
+    const node = tree.children[index]
     if (node.type !== "element") continue
     if (node.tagName === "h2") beforeFirstSection = false
     if (node.tagName !== "blockquote") continue
     const kind = beforeFirstSection ? noticeKind(hastToString(node)) : undefined
-    if (kind) {
+    if (dropsSiteNotice(slug, banner, kind)) {
+      tree.children.splice(index, 1)
+      index--
+    } else if (kind) {
       addClass(node, "docwiki-notice", `docwiki-notice--${kind}`)
     } else if (evidence) {
       addClass(node, "docwiki-verbatim")
@@ -272,7 +287,7 @@ export const DocWiki: QuartzTransformerPlugin<Partial<Options>> = (userOpts) => 
               decorateFootnotes(node)
               return SKIP
             })
-            decorateNotices(tree, evidence)
+            decorateNotices(tree, evidence, file.data.slug, opts.siteBanner)
             if (evidence) decorateEvidence(tree)
             decorateDocumentLinks(tree)
           }

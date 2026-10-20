@@ -3,8 +3,8 @@
 * ``docwiki-researcher`` - the deployed Foundry Researcher (``docwiki.agents_client``) using the
   MCP server over the current release;
 * ``baseline-rag`` - extracted text in ~800-token chunks, BM25 top-8, one ``smart`` call;
-* ``baseline-long-context`` - all extracted text of the quickstart subset in one ``smart`` call,
-  when it fits the token budget.
+* ``baseline-long-context`` - all extracted text of the public documents of the selected scope
+  (``full/`` by default) in one ``smart`` call, when it fits the token budget.
 
 Every system returns the same :class:`~evals.records.Answer`: text, citations as (source, locator)
 pairs and an abstention flag, plus tokens and cost. The baselines follow the Researcher's answer
@@ -517,11 +517,11 @@ def chunk_document(
 class BaselineRagSystem(_LlmBaseline):
     """Naive RAG over the extracted corpus: chunks, BM25 top-k, one structured ``smart`` call.
 
-    The index covers the documents visible to the evaluated audience (the same scope as the
-    DocWiki build under test). BM25 is ``docwiki.search``'s scorer (k1 1.2, b 0.75) over the
-    chunk text and its source title; question function words are dropped and there are no
-    synonyms. A cited passage maps to every locator of its blocks (adjacent rows and lines
-    merged).
+    The index covers the documents of the selected scope that the evaluated audience may see
+    (``full/`` for the public audience by default, as in the DocWiki build under test). BM25 is
+    ``docwiki.search``'s scorer (k1 1.2, b 0.75) over the chunk text and its source title;
+    question function words are dropped and there are no synonyms. A cited passage maps to every
+    locator of its blocks (adjacent rows and lines merged).
     """
 
     name = "baseline-rag"
@@ -552,12 +552,12 @@ class BaselineRagSystem(_LlmBaseline):
     def build_index(self) -> None:
         chunks: list[Chunk] = []
         for entry in self._files:
-            doc = self._docs.get(entry.canonical)
+            doc = self._docs.get(entry.path)
             if doc is None:
-                raise SystemNotConfigured(f"{entry.canonical} was not extracted")
+                raise SystemNotConfigured(f"{entry.path} was not extracted")
             chunks.extend(
                 chunk_document(
-                    doc, path=entry.canonical, sha256=entry.sha256, max_tokens=self.chunk_tokens
+                    doc, path=entry.path, sha256=entry.sha256, max_tokens=self.chunk_tokens
                 )
             )
         self.chunks = chunks
@@ -662,11 +662,11 @@ def build_long_context(
     parts: list[str] = []
     refs: dict[str, _Ref] = {}
     for index, entry in enumerate(files, 1):
-        doc = docs[entry.canonical]
+        doc = docs[entry.path]
         source = f"S{index:02d}"
-        title = _title(doc, entry.canonical)
+        title = _title(doc, entry.path)
         label = title.replace('"', "'")
-        parts.append(f'<document id="{source}" source="{entry.canonical}" title="{label}">')
+        parts.append(f'<document id="{source}" source="{entry.path}" title="{label}">')
         previous: str | None = None
         for block in doc.blocks:
             text = block.text.strip()
@@ -675,7 +675,7 @@ def build_long_context(
             key = block.locator_key
             if key != previous:
                 ref = f"{source}:{key}"
-                refs[ref] = _Ref(entry.canonical, entry.sha256, title, key)
+                refs[ref] = _Ref(entry.path, entry.sha256, title, key)
                 text = f"[{ref}] {text}"
                 previous = key
             parts.append(_escape(text))
@@ -684,9 +684,10 @@ def build_long_context(
 
 
 class BaselineLongContextSystem(_LlmBaseline):
-    """The quickstart subset's extracted text in the prompt, when it fits ``budget_tokens``
-    (4 characters per token, prompt plus ``max_output_tokens``); otherwise the run is reported
-    as ``skipped: too_large``."""
+    """The extracted text of the selected documents in the prompt (the public documents of the
+    selected scope: ``full/`` by default), when it fits ``budget_tokens`` (4 characters per
+    token, prompt plus ``max_output_tokens``); otherwise the run is reported as
+    ``skipped: too_large``."""
 
     name = "baseline-long-context"
     prompt_version = LONG_CONTEXT_PROMPT_VERSION

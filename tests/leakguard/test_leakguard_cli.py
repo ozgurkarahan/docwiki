@@ -170,9 +170,9 @@ def test_history_finds_removed_secrets_and_author_emails(
 def test_history_scans_old_binary_versions(
     repo: Path, denylist: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    write(repo, "samples/corpus/sop.docx", make_docx(["Oil change"], author="Jane Quillon"))
-    commit_all(repo, "add sop")
-    write(repo, "samples/corpus/sop.docx", make_docx(["Oil change"]))
+    write(repo, "samples/corpus/devis.docx", make_docx(["Quote revision"], author="Jane Quillon"))
+    commit_all(repo, "add quote")
+    write(repo, "samples/corpus/devis.docx", make_docx(["Quote revision"]))
     commit_all(repo, "fix metadata")
     code, report = scan_json(capsys, repo, "--denylist", str(denylist))
     assert code == 0, report["findings"]
@@ -252,21 +252,23 @@ def test_site_folder_names_are_warnings(
 def test_sample_content_closed_world_and_metadata(
     repo: Path, denylist: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    write(repo, "samples/fiction/allowlist.txt", "Contoso Renewables\nMira Jensen\n")
+    write(repo, "samples/fiction/allowlist.txt", "Lamna Bâtiment\nInès Roux\n")
     write(
         repo,
         "samples/corpus/note.md",
-        "# Gearbox Oil Change\n\nMira Jensen asked Zorblax Lubricants about the oil grade.\n",
+        "# Window Delivery Schedule\n\nInès Roux asked Zorblax Supplies about the delivery date.\n",
     )
-    write(repo, "samples/corpus/ok.docx", make_docx(["The oil is changed by Contoso Renewables."]))
-    write(repo, "samples/corpus/sop.docx", make_docx(["Oil change"], author="Jane Quillon"))
-    deck = make_pptx("Site Rules", "Contoso Renewables", last_modified_by=None)
+    write(
+        repo, "samples/corpus/ok.docx", make_docx(["The windows are delivered by Lamna Bâtiment."])
+    )
+    write(repo, "samples/corpus/devis.docx", make_docx(["Quote revision"], author="Jane Quillon"))
+    deck = make_pptx("Site Meeting", "Lamna Bâtiment", last_modified_by=None)
     write(repo, "samples/corpus/deck.pptx", deck)
     write(repo, "samples/corpus/photo.jpg", make_image("JPEG", exif=True))
     pdf_info = {"Author": "jquillon", "Producer": "fpdf2"}
-    write(repo, "samples/corpus/report.pdf", make_pdf(["Contoso Renewables lab report"], pdf_info))
+    write(repo, "samples/corpus/report.pdf", make_pdf(["Lamna Batiment site report"], pdf_info))
     write(repo, "samples/generators/gen.py", 'TITLE = "Prepared for Quentin Marsh"\n')
-    write(repo, "evals/golden/dev.jsonl", '{"question": "Who supplies Zorblax oil?"}\n')
+    write(repo, "evals/golden/dev.jsonl", '{"question": "Who supplies Zorblax blocks?"}\n')
     commit_all(repo, "samples")
 
     code, report = scan_json(capsys, repo, "--denylist", str(denylist))
@@ -275,7 +277,7 @@ def test_sample_content_closed_world_and_metadata(
     assert ("closed-world", "error", "samples/corpus/note.md", "Zorblax") in found
     assert ("closed-world", "error", "samples/generators/gen.py", "Quentin Marsh") in found
     assert ("closed-world", "warning", "evals/golden/dev.jsonl", "Zorblax") in found
-    assert ("metadata-office-author", "error", "samples/corpus/sop.docx", "Jane Quillon") in found
+    assert ("metadata-office-author", "error", "samples/corpus/devis.docx", "Jane Quillon") in found
     assert ("metadata-exif", "error", "samples/corpus/photo.jpg", None) in found
     assert ("metadata-pdf", "error", "samples/corpus/report.pdf", "jquillon") in found
     deck = {f["rule"] for f in report["findings"] if f["file"] == "samples/corpus/deck.pptx"}
@@ -287,21 +289,22 @@ def test_sample_content_closed_world_and_metadata(
 def test_generated_release_identifiers_are_not_names(
     repo: Path, denylist: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    release_id = "20260215T090000Z-decd4b59"
+    release_id = "20260401T090000Z-7ce99a3f"
     base = f"samples/fixtures/mock-release/releases/{release_id}"
     write(repo, "samples/fixtures/mock-release/releases/current.json",
-          json.dumps({"release_id": release_id, "created_at": "2026-02-15T09:00:00Z"}))
+          json.dumps({"release_id": release_id, "created_at": "2026-04-01T09:00:00Z"}))
     write(repo, f"{base}/catalog.json", json.dumps(
-        {"pages": [{"id": "src-43c97f7dfcde", "summary": "Append-only change log of this wiki."},
+        {"pages": [{"id": "src-c6436ec50050", "summary": "Append-only change log of this wiki."},
                    {"summary": "Curated multi-source syntheses.",
-                    "synonyms": ["Standardarbeitsanweisung"]}],
-         "columns": [{"name": "asset", "type": "VARCHAR"}, {"name": "row", "type": "BIGINT"}]},
+                    "synonyms": ["Révision"]}],
+         "columns": [{"name": "tache", "type": "VARCHAR"}, {"name": "row", "type": "BIGINT"}]},
         indent=2))
-    write(repo, f"{base}/wiki/sources/sop-gbx-010-rev-a.md", "\n".join([
-        "---", "summary: Superseded revision A of the procedure SOP-GBX-010.",
-        f"release: {release_id}", "locator: p0003, b0042", "---", "", "### Draining", "",
-        "Drain the oil while it is still warm.", "Turbines are identified as WTG-NN.", "",
-        "| Asset | Document | OEM |", "|---|---|---|", "| WTG-07 | SOP-GBX-010 | Litware |", "",
+    write(repo, f"{base}/wiki/sources/pln-2026-003-indice-a.md", "\n".join([
+        "---", "summary: Superseded revision A of the schedule PLN-2026-003.",
+        f"release: {release_id}", "locator: p0003, b0042", "---", "", "### Delivery", "",
+        "Deliver the windows once the slab is dry.", "Orders are identified as BC-2026-NNN.", "",
+        "| Order | Document | Supplier |", "|---|---|---|",
+        "| BC-2026-009 | PLN-2026-003 | VanArsdel |", "",
     ]))
     write(repo, "samples/fixtures/mock-release/build_fixture.py",
           '"""Usage: build_fixture.py --out DIR"""\nRELEASE = "' + release_id + '"\n')
@@ -312,11 +315,11 @@ def test_generated_release_identifiers_are_not_names(
 
     code, report = scan_json(capsys, repo, "--denylist", str(denylist))
     names = [(f["match"], f["file"].rsplit("/", 1)[-1]) for f in report["findings"]]
-    assert names == [("Litware", "sop-gbx-010-rev-a.md")]
+    assert names == [("VanArsdel", "pln-2026-003-indice-a.md")]
     assert code == 1
 
     allowlist = tmp_path / "allowlist.txt"
-    allowlist.write_text("Litware\nre:WTG-\\d{2}\nre:SOP-[A-Z]{3}-\\d{3}\n", encoding="utf-8")
+    allowlist.write_text("VanArsdel\nre:BC-\\d{4}-\\d{3}\nre:PLN-\\d{4}-\\d{3}\n", encoding="utf-8")
     code, report = scan_json(capsys, repo, "--denylist", str(denylist), "--strict",
                              "--allowlist", str(allowlist))
     assert (code, report["findings"]) == (0, [])
@@ -329,7 +332,7 @@ def test_unicode_escaped_text_is_checked_decoded(
     deny = tmp_path / "deny-umlaut.txt"
     deny.write_text(pattern + "\n", encoding="utf-8")
     write(repo, "samples/corpus/glossary.json",
-          '{"term": "Generatorb\\u00fcrsten", "vendor": "Z\\u00f6rblax"}\n')
+          '{"term": "Mat\\u00e9riaux", "vendor": "Z\\u00f6rblax"}\n')
     commit_all(repo, "glossary")
     code, report = scan_json(capsys, repo, "--denylist", str(deny))
     assert code == 1

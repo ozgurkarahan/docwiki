@@ -23,7 +23,7 @@ from docwiki.extract.cu import (
 )
 
 ENDPOINT = "https://docwiki-cu.example"
-PDF = "docs/sop-gbx-010.pdf"
+PDF = "docs/devis-indice-a.pdf"
 
 
 class FakeTokens:
@@ -202,7 +202,7 @@ async def test_tables_figures_and_reading_order(corpus: Corpus, tmp_path: Path) 
             "span": {"offset": markdown_end + i * 10, "length": len(text)},
         }
         for i, (text, x) in enumerate(
-            (("Asset", 1.0), ("Due", 3.0), ("WTG-07", 1.0), ("2026-03", 3.0))
+            (("Tâche", 1.0), ("Date", 3.0), ("T07", 1.0), ("2026-03-30", 3.0))
         )
     ]
     first_cell = len(paragraphs)
@@ -246,7 +246,7 @@ async def test_tables_figures_and_reading_order(corpus: Corpus, tmp_path: Path) 
             "id": "1.1",
             "source": source(1, [0.7874, 5.9055, 3.5433, 5.9055, 3.5433, 7.6280, 0.7874, 7.6280]),
             "span": {"offset": paragraphs[5]["span"]["offset"] + 5, "length": 3},
-            "caption": {"content": "Figure 1: drain valve"},
+            "caption": {"content": "Figure 1: plan de la baie F1"},
         }
     ]
     data = corpus.path(PDF).read_bytes()
@@ -256,16 +256,16 @@ async def test_tables_figures_and_reading_order(corpus: Corpus, tmp_path: Path) 
     doc = result.doc
 
     (table,) = doc.tables
-    assert table.columns == ["Asset", "Due"]
-    assert [(row.row_id, row.cells) for row in table.rows] == [("r0002", ["WTG-07", "2026-03"])]
+    assert table.columns == ["Tâche", "Date"]
+    assert [(row.row_id, row.cells) for row in table.rows] == [("r0002", ["T07", "2026-03-30"])]
     assert table.provenance == "native-text" and table.locator.page == 2
     row_block = doc.blocks[-1]
-    assert (row_block.kind, row_block.text) == ("table-ref", "Asset: WTG-07; Due: 2026-03")
+    assert (row_block.kind, row_block.text) == ("table-ref", "Tâche: T07; Date: 2026-03-30")
     assert row_block.locator.page == 2 and row_block.locator.bbox is not None
-    assert all(block.text not in ("Asset", "Due", "WTG-07") for block in doc.blocks)
+    assert all(block.text not in ("Tâche", "Date", "T07") for block in doc.blocks)
 
     (figure,) = doc.figures
-    assert figure.caption == "Figure 1: drain valve"
+    assert figure.caption == "Figure 1: plan de la baie F1"
     assert figure.locator.page == 1
     assert figure.bbox == pytest.approx([0.0952, 0.5051, 0.4286, 0.6524], abs=0.002)
     assert result.figures["f01"].startswith(b"\x89PNG")
@@ -276,20 +276,24 @@ async def test_scanned_pdf_gets_ocr_provenance_and_confidence(
 ) -> None:
     from extract_fixtures import PdfItem, PdfLayout
 
-    rel = "docs/crane-lift-plan-scan.pdf"
-    layout = PdfLayout([PdfItem(1, "Crane lift plan", (20, 20, 80, 30))], pages=1)
+    rel = "docs/bon-de-livraison-scan.pdf"
+    layout = PdfLayout([PdfItem(1, "Bon de livraison BL-2026-0391", (20, 20, 80, 30))], pages=1)
     response = fake_cu_response(layout, words=True)
     data = corpus.path(rel).read_bytes()
     request = cu_request(analyzer="prebuilt-layout", data=data, content_range=None)
     save_recording(recording_path(tmp_path, request), request, response)
     result = await corpus.extract(rel, azure("replay", tmp_path))
     (block,) = result.doc.blocks
-    assert (block.text, block.provenance, block.confidence) == ("Crane lift plan", "ocr", 0.9)
+    assert (block.text, block.provenance, block.confidence) == (
+        "Bon de livraison BL-2026-0391",
+        "ocr",
+        0.9,
+    )
     assert not any(w.startswith("needs-ocr") for w in result.warnings)
 
 
 async def test_image_regions_follow_ocr_order(corpus: Corpus, tmp_path: Path) -> None:
-    rel = "photos/checklist.png"
+    rel = "photos/photo-palettes.png"
     response = {
         "status": "Succeeded",
         "result": {
@@ -297,7 +301,7 @@ async def test_image_regions_follow_ocr_order(corpus: Corpus, tmp_path: Path) ->
                 {
                     "kind": "document",
                     "unit": "pixel",
-                    "markdown": "Oil level OK\n\n63 %",
+                    "markdown": "Palettes reçues\n\n8 palettes",
                     "pages": [
                         {
                             "pageNumber": 1,
@@ -305,8 +309,8 @@ async def test_image_regions_follow_ocr_order(corpus: Corpus, tmp_path: Path) ->
                             "height": 200,
                             "words": [
                                 {
-                                    "content": "63",
-                                    "span": {"offset": 14, "length": 2},
+                                    "content": "8",
+                                    "span": {"offset": 17, "length": 1},
                                     "confidence": 0.5,
                                 }
                             ],
@@ -314,14 +318,14 @@ async def test_image_regions_follow_ocr_order(corpus: Corpus, tmp_path: Path) ->
                     ],
                     "paragraphs": [
                         {
-                            "content": "Oil level OK",
+                            "content": "Palettes reçues",
                             "source": "D(1,32,20,160,20,160,40,32,40)",
-                            "span": {"offset": 0, "length": 12},
+                            "span": {"offset": 0, "length": 15},
                         },
                         {
-                            "content": "63 %",
+                            "content": "8 palettes",
                             "source": "D(1,32,100,96,40)",
-                            "span": {"offset": 14, "length": 4},
+                            "span": {"offset": 17, "length": 10},
                         },
                     ],
                 }
@@ -351,7 +355,7 @@ async def test_max_pages_sends_a_page_range(
 async def test_azure_mode_keeps_local_adapters_for_other_formats(
     corpus: Corpus, tmp_path: Path
 ) -> None:
-    result = await corpus.extract("plans/work-orders.csv", azure("replay", tmp_path))
+    result = await corpus.extract("plans/commandes.csv", azure("replay", tmp_path))
     assert result.doc.extraction.adapter == "local"
     assert list(tmp_path.iterdir()) == []
 

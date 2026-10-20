@@ -4,9 +4,10 @@ title = "DocWiki gitleaks configuration"
 useDefault = true
 
 [allowlist]
-description = "DocWiki evidence locator keys (e.g. msg-body-l0021-l0024) are identifiers, not secrets"
+description = "Identifiers, not secrets: DocWiki evidence locator keys (e.g. msg-body-l0021-l0024) and YAML slug keys of the domain pack and the fiction bible (e.g. key: lot-2-terrassement-et-fondations)"
 regexTarget = "line"
 regexes = [
   '''"locator_key"\s*:\s*"[a-z0-9\-\*]*"''',
   '''locator_key:\s*[a-z0-9\-\*]+''',
+  '''^\s*(?:-\s+)?key:\s*[a-z0-9]+(?:-[a-z0-9]+)+\s*$''',
 ]

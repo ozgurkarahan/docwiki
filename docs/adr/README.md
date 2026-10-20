@@ -4,9 +4,10 @@
 |---|---|
 | [0001](0001-compiled-wiki-over-vector-index.md) | A compiled wiki instead of a vector index by default |
 | [0002](0002-aca-job-with-agent-control-plane.md) | Batch compilation in an ACA Job; agents as the control plane |
-| 0003 | MCP agent identity (written after the identity spike) |
+| [0003](0003-mcp-agent-identity.md) | MCP agent identity (written after the identity spike) |
 | [0004](0004-evidence-sidecars-and-provenance.md) | Evidence sidecars and provenance types |
 | [0005](0005-skills-from-templates-only.md) | Skills generated only from reviewed templates |
 | [0006](0006-immutable-releases.md) | Immutable releases and an atomic pointer |
+| [0007](0007-answers-in-the-wiki.md) | Answers in the wiki: filed Researcher answers and an "Ask this wiki" panel (proposed) |
 
 The full decision log with rationale is in [`docs/spec/README.md`](../spec/README.md#4-decision-log-v1).

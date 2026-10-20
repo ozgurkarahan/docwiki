@@ -1,21 +1,24 @@
 """Stage 12 — ``site``: build the Quartz site of a release through the site lane.
 
 Calls ``docwiki.site.build_site(release_root, release_root / "site", page_title=…, banner=…,
-base_url=…)`` on the staged release, before it is finalized, so the site is part of the
-published release. The stage is recorded as ``skipped`` with a warning — and the release is
-still published — when the site lane is not installed or Node/git are not available; any other
-failure (build error, broken link, security scan finding) is ``failed`` and blocks the publish.
+base_url=…, gates=…, run_id=…)`` on the staged release, before it is finalized, so the site is part
+of the published release (the manifest does not exist yet, so the run passes its gate results and
+id for the home page's provenance line). The stage is recorded as ``skipped`` with a warning — and
+the release is still published — when the site lane is not installed or Node/git are not
+available; any other failure (build error, broken link, security scan finding) is ``failed`` and
+blocks the publish.
 """
 
 from __future__ import annotations
 
 import importlib
 import shutil
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from docwiki.contracts.gates import GateResult
 from docwiki.contracts.layout import ReleaseFiles
 
 __all__ = [
@@ -83,14 +86,25 @@ def build_site_for_release(
     base_url: str | None = None,
     page_title: str | None = None,
     banner: str | None = None,
+    gates: Sequence[GateResult] | None = None,
+    run_id: str | None = None,
     builder: SiteBuilder | None = None,
 ) -> SiteResult:
-    """Build the site into ``out_dir`` (default ``<release>/site``)."""
+    """Build the site into ``out_dir`` (default ``<release>/site``).
+
+    ``gates`` and ``run_id`` describe a staged release, whose manifest does not exist yet; they
+    are forwarded only when given.
+    """
     build = builder or site_builder()
     reason = site_unavailable(build)
     if build is None or reason is not None:
         return SiteResult("skipped", f"site not built: {reason}")
     target = out_dir or Path(release_root) / ReleaseFiles.SITE_DIR
+    extra: dict[str, object] = {}
+    if gates is not None:
+        extra["gates"] = list(gates)
+    if run_id is not None:
+        extra["run_id"] = run_id
     try:
         path = build(
             Path(release_root),
@@ -98,6 +112,7 @@ def build_site_for_release(
             page_title=page_title,
             banner=banner,
             base_url=base_url,
+            **extra,
         )
     except Exception as exc:  # the site lane runs Node/Quartz; any failure is reported
         message = _clip(str(exc))

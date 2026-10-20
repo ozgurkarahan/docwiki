@@ -17,7 +17,7 @@ MAX_TABLE_COLUMNS = 500
 
 
 def row_text(columns: Sequence[str], cells: Sequence[str]) -> str:
-    """``"Asset: WTG-07; Task: Gearbox oil change"`` (empty cells skipped)."""
+    """``"Tâche: T07; Désignation: Livraison des menuiseries"`` (empty cells skipped)."""
     parts: list[str] = []
     for index, cell in enumerate(cells):
         value = one_line(cell)

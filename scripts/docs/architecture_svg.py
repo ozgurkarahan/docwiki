@@ -368,7 +368,7 @@ def consumers_column(canvas: Canvas) -> None:
     humans = (
         "Quartz site: graph, search, backlinks",
         "Evidence microscope on every footnote",
-        "GitHub Pages or a private portal",
+        "Served by the portal Container App",
     )
     for row, label in enumerate(humans):
         canvas.text(976, 158 + row * 22, label, size=12.5, within=(left, right))

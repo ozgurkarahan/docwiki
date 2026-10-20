@@ -32,24 +32,56 @@ import hashlib
 import json
 import re
 import shutil
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
 from docwiki import __version__
+from docwiki.answers.inbox import InboxItem, read_inbox, reject_inbox_item
 from docwiki.contracts._base import sha256_hex
 from docwiki.contracts.catalog import Catalog
-from docwiki.contracts.enums import QueueKind, RequestedBy, allowed_for_audience, max_sensitivity
+from docwiki.contracts.enums import (
+    QueueKind,
+    RequestedBy,
+    allowed_for_audience,
+    badge_for,
+    max_sensitivity,
+)
 from docwiki.contracts.extracted import ExtractedDoc
-from docwiki.contracts.gates import GateResult
+from docwiki.contracts.gates import GateResult, Violation
 from docwiki.contracts.ids import assign_source_slugs, cache_key, new_run_id, source_page_path
-from docwiki.contracts.layout import ReleaseFiles, StorageKeys, WikiFiles, run_report_key
-from docwiki.contracts.locators import ImageRegionLocator, PdfPageLocator
+from docwiki.contracts.layout import (
+    EVIDENCE_MOUNT,
+    ReleaseFiles,
+    StorageKeys,
+    WikiFiles,
+    evidence_path,
+    run_report_key,
+)
+from docwiki.contracts.locators import (
+    ImageRegionLocator,
+    Locator,
+    PdfPageLocator,
+    locator_label,
+)
 from docwiki.contracts.manifest import ReleaseInputs
-from docwiki.contracts.markdown import extract_footnotes, extract_links, resolve_href
-from docwiki.contracts.pages import DocwikiStamp, Page, QueryFrontmatter, SourceFrontmatter
+from docwiki.contracts.markdown import (
+    extract_footnotes,
+    extract_links,
+    relative_link,
+    resolve_href,
+)
+from docwiki.contracts.pages import (
+    DocwikiStamp,
+    EvidenceFrontmatter,
+    EvidencePage,
+    Frontmatter,
+    Page,
+    QueryFrontmatter,
+    SourceFrontmatter,
+)
 from docwiki.contracts.runs import (
     ContentUnderstandingUsage,
     ModelVersion,
@@ -61,6 +93,7 @@ from docwiki.contracts.state import RETRY_ATTEMPTS, SourceState
 from docwiki.contracts.storage import (
     KeyNotFoundError,
     LeaseLostError,
+    PreconditionFailedError,
     Storage,
     StorageError,
 )
@@ -116,7 +149,9 @@ from docwiki.orchestration.registry import Engine, EngineUnavailableError
 from docwiki.orchestration.report import LedgerCursor, StageClock, cost_receipt
 from docwiki.orchestration.settings import EngineSettings
 from docwiki.orchestration.telemetry import engine_logger, stage_span
+from docwiki.release.layout import ReleaseLayout
 from docwiki.release.publish import read_current_pointer, read_manifest, try_retention
+from docwiki.release.validate import CITATION_RE, validate_page
 from docwiki.release.writer import ReleaseWriter
 from docwiki.search.index import blocks_from_extracted
 from docwiki.stages.agentkit import build_agent_kit, write_agent_kit
@@ -129,7 +164,7 @@ from docwiki.stages.discover import (
     revalidate_state,
 )
 from docwiki.stages.indexes import build_catalog, build_indexes, changes_since, run_page_path
-from docwiki.stages.links import apply_links, build_edges, replace_frontmatter
+from docwiki.stages.links import apply_links, build_edges, md_link, replace_frontmatter
 from docwiki.stages.publish import finalize_and_publish, run_receipt_page
 from docwiki.stages.sitehook import SiteResult, build_site_for_release, site_unavailable
 from docwiki.stages.verify import (
@@ -184,6 +219,10 @@ DETERMINISTIC_NOTE = (
     "then a new upload, a recompile or the reconcile schedule starts the next run"
 )
 _WITHDRAWN_BANNER = "> **Warning:** this answer cited sources that were withdrawn"
+_SUPERSEDED_BANNER = "> **Superseded:** this answer cites"
+_QUERY_LEFT_OUT = "it no longer passes the checks of this release"
+"""Log reason of a research answer left out because it fails the release checks (the run
+report has the details)."""
 _HASH_CHUNK = 1 << 20
 
 
@@ -356,6 +395,8 @@ class Pipeline:
         self.fast: DeploymentInfo | None = None
         self.smart: DeploymentInfo | None = None
         self.previous = _Previous()
+        self.inbox: list[InboxItem] = []
+        """Research answers filed since the last run (``work/inbox/queries/``, ADR 0007)."""
         self.no_op = False
         self.retries: list[str] = []
         """Sources whose transient quarantine this run retries."""
@@ -567,6 +608,7 @@ class Pipeline:
                 self.clock.error("discover", f"skipped {skipped.raw_path}: {skipped.reason}")
             self.errors.extend(plan.notes)
             self._load_previous()
+            self._load_inbox()
             for item in plan.active_items():
                 work = SourceWork(item=item)
                 floor = sensitivity_floor(self.pack, item.raw_path)
@@ -674,7 +716,59 @@ class Pipeline:
             and state.get("options") == self._options_digest()
             and state.get("sources") == current
             and not plan.restricted
+            and not self.inbox
         )
+
+    def _load_inbox(self) -> None:
+        """Reviewed research answers waiting in ``work/inbox/queries/``; files that are not
+        valid query pages move to ``work/inbox/rejected/`` (only when this run publishes)."""
+        for item in read_inbox(self.ctx.storage):
+            if item.page is not None:
+                self.inbox.append(item)
+                continue
+            reason = item.error or "not a valid query page"
+            if self.request.publish:
+                self._reject_inbox(item, reason, f"{item.key} rejected")
+            else:
+                self.warnings.append(f"answers inbox: {item.key} cannot be merged ({reason})")
+
+    def _consume_inbox(self, published: Sequence[Page], reasons: Mapping[str, str]) -> None:
+        """After a publish: delete the filed answers that are now pages; move the others to
+        ``work/inbox/rejected/`` with the reason (``reasons`` by page id: sources above this
+        audience, or a page that fails the release checks). Only the version this run read is
+        touched: an answer filed again meanwhile stays in the inbox for the next run."""
+        paths = {page.path for page in published}
+        for item in self.inbox:
+            page = item.page
+            assert page is not None
+            if page.path in paths:
+                try:
+                    self.ctx.storage.delete(item.key, if_match=item.etag)
+                except PreconditionFailedError:
+                    self._inbox_changed(item)
+            else:
+                reason = reasons.get(page.frontmatter.id, "it could not be merged")
+                self._reject_inbox(item, reason, f"{page.path} not published")
+
+    def _reject_inbox(self, item: InboxItem, reason: str, what: str) -> None:
+        try:
+            target = reject_inbox_item(self.ctx.storage, item, reason)
+        except PreconditionFailedError:
+            self._inbox_changed(item)
+            return
+        self.warnings.append(f"answers inbox: {what} ({reason}); see {target}")
+
+    def _inbox_changed(self, item: InboxItem) -> None:
+        """The inbox file is no longer the version this run read: leave it alone."""
+        if self.ctx.storage.exists(item.key):
+            message = (
+                f"answers inbox: {item.key} was filed again during this run; the new filing "
+                "is left in the inbox for the next run"
+            )
+        else:
+            message = f"answers inbox: {item.key} was removed during this run"
+        logger.warning("%s", message)
+        self.warnings.append(message)
 
     # -- per-source stages -----------------------------------------------------------------
 
@@ -1028,11 +1122,31 @@ class Pipeline:
         cited.extend(entity_cited)
         cited.extend(topic_cited)
 
-        # research answers filed in earlier releases
+        # research answers filed in earlier releases and since the last run (ADR 0007)
+        excluded = {w.source_id for w in self.work.values() if w.status == "excluded"}
+        dropped_queries: dict[str, str] = {}
+        invalid_queries: dict[str, str] = {}
         query_pages, query_cited = carry_queries(
-            self.previous.queries, source_pages, docs, stamp=stamp, day=day
+            merge_filed_queries(
+                self.previous.queries, [item.page for item in self.inbox if item.page is not None]
+            ),
+            source_pages,
+            docs,
+            stamp=stamp,
+            day=day,
+            excluded=excluded,
+            audience=self.audience,
+            dropped=dropped_queries,
+            invalid=invalid_queries,
+            canaries=self.ctx.canaries,
         )
         cited.extend(query_cited)
+        filed_ids = {item.page.frontmatter.id for item in self.inbox if item.page is not None}
+        for query_id, reason in sorted(invalid_queries.items()):
+            logger.warning("research answer %s left out of this release: %s", query_id, reason)
+            if query_id not in filed_ids:  # filed answers are reported when they are rejected
+                self.warnings.append(f"queries: {query_id} left out of this release ({reason})")
+        dropped_queries.update(invalid_queries)
 
         # links
         self.check_lease()
@@ -1063,7 +1177,13 @@ class Pipeline:
         self.clock.finish("agentkit")
         self.clock.start("indexes")
         removed = self._removed_reasons()
-        entries = changes_since(self.previous.catalog, content, day=day, removed=removed)
+        entries = changes_since(
+            self.previous.catalog,
+            content,
+            day=day,
+            removed=removed,
+            removed_queries=dict.fromkeys(invalid_queries, _QUERY_LEFT_OUT),
+        )
         bundle = build_indexes(
             content,
             pack,
@@ -1110,6 +1230,8 @@ class Pipeline:
         self.clock.start("evidence")
         with stage_span("evidence", run_id=self.run_id):
             self._write_evidence(writer, included, source_pages, cited, docs, contained)
+            pages = self._settle_queries(writer, pages, day)
+            by_path = {page.path: page for page in pages}
         self.clock.finish("evidence")
 
         # catalog and search index
@@ -1212,6 +1334,8 @@ class Pipeline:
                     page_title=pack.info.wiki_title,
                     banner=pack.info.banner,
                     base_url=self.ctx.settings.site_base_url,
+                    gates=verdict.gates,
+                    run_id=self.run_id,
                 )
             )
             message = scrub(result.message, self.ctx.canaries)
@@ -1277,6 +1401,7 @@ class Pipeline:
         if published.published:
             # the pointer is swapped: record the build state first, then prune (best effort)
             self._save_build_state(published.staged.release_id, pages)
+            self._consume_inbox(query_pages, dropped_queries)
             shutil.rmtree(published.staged.root, ignore_errors=True)
             self._retention()
         self.clock.finish("publish")
@@ -1422,6 +1547,33 @@ class Pipeline:
             self.clock.count("evidence", items=len(written))
             if doc.tables:
                 writer.write_tables(work.source_id, list(doc.tables), sensitivity)
+
+    def _settle_queries(self, writer: ReleaseWriter, pages: list[Page], day: date) -> list[Page]:
+        """Research answers cite the locator label and badge of the sidecars just written.
+
+        :func:`carry_queries` derives them from the extracted blocks; the evidence engine has the
+        last word on a sidecar's locator and provenance (a page that mixes provenances).
+        """
+        layout = ReleaseLayout("release", writer.root)
+
+        def sidecar(ns_path: str) -> EvidenceFrontmatter | None:
+            if not ns_path.startswith(f"{EVIDENCE_MOUNT}/"):
+                return None
+            file = layout.content_file(ns_path)
+            if not file.is_file():
+                return None
+            fm = EvidencePage.parse(file.read_text(encoding="utf-8"), ns_path).frontmatter
+            return fm if isinstance(fm, EvidenceFrontmatter) else None
+
+        settled: list[Page] = []
+        for page in pages:
+            if isinstance(page.frontmatter, QueryFrontmatter):
+                fixed = settle_query_citations(page, sidecar)
+                if fixed is not page:
+                    (page,) = self._normalize_updated([fixed], day)
+                    writer.write_page(page)
+            settled.append(page)
+        return settled
 
     def _counts(self, pages: Sequence[Page], writer: ReleaseWriter) -> dict[str, int]:
         types: dict[str, int] = {}
@@ -1622,6 +1774,132 @@ def _drop_footnotes(body: str, drop: set[str]) -> str:
     return "\n".join(out)
 
 
+def _rewrite_definitions(body: str, contents: Mapping[str, str]) -> str:
+    """``body`` whose footnote definitions named in ``contents`` (by label) get that content."""
+    if not contents:
+        return body
+    out: list[str] = []
+    fence = False
+    for line in body.split("\n"):
+        if line.lstrip().startswith(("```", "~~~")):
+            fence = not fence
+        elif not fence:
+            definition = _FOOTNOTE_DEF_LINE_RE.match(line)
+            label = definition.group("label") if definition else None
+            if label is not None and label in contents:
+                line = f"[^{label}]: {contents[label]}"
+        out.append(line)
+    return "\n".join(out)
+
+
+def _query_citation(title: str, locator: Locator, href: str, provenance: str) -> str:
+    """A research answer's footnote, ``[<source title> — <locator label>](<sidecar>) · <badge>``:
+    filed answers paraphrase their evidence, so native text gets ``paraphrase`` (as filing does,
+    :func:`docwiki.answers.build_query_page`)."""
+    badge = badge_for(provenance, "unverified-paraphrase")
+    return f"[{title} — {locator_label(locator)}]({href}) · {badge}"
+
+
+def _sidecar_preview(source: Frontmatter, item: CitedLocator) -> EvidencePage:
+    """The sidecar that the evidence stage writes for ``item``, as far as the extracted blocks
+    tell (the checks of a research answer run before that stage)."""
+    return EvidencePage(
+        path=evidence_path(item.source_id, item.key),
+        frontmatter=EvidenceFrontmatter(
+            id=f"evidence:{item.source_id}:{item.key}",
+            title=f"{source.title} — {locator_label(item.locator)}",
+            source_id=item.source_id,
+            locator=item.locator,
+            provenance=item.provenance,
+            sensitivity=source.sensitivity,
+        ),
+        body="",
+    )
+
+
+def _failed_checks(problems: Sequence[Violation]) -> str:
+    first = problems[0]
+    more = f" (and {len(problems) - 1} more)" if len(problems) > 1 else ""
+    return f"it fails the release checks: {first.gate} {first.code}: {first.message}{more}"
+
+
+def settle_query_citations(
+    page: Page, sidecar: Callable[[str], EvidenceFrontmatter | None]
+) -> Page:
+    """``page`` whose citations carry the locator label and the badge of the sidecar they link
+    to; ``sidecar`` returns the frontmatter of a written sidecar by content path, or ``None``."""
+    _, definitions = extract_footnotes(page.body)
+    contents: dict[str, str] = {}
+    for definition in definitions:
+        match = CITATION_RE.match(definition.content)
+        if match is None:
+            continue
+        target = resolve_href(page.path, match.group("href"))
+        found = sidecar(target.path) if target.path and not target.anchor else None
+        if found is None:
+            continue
+        content = _query_citation(
+            match.group("title"), found.locator, match.group("href"), found.provenance
+        )
+        if content != definition.content:
+            contents[definition.label] = content
+    if not contents:
+        return page
+    body = _rewrite_definitions(page.body, contents)
+    return Page(path=page.path, frontmatter=page.frontmatter, body=body)
+
+
+def merge_filed_queries(previous: Sequence[Page], filed: Sequence[Page]) -> list[Page]:
+    """Query pages of the previous release plus the answers filed since; a filed answer
+    replaces the page at the same path (the same question filed again the same day)."""
+    by_path = {page.path: page for page in previous}
+    for page in filed:
+        by_path[page.path] = page
+    return [by_path[path] for path in sorted(by_path)]
+
+
+def _insert_banner(body: str, banner: str) -> str:
+    lines = body.split("\n")
+    position = next((index + 1 for index, line in enumerate(lines) if line.startswith("# ")), 0)
+    lines[position:position] = ["", banner, ""]
+    return "\n".join(lines)
+
+
+def _strip_banner(body: str, prefix: str) -> str:
+    """Remove the banner lines starting with ``prefix`` and the blank line that followed."""
+    out: list[str] = []
+    skip_blank = False
+    for line in body.split("\n"):
+        if line.startswith(prefix):
+            skip_blank = bool(out) and out[-1] == ""
+            continue
+        if skip_blank and line == "":
+            skip_blank = False
+            continue
+        skip_blank = False
+        out.append(line)
+    return "\n".join(out)
+
+
+def _superseded_banner(
+    path: str, superseded: Sequence[Page], source_pages: Mapping[str, Page]
+) -> str:
+    parts: list[str] = []
+    for page in superseded:
+        fm = page.frontmatter
+        assert isinstance(fm, SourceFrontmatter)
+        newer = [source_pages[s] for s in fm.superseded_by if s in source_pages]
+        old = md_link(fm.title, path, page.path)
+        if newer:
+            parts.append(
+                f"{old}, superseded by "
+                + ", ".join(md_link(n.frontmatter.title, path, n.path) for n in newer)
+            )
+        else:
+            parts.append(f"{old}, which was superseded")
+    return f"{_SUPERSEDED_BANNER} {'; '.join(parts)}. Check the current revision."
+
+
 def carry_queries(
     queries: Sequence[Page],
     source_pages: Mapping[str, Page],
@@ -1629,11 +1907,27 @@ def carry_queries(
     *,
     stamp: DocwikiStamp,
     day: date,
+    excluded: Collection[str] = (),
+    audience: str | None = None,
+    dropped: dict[str, str] | None = None,
+    invalid: dict[str, str] | None = None,
+    canaries: Sequence[str] = (),
 ) -> tuple[list[Page], list[CitedLocator]]:
-    """Research answers of the previous release, restamped, with their evidence re-cited.
+    """Research answers of the previous release and those filed since, restamped, with their
+    evidence re-cited (ADR 0007).
 
-    Citations whose source or locator is gone are removed and the page gets a warning banner
-    (wiki-contract §9 withdrawal).
+    * A page whose tier is above ``audience`` or that cites a source ``excluded`` from this
+      audience build is left out entirely (wiki-contract §8: no mention); ``dropped`` collects
+      the reason by page id.
+    * Citations whose source or locator is gone are removed and the page gets a warning banner
+      (wiki-contract §9 withdrawal).
+    * The other citations are written again from this release, like filing writes them: the
+      current source title, the locator label and the badge of the cited evidence. ``sources``
+      lists the cited sources and ``sensitivity`` is their highest current tier.
+    * A cited source that was superseded adds a banner naming its current revision.
+    * A page that would still fail the checks of :func:`~docwiki.release.validate.validate_page`
+      (citations, sources and tier, safe content, ``canaries``) is left out instead of blocking
+      the release; ``invalid`` collects the reason by page id.
     """
     pages: list[Page] = []
     cited: list[CitedLocator] = []
@@ -1642,49 +1936,74 @@ def carry_queries(
         if not isinstance(fm, QueryFrontmatter):
             continue
         _, definitions = extract_footnotes(query.body)
-        drop: set[str] = set()
-        keep: list[CitedLocator] = []
+        targets: list[tuple[str, str, str]] = []
         for definition in definitions:
             target = None
             for link in extract_links(definition.content):
                 target = resolve_href(query.path, link.href).path
                 break
             parts = (target or "").split("/")
-            if len(parts) != 3 or parts[0] != "evidence":
-                continue
-            source_id, key = parts[1], parts[2].removesuffix(".md")
+            if len(parts) == 3 and parts[0] == EVIDENCE_MOUNT:
+                targets.append((definition.label, parts[1], parts[2].removesuffix(".md")))
+        cited_sources = {source_id for _, source_id, _ in targets} | set(fm.sources)
+        if (audience is not None and not allowed_for_audience(fm.sensitivity, audience)) or (
+            cited_sources & set(excluded)
+        ):
+            if dropped is not None:
+                dropped[fm.id] = "its sources are above the audience of this build"
+            continue
+        drop: set[str] = set()
+        keep: list[CitedLocator] = []
+        rewritten: dict[str, str] = {}
+        sidecars: dict[str, EvidencePage] = {}
+        for label, source_id, key in targets:
             doc = docs.get(source_id)
             blocks = [block for block in doc.blocks if block.locator_key == key] if doc else []
             if source_id not in source_pages or not blocks:
-                drop.add(definition.label)
+                drop.add(label)
                 continue
-            keep.append(
-                CitedLocator(
-                    source_id=source_id,
-                    locator=blocks[0].locator,
-                    block_ids=tuple(block.id for block in blocks),
-                    provenance=blocks[0].provenance,
-                )
+            item = CitedLocator(
+                source_id=source_id,
+                locator=blocks[0].locator,
+                block_ids=tuple(block.id for block in blocks),
+                provenance=blocks[0].provenance,
             )
-        sources = [source_id for source_id in fm.sources if source_id in source_pages]
-        page = restamp(query, stamp, day)
-        if drop or len(sources) != len(fm.sources):
-            body = _drop_footnotes(query.body, drop)
+            keep.append(item)
+            source = source_pages[source_id].frontmatter
+            sidecar = _sidecar_preview(source, item)
+            sidecars[sidecar.path] = sidecar
+            href = relative_link(query.path, sidecar.path)
+            rewritten[label] = _query_citation(source.title, item.locator, href, item.provenance)
+        body = _rewrite_definitions(query.body, rewritten)
+        if drop or any(source_id not in source_pages for source_id in fm.sources):
+            body = _drop_footnotes(body, drop)
             if _WITHDRAWN_BANNER not in body:
-                lines = body.split("\n")
-                position = next(
-                    (index + 1 for index, line in enumerate(lines) if line.startswith("# ")), 0
-                )
-                banner = f"{_WITHDRAWN_BANNER}; their citations were removed."
-                lines[position:position] = ["", banner, ""]
-                body = "\n".join(lines)
-            tiers = [source_pages[s].frontmatter.sensitivity for s in sources]
-            updates: dict[str, Any] = {"sources": sorted(sources)}
-            if tiers:
-                updates["sensitivity"] = max_sensitivity(*tiers)
-            page = replace_frontmatter(
-                Page(path=page.path, frontmatter=page.frontmatter, body=body), **updates
-            )
+                body = _insert_banner(body, f"{_WITHDRAWN_BANNER}; their citations were removed.")
+        superseded = [
+            source_pages[s]
+            for s in sorted(cited_sources & set(source_pages))
+            if getattr(source_pages[s].frontmatter, "status", None) == "superseded"
+        ]
+        body = _strip_banner(body, _SUPERSEDED_BANNER)
+        if superseded:
+            body = _insert_banner(body, _superseded_banner(query.path, superseded, source_pages))
+        sources = sorted(
+            {source_id for source_id in fm.sources if source_id in source_pages}
+            | {item.source_id for item in keep}
+        )
+        updates: dict[str, Any] = {"sources": sources}
+        tiers = [source_pages[source_id].frontmatter.sensitivity for source_id in sources]
+        if tiers:
+            updates["sensitivity"] = max_sensitivity(*tiers)
+        stamped = restamp(query, stamp, day)
+        page = replace_frontmatter(
+            Page(path=stamped.path, frontmatter=stamped.frontmatter, body=body), **updates
+        )
+        problems = validate_page(page, sources=source_pages, evidence=sidecars, canaries=canaries)
+        if problems:
+            if invalid is not None:
+                invalid[fm.id] = _failed_checks(problems)
+            continue
         pages.append(page)
         cited.extend(keep)
     return pages, cited

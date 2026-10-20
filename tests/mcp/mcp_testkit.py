@@ -52,11 +52,12 @@ from docwiki.mcp.tokens import SigningKeys, TokenValidator, issuer_for, jwks_url
 from docwiki.release import ReleaseWriter, StagedRelease
 
 FIXTURE_ROOT = Path(__file__).resolve().parents[2] / "samples" / "fixtures" / "mock-release"
-DOMAIN_PACK = Path(__file__).resolve().parents[2] / "domains" / "wind-om"
-RELEASE_ID = "20260215T090000Z-decd4b59"
-SOP_A, SOP_B, PLAN = "src-f2750f41f3fa", "src-4d9c65e05302", "src-43c97f7dfcde"
+DOMAIN_PACK = Path(__file__).resolve().parents[2] / "domains" / "batiment"
+RELEASE_ID = "20260401T090000Z-7ce99a3f"
+PLAN_A, PLAN_B, MINUTES = "src-c6436ec50050", "src-86eabe3d6d0d", "src-165f1d3a109c"
+TOPIC_ID = "topic:schedule-and-window-delivery"
 OID_CLAIM = "http://schemas.microsoft.com/identity/claims/objectidentifier"
-NOW = datetime(2026, 3, 1, 8, 30, 0, tzinfo=UTC)
+NOW = datetime(2026, 4, 3, 8, 30, 0, tzinfo=UTC)
 
 
 def load_builder() -> ModuleType:
@@ -113,7 +114,7 @@ def stage_release(
             update: dict[str, Any] = {
                 "frontmatter": page.frontmatter.model_copy(update={"docwiki": writer.stamp})
             }
-            if topic_note and rel == "topics/gearbox-oil.md":
+            if topic_note and rel == "topics/schedule-and-window-delivery.md":
                 update["body"] = page.body.replace(
                     "## Overview\n", f"## Overview\n\n{topic_note}\n", 1
                 )
@@ -130,15 +131,13 @@ def stage_release(
             writer.copy_file(rel, file)
     catalog = Catalog.from_json((source / "catalog.json").read_bytes())
     writer.write_catalog(catalog.model_copy(update={"release_id": writer.release_id}))
-    writer.write_tables(builder.PLAN, [builder.PLAN_TABLE], "public")
+    writer.write_tables(builder.PLAN_B, builder.PLAN_TABLES, "public")
     titles = {
         p.frontmatter.id: (p.frontmatter.title, p.path)
         for p in pages
         if p.frontmatter.type == "source"
     }
-    writer.write_search_db(
-        pages, builder._blocks(titles), [("WTG", "wind turbine generator", "en")]
-    )
+    writer.write_search_db(pages, builder._blocks(titles), [("revision", "indice", "fr")])
     return writer.finalize(
         gates=gate_results([], skipped=builder.SKIPPED_GATES), counts={"pages": len(pages)}
     )
@@ -308,15 +307,16 @@ def tool_payload(result: Any) -> dict[str, Any]:
 
 
 READ_CALLS: dict[str, dict[str, Any]] = {
-    "search": {"query": "cold sites ISO VG 220", "limit": 20},
-    "read_page": {"page": "topic:gearbox-oil"},
-    "get_index": {"scope": "entities/asset"},
-    "get_links": {"page": SOP_B},
-    "glossary": {"term": "WTG"},
-    "get_evidence": {"source_id": PLAN, "locator_key": "sheet-plan-r0002-r0004"},
+    "search": {"query": "report de la livraison des menuiseries", "limit": 20},
+    "read_page": {"page": TOPIC_ID},
+    "get_index": {"scope": "entities/work-package"},
+    "get_links": {"page": PLAN_B},
+    "glossary": {"term": "revision"},
+    "get_evidence": {"source_id": PLAN_B, "locator_key": "sheet-planning-r0006-r0009"},
     "query_table": {
-        "source_id": PLAN,
-        "sql": "SELECT row_id, asset, hours FROM t01 ORDER BY row_id",
+        "source_id": PLAN_B,
+        "sql": "SELECT row_id, n_commande, commande_ht FROM t02 WHERE n_commande LIKE 'BC-%' "
+        "AND commande_ht > 3000 ORDER BY row_id",
     },
     "get_skill": {"name": "wiki-navigator"},
     "list_skills": {},
@@ -333,25 +333,24 @@ def check_read_results(results: dict[str, dict[str, Any]]) -> None:
     cited = [
         hit
         for hit in results["search"]["hits"]
-        if hit["kind"] == "source-block" and hit["source_id"] == SOP_B
+        if hit["kind"] == "source-block" and hit["source_id"] == MINUTES
     ]
-    assert cited and cited[0]["evidence_path"] == f"evidence/{SOP_B}/para-0004.md"
+    assert cited and cited[0]["evidence_path"] == f"evidence/{MINUTES}/para-0011.md"
     assert cited[0]["provenance"] == "native-text"
     citations = {item["label"]: item for item in results["read_page"]["citations"]}
-    assert citations["c2"]["evidence_path"] == f"evidence/{PLAN}/sheet-plan-r0002-r0004.md"
-    assert results["get_index"]["path"] == "entities/asset/index.md"
+    assert citations["c1"]["evidence_path"] == f"evidence/{PLAN_B}/sheet-planning-r0006-r0009.md"
+    assert results["get_index"]["path"] == "entities/work-package/index.md"
     assert any(
-        item["page_id"] == SOP_A and "supersedes" in item["kinds"]
+        item["page_id"] == PLAN_A and "supersedes" in item["kinds"]
         for item in results["get_links"]["outgoing"]
     )
-    assert [match["term"] for match in results["glossary"]["matches"]] == ["WTG"]
+    assert [match["term"] for match in results["glossary"]["matches"]] == ["revision"]
     evidence = results["get_evidence"]
     assert evidence["provenance"] == "deterministic-table" and evidence["tables_available"]
-    assert "| WTG-12 | Gearbox oil change | ISO VG 220 | 2026-05 | 6 |" in evidence["content"]
+    assert "| T07 | Livraison des menuiseries | 5 | VanArsdel Menuiseries |" in evidence["content"]
     assert results["query_table"]["rows"] == [
-        ["r0002", "WTG-07", 6],
-        ["r0003", "WTG-07", 2],
-        ["r0004", "WTG-12", 6],
+        ["r0003", "BC-2026-009", 3320.0],
+        ["r0004", "BC-2026-010", 4386.5],
     ]
     assert results["get_skill"]["content"].startswith("---\nname: wiki-navigator")
     assert len(results["list_skills"]["skills"]) == 4
@@ -416,14 +415,15 @@ def _state(
 
 
 EXTRACT_KEY = "a" * 64
-BROKEN_PATH = "procedures/broken-scan.pdf"
-ODD_PATH = "records/odd-export.csv"
-NEW_PATH = "records/new-plan.xlsx"
-GONE_PATH = "old/manual.txt"
+BROKEN_PATH = "achats/scan-bon-de-livraison.pdf"
+ODD_PATH = "planning/export-atypique.csv"
+NEW_PATH = "planning/nouveau-planning.xlsx"
+GONE_PATH = "chantier/ancien-compte-rendu.txt"
+DONE_PATH = "chantier/2026-03-24_compte-rendu-de-chantier-n3.docx"
 
 
 def seed_pack(storage: FolderStorage) -> None:
-    """``work/state/domain-pack.json`` as the pipeline records it (the wind-om sample pack)."""
+    """``work/state/domain-pack.json`` as the pipeline records it (the batiment sample pack)."""
     from docwiki.domain.loader import load_pack
     from docwiki.orchestration.proposals import ProposalStore
 
@@ -437,7 +437,7 @@ def seed_work(storage: FolderStorage) -> dict[str, Any]:
     done = StageState(status="done", updated_at=NOW)
     states = [
         _state(
-            "procedures/SOP-GBX-010 rev B.docx",
+            DONE_PATH,
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             {"discover": done, "extract": done, "compile": done},
         ),
@@ -484,12 +484,12 @@ def seed_work(storage: FolderStorage) -> dict[str, Any]:
         source_path=BROKEN_PATH,
         source_hash=_hash(BROKEN_PATH),
         media_type="application/pdf",
-        lang="en",
+        lang="fr",
         blocks=[
             Block(
                 id="b0001",
                 kind="paragraph",
-                text="Inspect the yaw brake pads every 6 months.",
+                text="Vérifier la conformité des palettes à la livraison.",
                 locator=PdfPageLocator(page=1),
                 provenance="native-text",
             ),
@@ -517,7 +517,7 @@ def seed_work(storage: FolderStorage) -> dict[str, Any]:
     )
     versions = load_builder().VERSIONS
     older = RunReport(
-        run_id="run-20260228-060000-0a0b0c0d",
+        run_id="run-20260402-060000-0a0b0c0d",
         kind="ingest",
         requested_by="event",
         status="succeeded",
@@ -530,7 +530,7 @@ def seed_work(storage: FolderStorage) -> dict[str, Any]:
         cost=CostReceipt(price_table="prices-2026-01", total_cost=0.42, duration_s=540.0),
     )
     newer = RunReport(
-        run_id="run-20260301-070000-1a1b1c1d",
+        run_id="run-20260403-070000-1a1b1c1d",
         kind="ingest",
         requested_by="librarian",
         status="failed",
@@ -574,10 +574,12 @@ def seed_work(storage: FolderStorage) -> dict[str, Any]:
     glossary = new_proposal(
         "glossary",
         GlossaryProposalPayload(
-            term="GBX", definition="Gearbox of a wind turbine.", synonyms={"fr": ["multiplicateur"]}
+            term="chape",
+            definition="Screed laid on a floor slab.",
+            synonyms={"en": ["screed"]},
         ),
         created_at=NOW - timedelta(hours=3),
-        evidence=[ProposalEvidence(source_id=SOP_B, block_id="b0004")],
+        evidence=[ProposalEvidence(source_id=MINUTES, block_id="b0004")],
     )
     injection = new_proposal(
         "injection",
@@ -599,14 +601,14 @@ def seed_work(storage: FolderStorage) -> dict[str, Any]:
     )
     accepted_data = new_proposal(
         "entity",
-        EntityProposalPayload(type="asset", key="wtg-21", label="WTG-21"),
+        EntityProposalPayload(type="building-element", key="fenetre-f2", label="fenêtre F2"),
         created_at=NOW - timedelta(days=3),
     ).to_json_dict()
     accepted_data.update(
         status="accepted",
         decided_by="local-operator",
-        decided_at="2026-02-27T10:00:00Z",
-        note="seen in the plan",
+        decided_at="2026-03-31T10:00:00Z",
+        note="seen in the schedule",
     )
     accepted = parse_proposal(accepted_data)
     for proposal in (glossary, injection, recompile, accepted):

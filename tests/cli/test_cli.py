@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import sys
 import types
@@ -72,10 +73,12 @@ def test_export_obsidian_rewrites_links(cli_env):
     assert result.exit_code == 0, result.output
     index = (vault / "index.md").read_text(encoding="utf-8")
     assert "[[topics/index|topics]]" in index
-    assert "[[sources/index#Procedures|Procedures]]" in index
-    page = next((vault / "sources").glob("sop-gbx-010-rev-a.md"))
-    text = page.read_text(encoding="utf-8")
-    assert "[[evidence/" in text and "](../evidence/" not in text
+    assert re.search(r"\[\[sources/index#[^|\]]+\|[^\]]+\]\]", index), "category links"
+    pages = [p for p in sorted((vault / "sources").glob("*.md")) if p.name != "index.md"]
+    assert pages
+    texts = [page.read_text(encoding="utf-8") for page in pages]
+    assert any("[[evidence/" in text for text in texts)
+    assert not any("](../evidence/" in text for text in texts)
     assert (vault / "evidence").is_dir()
     assert not (vault / ".agents").exists()
 
@@ -170,12 +173,12 @@ def test_serve_and_ask_delegate_or_report_unavailable(cli_env, monkeypatch):
     server = types.ModuleType("docwiki.mcp.server")
     server.main = lambda argv=None: calls.append(list(argv or [])) or 0  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "docwiki.mcp.server", server)
-    result = runner.invoke(app, ["serve", "--stdio", "--release", "samples/wiki", "--verbose"])
+    result = runner.invoke(app, ["serve", "--stdio", "--release", "releases", "--verbose"])
     assert result.exit_code == 0, result.output
-    assert calls == [["--stdio", "--release", "samples/wiki", "--verbose"]]
+    assert calls == [["--stdio", "--release", "releases", "--verbose"]]
 
     monkeypatch.setitem(sys.modules, "docwiki.agents_client", None)
-    assert runner.invoke(app, ["ask", "Which oil?"]).exit_code == 2
+    assert runner.invoke(app, ["ask", "When are the windows delivered?"]).exit_code == 2
     client = types.ModuleType("docwiki.agents_client")
     asked: list[dict[str, object]] = []
 
@@ -193,7 +196,7 @@ def test_serve_and_ask_delegate_or_report_unavailable(cli_env, monkeypatch):
         asked.append({"question": question, **options})
         if question == "boom":
             raise AgentsClientError("agent unavailable")
-        return Answer(f"{options['agent']}: {question}\n\n[1] Rev B — ¶ 3")
+        return Answer(f"{options['agent']}: {question}\n\n[1] Indice B — ¶ 3")
 
     async def prompt_approval(request: object) -> bool:
         return True
@@ -204,19 +207,30 @@ def test_serve_and_ask_delegate_or_report_unavailable(cli_env, monkeypatch):
     client.AgentsClientError = AgentsClientError  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "docwiki.agents_client", client)
     result = runner.invoke(
-        app, ["ask", "Which oil?", "--agent", "librarian", "--conversation", "conv-1"]
+        app,
+        [
+            "ask",
+            "When are the windows delivered?",
+            "--agent",
+            "librarian",
+            "--conversation",
+            "conv-1",
+        ],
     )
     assert result.exit_code == 0, result.output
-    assert "librarian: Which oil?" in result.output and "[1] Rev B" in result.output
+    assert "librarian: When are the windows delivered?" in result.output
+    assert "[1] Indice B" in result.output
     assert "[receipt]" in result.output
     assert asked[-1] == {
-        "question": "Which oil?",
+        "question": "When are the windows delivered?",
         "agent": "librarian",
         "conversation_id": "conv-1",
         "approve": None,
         "version": None,
     }
-    result = runner.invoke(app, ["ask", "Which oil?", "--approve", "prompt", "--json"])
+    result = runner.invoke(
+        app, ["ask", "When are the windows delivered?", "--approve", "prompt", "--json"]
+    )
     assert result.exit_code == 0 and json.loads(result.output)["text"].startswith("researcher")
     assert asked[-1]["approve"] is prompt_approval
     failed = runner.invoke(app, ["ask", "boom"])
@@ -249,8 +263,8 @@ def test_output_that_the_console_cannot_encode_never_crashes(
     ansi = io.TextIOWrapper(buffer, encoding="cp1252")
     monkeypatch.setattr(sys, "stdout", ansi)
     _never_fail_on_output_encoding()
-    print("Minimum start temperature \u22125 \u00b0C \u2713")
+    print("Dalle de l\u2019extension \u2265 30 m\u00b2 \u2713")
     ansi.flush()
     assert buffer.getvalue().decode("cp1252").splitlines() == [
-        "Minimum start temperature ?5 \u00b0C ?"
+        "Dalle de l\u2019extension ? 30 m\u00b2 ?"
     ]

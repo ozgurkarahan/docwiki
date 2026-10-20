@@ -1,7 +1,9 @@
 terms:
-  - term: LOTO
-    definition: Lockout/tagout, isolating energy sources before work starts.
+  - term: deposit
+    definition: Advance payment of part of the price, made when a contract or an order is signed.
     synonyms:
-      fr: [consignation]
-  - term: SCADA
-    definition: Supervisory control and data acquisition system of the wind farm.
+      fr: [acompte]
+  - term: retention
+    definition: Share of the price held back as a guarantee after the handover of the works.
+    synonyms:
+      fr: [retenue de garantie]

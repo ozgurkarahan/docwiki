@@ -3,7 +3,10 @@
     uv run python tests/studio/studio_preview.py [--port 8091] [--delay 3]
 
 Serves http://127.0.0.1:8091/ with the sign-in checks off (loopback only). The seeded storage
-lives in a temporary folder: uploads land there, nothing leaves the machine.
+lives in a temporary folder: uploads land there, nothing leaves the machine. The canned
+Researcher answer cites evidence sidecars of the seeded release, so "File to wiki" works: the
+preview shows one number warning and filing writes the query page to the folder's
+``work/inbox/queries/`` (no pipeline runs here).
 """
 
 from __future__ import annotations
@@ -13,7 +16,7 @@ import tempfile
 from pathlib import Path
 
 import uvicorn
-from studio_testkit import WIKI_URL, FakeAgentClient, seed_storage
+from studio_testkit import WIKI_URL, WINDOWS_TEXT, FakeAgentClient, seed_storage
 
 from docwiki.studio.app import create_app
 from docwiki.studio.config import StudioConfig
@@ -30,7 +33,7 @@ def main() -> None:
     storage = seed_storage(root)
     config = StudioConfig(wiki_url=WIKI_URL, require_sign_in=False)
     service = StudioService(storage, config, queue_depth=lambda: 1)
-    client = FakeAgentClient(delay_s=args.delay)
+    client = FakeAgentClient(delay_s=args.delay, researcher_text=WINDOWS_TEXT)
     jobs = AgentJobs(lambda: client, daily_questions=100, approval_timeout_s=600.0)
     print(f"seeded storage: {root}")
     uvicorn.run(

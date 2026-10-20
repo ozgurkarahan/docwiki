@@ -22,7 +22,7 @@ def base_lists() -> tuple[TermSet, TermSet]:
 @pytest.fixture
 def vocabulary(base_lists: tuple[TermSet, TermSet]) -> Vocabulary:
     allow = TermSet(name="allow")
-    for term in ("Contoso Renewables", "Mira Jensen", "Northwind Ridge"):
+    for term in ("Lamna Bâtiment", "Inès Roux", "Chantier Moreau", "BC"):
         allow.add_term(term)
     tech, common = base_lists
     return Vocabulary(allow=allow, tech=tech, common=common)
@@ -34,14 +34,14 @@ def terms(text: str, vocabulary: Vocabulary, *, sentence_start: bool = True) -> 
 
 def test_allowlisted_tech_and_common_words_are_accepted(vocabulary: Vocabulary) -> None:
     text = (
-        "Contoso Renewables operates Northwind Ridge. Mira Jensen reviewed the Gearbox "
-        "Maintenance Procedure with Microsoft Foundry on Azure and the SCADA Alarm Log."
+        "Lamna Bâtiment runs the Chantier Moreau. Inès Roux reviewed the Delivery Schedule "
+        "with Microsoft Foundry on Azure and the OCR Evidence Log."
     )
     assert terms(text, vocabulary) == []
 
 
 def test_unknown_names_are_reported(vocabulary: Vocabulary) -> None:
-    text = "The oil was supplied by Zorblax Lubricants and checked by Quentin Marsh."
+    text = "The blocks were supplied by Zorblax Supplies and checked by Quentin Marsh."
     assert terms(text, vocabulary) == ["Zorblax", "Quentin Marsh"]
 
 
@@ -89,7 +89,7 @@ def test_urls_code_and_emails_are_ignored(vocabulary: Vocabulary) -> None:
 def test_learned_vocabulary_accepts_title_case_corpus_words(vocabulary: Vocabulary) -> None:
     heading = "Dehumidifier Overhaul"
     assert terms(heading, vocabulary, sentence_start=False) == ["Dehumidifier"]
-    vocabulary.learn("The dehumidifier in the nacelle is serviced with the yaw drive.")
+    vocabulary.learn("The dehumidifier in the extension dries the slab.")
     assert terms(heading, vocabulary, sentence_start=False) == []
 
 
@@ -102,7 +102,7 @@ def test_regex_entries_in_allowlists(base_lists: tuple[TermSet, TermSet]) -> Non
 
 
 def test_plurals_possessives_and_french_elision(vocabulary: Vocabulary) -> None:
-    assert terms("Read the Contoso's Inspections Reports today.", vocabulary) == []
+    assert terms("Read the Lamna's Inspections Reports today.", vocabulary) == []
     assert terms("Le technicien de l'Atelier Zorblax arrive.", vocabulary) == ["Zorblax"]
 
 
@@ -114,15 +114,15 @@ def test_long_runs_are_split_into_short_candidates(vocabulary: Vocabulary) -> No
 @pytest.mark.parametrize(
     "text",
     [
-        "release: 20260215T090000Z-decd4b59",
-        '"release_id": "20260215T090000Z-decd4b59",',
-        "created 2026-02-15T09:00:00Z by the job",
-        "evidence for src-43c97f7dfcde and SRC-4D9C65E05302",
-        "see p0003, b0042 and sheet-plan-r0002-r0004",
-        "inspect WTG-07 and WTG-12 today",
-        "follow SOP-GBX-010 rev B and SOP-GBX-010.",
+        "release: 20260401T090000Z-7ce99a3f",
+        '"release_id": "20260401T090000Z-7ce99a3f",',
+        "created 2026-04-01T09:00:00Z by the job",
+        "evidence for src-c6436ec50050 and SRC-165F1D3A109C",
+        "see p0003, b0042 and sheet-planning-r0006-r0009",
+        "check BC-2026-009 and BC-2026-012 today",
+        "follow DEV-2026-014 indice B and DEV-2026-014.",
         "set FIXTURE_DIR and ReleaseFiles.WIKI_DIR first",
-        "turbines are identified as WTG-NN",
+        "orders are identified as BC-NNN",
         "dates use YYYY-MM-DD and times HH:MM",
     ],
 )
@@ -133,8 +133,8 @@ def test_identifier_fragments_and_placeholders_are_not_names(
 
 
 def test_names_next_to_identifiers_are_still_reported(vocabulary: Vocabulary) -> None:
-    assert terms("WTG-07 was serviced by Zorblax on 2026-02-15.", vocabulary) == ["Zorblax"]
-    text = "release 20260215T090000Z-decd4b59 approved by Quentin Marsh"
+    assert terms("BC-2026-009 was delivered by Zorblax on 2026-04-20.", vocabulary) == ["Zorblax"]
+    text = "release 20260401T090000Z-7ce99a3f approved by Quentin Marsh"
     assert terms(text, vocabulary) == ["Quentin Marsh"]
 
 
@@ -144,14 +144,14 @@ def test_names_next_to_identifiers_are_still_reported(vocabulary: Vocabulary) ->
         ('"summary": "Append-only change log of this wiki."', []),
         ('"summary": "Curated multi-source syntheses."', []),
         ('"message": "Non-empty when the domain pack has seeds"', []),
-        ('["Drain the oil", "Check the level"]', []),
-        ("summary: Superseded revision A of the procedure.", []),
-        ("Drain the oil while it is still warm.", []),
+        ('["Deliver the windows", "Check the level"]', []),
+        ("summary: Superseded revision A of the schedule.", []),
+        ("Deliver the windows once the slab is dry.", []),
         ('"vendor": "Zorblax"', ["Zorblax"]),
         ("Supplier: Zorblax", ["Zorblax"]),
         ("| Zorblax | 12 |", ["Zorblax"]),
         ("Note (Zorblax supplied it) today", ["Zorblax"]),
-        ("# Zorblax gearbox", ["Zorblax"]),
+        ("# Zorblax window", ["Zorblax"]),
     ],
 )
 def test_phrase_starts_followed_by_prose_are_not_names(

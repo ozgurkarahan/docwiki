@@ -36,6 +36,7 @@ from evals import METRICS_VERSION, RESULT_FORMAT
 from evals.corpus import (
     SCOPES,
     CorpusContext,
+    CorpusManifest,
     ExtractionCache,
     ReleaseCatalog,
     load_corpus,
@@ -86,6 +87,8 @@ PUBLIC_SPLIT = "dev"
 """The only split whose per-question records may be written to the repository."""
 PRIVATE_FOLDERS = ("evals/holdout", "private", ".local")
 """Git-ignored folders of the repository where private outputs may be written."""
+BASELINES = ("baseline-rag", "baseline-long-context")
+"""Systems that index the documents of ``--scope`` (the Researcher answers over its release)."""
 MAX_CONTEXT_CHARS = 30_000
 _SPLIT_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
 
@@ -163,6 +166,13 @@ def _check_split_labels(options: RunOptions, questions: QuestionSet) -> None:
             f"the questions are labelled split={', '.join(labels)}: pass --split-name "
             f"{labels[0]} (per-question details of non-dev splits are never written to --out)"
         )
+
+
+def _check_documents(options: RunOptions) -> None:
+    """The baselines index the documents of the selected scope: none at all is an error, reported
+    before any extraction or model call."""
+    if options.system in BASELINES:
+        CorpusManifest.load(options.corpus).select(options.scope, options.audience)
 
 
 def _display_path(path: Path) -> str:
@@ -244,6 +254,8 @@ def scrub(text: str | None, *, limit: int = 300) -> str | None:
 
 
 def build_system(options: RunOptions, corpus: CorpusContext) -> EvalSystem:
+    """The system under test. The baselines index the documents of ``options.scope`` that the
+    audience may see; an empty selection raises ``ValueError``."""
     if options.system == "docwiki-researcher":
         return ResearcherSystem(env=options.env)
     if options.system == "baseline-rag":
@@ -256,7 +268,7 @@ def build_system(options: RunOptions, corpus: CorpusContext) -> EvalSystem:
     if options.system == "baseline-long-context":
         return BaselineLongContextSystem(
             docs=corpus.docs,
-            files=corpus.manifest.select("quickstart", options.audience),
+            files=corpus.manifest.select(options.scope, options.audience),
             budget_tokens=options.budget_tokens,
         )
     raise ValueError(f"unknown system {options.system!r}; use one of {', '.join(SYSTEMS)}")
@@ -524,7 +536,7 @@ async def run_evaluation(
         "config": {
             "system": system_config,
             "audience": options.audience,
-            "scope": options.scope if system.name == "baseline-rag" else None,
+            "scope": options.scope if system.name in BASELINES else None,
             "extract_mode": options.extract_mode,
             "catalog": catalog is not None,
             "judge": options.judge,
@@ -597,7 +609,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--cache-dir", type=Path, default=REPO_ROOT / ".cache" / "evals")
     parser.add_argument("--extract-mode", choices=("local", "azure"), default="local")
     parser.add_argument("--audience", choices=SENSITIVITIES, default="public")
-    parser.add_argument("--scope", choices=SCOPES, default="full", help="baseline-rag corpus")
+    parser.add_argument(
+        "--scope", choices=SCOPES, default="full", help="document scope of the baselines"
+    )
     parser.add_argument("--top-k", type=int, default=8)
     parser.add_argument("--chunk-tokens", type=int, default=800)
     parser.add_argument("--budget-tokens", type=int, default=120_000)
@@ -642,6 +656,7 @@ async def _main(options: RunOptions) -> int:
         questions = load_questions(options.questions, limit=options.limit)
         _check_split_labels(options, questions)
         catalog = ReleaseCatalog.load(options.catalog) if options.catalog else None
+        _check_documents(options)
     except (ValueError, QuestionSetError, OSError, KeyError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2

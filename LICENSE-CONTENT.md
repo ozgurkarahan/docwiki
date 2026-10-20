@@ -8,7 +8,6 @@ This applies to:
 
 - `samples/fiction/` — the fictional world bible,
 - `samples/corpus/` — the generated fictional documents,
-- `samples/wiki/` — the generated sample wiki,
 - `samples/fixtures/` — test fixtures such as the mock release,
 - `evals/golden/` — the public evaluation questions,
 - images and diagrams under `docs/`.

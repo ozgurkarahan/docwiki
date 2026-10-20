@@ -28,7 +28,7 @@ What gets deployed (`infra/main.bicep`):
 | Microsoft Foundry account + project | `aif-<token>`, project `docwiki` | AIServices, local auth disabled; deployments `fast` and `smart`; App Insights tracing connection |
 | Storage account | `st<token>` | Shared key disabled, versioning + soft delete; containers `raw`, `work`, `releases`; queues `ingest`, `ingest-poison` |
 | Network security perimeter (optional) | `nsp-docwiki-<token>` | Only with `DOCWIKI_NETWORK_PERIMETER=true`: storage reachable only by managed identities of the subscription and `DOCWIKI_ALLOWED_IP_RANGES` |
-| Event Grid system topic | `evgt-<token>` | `raw/` BlobCreated/BlobDeleted → queue `ingest` (managed identity delivery) |
+| Event Grid system topic | `evgt-<token>` | `raw/` BlobCreated/BlobDeleted and `work/inbox/queries/` BlobCreated (filed answers) → queue `ingest` (managed identity delivery) |
 | Container registry | `cr<token>` | Basic, admin user disabled; images built remotely by azd |
 | Container Apps environment | `cae-<token>` | Consumption profile; logs to Log Analytics through Azure Monitor |
 | Jobs | `caj-ingest-<token>`, `caj-reconcile-<token>` | Queue-triggered (KEDA, one execution) and scheduled reconcile |
@@ -133,7 +133,7 @@ azd env set DOCWIKI_MCP_MIN_REPLICAS 0
 | `DOCWIKI_ENABLE_EVENT_TRIGGER` | `true` | `false` makes the ingest job manual |
 | `DOCWIKI_RECONCILE_CRON` | `0 */6 * * *` | Reconcile schedule (UTC) |
 | `DOCWIKI_AUDIENCE` | `internal` | Build audience (`public`, `internal`, `restricted`) |
-| `DOCWIKI_DOMAIN` | `wind-om` | Domain pack |
+| `DOCWIKI_DOMAIN` | `batiment` | Domain pack |
 | `DOCWIKI_CONTENT_UNDERSTANDING` | `true` | Extract with Content Understanding (`prebuilt-layout`) |
 | `DOCWIKI_ENABLE_ROUTINE` | `false` | `true` deploys the Librarian routine enabled (`agents/deploy.py --routine enable`); back to `false` disables it |
 | `DOCWIKI_ENABLE_FOUNDRY_SKILLS_PREVIEW` | `false` | Opt-in Foundry skills preview for the agents |
@@ -173,8 +173,10 @@ python scripts/preflight.py
 VERIFY: The last line reads `preflight: 0 failed`. Checks: tool versions, az/azd sign-in,
 subscription state, allowed region, resource providers, both models offered in the region
 with the chosen deployment type and GA lifecycle, model quota, deployer roles (Owner, or
-Contributor + User Access Administrator), permission to register Entra applications, budget
-contacts, no soft-deleted Foundry account blocking the name.
+Contributor + User Access Administrator; both include
+`Microsoft.Authorization/roleDefinitions/write`, which the Studio's custom role on `work` needs),
+permission to register Entra applications, budget contacts, no soft-deleted Foundry account
+blocking the name.
 
 ON_FAIL: Apply the `fix:` line printed under each failed check. Typical fixes:
 
@@ -263,6 +265,7 @@ az role assignment list --assignee $(azd env get-value DOCWIKI_RUNTIME_IDENTITY_
 az role assignment list --assignee $(azd env get-value DOCWIKI_MCP_IDENTITY_PRINCIPAL_ID) --all --query "[].{role:roleDefinitionName, scope:scope, condition:condition}" --output json
 az role assignment list --assignee $(azd env get-value DOCWIKI_PORTAL_IDENTITY_PRINCIPAL_ID) --all --query "[].{role:roleDefinitionName, scope:scope}" --output table
 az eventgrid system-topic event-subscription show --name raw-to-ingest --system-topic-name $(azd env get-value DOCWIKI_EVENT_GRID_SYSTEM_TOPIC) --resource-group $(azd env get-value AZURE_RESOURCE_GROUP) --query "{state:provisioningState, subject:filter.subjectBeginsWith, types:filter.includedEventTypes}"
+az eventgrid system-topic event-subscription show --name inbox-to-ingest --system-topic-name $(azd env get-value DOCWIKI_EVENT_GRID_SYSTEM_TOPIC) --resource-group $(azd env get-value AZURE_RESOURCE_GROUP) --query "{state:provisioningState, subject:filter.subjectBeginsWith, types:filter.includedEventTypes}"
 az containerapp job show --name $(azd env get-value DOCWIKI_INGEST_JOB_NAME) --resource-group $(azd env get-value AZURE_RESOURCE_GROUP) --query "properties.configuration.{trigger:triggerType, timeout:replicaTimeout, retries:replicaRetryLimit, scale:eventTriggerConfig.scale}"
 az containerapp auth show --name $(azd env get-value DOCWIKI_MCP_APP_NAME) --resource-group $(azd env get-value AZURE_RESOURCE_GROUP) --query "{enabled:platform.enabled, action:globalValidation.unauthenticatedClientAction, excluded:globalValidation.excludedPaths, issuer:identityProviders.azureActiveDirectory.registration.openIdIssuer, audiences:identityProviders.azureActiveDirectory.validation.allowedAudiences, allowed:identityProviders.azureActiveDirectory.validation.defaultAuthorizationPolicy.allowedApplications}"
 az containerapp show --name $(azd env get-value DOCWIKI_MCP_APP_NAME) --resource-group $(azd env get-value AZURE_RESOURCE_GROUP) --query "{external:properties.configuration.ingress.external, settings:properties.template.containers[0].env[?starts_with(name, 'DOCWIKI_MCP_')].name, validation:properties.template.containers[0].env[?name=='DOCWIKI_MCP_TOKEN_VALIDATION'].value | [0]}"
@@ -286,8 +289,10 @@ VERIFY:
   `ingest`; AcrPull; Monitoring Metrics Publisher. Nothing on `raw` or on Foundry.
 - The portal identity (`DOCWIKI_PORTAL_IDENTITY_*`) holds: Storage Blob Data Reader on
   `releases`; AcrPull; Monitoring Metrics Publisher.
-- The Event Grid subscription is `Succeeded`, filtered on `/blobServices/default/containers/raw/blobs/`
-  with `Microsoft.Storage.BlobCreated` and `Microsoft.Storage.BlobDeleted`; the system topic's
+- The Event Grid subscription `raw-to-ingest` is `Succeeded`, filtered on `/blobServices/default/containers/raw/blobs/`
+  with `Microsoft.Storage.BlobCreated` and `Microsoft.Storage.BlobDeleted`, and `inbox-to-ingest`
+  is `Succeeded`, filtered on `/blobServices/default/containers/work/blobs/inbox/queries/` with
+  `Microsoft.Storage.BlobCreated`; the system topic's
   identity holds Storage Queue Data Message Sender on the storage account. (With
   `DOCWIKI_NETWORK_PERIMETER=true` the subscription is no longer declared: Event Grid cannot
   create or update it inside the perimeter, but one created by an earlier provision keeps
@@ -317,21 +322,27 @@ COMMAND (Entra sign-in, no keys; the deployer received Storage Blob Data Contrib
 `raw` during provisioning):
 
 ```bash
-az storage blob upload-batch --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --destination raw --source samples/corpus/quickstart --auth-mode login
+az storage blob upload-batch --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --destination raw --source samples/corpus/full --auth-mode login
 ```
 
-Use `samples/corpus/full` for the full corpus. With azcopy: `azcopy login` then
-`azcopy copy "samples/corpus/quickstart/*" "https://<account>.blob.core.windows.net/raw/" --recursive`.
+`samples/corpus/full` holds the 12 public documents and, under `restricted/`, the restricted
+internal price study. Every document is fictional, and the two site photos are AI-generated images
+(model and prompts in `samples/generators/assets/photos/PROVENANCE.md`). Upload the restricted
+study too: its sensitivity rule keeps it out of any build below the `restricted` audience
+(gate G07), so a `public` or `internal` deployment never serves it. Do not upload
+`samples/corpus/held-back/`: it is the document of the live upload demo
+([`docs/studio.md`](docs/studio.md#time-travel-optional)). With azcopy: `azcopy login` then
+`azcopy copy "samples/corpus/full/*" "https://<account>.blob.core.windows.net/raw/" --recursive`.
 
 VERIFY:
 
 ```bash
-az storage blob list --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --container-name raw --auth-mode login --query "length(@)"
+az storage blob list --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --container-name raw --auth-mode login --num-results "*" --query "length(@)"
 az storage message peek --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --queue-name ingest --auth-mode login --num-messages 5 --query "length(@)"
 ```
 
-The blob count matches the uploaded files; the queue shows messages (or is already empty
-because the job consumed them — Step 9 tells).
+The blob count matches the uploaded files (13: the 12 public documents and the restricted one); the
+queue shows messages (or is already empty because the job consumed them — Step 9 tells).
 
 ON_FAIL: `AuthorizationPermissionMismatch`: role assignments take up to 10 minutes to apply;
 retry. If `AZURE_PRINCIPAL_ID` was empty during provisioning, run `azd provision` again while
@@ -398,7 +409,7 @@ python -c "import json; p = json.load(open('.local/current.json', encoding='utf-
 
 VERIFY: `release_id` has the form `YYYYMMDDTHHMMSSZ-xxxxxxxx`, `audience` is the
 `DOCWIKI_AUDIENCE` value, and
-`az storage blob list --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --container-name releases --prefix <release_id>/manifest.json --auth-mode login --query "length(@)"`
+`az storage blob list --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --container-name releases --prefix <release_id>/manifest.json --auth-mode login --num-results "*" --query "length(@)"`
 returns `1`.
 
 ON_FAIL: No `current.json` means no release was published yet: go back to Step 9 and read the
@@ -449,7 +460,7 @@ COMMAND:
 
 ```bash
 python scripts/hooks/postprovision.py --only mcp-connection,agents,agent-roles,mcp-allowlist
-uv run --extra azure docwiki ask "Which gearbox oil grade is current, and since which revision?" --agent researcher
+uv run --extra azure docwiki ask "Which revision of quote DEV-2026-014 is current, and which revision did it replace?" --agent researcher
 uv run --extra azure docwiki ask "What is the status of the last run?" --agent librarian
 ```
 
@@ -533,10 +544,9 @@ VERIFY: The budget exists with the configured amount (only when `BUDGET_CONTACT_
 set). Each run report (`work/runs/<run_id>/report.json`) carries a cost receipt (tokens ×
 price table, Content Understanding pages, duration); see
 [`docs/operations.md`](docs/operations.md#budgets-and-cost). The Cost analysis blade of the
-resource group shows month-to-date spend. Expect one-time costs: a full ingest of the
-38-document sample cost about USD 19 (gpt-5.5 / gpt-5.4-mini, Data Zone list prices, unverified
-price table), so a 50 budget alert can fire during the first days of experimentation; an idle
-environment costs close to nothing.
+resource group shows month-to-date spend. Expect one-time costs: the first full ingest compiles
+every document (see [`docs/cost.md`](docs/cost.md)), so a 50 budget alert can fire during the first
+days of experimentation; an idle environment costs close to nothing.
 
 ON_FAIL: No budget: set `BUDGET_CONTACT_EMAILS` and run `azd provision`. Unexpected spend:
 check for repeated job executions (poison loops), `DOCWIKI_MCP_MIN_REPLICAS` above 0, and
@@ -587,3 +597,203 @@ ON_FAIL:
 - App registrations that existed before the hooks ran are never deleted; remove them in
   Microsoft Entra ID if they are no longer needed. Without purge, deleted app registrations
   stay restorable for 30 days.
+
+---
+
+One maintenance procedure follows. It is not part of a first deployment.
+
+## Reset the sample data
+
+Replace everything an environment holds (documents, state and releases) with another corpus, for
+example after the sample corpus or its domain pack changed. It destroys data: **run it only with
+the explicit approval of the environment's owner**, and never skip the backup (R2).
+
+Preconditions: you are signed in and pointed at the right azd environment (Steps 2 and 3); the
+deployer holds Storage Blob Data Contributor on `raw`, `work` and `releases` and Storage Queue
+Data Contributor on `ingest` and `ingest-poison` (Bicep grants them when
+`grantDeployerDataAccess` is on); nobody is uploading through the Studio. `<backup>` is a new, empty
+folder outside the repository, written without a trailing slash (never commit it). Delete
+**blobs, never containers**: the role assignments, the Event Grid subscription and the queue
+scaler are tied to them.
+
+### R1 — Record the settings, update the pack and the job image, pause the writers
+
+GOAL: Nothing writes to the environment while you back it up and reset it, and both jobs are
+ready to compile the new corpus: pack `batiment`, new job image.
+
+COMMAND:
+
+```bash
+azd env get-value DOCWIKI_ENABLE_EVENT_TRIGGER
+azd env get-value DOCWIKI_RECONCILE_CRON
+azd env get-value SERVICE_JOB_IMAGE_NAME
+azd env set DOCWIKI_ENABLE_EVENT_TRIGGER false
+azd env set DOCWIKI_RECONCILE_CRON "0 0 1 1 *"
+azd env set DOCWIKI_DOMAIN batiment
+azd provision
+azd deploy job
+```
+
+Write down the values printed by the first three commands (an error means the template default
+applies, `true` and `0 */6 * * *`, or, for the image, that none has been deployed yet); R5 restores
+the first two and the VERIFY compares the third with the new image.
+
+Two things do not follow the repository by themselves in an existing environment:
+
+- **The pack.** After the first `azd provision`, azd saves the Bicep outputs, `DOCWIKI_DOMAIN`
+  included, in `.azure/<env>/.env`, and `infra/main.parameters.json` feeds that value back into
+  every later provision (Step 4 says the same of the models). The template default, `batiment`,
+  therefore never applies to an environment provisioned with another pack: set it explicitly (a
+  no-op when the environment already uses it).
+- **The job image.** `domains/` is bundled in the job image, and `azd provision` never replaces a
+  deployed image ([`docs/operations.md`](docs/operations.md#images-and-updates)), so an older image
+  does not hold the pack. `azd deploy job` (or `azd deploy` for every service) builds a new one
+  remotely, and its `postdeploy` hook copies it to the reconcile job
+  ([`docs/domain-packs.md`](docs/domain-packs.md#workflow-for-a-new-pack)). Do it now, before any
+  data is deleted: a failed build then costs nothing, and the job started in R4 finds its pack.
+
+VERIFY (repeat it right before R3):
+
+```bash
+az containerapp job show --name $(azd env get-value DOCWIKI_INGEST_JOB_NAME) --resource-group $(azd env get-value AZURE_RESOURCE_GROUP) --query "properties.configuration.triggerType"
+az containerapp job show --name $(azd env get-value DOCWIKI_RECONCILE_JOB_NAME) --resource-group $(azd env get-value AZURE_RESOURCE_GROUP) --query "properties.configuration.scheduleTriggerConfig.cronExpression"
+az containerapp job execution list --name $(azd env get-value DOCWIKI_INGEST_JOB_NAME) --resource-group $(azd env get-value AZURE_RESOURCE_GROUP) --query "[?properties.status=='Running'].name" --output tsv
+az containerapp job execution list --name $(azd env get-value DOCWIKI_RECONCILE_JOB_NAME) --resource-group $(azd env get-value AZURE_RESOURCE_GROUP) --query "[?properties.status=='Running'].name" --output tsv
+az storage blob show --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --container-name work --name state/lease --auth-mode login --query "properties.lease.status"
+azd env get-value SERVICE_JOB_IMAGE_NAME
+az containerapp job show --name $(azd env get-value DOCWIKI_INGEST_JOB_NAME) --resource-group $(azd env get-value AZURE_RESOURCE_GROUP) --query "{pack: properties.template.containers[0].env[?name=='DOCWIKI_DOMAIN'].value | [0], image: properties.template.containers[0].image}"
+az containerapp job show --name $(azd env get-value DOCWIKI_RECONCILE_JOB_NAME) --resource-group $(azd env get-value AZURE_RESOURCE_GROUP) --query "{pack: properties.template.containers[0].env[?name=='DOCWIKI_DOMAIN'].value | [0], image: properties.template.containers[0].image}"
+```
+
+The ingest job reads `"Manual"`, the reconcile job `"0 0 1 1 *"`, both execution lists are empty,
+and the run lease reads `"unlocked"` (or the blob does not exist because no run ever took it).
+Both jobs report the pack `batiment` and the same image, the one `SERVICE_JOB_IMAGE_NAME` names,
+whose tag differs from the one you wrote down.
+
+ON_FAIL: An execution is still running: let it finish (stopping it leaves an `abandoned`
+report). `azd provision` refuses to change the trigger of the existing job: stop and report it;
+do not delete the job by hand. `azd deploy job` fails, or a job still reports the old pack or
+image: Step 6 ON_FAIL (remote build, hooks), then repeat the command; do not go on without the new
+image.
+
+### R2 — Back up
+
+GOAL: A complete copy of the data exists outside the environment.
+
+COMMAND (`download-batch` writes into **existing** folders, so create them first):
+
+```bash
+python -c "import pathlib; [pathlib.Path(r'<backup>', name).mkdir(parents=True, exist_ok=True) for name in ('raw', 'work', 'releases')]"
+az storage blob download-batch --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --source raw --destination "<backup>/raw" --auth-mode login
+az storage blob download-batch --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --source work --destination "<backup>/work" --auth-mode login
+az storage blob download-batch --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --source releases --destination "<backup>/releases" --auth-mode login
+```
+
+VERIFY: Each backup folder holds as many files as its container has blobs. Count the blobs
+(`--num-results "*"` lists them all; the default stops at 5,000), then the local files, and
+compare the three pairs:
+
+```bash
+az storage blob list --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --container-name raw --auth-mode login --num-results "*" --query "length(@)"
+az storage blob list --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --container-name work --auth-mode login --num-results "*" --query "length(@)"
+az storage blob list --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --container-name releases --auth-mode login --num-results "*" --query "length(@)"
+python -c "import pathlib; [print(name, sum(p.is_file() for p in pathlib.Path(r'<backup>', name).rglob('*'))) for name in ('raw', 'work', 'releases')]"
+```
+
+The last command prints `raw <n>`, `work <n>` and `releases <n>`: each number equals the blob
+count of its container. **Do not start R3 unless all three pairs match.**
+
+ON_FAIL: A download fails with `AuthorizationPermissionMismatch`: a data role is missing or still
+propagating (up to 10 minutes, Step 8). In an older environment, grant the missing role
+temporarily with the owner's agreement and remove it in R5. A count differs, or a download
+stopped half-way: repeat that download with `--overwrite true` (by default existing files are
+kept as they are), then count again. Do not continue without a complete backup.
+
+### R3 — Delete the data
+
+GOAL: `raw`, `work` and `releases` hold no blob, and both queues hold no message.
+
+Start only when the VERIFY of R2 matched for the three containers: once the blobs are deleted, the
+backup is the only copy. Then run the VERIFY of R1 again: no execution may be running, and both
+jobs still report the new image and the pack `batiment`.
+
+COMMAND:
+
+```bash
+az storage blob delete-batch --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --source raw --auth-mode login
+az storage blob delete-batch --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --source work --auth-mode login
+az storage blob delete-batch --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --source releases --auth-mode login
+```
+
+Event Grid turns every deleted `raw` blob into a message on `ingest`: wait a minute, then clear
+both queues:
+
+```bash
+az storage message clear --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --queue-name ingest --auth-mode login
+az storage message clear --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --queue-name ingest-poison --auth-mode login
+```
+
+VERIFY: Each command prints `0`:
+
+```bash
+az storage blob list --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --container-name raw --auth-mode login --num-results "*" --query "length(@)"
+az storage blob list --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --container-name work --auth-mode login --num-results "*" --query "length(@)"
+az storage blob list --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --container-name releases --auth-mode login --num-results "*" --query "length(@)"
+az storage message peek --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --queue-name ingest --auth-mode login --num-messages 5 --query "length(@)"
+az storage message peek --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --queue-name ingest-poison --auth-mode login --num-messages 5 --query "length(@)"
+```
+
+ON_FAIL: A late event refilled `ingest`: clear it again. Versioning and soft delete keep the
+deleted blobs recoverable for a few days (see
+[`docs/operations.md`](docs/operations.md#rotate-and-retain-releases)), but they do not replace the
+backup. Until the first new release is published, the MCP server and the portal keep what they
+cached or report that no release is available.
+
+### R4 — Upload the corpus and compile by hand
+
+GOAL: The new corpus is compiled into the first release of the clean environment.
+
+Both jobs must already report the pack `batiment` and the new image (the end of the R1 VERIFY):
+check it before the start.
+
+COMMAND:
+
+```bash
+az storage blob upload-batch --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --destination raw --source samples/corpus/full --auth-mode login
+az containerapp job start --name $(azd env get-value DOCWIKI_INGEST_JOB_NAME) --resource-group $(azd env get-value AZURE_RESOURCE_GROUP)
+```
+
+VERIFY: Follow the execution to its end as in Step 9. It ends `Succeeded`, the newest run report
+(`work/runs/<run_id>/report.json`) says `succeeded` (a deterministic failure also ends
+`Succeeded`: read the report), and Step 10 finds a new `current.json` with the expected audience.
+A cold compile calls the models for every document: expect the cost described in Step 13.
+
+ON_FAIL: Step 9. The writers stay paused, so nothing else changes while you fix forward. Restore
+the backup only when the old data must be served again: empty the containers as in R3, then
+upload `<backup>/releases` (release folders first, `current.json` last), then `work`, then `raw`.
+
+### R5 — Re-enable the triggers and test the automatic ingest
+
+GOAL: The environment ingests on its own again, with its original settings.
+
+COMMAND:
+
+```bash
+az storage message clear --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --queue-name ingest --auth-mode login
+az storage message clear --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --queue-name ingest-poison --auth-mode login
+azd env set DOCWIKI_ENABLE_EVENT_TRIGGER <value recorded in R1>
+azd env set DOCWIKI_RECONCILE_CRON "<value recorded in R1>"
+azd provision
+az storage blob upload --account-name $(azd env get-value DOCWIKI_STORAGE_ACCOUNT) --container-name raw --name <folder>/<file> --file samples/corpus/full/<folder>/<file> --overwrite --auth-mode login
+```
+
+The last command re-uploads one public document with identical bytes.
+
+VERIFY: The first two `az containerapp job show` commands of the R1 VERIFY (trigger and cron) read
+`"Event"` (when the trigger is on) and the original cron. Within about a minute an ingest execution
+starts by itself and ends `Succeeded`; its report shows no change, `current.json` still names the
+release compiled in R4, and the served sources are the same.
+
+ON_FAIL: No execution: Step 9 ON_FAIL (Event Grid delivery, KEDA, queue roles). Remove any
+temporary role you granted for the reset, and delete `<backup>` once the owner agrees. Then run
+Steps 10 to 12 for the new release.

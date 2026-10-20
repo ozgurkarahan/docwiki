@@ -11,7 +11,7 @@ Start with the [project README](../README.md) for the overview and the ways to t
 | [Agents](agents.md) | See how the Researcher and the Librarian behave, their tools, approvals and routine |
 | [Studio](studio.md) | Use the web app: add documents, follow the pipeline, ask the agents; its access model and a demo script |
 | [Skills and agent kit](skills.md) | Use `AGENTS.md`, `llms.txt`, the catalog, the search index and the Agent Skills |
-| [Local agents](local-agents.md) | Connect GitHub Copilot (VS Code and CLI), Claude Code or Codex to the sample wiki |
+| [Local agents](local-agents.md) | Connect GitHub Copilot (VS Code and CLI), Claude Code or Codex to a wiki |
 | [Domain packs](domain-packs.md) | Adapt DocWiki to your own industry |
 | [Security](security.md) | Review the threat model, the identity model, the leak guard and the publication process |
 | [Evaluation](evaluation.md) | Check the method behind the scoreboard |
@@ -21,12 +21,13 @@ Start with the [project README](../README.md) for the overview and the ways to t
 ## Operating a deployment
 
 - [`BOOTSTRAP.md`](../BOOTSTRAP.md): agent-executable deployment runbook (azd, verification,
-  agents, teardown).
+  agents, teardown) and a maintenance procedure (reset the sample data).
 - [Operations](operations.md): day-2 tasks (ingest, recompile, rollback, logs, identities, costs).
 
 ## Design records
 
-- [Specification](spec/README.md) (v1, frozen) and its [changelog](spec/CHANGELOG.md).
+- [Specification](spec/README.md) (v1, frozen; its [v1.2 amendment](spec/CHANGELOG.md#v12)
+  replaced the sample world) and its [changelog](spec/CHANGELOG.md).
 - [Architecture decision records](adr/README.md).
 - [Identity spike](spikes/identity-spike.md): how per-agent identities were validated.
 

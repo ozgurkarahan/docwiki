@@ -1,0 +1,94 @@
+# Closed topic catalog of the batiment pack (7 topics). Topics are routed on the compiled
+# ENGLISH text: every keyword or alias occurrence scores 3 in the title, 2 in a heading and 1 in
+# the body (case- and accent-insensitive, whole words). French aliases count when the English
+# text keeps the French term, as the compile hints ask. A source feeds a topic from `min_score`
+# (default 3) and a topic needs `min_sources` feeding sources (default 2). Keywords avoid words
+# that every document uses (indice, lot, VAT) so that each topic keeps its own sources.
+topics:
+  - slug: quotes-contract-and-amendment
+    title: Quotes, contract and amendment
+    description: >-
+      The quote and its revisions, the signed works contract and its amendment: scope of the
+      works, prices excluding and including VAT, and the total contract amount.
+    keywords: [quote, quotes, quotation, estimate, revised quote, works contract, contract price, contract amount, contract total, total price, amendment, amendments, amended, scope of works, fixed price, lump-sum price]
+    aliases:
+      - {text: devis, lang: fr}
+      - {text: contrat de travaux, lang: fr}
+      - {text: avenant, lang: fr}
+      - {text: prix global et forfaitaire, lang: fr}
+  - slug: schedule-and-window-delivery
+    title: Schedule and window delivery
+    description: >-
+      The works schedule, task dates and progress, the delivery date of the windows and its
+      postponement, and the planned completion and handover dates.
+    keywords: [schedule, scheduled, planning, rescheduled, delivery date, new delivery date, window delivery, delivery of the windows, windows delivery, windows, postponed, postponement, postpone, delay, delayed, shortage, new date, start date, completion date, planned completion, handover date]
+    aliases:
+      - {text: livraison des menuiseries, lang: fr}
+      - {text: report de livraison, lang: fr}
+      - {text: date de livraison, lang: fr}
+      - {text: délai, lang: fr}
+    min_score: 2
+  - slug: materials-deliveries-and-invoices
+    title: Materials, deliveries and invoices
+    description: >-
+      Materials ordered from the builders' merchant, purchase orders, deliveries and their
+      delivery notes, supplier invoices, the quantities billed and delivered, and the purchases
+      to date.
+    keywords: [invoice, invoices, invoiced, billed, delivery note, delivery notes, pallet, pallets, concrete block, concrete blocks, purchase order, purchase orders, purchases, materials, builders' merchant, mortar, lintel, missing]
+    aliases:
+      - {text: facture, lang: fr}
+      - {text: bon de livraison, lang: fr}
+      - {text: palette, lang: fr}
+      - {text: palettes, lang: fr}
+      - {text: bon de commande, lang: fr}
+      - {text: suivi des achats, lang: fr}
+      - {text: réserves, lang: fr}
+  - slug: client-change-requests
+    title: Client change requests
+    description: >-
+      Changes to the works requested by the clients, how they were priced in a quote revision or
+      a contract amendment, and their effect on the works.
+    keywords: [change request, change requests, requested change, requested changes, changes requested, requested by the client, requested by the clients, client request, client's request, clients' request, additional work, modification, modifications, roof window, exterior socket, outdoor socket, exterior light, outdoor light, exterior lighting, outdoor lighting, floor tiling, widened]
+    aliases:
+      - {text: demande de modification, lang: fr}
+      - {text: fenêtre de toit, lang: fr}
+      - {text: travaux supplémentaires, lang: fr}
+    min_score: 2
+  - slug: payments-deposit-and-retention
+    title: Payments, deposit and retention
+    description: >-
+      The payment schedule of the works contract, the deposit, the instalments, the retention
+      and its release, the payment of the amendment, and the payment terms of supplier invoices.
+    keywords: [payment schedule, payment, payments, paid, payable, deposit, deposits, instalment, instalments, installment, installments, retention, down payment, due date, payment terms]
+    aliases:
+      - {text: échéancier, lang: fr}
+      - {text: acompte, lang: fr}
+      - {text: retenue de garantie, lang: fr}
+      - {text: paiement, lang: fr}
+      - {text: règlement, lang: fr}
+    min_score: 2
+  - slug: site-progress-and-meetings
+    title: Site progress and meetings
+    description: >-
+      Progress of the works on site, site meetings with their attendees, decisions and actions,
+      and the site photos.
+    keywords: [progress, completed, site meeting, site meetings, meeting minutes, minutes, decision, decisions, action, actions, attendees, site photo, site photos, photo, photograph, poured, blockwork]
+    aliases:
+      - {text: compte rendu de chantier, lang: fr}
+      - {text: réunion de chantier, lang: fr}
+      - {text: avancement, lang: fr}
+      - {text: photo de chantier, lang: fr}
+    min_score: 2
+  - slug: kitchen-renovation
+    title: Kitchen renovation
+    description: >-
+      The renovation of the existing kitchen: scope and price, VAT rate, schedule of the kitchen
+      works and the related site decisions.
+    keywords: [kitchen, kitchen renovation, kitchen units, kitchen furniture, splashback, wall tiles, plumbing, water supply, kitchen floor]
+    aliases:
+      - {text: cuisine, lang: fr}
+      - {text: rénovation de la cuisine, lang: fr}
+      - {text: crédence, lang: fr}
+      - {text: faïence, lang: fr}
+      - {text: meubles de cuisine, lang: fr}
+    min_score: 2

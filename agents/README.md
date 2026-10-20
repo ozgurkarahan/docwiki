@@ -102,7 +102,7 @@ SDK calls (`azure-ai-projects` 2.9, async): `agents.get`, `agents.create_version
 ## Invoke
 
 ```powershell
-docwiki ask "Which gearbox oil grade applies to WTG-07 in winter?"
+docwiki ask "What is the total contract amount including amendment no. 1?"
 docwiki ask "Write today's health report" --agent librarian
 uv run python -m docwiki.agents_client "<question>" [--agent librarian] [--json]   # same client
 ```
@@ -114,7 +114,7 @@ one client open for many questions (the evaluation runner does):
 from docwiki.agents_client import AgentClient
 
 async with AgentClient() as client:  # DOCWIKI_FOUNDRY_PROJECT_ENDPOINT + DefaultAzureCredential
-    answer = await client.ask("Which gearbox oil grade applies to WTG-07 in winter?")
+    answer = await client.ask("What is the total contract amount including amendment no. 1?")
 print(answer.text, answer.sources, answer.tool_calls, answer.usage, answer.version)
 ```
 

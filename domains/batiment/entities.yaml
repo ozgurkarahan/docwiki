@@ -1,0 +1,354 @@
+# Entity types and registry of the batiment pack. Every name comes from
+# samples/fiction/bible.yaml. Entity-type titles are plural display titles.
+#
+# Aliases drive deterministic mentions in the French documents (`fr`) and gather the English
+# facts of the compiled wiki on entity pages (`en`); they also expand search queries. Matching
+# ignores case and accents (not the "œ" ligature: both spellings are listed) and needs whole
+# words. Window marks shorter than three characters (F1, F2) only match inside longer aliases.
+types:
+  - {key: organisation, title: Organisations, description: "The contractor, the client household and the third parties of the job."}
+  - {key: person, title: People, description: "People named in the job file, with their organisation and role."}
+  - {key: work-package, title: Work packages, description: "The lots of the quote, which structure prices, the schedule and who does the work."}
+  - {key: building-element, title: Building elements, description: "Parts of the building that the documents follow individually: openings, windows and the slab."}
+  - {key: material, title: Materials, description: "Articles supplied by the builders' merchant, with their article codes."}
+  - {key: commercial-document, title: Commercial documents, description: "The quote, the works contract and its amendment, the schedule, purchase orders, invoices and delivery notes, as other documents cite them."}
+
+registry:
+  # --- organisations ---------------------------------------------------------------------------
+  - type: organisation
+    key: lamna-batiment
+    label: Lamna Bâtiment
+    aliases:
+      - {text: Lamna, lang: fr}
+    attributes: {role: general contractor}
+  - type: organisation
+    key: famille-moreau
+    label: Famille Moreau
+    aliases:
+      - {text: Moreau, lang: fr}
+      - {text: M. et Mme Moreau, lang: fr}
+      - {text: Moreau household, lang: en}
+    attributes: {role: client}
+  - type: organisation
+    key: zava-materiaux
+    label: Zava Matériaux
+    aliases:
+      - {text: Zava, lang: fr}
+    attributes: {role: builders' merchant}
+  - type: organisation
+    key: vanarsdel-menuiseries
+    label: VanArsdel Menuiseries
+    aliases:
+      - {text: VanArsdel, lang: fr}
+    attributes: {role: window maker}
+  - type: organisation
+    key: adatum-electricite
+    label: Adatum Électricité
+    aliases:
+      - {text: Adatum, lang: fr}
+    attributes: {role: electrical subcontractor}
+
+  # --- people ----------------------------------------------------------------------------------
+  - type: person
+    key: bertrand-sauzede
+    label: Bertrand Sauzède
+    aliases:
+      - {text: B. Sauzède, lang: fr}
+      - {text: M. Sauzède, lang: fr}
+    attributes: {organisation: lamna-batiment, role: gérant}
+  - type: person
+    key: ines-roux
+    label: Inès Roux
+    aliases:
+      - {text: I. Roux, lang: fr}
+      - {text: Mme Roux, lang: fr}
+      - {text: conductrice de travaux, lang: fr}
+    attributes: {organisation: lamna-batiment, role: conductrice de travaux}
+  - type: person
+    key: mathis-ancelin
+    label: Mathis Ancelin
+    aliases:
+      - {text: M. Ancelin, lang: fr}
+      - {text: chef d'équipe maçonnerie, lang: fr}
+    attributes: {organisation: lamna-batiment, role: chef d'équipe maçonnerie}
+  - type: person
+    key: severine-moreau
+    label: Séverine Moreau
+    aliases:
+      - {text: Mme Moreau, lang: fr}
+      - {text: Mrs Moreau, lang: en}
+    attributes: {organisation: famille-moreau, role: cliente}
+  - type: person
+    key: aymeric-moreau
+    label: Aymeric Moreau
+    aliases:
+      - {text: M. Moreau, lang: fr}
+      - {text: Mr Moreau, lang: en}
+    attributes: {organisation: famille-moreau, role: client}
+  - type: person
+    key: nadia-ferrandon
+    label: Nadia Ferrandon
+    aliases:
+      - {text: N. Ferrandon, lang: fr}
+      - {text: Mme Ferrandon, lang: fr}
+    attributes: {organisation: zava-materiaux, role: technico-commerciale}
+  - type: person
+    key: erwan-gouzelin
+    label: Erwan Gouzelin
+    aliases:
+      - {text: E. Gouzelin, lang: fr}
+      - {text: M. Gouzelin, lang: fr}
+    attributes: {organisation: vanarsdel-menuiseries, role: responsable planification}
+  - type: person
+    key: damien-pradere
+    label: Damien Pradère
+    aliases:
+      - {text: D. Pradère, lang: fr}
+      - {text: M. Pradère, lang: fr}
+    attributes: {organisation: adatum-electricite, role: électricien}
+
+  # --- work packages (lots of the quote) -------------------------------------------------------
+  - type: work-package
+    key: lot-1-installation-de-chantier
+    label: Lot 1 - Installation de chantier
+    aliases:
+      - {text: lot 1, lang: fr}
+      - {text: installation de chantier, lang: fr}
+      - {text: site setup, lang: en}
+    attributes: {lot: 1}
+  - type: work-package
+    key: lot-2-terrassement-et-fondations
+    label: Lot 2 - Terrassement et fondations
+    aliases:
+      - {text: lot 2, lang: fr}
+      - {text: terrassement et fondations, lang: fr}
+      - {text: earthworks and foundations, lang: en}
+    attributes: {lot: 2}
+  - type: work-package
+    key: lot-3-gros-oeuvre
+    label: Lot 3 - Gros œuvre
+    aliases:
+      - {text: lot 3, lang: fr}
+      - {text: gros œuvre, lang: fr}
+      - {text: gros oeuvre, lang: fr}
+      - {text: structural work, lang: en}
+    attributes: {lot: 3}
+  - type: work-package
+    key: lot-4-charpente-et-couverture
+    label: Lot 4 - Charpente et couverture
+    aliases:
+      - {text: lot 4, lang: fr}
+      - {text: charpente et couverture, lang: fr}
+      - {text: roof structure and roofing, lang: en}
+    attributes: {lot: 4}
+  - type: work-package
+    key: lot-5-menuiseries-exterieures
+    label: Lot 5 - Menuiseries extérieures
+    aliases:
+      - {text: lot 5, lang: fr}
+      - {text: menuiseries extérieures, lang: fr}
+      - {text: exterior joinery, lang: en}
+    attributes: {lot: 5}
+  - type: work-package
+    key: lot-6-electricite-extension
+    label: Lot 6 - Électricité de l'extension
+    aliases:
+      - {text: lot 6, lang: fr}
+      - {text: électricité de l'extension, lang: fr}
+      - {text: electrical work of the extension, lang: en}
+    attributes: {lot: 6}
+  - type: work-package
+    key: lot-7-second-oeuvre-extension
+    label: Lot 7 - Second œuvre de l'extension
+    aliases:
+      - {text: lot 7, lang: fr}
+      - {text: second œuvre de l'extension, lang: fr}
+      - {text: second oeuvre de l'extension, lang: fr}
+      - {text: interior finishing of the extension, lang: en}
+    attributes: {lot: 7}
+  - type: work-package
+    key: lot-8-renovation-cuisine
+    label: Lot 8 - Rénovation de la cuisine
+    aliases:
+      - {text: lot 8, lang: fr}
+      - {text: rénovation de la cuisine, lang: fr}
+    attributes: {lot: 8}
+
+  # --- building elements -----------------------------------------------------------------------
+  - type: building-element
+    key: baie-f1
+    label: Baie coulissante F1
+    aliases:
+      - {text: baie F1, lang: fr}
+      - {text: repère F1, lang: fr}
+      - {text: baie coulissante, lang: fr}
+      - {text: bay window F1, lang: en}
+      - {text: sliding bay window, lang: en}
+    attributes: {mark: F1}
+  - type: building-element
+    key: fenetres-f2-f3
+    label: Fenêtres PVC F2 et F3
+    aliases:
+      - {text: fenêtres F2 et F3, lang: fr}
+      - {text: F2 et F3, lang: fr}
+      - {text: fenêtre PVC, lang: fr}
+      - {text: fenêtres PVC, lang: fr}
+      - {text: windows F2 and F3, lang: en}
+      - {text: F2 and F3, lang: en}
+      - {text: PVC windows, lang: en}
+    attributes: {marks: F2 and F3}
+  - type: building-element
+    key: fenetre-de-toit-ft1
+    label: Fenêtre de toit FT1
+    aliases:
+      - {text: FT1, lang: fr}
+      - {text: fenêtre de toit, lang: fr}
+      - {text: roof window, lang: en}
+    attributes: {mark: FT1}
+  - type: building-element
+    key: baie-de-liaison
+    label: Baie de liaison
+    aliases:
+      - {text: ouverture dans le mur existant, lang: fr}
+      - {text: ouverture du mur existant, lang: fr}
+      - {text: opening in the existing wall, lang: en}
+      - {text: opening of the existing wall, lang: en}
+  - type: building-element
+    key: dalle
+    label: Dalle de l'extension
+    aliases:
+      - {text: dalle, lang: fr}
+      - {text: dallage, lang: fr}
+      - {text: slab, lang: en}
+
+  # --- materials (articles of the builders' merchant) -----------------------------------------
+  - type: material
+    key: zm-20450
+    label: Bloc béton creux 20 x 20 x 50 cm (ZM-20450)
+    aliases:
+      - {text: ZM-20450, lang: fr}
+      - {text: bloc béton creux, lang: fr}
+      - {text: blocs béton creux, lang: fr}
+      - {text: blocs béton, lang: fr}
+      - {text: hollow concrete block, lang: en}
+      - {text: hollow concrete blocks, lang: en}
+      - {text: concrete blocks, lang: en}
+    attributes: {code: ZM-20450, sale_unit: palette de 48 blocs}
+  - type: material
+    key: zm-31020
+    label: Mortier de montage (ZM-31020)
+    aliases:
+      - {text: ZM-31020, lang: fr}
+      - {text: mortier de montage, lang: fr}
+      - {text: mortar, lang: en}
+    attributes: {code: ZM-31020, sale_unit: sac de 35 kg}
+  - type: material
+    key: zm-44108
+    label: Acier HA 10 pour chaînages (ZM-44108)
+    aliases:
+      - {text: ZM-44108, lang: fr}
+      - {text: acier HA 10, lang: fr}
+      - {text: HA 10, lang: en}
+    attributes: {code: ZM-44108, sale_unit: barre de 6 m}
+  - type: material
+    key: zm-27340
+    label: Linteau béton préfabriqué 3,40 m (ZM-27340)
+    aliases:
+      - {text: ZM-27340, lang: fr}
+      - {text: linteau béton préfabriqué, lang: fr}
+      - {text: precast concrete lintel, lang: en}
+      - {text: precast lintel, lang: en}
+    attributes: {code: ZM-27340, sale_unit: u}
+  - type: material
+    key: zm-61078
+    label: Fenêtre de toit 78 x 98 cm (ZM-61078)
+    aliases:
+      - {text: ZM-61078, lang: fr}
+      - {text: fenêtre de toit 78 x 98, lang: fr}
+      - {text: roof window 78 x 98, lang: en}
+    attributes: {code: ZM-61078, sale_unit: u}
+
+  # --- commercial documents (as other documents cite them) -------------------------------------
+  - type: commercial-document
+    key: dev-2026-014
+    label: Devis DEV-2026-014
+    aliases:
+      - {text: DEV-2026-014, lang: fr}
+    attributes: {kind: quote}
+  - type: commercial-document
+    key: contrat-de-travaux
+    label: Contrat de travaux du 10/02/2026
+    aliases:
+      - {text: contrat de travaux, lang: fr}
+      - {text: works contract, lang: en}
+    attributes: {kind: works contract}
+  - type: commercial-document
+    key: avenant-n1
+    label: Avenant n°1
+    aliases:
+      - {text: avenant n° 1, lang: fr}
+      - {text: amendment n°1, lang: en}
+      - {text: amendment no. 1, lang: en}
+      - {text: amendment no 1, lang: en}
+      - {text: amendment 1, lang: en}
+    attributes: {kind: contract amendment}
+  - type: commercial-document
+    key: pln-2026-003
+    label: Planning PLN-2026-003
+    aliases:
+      - {text: PLN-2026-003, lang: fr}
+    attributes: {kind: schedule and purchase tracking}
+  - type: commercial-document
+    key: bc-2026-008
+    label: Bon de commande BC-2026-008
+    aliases:
+      - {text: BC-2026-008, lang: fr}
+    attributes: {kind: subcontract order}
+  - type: commercial-document
+    key: bc-2026-009
+    label: Bon de commande BC-2026-009
+    aliases:
+      - {text: BC-2026-009, lang: fr}
+    attributes: {kind: purchase order}
+  - type: commercial-document
+    key: bc-2026-010
+    label: Bon de commande BC-2026-010
+    aliases:
+      - {text: BC-2026-010, lang: fr}
+    attributes: {kind: purchase order}
+  - type: commercial-document
+    key: bc-2026-012
+    label: Bon de commande BC-2026-012
+    aliases:
+      - {text: BC-2026-012, lang: fr}
+    attributes: {kind: purchase order}
+  - type: commercial-document
+    key: bc-2026-013
+    label: Bon de commande BC-2026-013
+    aliases:
+      - {text: BC-2026-013, lang: fr}
+    attributes: {kind: purchase order}
+  - type: commercial-document
+    key: bc-2026-016
+    label: Bon de commande BC-2026-016
+    aliases:
+      - {text: BC-2026-016, lang: fr}
+    attributes: {kind: purchase order}
+  - type: commercial-document
+    key: fa-2026-0174
+    label: Facture FA-2026-0174
+    aliases:
+      - {text: FA-2026-0174, lang: fr}
+    attributes: {kind: supplier invoice}
+  - type: commercial-document
+    key: fa-2026-0217
+    label: Facture FA-2026-0217
+    aliases:
+      - {text: FA-2026-0217, lang: fr}
+    attributes: {kind: supplier invoice}
+  - type: commercial-document
+    key: bl-2026-0391
+    label: Bon de livraison BL-2026-0391
+    aliases:
+      - {text: BL-2026-0391, lang: fr}
+    attributes: {kind: delivery note}

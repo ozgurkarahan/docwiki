@@ -1,6 +1,6 @@
 default: public
 rules:
   - tier: restricted
-    path_glob: "**/contracts/**"
+    path_glob: "**/restricted/**"
   - tier: internal
-    doc_type: maintenance-plan
+    doc_type: schedule

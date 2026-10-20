@@ -7,8 +7,10 @@ namespace as ``content/``: a release's ``wiki/`` with its ``evidence/`` mounted 
 or a portable wiki folder as is (``evidence/`` already inside, ``.docwiki/`` machine files left
 out). It is then built with the Quartz CLI (``npx quartz build`` ≡
 ``node quartz/bootstrap-cli.mjs build``), copied to ``out_dir`` and checked: internal links and
-anchors (:mod:`docwiki.site.links`) and the security scan (:mod:`docwiki.site.scan`). No symlinks
-are used, so it runs unprivileged on Windows.
+anchors (:mod:`docwiki.site.links`) and the security scan (:mod:`docwiki.site.scan`). The filed
+research answers (``queries/``) are published as ``static/docwiki/answers.json`` for the "Ask this
+wiki" drawer (:mod:`docwiki.site.answers`). No symlinks are used, so it runs unprivileged on
+Windows.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ import re
 import shutil
 import stat
 import subprocess
+from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,10 +30,14 @@ from typing import Any, Literal, Protocol
 
 from docwiki.contracts.catalog import Catalog
 from docwiki.contracts.frontmatter import read_frontmatter
+from docwiki.contracts.gates import GateResult
 from docwiki.contracts.ids import parse_release_id
 from docwiki.contracts.layout import EVIDENCE_MOUNT, ReleaseFiles, WikiFiles
+from docwiki.contracts.manifest import ReleaseManifest
 from docwiki.contracts.settings import SettingsKeys
 from docwiki.release.reader import ReleaseNotFoundError, ReleaseReader
+from docwiki.site.answers import build_answers, write_answers
+from docwiki.site.errors import SiteBuildError
 from docwiki.site.linkcheck import check_links
 from docwiki.site.security import REPO_URL, default_allowed_hosts, scan_site
 
@@ -83,10 +90,6 @@ _HOST_PATH_RE = re.compile(
     r"^[a-z0-9]([a-z0-9.\-]*[a-z0-9])?(:\d{1,5})?(/[A-Za-z0-9._~\-/]*)?$"
 )
 _FICTIONAL_RE = re.compile(r"^>\s*(\*\*)?FICTIONAL\b", re.MULTILINE)
-
-
-class SiteBuildError(RuntimeError):
-    """The site could not be built, or the built site failed its checks."""
 
 
 class CommandRunner(Protocol):
@@ -226,6 +229,17 @@ class ReleaseView:
     def audience(self) -> str:
         return self.catalog.audience
 
+    @property
+    def manifest_path(self) -> Path:
+        """Where the release manifest lives (absent while the pipeline stages the release)."""
+        if self.layout == "portable":
+            return self.root / PORTABLE_DIR / ReleaseFiles.MANIFEST
+        return self.root / ReleaseFiles.MANIFEST
+
+    def manifest(self) -> ReleaseManifest | None:
+        path = self.manifest_path
+        return ReleaseManifest.from_json(path.read_bytes()) if path.is_file() else None
+
 
 def is_portable_wiki(path: str | Path) -> bool:
     """A portable wiki folder: ``.docwiki/manifest.json`` (or ``.docwiki/current.json``)."""
@@ -261,6 +275,28 @@ def open_release(path: str | Path) -> ReleaseView:
     raise SiteBuildError(f"no catalog.json in {found.layout} {found.root}")
 
 
+def _quality_summary(gates: Sequence[GateResult]) -> dict[str, int] | None:
+    """Gate counts for the home page's provenance line (``None`` without gate results)."""
+    if not gates:
+        return None
+    statuses = Counter(gate.status for gate in gates)
+    return {
+        "gates": len(gates),
+        "passed": statuses["pass"],
+        "warned": statuses["warn"],
+        "failed": statuses["fail"],
+        "skipped": statuses["skipped"],
+        "blockingFailed": sum(1 for gate in gates if gate.blocks_publish),
+    }
+
+
+def _content_slug(release: ReleaseView, wiki_path: str) -> str | None:
+    """Content slug of a wiki page (``_meta/quality``) when the release has it."""
+    if not (release.wiki_dir / wiki_path).is_file():
+        return None
+    return wiki_path.removesuffix(".md")
+
+
 def site_settings(
     release: ReleaseView,
     *,
@@ -269,14 +305,29 @@ def site_settings(
     banner: str | None,
     repo_url: str,
     quartz_version: str,
+    gates: Sequence[GateResult] | None = None,
+    run_id: str | None = None,
+    answers: int | None = None,
 ) -> dict[str, Any]:
-    """The ``docwiki-site.json`` payload read by the overlay."""
+    """The ``docwiki-site.json`` payload read by the overlay.
+
+    Gate results and the run id come from the release manifest; the pipeline's site stage builds
+    the staged release before its manifest exists and passes them explicitly. ``answers`` is the
+    number of filed research answers (counted from ``queries/`` when ``None``); the "Ask this
+    wiki" drawer is left out of the pages when it is 0.
+    """
     index_text = (release.wiki_dir / WikiFiles.INDEX).read_text(encoding="utf-8")
     if page_title is None:
         frontmatter, _ = read_frontmatter(index_text)
         page_title = str(frontmatter.get("title") or "DocWiki")
     if banner is None:
         banner = DEFAULT_BANNER if detect_fictional(index_text) else ""
+    if gates is None or run_id is None:
+        manifest = release.manifest()
+        if manifest is not None:
+            gates = manifest.gates if gates is None else gates
+            run_id = manifest.run_id if run_id is None else run_id
+    statuses = Counter(source.status for source in release.catalog.sources)
     sources: dict[str, dict[str, str | None]] = {}
     for page in release.catalog.pages:
         if page.type != "source":
@@ -301,7 +352,16 @@ def site_settings(
         "releaseDate": release.release_date,
         "audience": release.audience,
         "quartzVersion": quartz_version,
+        "documents": {
+            "current": statuses["current"],
+            "superseded": statuses["superseded"],
+        },
+        "runId": run_id,
+        "runPage": _content_slug(release, f"{WikiFiles.RUNS_DIR}/{run_id}.md") if run_id else None,
+        "qualityPage": _content_slug(release, WikiFiles.QUALITY),
+        "quality": _quality_summary(gates or []),
         "sources": dict(sorted(sources.items())),
+        "answers": len(build_answers(release)["answers"]) if answers is None else answers,
     }
 
 
@@ -458,6 +518,8 @@ def build_site(
     base_url: str | None = None,
     page_title: str | None = None,
     banner: str | None = None,
+    gates: Sequence[GateResult] | None = None,
+    run_id: str | None = None,
     repo_url: str = REPO_URL,
     overlay_dir: Path | None = None,
     cache_dir: Path | None = None,
@@ -473,9 +535,11 @@ def build_site(
     contains one. ``base_url`` defaults to
     ``DOCWIKI_SITE_BASE_URL``; the page title defaults to the title of ``wiki/index.md`` (the
     domain pack's ``wiki_title``); the banner (``None``: automatic) shows a fictional-sample
-    notice when the home page carries one, and ``""`` disables it. With ``check`` the built site
-    must pass the link checker and the security scan, otherwise :class:`SiteBuildError` is
-    raised (the output is kept for review).
+    notice when the home page carries one, and ``""`` disables it. ``gates`` and ``run_id``
+    default to the release manifest (the pipeline passes them for a staged release). The filed
+    research answers (``queries/``) are published as ``static/docwiki/answers.json`` for the
+    "Ask this wiki" drawer. With ``check`` the built site must pass the link checker and the
+    security scan, otherwise :class:`SiteBuildError` is raised (the output is kept for review).
     """
     environment = os.environ if env is None else env
     release = open_release(release_root)
@@ -498,9 +562,11 @@ def build_site(
             "the folder itself is the site content"
         )
     _check_replaceable(target)
+    answers = build_answers(release)  # before Quartz, so that a bad query page fails fast
 
     checkout = ensure_quartz(tag, cache_dir or default_cache_dir(), runner=runner, log=log)
     apply_overlay(overlay, checkout)
+    write_answers(answers, checkout)
     files = assemble_content(release, checkout / "content")
     settings = site_settings(
         release,
@@ -509,6 +575,9 @@ def build_site(
         banner=banner,
         repo_url=repo_url,
         quartz_version=tag,
+        gates=gates,
+        run_id=run_id,
+        answers=len(answers["answers"]),
     )
     (checkout / SETTINGS_FILE).write_text(
         json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"

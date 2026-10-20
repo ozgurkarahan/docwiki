@@ -15,8 +15,10 @@ from docwiki.search import (
 )
 
 RELEASE = "20260131T080509Z-01234567"
-SRC_MANUAL = "src-00000000000a"
-SRC_SOP = "src-00000000000b"
+SRC_QUOTE = "src-00000000000a"
+SRC_MINUTES = "src-00000000000b"
+TOPIC = "topic:quotes-contract-and-amendment"
+BAIE = "building-element:baie-f1"
 
 
 def page(path: str, **fields: object) -> Page:
@@ -41,11 +43,11 @@ def source(path: str, source_id: str, title: str, body: str, **extra: object) ->
         source_path=f"raw/{source_id}.pdf",
         source_hash="sha256:" + "a" * 64,
         media_type="application/pdf",
-        doc_type="manual",
-        category="oem",
+        doc_type="quote",
+        category="contract-documents",
         status="current",
-        original_lang="en",
-        authority=5,
+        original_lang="fr",
+        authority=8,
         extraction={"adapter": "local", "version": "1"},
         body=body,
         **extra,
@@ -54,65 +56,72 @@ def source(path: str, source_id: str, title: str, body: str, **extra: object) ->
 
 PAGES = [
     source(
-        "sources/gearbox-manual.md",
-        SRC_MANUAL,
-        "Litware gearbox manual",
-        "# Litware gearbox manual\n\nOEM manual excerpt.\n\n## Key facts\n\n"
-        "- The gearbox oil grade is ISO VG 320.[^c1]\n\n## Sources\n\n"
-        "[^c1]: [Litware gearbox manual — p. 3](../evidence/src-00000000000a/p0003.md) · "
+        "sources/quote-dev-2026-014-indice-b.md",
+        SRC_QUOTE,
+        "Quote DEV-2026-014 indice B",
+        "# Quote DEV-2026-014 indice B\n\nQuote of the extension, referred to by the works "
+        "contract.\n\n## Key facts\n\n"
+        "- The sliding aluminium bay window F1 measures 3,00 x 2,15 m.[^c1]\n\n"
+        "## Prices\n\nAll amounts are given excluding VAT.\n\n## Sources\n\n"
+        "[^c1]: [Quote DEV-2026-014 indice B — p. 2](../evidence/src-00000000000a/p0002.md) · "
         "✓ quote verified\n",
-        entities=["asset:wtg-07"],
-        topics=["topic:gearbox-oil"],
+        entities=[BAIE],
+        topics=[TOPIC],
     ),
     source(
-        "sources/sop-gbx-010-rev-b.md",
-        SRC_SOP,
-        "Gearbox oil change SOP rev B",
-        "# Gearbox oil change SOP rev B\n\nProcedure summary.\n\n## Safety\n\n"
-        "Apply lockout/tagout before opening the nacelle.\n\n## Température\n\n"
-        "La température minimale est de -20 °C.\n",
-        entities=["procedure:sop-gbx-010"],
+        "sources/2026-03-24-compte-rendu-de-chantier-n3.md",
+        SRC_MINUTES,
+        "Site meeting minutes n°3",
+        "# Site meeting minutes n°3\n\nMinutes with the decisions on the amendment n°1.\n\n"
+        "## Decisions\n\n"
+        "The roof window of the amendment is installed with the roofing.\n\n## Réception\n\n"
+        "La réception des travaux est maintenue au 15/05/2026.\n",
+        entities=["commercial-document:pln-2026-003"],
     ),
     page(
-        "entities/asset/wtg-07.md",
-        id="asset:wtg-07",
+        "entities/building-element/baie-f1.md",
+        id=BAIE,
         type="entity",
-        title="WTG-07",
-        entity_type="asset",
-        key="wtg-07",
-        sources=[SRC_MANUAL],
+        title="Baie F1",
+        entity_type="building-element",
+        key="baie-f1",
+        sources=[SRC_QUOTE],
         body=(
-            "# WTG-07\n\nTurbine seven of the Contoso Renewables fleet.\n\n"
-            "## Facts\n\n- Gearbox over-temperature alarms.\n"
+            "# Baie F1\n\nBay window F1 of the extension of the Moreau house.\n\n"
+            "## Facts\n\n- Delivery postponed by the window maker.\n"
         ),
     ),
     page(
-        "topics/gearbox-oil.md",
-        id="topic:gearbox-oil",
+        "topics/quotes-contract-and-amendment.md",
+        id=TOPIC,
         type="topic",
-        title="Gearbox oil",
-        topic_slug="gearbox-oil",
-        sources=[SRC_MANUAL, SRC_SOP],
+        title="Quotes, contract and amendment",
+        topic_slug="quotes-contract-and-amendment",
+        sources=[SRC_QUOTE, SRC_MINUTES],
         confidence="high",
-        body="# Gearbox oil\n\n## Overview\n\nThe oil grade changed for cold sites.\n",
+        body=(
+            "# Quotes, contract and amendment\n\n## Overview\n\n"
+            "The quote revision widened the window.\n"
+        ),
     ),
     page("index.md", id="index:home", type="index", title="Home", body="# Home\n\nStart here.\n"),
 ]
 BLOCKS = [
     SearchBlock(
-        source_id=SRC_MANUAL,
-        page_id=SRC_MANUAL,
-        path="sources/gearbox-manual.md",
-        title="Litware gearbox manual",
+        source_id=SRC_QUOTE,
+        page_id=SRC_QUOTE,
+        path="sources/quote-dev-2026-014-indice-b.md",
+        title="Quote DEV-2026-014 indice B",
         locator_key="p0007",
         section="p. 7",
-        text="Torque the drain plug to 45 Nm after the oil change. Check the breather filter.",
+        text="Pose de la baie F1 : largeur 3,00 m, hauteur 2,15 m. "
+        "Vérifier le joint d'étanchéité de la baie.",
         sensitivity="public",
         status="current",
-        lang="en",
+        lang="fr",
     ),
 ]
-SYNONYMS = [("LOTO", "lockout/tagout", "en"), ("LOTO", "consignation", "fr")]
+SYNONYMS = [("HT", "excluding VAT", "en"), ("HT", "hors taxes", "fr")]
 
 
 @pytest.fixture(params=["fts5", "bm25"])
@@ -139,55 +148,55 @@ def test_meta_and_rows(index: SearchIndex) -> None:
 
 
 def test_ranking_prefers_title_matches(index: SearchIndex) -> None:
-    hits = index.search("gearbox oil")
-    assert hits and hits[0].page_id == "topic:gearbox-oil"
-    assert {hit.page_id for hit in hits} >= {"topic:gearbox-oil", SRC_MANUAL, SRC_SOP}
+    hits = index.search("contract amendment")
+    assert hits and hits[0].page_id == TOPIC
+    assert {hit.page_id for hit in hits} >= {TOPIC, SRC_QUOTE, SRC_MINUTES}
 
 
 def test_source_blocks_are_searchable_with_locators(index: SearchIndex) -> None:
-    hits = index.search("drain plug torque")
+    hits = index.search("largeur hauteur")
     assert hits[0].kind == "source-block"
     assert (hits[0].source_id, hits[0].locator_key, hits[0].section) == (
-        SRC_MANUAL,
+        SRC_QUOTE,
         "p0007",
         "p. 7",
     )
-    assert "45 Nm" in hits[0].snippet
+    assert "3,00 m" in hits[0].snippet
 
 
 def test_page_sections_carry_anchors(index: SearchIndex) -> None:
-    hit = index.search("ISO VG 320")[0]
-    assert (hit.page_id, hit.section, hit.anchor) == (SRC_MANUAL, "Key facts", "key-facts")
+    hit = index.search("sliding aluminium")[0]
+    assert (hit.page_id, hit.section, hit.anchor) == (SRC_QUOTE, "Key facts", "key-facts")
     assert "[^c1]" not in hit.snippet and "evidence" not in hit.snippet
 
 
 def test_synonym_expansion(index: SearchIndex) -> None:
-    hits = index.search("LOTO")
-    assert hits and hits[0].page_id == SRC_SOP and hits[0].section == "Safety"
-    assert index.expand("loto procedure") == [
-        ("consignation",),
-        ("lockout", "tagout"),
-        ("loto",),
-        ("procedure",),
+    hits = index.search("HT")
+    assert hits and hits[0].page_id == SRC_QUOTE and hits[0].section == "Prices"
+    assert index.expand("ht quote") == [
+        ("excluding", "vat"),
+        ("hors", "taxes"),
+        ("ht",),
+        ("quote",),
     ]
 
 
 def test_diacritics_and_case_are_folded(index: SearchIndex) -> None:
-    assert index.search("TEMPERATURE minimale")[0].section == "Température"
+    assert index.search("RECEPTION maintenue")[0].section == "Réception"
 
 
 def test_filters(index: SearchIndex) -> None:
-    assert {hit.kind for hit in index.search("oil", kinds=["source-block"])} == {"source-block"}
-    assert {hit.page_id for hit in index.search("gearbox", types=["entity"])} == {"asset:wtg-07"}
-    entity_hits = {hit.page_id for hit in index.search("gearbox", entity="asset:wtg-07")}
-    assert entity_hits == {"asset:wtg-07", SRC_MANUAL}
-    topic_hits = {hit.page_id for hit in index.search("oil", topic="topic:gearbox-oil")}
-    assert topic_hits == {"topic:gearbox-oil", SRC_MANUAL}
-    assert index.search("gearbox", limit=1) and len(index.search("gearbox", limit=1)) == 1
+    assert {hit.kind for hit in index.search("baie", kinds=["source-block"])} == {"source-block"}
+    assert {hit.page_id for hit in index.search("window", types=["entity"])} == {BAIE}
+    entity_hits = {hit.page_id for hit in index.search("window", entity=BAIE)}
+    assert entity_hits == {BAIE, SRC_QUOTE}
+    topic_hits = {hit.page_id for hit in index.search("window", topic=TOPIC)}
+    assert topic_hits == {TOPIC, SRC_QUOTE}
+    assert index.search("window", limit=1) and len(index.search("window", limit=1)) == 1
     assert (
         index.search("", limit=5) == []
         and index.search("!!!") == []
-        and index.search("oil", limit=0) == []
+        and index.search("window", limit=0) == []
     )
     assert index.search("nonexistentword") == []
 
@@ -199,7 +208,7 @@ def test_fts5_and_fallback_agree_on_top_hits(tmp_path: Path) -> None:
     build_search_db(PAGES, BLOCKS, SYNONYMS, path, use_fts5=True)
     with SearchIndex.open(path) as fts, SearchIndex.open(path, force_fallback=True) as fallback:
         assert (fts.backend, fallback.backend) == ("fts5", "bm25")
-        for query in ("gearbox oil", "drain plug", "LOTO", "temperature", "WTG-07 alarms"):
+        for query in ("contract amendment", "largeur hauteur", "HT", "reception", "F1 bay window"):
             assert fts.search(query)[0].page_id == fallback.search(query)[0].page_id, query
 
 
@@ -213,7 +222,7 @@ def test_automatic_fallback_when_fts5_is_missing(
     with SearchIndex.open(path) as index:
         assert index.backend == "bm25"
         assert index.meta["fts5"] == "0"
-        assert index.search("breather filter")[0].locator_key == "p0007"
+        assert index.search("joint étanchéité")[0].locator_key == "p0007"
 
 
 def test_build_is_deterministic_and_replaces_existing(tmp_path: Path) -> None:
@@ -223,17 +232,18 @@ def test_build_is_deterministic_and_replaces_existing(tmp_path: Path) -> None:
     assert first.read_bytes() == second.read_bytes()
     build_search_db(PAGES[:1], [], [], first)
     with SearchIndex.open(first) as index:
-        assert {hit.page_id for hit in index.search("oil")} == {SRC_MANUAL}
+        assert {hit.page_id for hit in index.search("window")} == {SRC_QUOTE}
 
 
 def test_tokenize_and_snippets() -> None:
-    assert tokenize("Getriebeöl-Wechsel, ISO_VG 320; Température") == [
-        "getriebeol",
-        "wechsel",
-        "iso",
-        "vg",
-        "320",
-        "temperature",
+    assert tokenize("Élévation-des-murs, BC_2026 009; Réception") == [
+        "elevation",
+        "des",
+        "murs",
+        "bc",
+        "2026",
+        "009",
+        "reception",
     ]
     text = (
         " ".join(f"w{i}" for i in range(60))

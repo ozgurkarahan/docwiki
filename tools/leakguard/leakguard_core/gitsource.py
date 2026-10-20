@@ -256,6 +256,54 @@ def read_blobs(root: Path, shas: Sequence[str]) -> dict[str, bytes]:
     return blobs
 
 
+def _split_words(output: bytes) -> list[str]:
+    return output.decode("ascii", errors="replace").split()
+
+
+def reachable_commits(root: Path, commits: Sequence[str] | None) -> list[str]:
+    """Commits reachable from ``commits`` and from ``HEAD`` (from every ref when ``None``)."""
+    if commits is None:
+        return _split_words(_git(root, ["rev-list", "--all"]))
+    revisions = list(commits)
+    try:
+        _git(root, ["rev-parse", "--verify", "--quiet", "HEAD"])
+        revisions.append("HEAD")
+    except ConfigError:
+        pass  # no commit yet: only the listed commits count
+    if not revisions:
+        return []
+    request = ("\n".join(revisions) + "\n").encode("ascii")
+    return _split_words(_git(root, ["rev-list", "--stdin"], request))
+
+
+def file_versions(
+    root: Path, commits: Sequence[str], paths: Sequence[str]
+) -> dict[str, list[bytes]]:
+    """Every distinct version of each path over ``commits``, as ``{path: [content, ...]}``.
+
+    A commit where the path does not exist contributes nothing; identical versions are returned
+    once. Versions of a path are in the order of ``commits`` (``git rev-list``: newest first).
+    """
+    versions: dict[str, list[bytes]] = {path: [] for path in paths}
+    if not commits or not paths:
+        return versions
+    pairs = [(commit, path) for commit in commits for path in paths]
+    request = "".join(f"{commit}:{path}\n" for commit, path in pairs).encode("utf-8")
+    answers = _git(root, ["cat-file", "--batch-check"], request).decode("utf-8", errors="replace")
+    lines = answers.splitlines()
+    if len(lines) != len(pairs):
+        raise ConfigError("git cat-file --batch-check returned an unexpected answer")
+    blob_shas: dict[str, list[str]] = {path: [] for path in paths}
+    for (_, path), line in zip(pairs, lines, strict=True):
+        parts = line.split()
+        if len(parts) == 3 and parts[1] == "blob" and parts[0] not in blob_shas[path]:
+            blob_shas[path].append(parts[0])
+    contents = read_blobs(root, sorted({sha for shas in blob_shas.values() for sha in shas}))
+    for path, shas in blob_shas.items():
+        versions[path] = [contents[sha] for sha in shas if sha in contents]
+    return versions
+
+
 def annotated_tags(root: Path) -> list[TagRecord]:
     output = _git(
         root,

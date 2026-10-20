@@ -7,11 +7,11 @@ from collections.abc import Callable
 
 import pytest
 from compile_testkit import (
-    CONTRACT,
     PLAN,
-    SOP_A,
-    SOP_B,
+    QUOTE_A,
+    QUOTE_B,
     STAMP,
+    STUDY,
     Corpus,
     build_corpus,
     fact_id,
@@ -43,52 +43,60 @@ async def corpus(pack: DomainPack) -> Corpus:
 
 def synthesis_handler(request: LlmRequest) -> dict:
     text = request.text
-    if "- slug: cold-weather" in text:
-        cold = fact_id(text, "At cold sites below")
+    frost = fact_id(text, "In case of frost below")
+    if "- slug: cold-weather-works" in text:
         return {
-            "summary": "How cold sites change gearbox oil requirements.",
-            "overview": [{"text": "Cold sites below -20 °C use ISO VG 220.", "fact_ids": [cold]}],
+            "summary": "How frost changes the masonry work.",
+            "overview": [
+                {"text": "Frost below -5 °C suspends the masonry work.", "fact_ids": [frost]}
+            ],
             "sections": [],
             "contradictions": [],
             "superseded": [],
         }
-    cold = fact_id(text, "At cold sites below")
-    first = fact_id(text, "first turbine to switch")
-    plan = fact_id(text, "planned for 2026-03")
-    old = fact_id(text, "Revision A specifies")
-    rev_b = source_label(text, "Gearbox oil change SOP rev B")
+    first = fact_id(text, "is installed first")
+    wide = fact_id(text, "is widened to")
+    plan = fact_id(text, "is ordered at 2,40 m")
+    old = fact_id(text, "Indice A specifies")
+    quote_b = source_label(text, "Quote DEV-2026-014 indice B")
     return {
-        "summary": "Gearbox oil grades, the cold-site change and an open plan contradiction.",
+        "summary": "Window sizes, the installation order and an open purchase-tracking "
+        "contradiction.",
         "overview": [
-            {"text": "Cold sites below -20 °C use ISO VG 220 gearbox oil.", "fact_ids": [cold]},
-            {"text": "All turbines use ISO VG 320.", "fact_ids": [old]},
-            {"text": "WTG-07 switches first.", "fact_ids": [first, old, "F99"]},
+            {"text": "In frost below -5 °C, the masonry work is suspended.", "fact_ids": [frost]},
+            {"text": "All bays are 2,40 m wide.", "fact_ids": [old]},
+            {"text": "The bay window F1 is installed first.", "fact_ids": [first, old, "F99"]},
         ],
         "sections": [
             {
-                "heading": "Oil grade by site",
+                "heading": "Window sizes",
                 "claims": [
-                    {"text": "WTG-07 is planned for ISO VG 320 in 2026-03.", "fact_ids": [plan]},
-                    {"text": "The plug takes 45 Nm.", "fact_ids": [cold]},
+                    {
+                        "text": (
+                            "The bay window F1 is ordered at 2,40 m for delivery on 2026-03-30."
+                        ),
+                        "fact_ids": [plan],
+                    },
+                    {"text": "The slab is 30,00 m long.", "fact_ids": [frost]},
                 ],
             },
             {"heading": "Overview", "claims": [{"text": "Repeated.", "fact_ids": [first]}]},
             {"heading": "Empty", "claims": [{"text": "Nothing.", "fact_ids": ["F404"]}]},
         ],
         "contradictions": [
-            {"subject": "Oil grade for WTG-07", "fact_ids_a": [plan], "fact_ids_b": [first]},
-            {"subject": "Same source", "fact_ids_a": [cold], "fact_ids_b": [first]},
+            {"subject": "Width of the bay window F1", "fact_ids_a": [plan], "fact_ids_b": [wide]},
+            {"subject": "Same source", "fact_ids_a": [frost], "fact_ids_b": [first]},
         ],
         "superseded": [
             {
-                "subject": "Oil grade for all turbines",
+                "subject": "Width of the bays",
                 "old_fact_ids": [old],
-                "replacement_fact_ids": [cold],
-                "superseding_source": rev_b,
+                "replacement_fact_ids": [wide],
+                "superseding_source": quote_b,
             },
             {
                 "subject": "Invalid",
-                "old_fact_ids": [cold],
+                "old_fact_ids": [frost],
                 "replacement_fact_ids": [],
                 "superseding_source": None,
             },
@@ -115,9 +123,9 @@ async def build(
 
 async def test_routing_thresholds(corpus: Corpus, pack: DomainPack) -> None:
     feeding = route_sources(list(corpus.results.values()), pack)
-    assert set(feeding["gearbox-oil"]) == {SOP_B, SOP_A, PLAN, CONTRACT}
-    assert feeding["cold-weather"] == [SOP_B]
-    assert "blade-inspection" not in feeding
+    assert set(feeding["schedule-and-window-delivery"]) == {QUOTE_B, QUOTE_A, PLAN, STUDY}
+    assert feeding["cold-weather-works"] == [QUOTE_B]
+    assert "kitchen-renovation" not in feeding
     strict = pack.model_copy(
         update={
             "topics": TopicsFile(
@@ -132,11 +140,11 @@ async def test_routing_thresholds(corpus: Corpus, pack: DomainPack) -> None:
 
 async def test_topic_pages_and_skips(corpus: Corpus, pack: DomainPack) -> None:
     pages, cited, skips, llm = await build(corpus, pack)
-    assert sorted(pages) == ["topic:cold-weather", "topic:gearbox-oil"]
-    assert skips == [TopicSkip("blade-inspection", "insufficient_evidence", ())]
+    assert sorted(pages) == ["topic:cold-weather-works", "topic:schedule-and-window-delivery"]
+    assert skips == [TopicSkip("kitchen-renovation", "insufficient_evidence", ())]
     assert all(r.tier == "smart" and r.prompt_version == "topic-synthesis-v1" for r in llm.requests)
-    request = next(r for r in llm.requests if "- slug: gearbox-oil" in r.text)
-    assert "Rate card" not in request.text and "supplied at cost" not in request.text, (
+    request = next(r for r in llm.requests if "- slug: schedule-and-window-delivery" in r.text)
+    assert "Internal price study" not in request.text and "supplied at cost" not in request.text, (
         "sources above the audience never reach the synthesis"
     )
     assert "Contradictions are resolved by authority, then recency" in request.text
@@ -144,30 +152,32 @@ async def test_topic_pages_and_skips(corpus: Corpus, pack: DomainPack) -> None:
         assert find_violations(page.body) == []
         assert Page.parse(page.render(), page.path) == page
     assert cited
-    cold = pages["topic:cold-weather"].frontmatter
+    cold = pages["topic:cold-weather-works"].frontmatter
     assert isinstance(cold, TopicFrontmatter)
-    assert (cold.sources, cold.confidence, cold.contradictions) == ([SOP_B], "low", 0)
+    assert (cold.sources, cold.confidence, cold.contradictions) == ([QUOTE_B], "low", 0)
 
 
-async def test_gearbox_oil_page(corpus: Corpus, pack: DomainPack) -> None:
+async def test_window_delivery_page(corpus: Corpus, pack: DomainPack) -> None:
     pages, _, _, _ = await build(corpus, pack)
-    page = pages["topic:gearbox-oil"]
+    page = pages["topic:schedule-and-window-delivery"]
     fm = page.frontmatter
     assert isinstance(fm, TopicFrontmatter)
-    assert page.path == "topics/gearbox-oil.md"
-    assert fm.sources == sorted([SOP_B, SOP_A, PLAN])
+    assert page.path == "topics/schedule-and-window-delivery.md"
+    assert fm.sources == sorted([QUOTE_B, QUOTE_A, PLAN])
     assert (fm.sensitivity, fm.contradictions, fm.superseded_claims, fm.confidence) == (
         "internal",
         1,
         1,
         "medium",
     )
-    assert fm.summary == "Gearbox oil grades, the cold-site change and an open plan contradiction."
+    assert fm.summary == (
+        "Window sizes, the installation order and an open purchase-tracking contradiction."
+    )
     headings = [h.text for h in extract_headings(page.body)]
     assert headings == [
-        "Gearbox oil",
+        "Schedule and window delivery",
         "Overview",
-        "Oil grade by site",
+        "Window sizes",
         "Overview (topic section)",
         "Contradictions",
         "Superseded information",
@@ -177,39 +187,40 @@ async def test_gearbox_oil_page(corpus: Corpus, pack: DomainPack) -> None:
     body = page.body
     overview = body.split("## Overview\n\n", 1)[1].split("\n\n", 1)[0]
     assert overview == (
-        "Cold sites below -20 °C use ISO VG 220 gearbox oil.[^c1] WTG-07 switches first.[^c1]"
+        "In frost below -5 °C, the masonry work is suspended.[^c1] "
+        "The bay window F1 is installed first.[^c1]"
     ), "claims citing only superseded or unknown facts are dropped"
-    assert "The plug takes 45 Nm." not in body, "quantities missing from the cited facts"
+    assert "The slab is 30,00 m long." not in body, "quantities missing from the cited facts"
     contradiction = body.split("## Contradictions\n\n", 1)[1].split("\n\n", 1)[0]
     assert contradiction.startswith(
-        "- **Oil grade for WTG-07.** [Maintenance plan 2026](../sources/maintenance-plan-2026.md)"
-        " states: WTG-07 has a gearbox oil change planned for 2026-03 with ISO VG 320 oil "
-        "(6 hours).[^c2] (authority 5, dated 2026-01-10). [Gearbox oil change SOP rev B]"
-        "(../sources/sop-gbx-010-rev-b.md) states: WTG-07 is the first turbine to switch to ISO "
-        "VG 220.[^c1] (authority 7, dated 2026-01-15)."
+        "- **Width of the bay window F1.** [Schedule and purchase tracking]"
+        "(../sources/planning-et-suivi-des-achats.md) states: The bay window F1 is ordered at "
+        "2,40 m for delivery on 2026-03-30.[^c2] (authority 4, dated 2026-03-17). "
+        "[Quote DEV-2026-014 indice B](../sources/dev-2026-014-indice-b.md) states: The bay "
+        "window F1 is widened to 3,00 m.[^c1] (authority 8, dated 2026-02-03)."
     )
     assert contradiction.endswith(
-        "Resolution rule (authority, then recency): Gearbox oil change SOP rev B prevails "
-        "(authority 7 vs 5)."
+        "Resolution rule (authority, then recency): Quote DEV-2026-014 indice B prevails "
+        "(authority 8 vs 4)."
     )
     assert "Resolution policy: Higher authority wins" in body
     assert "Same source" not in body
     superseded = body.split("## Superseded information\n\n", 1)[1].split("\n\n", 1)[0]
     assert superseded == (
-        "- **Oil grade for all turbines.** [Gearbox oil change SOP rev A]"
-        "(../sources/sop-gbx-010-rev-a.md) stated: Revision A specifies ISO VG 320 gearbox oil "
-        "for all turbines, including WTG-07.[^c3] Replacement: At cold sites below -20 °C, ISO VG "
-        "220 gearbox oil is used.[^c1] Superseding source: [Gearbox oil change SOP rev B]"
-        "(../sources/sop-gbx-010-rev-b.md)."
+        "- **Width of the bays.** [Quote DEV-2026-014 indice A]"
+        "(../sources/dev-2026-014-indice-a.md) stated: Indice A specifies a width of 2,40 m for "
+        "all bays, including the bay window F1.[^c3] Replacement: The bay window F1 is widened "
+        "to 3,00 m.[^c1] Superseding source: [Quote DEV-2026-014 indice B]"
+        "(../sources/dev-2026-014-indice-b.md)."
     )
     consulted = body.split("## Sources consulted\n\n", 1)[1].split("\n\n", 1)[0].splitlines()
     assert consulted == [
-        "- [Gearbox oil change SOP rev B](../sources/sop-gbx-010-rev-b.md): current, "
-        "authority 7, dated 2026-01-15",
-        "- [Maintenance plan 2026](../sources/maintenance-plan-2026.md): current, authority 5, "
-        "dated 2026-01-10",
-        "- [Gearbox oil change SOP rev A](../sources/sop-gbx-010-rev-a.md): superseded, "
-        "authority 7, dated 2025-03-01",
+        "- [Quote DEV-2026-014 indice B](../sources/dev-2026-014-indice-b.md): current, "
+        "authority 8, dated 2026-02-03",
+        "- [Schedule and purchase tracking](../sources/planning-et-suivi-des-achats.md): "
+        "current, authority 4, dated 2026-03-17",
+        "- [Quote DEV-2026-014 indice A](../sources/dev-2026-014-indice-a.md): superseded, "
+        "authority 8, dated 2026-01-20",
     ]
     _, defs = extract_footnotes(body)
     assert [d.label for d in defs] == ["c1", "c2", "c3"]
@@ -225,24 +236,24 @@ async def test_superseded_footnotes_follow_reading_order(corpus: Corpus, pack: D
     # labels are c1..cN in order of first use (gate G03; the first Azure run failed on it).
     def handler(request: LlmRequest) -> dict:
         text = request.text
-        if "- slug: gearbox-oil" not in text:
+        if "- slug: schedule-and-window-delivery" not in text:
             return synthesis_handler(request)
         return {
-            "summary": "Superseded gearbox oil grade.",
+            "summary": "Superseded bay window width.",
             "overview": [
                 {
-                    "text": "WTG-07 has an oil change planned.",
-                    "fact_ids": [fact_id(text, "planned for 2026-03")],
+                    "text": "The bay window F1 is ordered at 2,40 m.",
+                    "fact_ids": [fact_id(text, "is ordered at 2,40 m")],
                 }
             ],
             "sections": [],
             "contradictions": [],
             "superseded": [
                 {
-                    "subject": "Oil grade for all turbines",
-                    "old_fact_ids": [fact_id(text, "Revision A specifies")],
-                    "replacement_fact_ids": [fact_id(text, "At cold sites below")],
-                    "superseding_source": source_label(text, "Gearbox oil change SOP rev B"),
+                    "subject": "Width of the bays",
+                    "old_fact_ids": [fact_id(text, "Indice A specifies")],
+                    "replacement_fact_ids": [fact_id(text, "is widened to")],
+                    "superseding_source": source_label(text, "Quote DEV-2026-014 indice B"),
                 }
             ],
         }
@@ -257,7 +268,9 @@ async def test_superseded_footnotes_follow_reading_order(corpus: Corpus, pack: D
         audience="internal",
         stamp=STAMP,
     )
-    body = next(page for page in pages if page.frontmatter.id == "topic:gearbox-oil").body
+    body = next(
+        page for page in pages if page.frontmatter.id == "topic:schedule-and-window-delivery"
+    ).body
     refs, defs = extract_footnotes(body)
     order: list[str] = []
     for label, _line in refs:
@@ -271,21 +284,23 @@ async def test_audience_filtering(corpus: Corpus, pack: DomainPack) -> None:
     pages, _, skips, llm = await build(corpus, pack, audience="public")
     assert pages == {} and llm.requests == []
     assert {(s.topic_slug, s.reason) for s in skips} == {
-        ("gearbox-oil", "audience"),
-        ("cold-weather", "audience"),
-        ("blade-inspection", "insufficient_evidence"),
+        ("schedule-and-window-delivery", "audience"),
+        ("cold-weather-works", "audience"),
+        ("kitchen-renovation", "insufficient_evidence"),
     }
     assert all(s.sources == () for s in skips)
     restricted, _, _, _ = await build(corpus, pack, audience="restricted")
-    page = restricted["topic:gearbox-oil"]
-    assert CONTRACT in page.frontmatter.sources  # type: ignore[union-attr]
+    page = restricted["topic:schedule-and-window-delivery"]
+    assert STUDY in page.frontmatter.sources  # type: ignore[union-attr]
     assert page.frontmatter.sensitivity == "restricted"
 
 
 async def test_minimum_sources_and_current_sources(corpus: Corpus, pack: DomainPack) -> None:
-    pages, _, skips, _ = await build(corpus, pack, results=[corpus.results[SOP_A]])
+    pages, _, skips, _ = await build(corpus, pack, results=[corpus.results[QUOTE_A]])
     assert pages == {}
-    assert ("gearbox-oil", "insufficient_evidence") in {(s.topic_slug, s.reason) for s in skips}
+    assert ("schedule-and-window-delivery", "insufficient_evidence") in {
+        (s.topic_slug, s.reason) for s in skips
+    }
     lenient = pack.model_copy(
         update={
             "topics": TopicsFile(
@@ -295,7 +310,7 @@ async def test_minimum_sources_and_current_sources(corpus: Corpus, pack: DomainP
     )
     llm = FakeLlmClient({"topic_synthesis": synthesis_handler})
     pages_list, _, skips = await build_topic_pages(
-        [corpus.results[SOP_A]],
+        [corpus.results[QUOTE_A]],
         corpus.pages,
         corpus.states,
         corpus.classifications,
@@ -305,7 +320,7 @@ async def test_minimum_sources_and_current_sources(corpus: Corpus, pack: DomainP
         stamp=STAMP,
     )
     assert pages_list == []
-    assert TopicSkip("gearbox-oil", "no_current_sources", (SOP_A,)) in skips
+    assert TopicSkip("schedule-and-window-delivery", "no_current_sources", (QUOTE_A,)) in skips
 
 
 def _truncated(request: LlmRequest) -> dict:
@@ -317,7 +332,7 @@ def _filtered(request: LlmRequest) -> dict:
 
 
 def _invalid(request: LlmRequest) -> dict:
-    return {"summary": "Gearbox oil.", "overview": "not a list"}
+    return {"summary": "Window sizes.", "overview": "not a list"}
 
 
 @pytest.mark.parametrize(
@@ -336,7 +351,7 @@ async def test_failed_synthesis_skips_only_that_topic(
     error: str,
 ) -> None:
     def handler(request: LlmRequest) -> dict:
-        if "- slug: gearbox-oil" in request.text:
+        if "- slug: schedule-and-window-delivery" in request.text:
             return failure(request)
         return synthesis_handler(request)
 
@@ -351,16 +366,20 @@ async def test_failed_synthesis_skips_only_that_topic(
             audience="internal",
             stamp=STAMP,
         )
-    assert [page.frontmatter.id for page in pages] == ["topic:cold-weather"]
+    assert [page.frontmatter.id for page in pages] == ["topic:cold-weather-works"]
     assert cited
     assert skips == [
-        TopicSkip("blade-inspection", "insufficient_evidence", ()),
-        TopicSkip("gearbox-oil", "insufficient_evidence", tuple(sorted([SOP_B, SOP_A, PLAN]))),
+        TopicSkip("kitchen-renovation", "insufficient_evidence", ()),
+        TopicSkip(
+            "schedule-and-window-delivery",
+            "insufficient_evidence",
+            tuple(sorted([QUOTE_B, QUOTE_A, PLAN])),
+        ),
     ]
     warnings = [r.getMessage() for r in caplog.records if r.name == "docwiki.stages.topics"]
     assert warnings == [
-        f"topic gearbox-oil: synthesis call failed ({error}); the topic is skipped as "
-        "insufficient_evidence"
+        f"topic schedule-and-window-delivery: synthesis call failed ({error}); the topic is "
+        "skipped as insufficient_evidence"
     ]
 
 
@@ -391,7 +410,7 @@ def info(title: str, authority: int, day: str | None) -> SourceInfo:
         status="current",
         sensitivity="internal",
         authority=authority,
-        doc_type="sop",
+        doc_type="quote",
         doc_number=None,
         revision=None,
         date=date.fromisoformat(day) if day else None,

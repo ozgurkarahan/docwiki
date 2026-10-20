@@ -21,13 +21,20 @@ from docwiki.stages.agentkit import (
     write_agent_kit,
 )
 
+QUOTE_A = "devis/DEV-2026-014 indice A.txt"
+
 
 def _pages():
-    a = source_id_for("procedures/SOP-GBX-010 rev A.txt")
+    a = source_id_for(QUOTE_A)
     return [
-        source_page("procedures/SOP-GBX-010 rev A.txt", "Rev A", "# Rev A\n", slug="rev-a"),
-        entity_page("asset:wtg-07", "WTG-07", "# WTG-07\n", sources=[a]),
-        topic_page("gearbox-oil", "Gearbox oil", "# Gearbox oil\n", sources=[a]),
+        source_page(QUOTE_A, "Indice A", "# Indice A\n", slug="indice-a"),
+        entity_page("building-element:baie-f1", "baie F1", "# baie F1\n", sources=[a]),
+        topic_page(
+            "quotes-contract-and-amendment",
+            "Quotes, contract and amendment",
+            "# Quotes, contract and amendment\n",
+            sources=[a],
+        ),
     ]
 
 
@@ -45,20 +52,22 @@ def _kit(**kwargs):
 
 def test_core_and_domain_skills_render_valid_files():
     kit = _kit()
-    assert set(kit.skills) == {*CORE_SKILLS, "troubleshoot-alarm"}
+    assert set(kit.skills) == {*CORE_SKILLS, "prepare-site-meeting"}
     for name, text in kit.skills.items():
         skill = SkillFile.parse(text, name)
         assert skill.frontmatter.name == name
         assert find_violations(text, allow_markers=False) == []
-    assert "stop after 12 tool calls" in kit.skills["troubleshoot-alarm"]
+    assert "stop after 12 tool calls" in kit.skills["prepare-site-meeting"]
     agents = kit.agents
     assert agents.path == "AGENTS.md" and agents.frontmatter.id == "meta:agents"
-    assert "[Gearbox oil](topics/gearbox-oil.md)" in agents.body
-    assert "- `troubleshoot-alarm`:" in agents.body
+    assert (
+        "[Quotes, contract and amendment](topics/quotes-contract-and-amendment.md)" in agents.body
+    )
+    assert "- `prepare-site-meeting`:" in agents.body
     assert "1 topic synthesis" in agents.body and "1 entity page" in agents.body
 
 
-@pytest.mark.parametrize("domain", ["wind-om", "it-runbooks"])
+@pytest.mark.parametrize("domain", ["batiment"])
 def test_shipped_domain_pack_skills_render(domain: str) -> None:
     # The shipped packs use the documented `paths.index` (docs/skills.md); a context without
     # it made the first Azure run fail in the agentkit stage (StrictUndefined).

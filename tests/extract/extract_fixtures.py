@@ -88,24 +88,24 @@ def _write(
 def make_text_pdf(path: Path, *, pages: int = 2) -> PdfLayout:
     """A text PDF: title, stamp, paragraphs, a numbered list and a figure on page 1."""
     pdf = _new_pdf()
-    pdf.set_title("Gearbox oil change SOP")
+    pdf.set_title("Devis DEV-2026-014 indice A")
     layout = PdfLayout()
     pdf.add_page()
-    _write(pdf, layout, "Gearbox oil change", size=20, style="B", height=12, role="title")
+    _write(pdf, layout, "Devis de l'extension", size=20, style="B", height=12, role="title")
     _write(pdf, layout, STAMP, size=9)
     pdf.ln(4)
     _write(
         pdf,
         layout,
-        "Use ISO VG 320 gearbox oil for all Litware turbines. Check the oil level after every "
-        "change and record the value in the maintenance log of the turbine.",
+        "Toutes les baies de l'extension mesurent 2,40 x 2,15 m. Vérifier la cote après chaque "
+        "pose et noter la valeur dans le compte rendu de chantier.",
         size=11,
     )
     pdf.ln(4)
-    _write(pdf, layout, "Drain the oil while it is still warm.", size=11)
+    _write(pdf, layout, "Nettoyer la dalle avant la pose.", size=11)
     pdf.ln(4)
-    _write(pdf, layout, "1. Stop the turbine and lock the rotor.", size=11)
-    _write(pdf, layout, "2. Open the drain valve.", size=11)
+    _write(pdf, layout, "1. Fermer l'ouverture provisoire.", size=11)
+    _write(pdf, layout, "2. Contrôler la livraison.", size=11)
     pdf.image(png_image(), x=20, y=150, w=70)
     layout.figures.append((1, (20.0, 150.0, 90.0, 150.0 + 70.0 * 100 / 160)))
     for number in range(2, pages + 1):
@@ -116,7 +116,7 @@ def make_text_pdf(path: Path, *, pages: int = 2) -> PdfLayout:
         _write(
             pdf,
             layout,
-            f"WTG-07 switches to ISO VG 220 at cold sites below -20 \u00b0C (page {number}).",
+            f"La baie F1 est posée en premier, sauf gel sous -5 \u00b0C (page {number}).",
             size=11,
         )
     layout.pages = pages
@@ -139,37 +139,37 @@ def make_scanned_pdf(path: Path) -> None:
 def make_docx(path: Path) -> None:
     """Paragraph indices (python-docx ``Document.paragraphs``, empty ones included):
 
-    1 Title · 2 stamp · 3 empty · 4 Heading 1 "Scope" · 5 text · 6 empty · (table 1) ·
+    1 Title · 2 stamp · 3 empty · 4 Heading 1 "Objet" · 5 text · 6 empty · (table 1) ·
     7 list item · 8 picture · 9 closing text.
     """
     from docx import Document
     from docx.shared import Inches
 
     document = Document()
-    document.core_properties.title = "Gearbox oil change SOP rev B"
+    document.core_properties.title = "Avenant n°1 au contrat de travaux"
     document.core_properties.author = "DocWiki sample generator"
-    document.add_paragraph("Gearbox oil change", style="Title")
+    document.add_paragraph("Avenant n°1", style="Title")
     document.add_paragraph(STAMP)
     document.add_paragraph("")
-    document.add_heading("Scope", level=1)
+    document.add_heading("Objet", level=1)
     document.add_paragraph(
-        "At cold sites, where the ambient temperature can fall below -20 \u00b0C, use ISO VG 220 "
-        "gearbox oil."
+        "En cas de gel, lorsque la température peut descendre sous -5 \u00b0C, la pose de la "
+        "fenêtre de toit est reportée."
     )
     document.add_paragraph("")
     table = document.add_table(rows=3, cols=3)
     for row, values in enumerate(
         (
-            ("Asset", "Task", "Oil grade"),
-            ("WTG-07", "Gearbox oil change", "ISO VG 220"),
-            ("WTG-12", "Gearbox oil change", "ISO VG 320"),
+            ("Repère", "Désignation", "Montant HT"),
+            ("FT1", "Fenêtre de toit", "1160,00 €"),
+            ("F1", "Baie coulissante", "4140,00 €"),
         )
     ):
         for column, value in enumerate(values):
             table.cell(row, column).text = value
-    document.add_paragraph("Drain the oil while it is still warm.", style="List Number")
+    document.add_paragraph("Nettoyer la dalle avant la pose.", style="List Number")
     document.add_picture(io.BytesIO(png_bytes(200, 120)), width=Inches(2))
-    document.add_paragraph("End of procedure.")
+    document.add_paragraph("Fin de l'avenant.")
     document.save(path)
 
 
@@ -188,24 +188,24 @@ def _set_cached_value(path: Path, member: str, cell: str, value: str) -> None:
 
 
 def make_xlsx(path: Path) -> None:
-    """Sheet "Plan" (rows 1-6, row 5 empty, merged A6:B6, formula F2 = 12) and "Notes & Ölstand"."""
+    """Sheets "Planning" (rows 1-6, row 5 empty, merged A6:B6, F2 = 12) and "Notes & Réserves"."""
     from openpyxl import Workbook
 
     workbook = Workbook()
-    plan = workbook.active
-    plan.title = "Plan"
-    plan.append(["Asset", "Task", "Hours", "Due", "Share", "Double"])
-    plan.append(["WTG-07", "Gearbox oil change", 6, date(2026, 3, 1), 0.25])
-    plan["E2"].number_format = "0%"
-    plan["F2"] = "=C2*2"
-    plan.append(["WTG-07", "Vibration check", 2.5, datetime(2026, 4, 2, 13, 30)])
-    plan.append(["WTG-12", "Gearbox oil change", 6, date(2026, 5, 4)])
-    plan["A6"] = "Merged remark"
-    plan.merge_cells("A6:B6")
-    plan["C6"] = 1
-    notes = workbook.create_sheet("Notes & \u00d6lstand")
+    planning = workbook.active
+    planning.title = "Planning"
+    planning.append(["Tâche", "Désignation", "Durée", "Début", "Avancement", "Double"])
+    planning.append(["T05", "Élévation des murs", 6, date(2026, 3, 17), 0.2])
+    planning["E2"].number_format = "0%"
+    planning["F2"] = "=C2*2"
+    planning.append(["T07", "Livraison des menuiseries", 2.5, datetime(2026, 3, 30, 13, 30)])
+    planning.append(["T08", "Pose des menuiseries", 6, date(2026, 3, 31)])
+    planning["A6"] = "Remarque fusionnée"
+    planning.merge_cells("A6:B6")
+    planning["C6"] = 1
+    notes = workbook.create_sheet("Notes & R\u00e9serves")
     notes.append(["Note"])
-    notes.append(["Oil level checked"])
+    notes.append(["Réserves levées"])
     workbook.save(path)
     _set_cached_value(path, "xl/worksheets/sheet1.xml", "F2", "12")
 
@@ -213,10 +213,10 @@ def make_xlsx(path: Path) -> None:
 def make_csv(path: Path) -> None:
     """UTF-8 BOM, semicolons, a quoted field with a line break, a blank record (row 3)."""
     text = (
-        "Asset;Task;Hours\r\n"
-        'WTG-07;"Gearbox oil change\nwith flush";6\r\n'
+        "Commande;Désignation;Montant HT\r\n"
+        'BC-2026-009;"Baie coulissante F1\navec quincaillerie";3320,00\r\n'
         "\r\n"
-        "WTG-12;Vibration check;2\r\n"
+        "BC-2026-010;Fenêtre F2 PVC;1020,00\r\n"
     )
     path.write_bytes(b"\xef\xbb\xbf" + text.encode("utf-8"))
 
@@ -230,18 +230,18 @@ def make_pptx(path: Path) -> None:
     presentation.core_properties.author = "DocWiki sample generator"
     presentation.core_properties.last_modified_by = "DocWiki sample generator"
     first = presentation.slides.add_slide(presentation.slide_layouts[0])
-    first.shapes.title.text = "Gearbox maintenance review"
-    first.placeholders[1].text = "Quarterly review"
+    first.shapes.title.text = "Réunion de chantier n°3"
+    first.placeholders[1].text = "Avancement des travaux"
     second = presentation.slides.add_slide(presentation.slide_layouts[1])
-    second.shapes.title.text = "Oil change steps"
+    second.shapes.title.text = "Décisions"
     frame = second.placeholders[1].text_frame
-    frame.text = "Drain the oil"
-    frame.add_paragraph().text = "Refill with ISO VG 320"
-    second.notes_slide.notes_text_frame.text = "Mention the cold-site exception."
+    frame.text = "Fermer les ouvertures"
+    frame.add_paragraph().text = "Avancer la cuisine"
+    second.notes_slide.notes_text_frame.text = "Rappeler le report de livraison des menuiseries."
     third = presentation.slides.add_slide(presentation.slide_layouts[5])
-    third.shapes.title.text = "Plan"
+    third.shapes.title.text = "Planning"
     table = third.shapes.add_table(3, 2, Inches(1), Inches(2), Inches(5), Inches(1.5)).table
-    for row, values in enumerate((("Asset", "Due"), ("WTG-07", "2026-03"), ("WTG-12", "2026-05"))):
+    for row, values in enumerate((("Tâche", "Date"), ("T07", "2026-04-20"), ("T08", "2026-04-21"))):
         for column, value in enumerate(values):
             table.cell(row, column).text = value
     third.shapes.add_picture(io.BytesIO(png_bytes(120, 80)), Inches(7), Inches(2), Inches(1.5))
@@ -249,26 +249,30 @@ def make_pptx(path: Path) -> None:
 
 
 def make_eml(path: Path, *, html_only: bool = False) -> None:
-    """Body lines: 1 greeting · 2 blank · 3-4 plan · 5 blank · 6-7 closing."""
+    """Body lines: 1 greeting · 2 blank · 3-4 delay · 5 blank · 6-7 closing."""
     message = EmailMessage()
-    message["From"] = "Maintenance planner <planner@example.org>"
-    message["To"] = "site-team@example.org"
-    message["Subject"] = "Gearbox oil change schedule"
-    message["Date"] = "Mon, 12 Jan 2026 09:30:00 +0000"
+    message["From"] = "Erwan Gouzelin <erwan.gouzelin@vanarsdel-menuiseries.example>"
+    message["To"] = "ines.roux@lamna-batiment.example"
+    message["Subject"] = "Report de livraison des menuiseries"
+    message["Date"] = "Wed, 18 Mar 2026 09:30:00 +0100"
     html = (
         "<html><head><style>p {color: red}</style><script>alert(1)</script></head><body>"
-        "<p>Hello team,</p><p>WTG-07 gearbox oil change is planned for March.</p></body></html>"
+        "<p>Bonjour,</p><p>La livraison de la commande BC-2026-009 est reportée au "
+        "20/04/2026.</p></body></html>"
     )
     if html_only:
         message.set_content(html, subtype="html")
     else:
         message.set_content(
-            "Hello team,\n\nWTG-07 gearbox oil change is planned for March.\nUse ISO VG 320.\n\n"
-            "Regards,\nPlanner\n"
+            "Bonjour,\n\nLa livraison de la commande BC-2026-009 est reportée au lundi "
+            "20 avril 2026.\nPénurie de profilés aluminium.\n\nCordialement,\nErwan Gouzelin\n"
         )
         message.add_alternative(html, subtype="html")
         message.add_attachment(
-            b"%PDF-1.4 fictional", maintype="application", subtype="pdf", filename="checklist.pdf"
+            b"%PDF-1.4 fictional",
+            maintype="application",
+            subtype="pdf",
+            filename="bon-de-commande.pdf",
         )
     path.write_bytes(message.as_bytes())
 
@@ -276,19 +280,19 @@ def make_eml(path: Path, *, html_only: bool = False) -> None:
 def make_vtt(path: Path) -> None:
     path.write_text(
         "WEBVTT\n\nNOTE fictional transcript\n\n1\n00:00:01.500 --> 00:00:04.250\n"
-        "<v Technician>Gearbox oil level checked on WTG-07.\n\n"
-        "00:03:15.000 --> 00:03:42.900 align:start\nSwitch to ISO VG 220 &amp; log it\n"
-        "before winter.\n",
+        "<v Chef d'équipe>Livraison des palettes contrôlée sur le chantier.\n\n"
+        "00:03:15.000 --> 00:03:42.900 align:start\nFermer les ouvertures &amp; noter la date\n"
+        "avant le 07/04.\n",
         encoding="utf-8",
         newline="\n",
     )
 
 
 def make_text(path: Path, *, markdown: bool) -> None:
-    heading = "# Gearbox oil notes\n" if markdown else "Gearbox oil notes\n"
+    heading = "# Consignes de pose\n" if markdown else "Consignes de pose\n"
     path.write_text(
-        f"{heading}\nUse ISO VG 320 for all turbines.\nRecord the level.\n\n\n"
-        "- WTG-07 switches to ISO VG 220.\n",
+        f"{heading}\nLa baie F1 mesure 3,00 x 2,15 m.\nNoter la mesure.\n\n\n"
+        "- BC-2026-009 est livrée le 20/04/2026.\n",
         encoding="utf-8",
         newline="\n",
     )
@@ -324,36 +328,36 @@ class Corpus:
 
 
 CORPUS_FILES = (
-    "docs/sop-gbx-010.pdf",
-    "docs/crane-lift-plan-scan.pdf",
-    "docs/sop-gbx-010-rev-b.docx",
-    "plans/maintenance-plan-2026.xlsx",
-    "plans/work-orders.csv",
-    "slides/gearbox-review.pptx",
-    "mail/oil-change-schedule.eml",
+    "docs/devis-indice-a.pdf",
+    "docs/bon-de-livraison-scan.pdf",
+    "docs/avenant-n1.docx",
+    "plans/planning-chantier.xlsx",
+    "plans/commandes.csv",
+    "slides/support-reunion-chantier.pptx",
+    "mail/report-de-livraison.eml",
     "mail/html-only.eml",
-    "meetings/standup.vtt",
-    "notes/gearbox-oil.md",
-    "notes/gearbox-oil.txt",
-    "photos/checklist.png",
+    "meetings/reunion-de-chantier.vtt",
+    "notes/consignes-de-pose.md",
+    "notes/consignes-de-pose.txt",
+    "photos/photo-palettes.png",
 )
 
 
 def build_corpus(root: Path) -> Corpus:
     for rel in CORPUS_FILES:
         (root / rel).parent.mkdir(parents=True, exist_ok=True)
-    layout = make_text_pdf(root / "docs/sop-gbx-010.pdf")
-    make_scanned_pdf(root / "docs/crane-lift-plan-scan.pdf")
-    make_docx(root / "docs/sop-gbx-010-rev-b.docx")
-    make_xlsx(root / "plans/maintenance-plan-2026.xlsx")
-    make_csv(root / "plans/work-orders.csv")
-    make_pptx(root / "slides/gearbox-review.pptx")
-    make_eml(root / "mail/oil-change-schedule.eml")
+    layout = make_text_pdf(root / "docs/devis-indice-a.pdf")
+    make_scanned_pdf(root / "docs/bon-de-livraison-scan.pdf")
+    make_docx(root / "docs/avenant-n1.docx")
+    make_xlsx(root / "plans/planning-chantier.xlsx")
+    make_csv(root / "plans/commandes.csv")
+    make_pptx(root / "slides/support-reunion-chantier.pptx")
+    make_eml(root / "mail/report-de-livraison.eml")
     make_eml(root / "mail/html-only.eml", html_only=True)
-    make_vtt(root / "meetings/standup.vtt")
-    make_text(root / "notes/gearbox-oil.md", markdown=True)
-    make_text(root / "notes/gearbox-oil.txt", markdown=False)
-    make_png(root / "photos/checklist.png")
+    make_vtt(root / "meetings/reunion-de-chantier.vtt")
+    make_text(root / "notes/consignes-de-pose.md", markdown=True)
+    make_text(root / "notes/consignes-de-pose.txt", markdown=False)
+    make_png(root / "photos/photo-palettes.png")
     return Corpus(root, layout)
 
 

@@ -105,7 +105,7 @@ def entity_answer(request: LlmRequest) -> dict[str, Any]:
 def topic_answer(request: LlmRequest) -> dict[str, Any]:
     fact = _first_fact(request)
     return {
-        "summary": "Gearbox oil grades in the fictional engine test corpus.",
+        "summary": "Window delivery in the fictional engine test corpus.",
         "overview": [{"text": fact[1], "fact_ids": [fact[0]]}] if fact else [],
         "sections": [],
         "contradictions": [],
@@ -148,16 +148,16 @@ async def test_real_compile_lane_builds_a_valid_release(make_harness):
 
     reader = ReleaseReader.open(harness.settings.work_dir)
     pages = {page.id: page for page in reader.list_pages("source")}
-    rev_a = source_id_for("procedures/SOP-GBX-010 rev A.txt")
-    rev_b = source_id_for("procedures/SOP-GBX-010 rev B.docx")
+    rev_a = source_id_for("devis/DEV-2026-014 indice A.txt")
+    rev_b = source_id_for("devis/DEV-2026-014 indice B.docx")
     old = reader.read_page(rev_a)
     assert old.frontmatter.status == "superseded"
     intro = old.body.split("\n## ", 1)[0]
     newer = pages[rev_b].path.rsplit("/", 1)[-1]
     assert f"]({newer})" in intro and f"`{rev_b}`" not in old.body
-    assert {page.id for page in reader.list_pages("entity")} >= {"asset:wtg-07"}
+    assert {page.id for page in reader.list_pages("entity")} >= {"building-element:baie-f1"}
     topics = reader.list_pages("topic")
-    assert [topic.id for topic in topics] == ["topic:gearbox-oil"]
+    assert [topic.id for topic in topics] == ["topic:schedule-and-window-delivery"]
     for topic in topics:
         for source_id in reader.read_page(topic.id).frontmatter.sources:
             assert topic.id in reader.read_page(source_id).frontmatter.topics
@@ -191,7 +191,7 @@ async def test_full_real_engine_builds_a_contained_public_release(make_harness):
     reader = ReleaseReader.open(harness.settings.work_dir)
     titles = {page.id: page.title for page in reader.list_pages("source")}
     note = source_id_for("notes/supplier-note.txt")
-    rev_b = source_id_for("procedures/SOP-GBX-010 rev B.docx")
+    rev_b = source_id_for("devis/DEV-2026-014 indice B.docx")
     assert {note, rev_b} <= set(titles)
     # the fictional public sample publishes originals, except for the flagged note
     assert list((root / "evidence" / rev_b).glob("original.*"))

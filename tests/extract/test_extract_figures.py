@@ -18,7 +18,7 @@ def describer() -> FakeLlmClient:
 
 async def test_pdf_figure_description(corpus: Corpus) -> None:
     llm = describer()
-    result = await corpus.extract("docs/sop-gbx-010.pdf", llm=llm)
+    result = await corpus.extract("docs/devis-indice-a.pdf", llm=llm)
     doc = result.doc
     (figure,) = doc.figures
     assert figure.description == DESCRIPTION
@@ -46,9 +46,9 @@ async def test_pdf_figure_description(corpus: Corpus) -> None:
 
 async def test_image_and_office_figures_are_described(corpus: Corpus) -> None:
     for rel in (
-        "photos/checklist.png",
-        "docs/sop-gbx-010-rev-b.docx",
-        "slides/gearbox-review.pptx",
+        "photos/photo-palettes.png",
+        "docs/avenant-n1.docx",
+        "slides/support-reunion-chantier.pptx",
     ):
         doc = (await corpus.extract(rel, llm=describer())).doc
         assert [figure.description for figure in doc.figures] == [DESCRIPTION]
@@ -58,12 +58,12 @@ async def test_image_and_office_figures_are_described(corpus: Corpus) -> None:
 async def test_no_description_without_llm_or_when_disabled(corpus: Corpus) -> None:
     llm = describer()
     disabled = await corpus.extract(
-        "docs/sop-gbx-010.pdf", ExtractSettings(describe_figures=False), llm=llm
+        "docs/devis-indice-a.pdf", ExtractSettings(describe_figures=False), llm=llm
     )
     assert llm.requests == []
     assert disabled.doc.figures[0].description is None
     assert all(block.kind != "figure-ref" for block in disabled.doc.blocks)
-    without = await corpus.extract("docs/sop-gbx-010.pdf")
+    without = await corpus.extract("docs/devis-indice-a.pdf")
     assert without.doc.to_json() == disabled.doc.to_json()
 
 
@@ -72,11 +72,11 @@ async def test_failures_and_empty_answers_become_warnings(corpus: Corpus) -> Non
         raise LlmServiceError("service unavailable")
 
     failing = FakeLlmClient({FIGURE_SCHEMA_NAME: fail})
-    result = await corpus.extract("docs/sop-gbx-010.pdf", llm=failing)
+    result = await corpus.extract("docs/devis-indice-a.pdf", llm=failing)
     assert result.doc.figures[0].description is None
     assert "figure-description-failed: f01: LlmServiceError" in result.warnings
 
     empty = FakeLlmClient({FIGURE_SCHEMA_NAME: {"description": "N/A"}})
-    result = await corpus.extract("docs/sop-gbx-010.pdf", llm=empty)
+    result = await corpus.extract("docs/devis-indice-a.pdf", llm=empty)
     assert result.doc.figures[0].description is None
     assert result.doc.extraction.model is None

@@ -23,10 +23,10 @@ from docwiki.stages.render import Footnotes
 from docwiki.stages.verify_citations import DocIndex
 
 CASES: dict[str, list[str]] = {
-    "docs/sop-gbx-010.pdf": ["b0003", "b0003,b0004", "f01", "b0007"],
-    "docs/crane-lift-plan-scan.pdf": ["b0001"],
-    "docs/sop-gbx-010-rev-b.docx": ["b0004", "t01:r0003", "t01:r0002,t01:r0003", "f01"],
-    "plans/maintenance-plan-2026.xlsx": [
+    "docs/devis-indice-a.pdf": ["b0003", "b0003,b0004", "f01", "b0007"],
+    "docs/bon-de-livraison-scan.pdf": ["b0001"],
+    "docs/avenant-n1.docx": ["b0004", "t01:r0003", "t01:r0002,t01:r0003", "f01"],
+    "plans/planning-chantier.xlsx": [
         "t01:r0003",
         "t01:r0002,t01:r0004",
         "t01:r0006",
@@ -34,12 +34,12 @@ CASES: dict[str, list[str]] = {
         "t02:r0002",
         "b0001",
     ],
-    "plans/work-orders.csv": ["t01:r0004", "t01:r0002"],
-    "slides/gearbox-review.pptx": ["b0005", "t01:r0002", "f01"],
-    "mail/oil-change-schedule.eml": ["b0001", "b0003", "b0005"],
-    "meetings/standup.vtt": ["b0002"],
-    "notes/gearbox-oil.txt": ["b0002"],
-    "photos/checklist.png": ["f01", "b0001"],
+    "plans/commandes.csv": ["t01:r0004", "t01:r0002"],
+    "slides/support-reunion-chantier.pptx": ["b0005", "t01:r0002", "f01"],
+    "mail/report-de-livraison.eml": ["b0001", "b0003", "b0005"],
+    "meetings/reunion-de-chantier.vtt": ["b0002"],
+    "notes/consignes-de-pose.txt": ["b0002"],
+    "photos/photo-palettes.png": ["f01", "b0001"],
 }
 
 
@@ -72,14 +72,14 @@ async def test_compile_citations_resolve_to_honest_sidecars(
         title=title,
         summary=f"Fixture {title}.",
         sensitivity="public",
-        updated=date(2026, 2, 15),
+        updated=date(2026, 4, 1),
         docwiki=writer.stamp,
         source_id=doc.source_id,
         source_path=doc.source_path,
         source_hash=doc.source_hash,
         media_type=doc.media_type,
-        doc_type="procedure",
-        category="maintenance",
+        doc_type="quote",
+        category="contract-documents",
         status="current",
         original_lang=doc.lang,
         authority=5,

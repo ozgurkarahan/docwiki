@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -184,4 +186,118 @@ def test_cli_end_to_end_with_a_fake_model(
     assert data["versions"]["system"]["prompt_version"] == systems.RAG_PROMPT_VERSION
     assert data["versions"]["extraction"].startswith("local-")
     assert data["cost"]["input_tokens"] > 0
-    assert "baseline-rag · dev · 3/33 questions" in capsys.readouterr().out
+    assert "baseline-rag · dev · 3/16 questions" in capsys.readouterr().out
+
+
+def test_cli_long_context_baseline_reads_the_public_documents_of_full(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    golden: QuestionSet,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    expected = {question.question: question.expected_answer for question in golden.questions}
+    seen: list[str] = []
+
+    def handler(request: LlmRequest) -> dict[str, Any]:
+        seen.append(request.text)
+        asked = request.text.rsplit("Question: ", 1)[1].split("\n", 1)[0]
+        return {"answer": expected[asked], "citations": [{"chunk_id": "S01:p0001"}]}
+
+    monkeypatch.setattr(
+        systems,
+        "default_llm_factory",
+        lambda: FakeLlmClient({"eval_baseline_long_context": handler}),
+    )
+    code = runner.main(
+        [
+            "--system",
+            "baseline-long-context",
+            "--questions",
+            str(runner.REPO_ROOT / "evals" / "golden" / "dev.jsonl"),
+            "--limit",
+            "2",
+            "--out",
+            str(tmp_path / "out"),
+            "--cache-dir",
+            str(tmp_path / "cache"),
+        ]
+    )
+    assert code == 0, capsys.readouterr().err
+    data = json.loads(
+        next((tmp_path / "out").glob("*-baseline-long-context-dev-limit2.json")).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert data["status"] == "ok" and data["config"]["scope"] == "full"
+    assert data["config"]["system"]["documents"] == 12  # the public documents of full/
+    assert data["versions"]["system"]["prompt_version"] == systems.LONG_CONTEXT_PROMPT_VERSION
+    context = seen[0]
+    for path in ("contrat/2026-02-10_contrat-de-travaux-signe.docx", "devis/DEV-2026-014_indice-A"):
+        assert f'source="full/{path}' in context
+    assert "etude-de-prix-interne" not in context  # restricted: not a public document
+    assert "held-back" not in context  # the held-back revision is not in the full scope
+
+
+def _group_digits(text: str) -> str:
+    """French digit grouping (narrow no-break space) and a no-break space before the euro sign."""
+    return re.sub(
+        r"(?<![\d,])(\d{1,3})(\d{3}),(\d{2}) €",
+        lambda match: f"{match[1]}\u202f{match[2]},{match[3]}\u00a0€",
+        text,
+    )
+
+
+_MONTHS = (
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+)
+_ENGLISH_DATE = re.compile(rf"\b(\d{{1,2}}) ({'|'.join(_MONTHS)}) (\d{{4}})\b")
+
+
+def _french_dates(text: str) -> str:
+    """``23 February 2026`` as ``23/02/2026``."""
+    return _ENGLISH_DATE.sub(
+        lambda match: f"{int(match[1]):02d}/{_MONTHS.index(match[2]) + 1:02d}/{match[3]}", text
+    )
+
+
+def _score_rewritten(
+    golden: QuestionSet, corpus: CorpusContext, rewrite: Callable[[str], str]
+) -> tuple[dict[str, Any], int]:
+    """Metrics of the reference answers once ``rewrite`` changed their numbers or dates, and the
+    number of answers it changed."""
+    changed = 0
+
+    def make(question: Any) -> tuple[str, list[Citation]]:
+        nonlocal changed
+        body = rewrite(question.expected_answer)
+        changed += body != question.expected_answer
+        citations = [
+            Citation(source_path=item.source_path, locator_key=item.locator_key)
+            for item in question.required_citations
+        ]
+        return body, citations
+
+    return _score(golden, corpus, make), changed
+
+
+@pytest.mark.parametrize("rewrite", [_group_digits, _french_dates], ids=["amounts", "dates"])
+def test_french_formats_still_match_the_golden_items(
+    golden: QuestionSet, real_corpus: CorpusContext, rewrite: Callable[[str], str]
+) -> None:
+    """A model that groups the digits of amounts (47 271,60 €) or writes dates JJ/MM/AAAA is not
+    penalised: the items of the golden set match whatever the format."""
+    overall, changed = _score_rewritten(golden, real_corpus, rewrite)
+    assert changed >= 5
+    for name in ("answer_accuracy", "must_include_coverage", "numeric_exactness"):
+        assert overall[name]["value"] == 1.0, (name, overall[name])

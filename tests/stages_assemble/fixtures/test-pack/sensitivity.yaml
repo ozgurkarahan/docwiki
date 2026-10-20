@@ -1,0 +1,6 @@
+default: public
+rules:
+  - tier: restricted
+    path_glob: "**/restricted/**"
+  - tier: internal
+    doc_type: schedule

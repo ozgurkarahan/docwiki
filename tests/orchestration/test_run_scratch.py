@@ -24,7 +24,7 @@ async def test_overwritten_raw_file_is_extracted_from_its_new_bytes(harness, cor
     first = await harness.run()
     assert first.status == "succeeded", first.errors
     (corpus / "notes" / "supplier-note.txt").write_text(
-        "Note from Litware support: use ISO VG 320 gearbox oil for turbine 7.\n",
+        "Note from VanArsdel Menuiseries: the bay window F1 is delivered with its hardware.\n",
         encoding="utf-8",
     )
     second = await harness.run()

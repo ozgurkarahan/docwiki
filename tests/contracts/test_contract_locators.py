@@ -25,9 +25,9 @@ CASES = [
     (DocxTableLocator(table=2, row_start=3, row_end=7), "tbl-02-r0003-r0007", "table 2, rows 3–7"),
     (DocxTableLocator(table=2, row_start=3, row_end=3), "tbl-02-r0003-r0003", "table 2, row 3"),
     (
-        XlsxRowsLocator(sheet="Plan", row_start=12, row_end=20),
-        "sheet-plan-r0012-r0020",
-        'sheet "Plan", rows 12–20',
+        XlsxRowsLocator(sheet="Planning", row_start=12, row_end=20),
+        "sheet-planning-r0012-r0020",
+        'sheet "Planning", rows 12–20',
     ),
     (
         XlsxRowsLocator(
@@ -135,7 +135,7 @@ def test_locator_validation_errors() -> None:
             {"kind": "image-region", "page": 2, "region": 1, "bbox": [0, 0, 1, 1]}
         )
     with pytest.raises(ValidationError):
-        XlsxRowsLocator(sheet="Plan", sheet_slug="Plan", row_start=1, row_end=2)
+        XlsxRowsLocator(sheet="Planning", sheet_slug="Planning", row_start=1, row_end=2)
 
 
 def test_locator_union_requires_kind_and_is_strict() -> None:

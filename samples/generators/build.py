@@ -3,7 +3,7 @@
 Usage (from the repository root)::
 
     uv run python samples/generators/build.py --out samples/corpus
-    uv run python samples/generators/build.py --out .local/corpus --only sb-oil mail-oem
+    uv run python samples/generators/build.py --out .local/corpus --only devis-b mail-fournisseur
 """
 
 from __future__ import annotations
@@ -29,8 +29,8 @@ def main(argv: list[str] | None = None) -> int:
     if manifest is not None:
         totals = manifest["totals"]
         print(
-            f"wrote {totals['files']} files ({totals['unique_documents']} documents, "
-            f"{totals['bytes'] / 1_000_000:.1f} MB) to {args.out}"
+            f"wrote {totals['files']} files ({totals['documents']} documents and "
+            f"{totals['held_back']} held back, {totals['bytes'] / 1_000_000:.1f} MB) to {args.out}"
         )
     return 0
 

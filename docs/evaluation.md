@@ -6,28 +6,31 @@ against baselines, on questions written before the system ever saw the data, and
 its failures. This page describes the method; the normative text is the [evaluation
 spec](spec/evals.md).
 
-> **Results:** a live run on 2026-10-18 measured the deployed Researcher and both baselines on the
-> dev split and the private holdout; see [results](#results) below and the README scoreboard.
+> **Results:** pending re-evaluation on the new sample; see [results](#results) below and the README
+> scoreboard, which `evals/scoreboard.py` generates from `evals/results/`.
 
 ## The golden set
 
-The public dev split lives in [`evals/golden/`](../evals/golden/README.md): **33 questions** about
-the fictional Quellmoor Ridge corpus, one JSON object per line.
+The public dev split lives in [`evals/golden/`](../evals/golden/README.md): a small set of questions
+about the fictional building-job corpus (the [spec](spec/domain-and-corpus.md#5-golden-set) sets
+it between 12 and 20 questions), one JSON object per line. The documents are in French; English
+questions use only language-neutral `must_include` items (numbers with units, dates, document
+numbers, names), so a correct English answer never needs a French word.
 
-| Category | Questions | What it tests |
-|---|---|---|
-| single-hop | 4 | One fact from one source |
-| numeric | 2 | Exact values with units |
-| table | 4 | Spreadsheet and CSV rows, including a join across a workbook and a CSV |
-| multi-hop | 6 | Facts combined across formats: SCADA log, incident report, asset register, decks, e-mail, minutes |
-| contradiction | 2 | Current sources that disagree; authority and recency decide |
-| supersession | 2 | A later revision replaces an earlier one |
-| multilingual | 3 | English questions on French and German sources, and one question in French |
-| ocr | 2 | A handwritten value on a photographed checklist, an image-only scanned PDF |
-| abstain | 2 | The corpus does not contain the answer |
-| injection | 2 | An e-mail carries an instruction addressed to AI assistants and a canary token |
-| restricted | 1 | The answer exists only in a restricted document excluded from public builds |
-| skill | 3 | Tasks for the domain skills `troubleshoot-alarm`, `prepare-maintenance-task`, `audit-readiness` |
+| Category | What it tests |
+|---|---|
+| single-hop | One fact from one source |
+| numeric | Exact values with units (an amount, an area, a percentage) |
+| table | Spreadsheet rows, for example purchases to date in the planning workbook |
+| multi-hop | Facts combined across documents: the contract and its amendment, an invoice and a scanned delivery note, minutes and e-mails |
+| contradiction | Current sources that disagree (the window delivery date in the planning and in the window maker's e-mail); authority and recency decide |
+| supersession | A later revision replaces an earlier one (quote indice B replaces indice A) |
+| multilingual | English questions on French documents, and at least one question asked in French |
+| ocr | A handwritten remark on an image-only scanned delivery note |
+| abstain | The corpus does not contain the answer (no document names an architect) |
+| injection | An e-mail carries an instruction addressed to AI assistants and a canary token |
+| restricted | The answer exists only in a restricted document excluded from public builds (the internal price study) |
+| skill | Tasks for the domain skills of the pack (one per skill) |
 
 Each record carries the question and its language, a reference answer, `must_include` strings
 (numbers normalised), `required_citations` (source path and locator key), `forbidden` strings (for
@@ -47,13 +50,13 @@ of `dev.jsonl` and of the corpus manifest, and a test fails if either drifts. On
 first wiki be generated. Any later change to the set goes through its authoring script, with a
 commit message that explains why the seal changed.
 
-**A private holdout** of about 30 % of the questions is kept outside the repository. Its author
-sees only the corpus, never the notes that describe the planted facts. Only aggregate holdout
-scores are published, separately from dev scores, and prompts are never tuned on holdout results.
+**A private holdout** of about a quarter of all questions (about five) is kept outside the
+repository. Its author sees only the corpus, never the notes that describe the planted facts. Only
+aggregate holdout scores are published, separately from dev scores, and prompts are never tuned on
+holdout results.
 
-Fourteen dev questions cite only documents of the 12-document quickstart subset, so a cheaper
-quickstart evaluation is possible. One question is a "time travel" check: its answer changes when
-the held-back service bulletin is added to the corpus.
+The held-back planning revision supports a "time travel" check: the answer about the window
+delivery date changes when it is added to the corpus (see [`PLANTED.md`](../samples/fiction/PLANTED.md)).
 
 ## Systems under test
 
@@ -62,7 +65,7 @@ the held-back service bulletin is added to the corpus.
 | `docwiki-researcher` | The deployed Foundry Researcher agent, through the MCP server, over the current release |
 | `docwiki-local` | The same instructions through a local loop and the stdio MCP server (specified, not implemented in this proof of concept) |
 | `baseline-rag` | Naive RAG: extracted text split into chunks of about 800 tokens, BM25 top-8, the same `smart` model and answer format |
-| `baseline-long-context` | All extracted text of the quickstart subset in the prompt, when it fits the model budget, with the same model |
+| `baseline-long-context` | All extracted text of the public documents of `full/` in the prompt, when it fits the model budget, with the same model |
 
 Same model, same extracted text, same answer format: the baselines differ from DocWiki only in how
 knowledge is organised and reached.
@@ -131,38 +134,21 @@ single questions first.
 
 ## Results
 
-Live run of 2026-10-18: Sweden Central, `smart` = gpt-5.5 (Global Standard), Researcher measured
-on release `20261018T092417Z-d2186573` (the committed sample, `20261018T104207Z-650d6d98`, was
-rebuilt from the same cached model outputs with corrected navigation labels), one run per system,
-judge not run (every published score is deterministic). Full tables with denominators, tokens,
-versions and failed question ids: [`evals/SCOREBOARD.md`](../evals/SCOREBOARD.md).
+Pending re-evaluation on the new sample. The Researcher and both baselines will be run on the dev
+split and on the private holdout once the sample is compiled on Azure. The numbers then appear in
+the README scoreboard and in [`evals/SCOREBOARD.md`](../evals/SCOREBOARD.md), generated by
+`evals/scoreboard.py` from `evals/results/`, with denominators, tokens, cost, versions and the ids
+of failed questions. This page states no score until they exist.
 
-| System | Split | Answer accuracy | Citation precision | Citation recall | Abstention | Injection resistance | Cost per question |
-|---|---|---|---|---|---|---|---|
-| `docwiki-researcher` | dev (33) | 90.6 % (29/32) | 79.5 % (n=30) | 77.3 % (n=30) | 100 % (33/33) | 100 % (2/2) | 0.118 USD |
-| `baseline-rag` | dev (33) | 75.0 % (24/32) | 91.8 % (n=27) | 75.8 % (n=30) | 90.9 % (30/33) | 100 % (2/2) | 0.046 USD |
-| `baseline-long-context` | dev (33), quickstart documents only | 50.0 % (16/32) | 75.2 % (n=22) | 44.5 % (n=30) | 72.7 % (24/33) | 100 % (2/2) | 0.145 USD |
-| `docwiki-researcher` | holdout (15, aggregate) | 93.3 % (14/15) | 86.5 % (n=13) | 84.3 % (n=13) | 100 % (15/15) | 100 % (1/1) | 0.165 USD |
-| `baseline-rag` | holdout (15, aggregate) | 66.7 % (10/15) | 96.9 % (n=13) | 86.5 % (n=13) | 100 % (15/15) | 100 % (1/1) | 0.051 USD |
-| `baseline-long-context` | holdout (15, aggregate) | 46.7 % (7/15) | 71.7 % (n=9) | 37.8 % (n=13) | 66.7 % (10/15) | 100 % (1/1) | 0.169 USD |
+How the results will be read, and what they will not claim:
 
-What the numbers say, and what they do not:
-
-- **Where the wiki helps.** The Researcher answered six dev questions naive RAG missed: two
-  multi-hop (q011, q014), two multilingual (q021, q022) and two skill tasks (q031, q033). These
-  need facts joined across formats or languages, which entity pages, the glossary and topic
-  syntheses provide. Both systems missed q007 (one row of the stock workbook) and q012 (a permit
-  curtailment rule joined with the SCADA log).
-- **Where RAG is better.** Citation precision (91.8 % against 79.5 %), numeric exactness on dev
-  (5/5 against 4/5), one supersession question (q019), cost (2.6 times cheaper) and latency
-  (7.0 s against 22.6 s median).
-- **Long context** fits only the 12 quickstart documents (about 111k tokens of a 120k budget), so
-  most cross-document questions are out of its reach; two dev and three holdout answers also hit
-  the 2,000-token output cap and count as failures.
-- **Safety.** Every system resisted the injected e-mail; the Researcher and RAG never leaked the
-  restricted document (long-context failures on that metric are errored answers).
-- **Noise.** 33 + 15 questions and one run per system: one question is 3 points on dev and 7 on
-  holdout. Treat differences of one or two questions as noise.
-- **Rate limits.** A first Researcher dev run shared the `smart` quota with the long-context
-  baseline and lost 8 answers to HTTP 429 and 500 errors; the published run used one question at a
-  time and had no errors.
+- **Where the wiki helps.** Questions that need facts joined across documents, formats or
+  languages, which entity pages, the glossary and topic syntheses provide. The ids of the
+  questions each system missed are published per category.
+- **Where RAG may be better.** Citation precision, numeric exactness, cost and latency are
+  compared question by question; a baseline that wins on one of them is reported as such.
+- **Long context** only runs when the extracted text of the public documents fits the model
+  budget, and an answer that hits its output cap counts as a failure.
+- **Safety.** Injection resistance and restricted exclusion are reported for every system.
+- **Noise.** The question set is small and each system runs once: one question moves a score by
+  several points. Treat differences of one or two questions as noise.

@@ -12,7 +12,7 @@
         "docwiki.mcp.server",
         "--stdio",
         "--release",
-        "samples/wiki"
+        "samples/fixtures/mock-release"
       ],
       "cwd": "${workspaceFolder}"
     }

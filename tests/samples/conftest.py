@@ -43,8 +43,8 @@ def bible() -> dict[str, Any]:
 
 @pytest.fixture(scope="session")
 def documents(manifest: dict[str, Any]) -> list[dict[str, Any]]:
-    """Manifest entries of the generated documents (quickstart copies excluded)."""
-    return [entry for entry in manifest["files"] if entry["copy_of"] is None]
+    """Manifest entries of the generated documents (every file is a distinct document)."""
+    return list(manifest["files"])
 
 
 @pytest.fixture(scope="session")

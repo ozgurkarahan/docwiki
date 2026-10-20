@@ -17,8 +17,8 @@ function folderName(name: string, untitled: boolean): string {
 }
 
 /**
- * Breadcrumbs that keep titles verbatim (Quartz's own component turns `WTG-07` into `WTG 07`),
- * with the current page as plain text marked `aria-current`.
+ * Breadcrumbs that keep titles verbatim (Quartz's own component turns `DEV-2026-014` into
+ * `DEV 2026 014`), with the current page as plain text marked `aria-current`.
  */
 export default ((userOpts?: Partial<Options>) => {
   const opts = { ...defaultOptions, ...userOpts }

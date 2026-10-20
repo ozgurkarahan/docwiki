@@ -1,8 +1,8 @@
 # Cost
 
 DocWiki is designed to cost close to nothing when idle and to make every run's cost visible. This
-page explains the cost model and the levers, then gives the figures measured on the sample corpus
-on 2026-10-18; estimates are labelled as such.
+page explains the cost model and the levers, then lists the figures that will be measured on the
+sample corpus (pending re-evaluation on the new sample); estimates are labelled as such.
 
 ## Cost model
 
@@ -35,10 +35,10 @@ index inside each release, and the public sample is a static site.
 
 Runs are **incremental**. Every stage output is keyed by a hash of its inputs, prompt version,
 model version and domain pack, so an unchanged source is never re-extracted or recompiled.
-Entity summaries and topic syntheses read every source, so any change rebuilds them: on the
-sample they dominate the cost of a one-document change. A run with no change is a no-op and
-publishes nothing. Changing a prompt, a model version or the domain pack invalidates exactly the
-dependent artifacts; changing the domain pack invalidates almost everything.
+Entity summaries and topic syntheses read every source, so any change rebuilds them and they
+dominate the cost of a one-document change. A run with no change is a no-op and publishes
+nothing. Changing a prompt, a model version or the domain pack invalidates exactly the dependent
+artifacts; changing the domain pack invalidates almost everything.
 
 ### When an agent answers
 
@@ -86,7 +86,7 @@ estimated cost per tier is in [operations](operations.md#logs-and-queries).
 
 | Lever | Effect |
 |---|---|
-| Start with the quickstart subset (12 documents), `docwiki run --limit N` or `--only <source_id>` | Bounds the first runs |
+| Start small: `docwiki run --limit N` or `--only <source_id>` (the sample itself has 12 public documents) | Bounds the first runs |
 | Keep raw paths stable | A path is a source identity: a moved file becomes a new source with a new page, and the old one is withdrawn |
 | `DOCWIKI_FAST_MODEL`, `DOCWIKI_SMART_MODEL` (check with `scripts/preflight.py`) | Price per token of each tier |
 | `DOCWIKI_DEPLOYMENT_SKU` (`GlobalStandard` by default, or `DataZoneStandard`) | Price, quota and data residency: Global Standard has the widest quota and the lowest list price; Data Zone keeps processing in the EU or US data zone for about 10 % more |
@@ -98,20 +98,17 @@ estimated cost per tier is in [operations](operations.md#logs-and-queries).
 
 ## Measured costs
 
-Live runs of 2026-10-18 on the sample corpus (37 public sources), Sweden Central, `fast` =
-gpt-5.4-mini and `smart` = gpt-5.5. Costs are receipt estimates: tokens × the unverified price
-table.
+Pending re-evaluation on the new sample (12 public documents): no figure is claimed here until it
+has been measured. The table lists what will be reported and where each figure comes from. Costs
+are receipt estimates: tokens × the unverified price table.
 
-| Measurement | Tokens (`fast` / `smart`) | Content Understanding pages | Duration | Cost |
-|---|---|---|---|---|
-| Full ingest, cold cache | 100 calls, 93k in / 11k out / 61 calls, 776k in (15k cached) / 428k out | 21 | 20.4 min | 16.76 USD with the Global Standard table (the run used Data Zone deployments: about 20 USD) |
-| Recompile one source (the 600-row SCADA alarm log); entities and topics rebuilt | 88 calls, 96k in / 10k out / 24 calls, 465k in (165k cached) / 232k out | 0 | 15.3 min | 10.37 USD (Data Zone table) |
-| Rebuild with no source changed | none: every model output served from cache | 0 | 2.9 min (run 110 s) | 0 USD |
-| Researcher answer, 33 dev questions | `smart` only: 18.7k in / 1.3k out per answer (mean) | n/a | median 22.6 s, p95 75.1 s | 0.118 USD per answer (mean) |
-| Idle environment, one month | n/a | n/a | n/a | about 6 to 10 USD (estimate: Basic registry about 5 USD, storage, logs, the six-hourly reconcile job) |
-
-For comparison, the naive RAG baseline answered the same 33 questions with the same model in 7.0 s
-(median) for 0.046 USD per answer: see [evaluation](evaluation.md#results).
+| Measurement | Where the figure comes from |
+|---|---|
+| Full ingest, cold cache | The cost receipt of the first run after a [data reset](../BOOTSTRAP.md#reset-the-sample-data): calls and tokens per tier, Content Understanding pages, duration, estimated cost |
+| Recompile one source; entities and topics rebuilt | The receipt of a `recompile` run of one source |
+| Rebuild with no source changed | The report of a run with no change, which is a no-op: no model or Content Understanding call is expected |
+| Researcher answer and naive RAG answer | Tokens, latency and estimated cost per question in [`evals/SCOREBOARD.md`](../evals/SCOREBOARD.md); see [evaluation](evaluation.md#results) |
+| Idle environment, one month | An estimate from the price list: the Basic registry, storage, logs and the scheduled reconcile job |
 
 The identity spike (about 1.5 hours of throwaway resources, three remote image builds and about 25
 agent turns on a small model) cost less than USD 1.

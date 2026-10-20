@@ -80,15 +80,13 @@ def staged_copy_of_fixture(
             writer.copy_file(rel, file)
     catalog = Catalog.from_json((source / "catalog.json").read_bytes())
     writer.write_catalog(catalog.model_copy(update={"release_id": writer.release_id}))
-    writer.write_tables(builder.PLAN, [builder.PLAN_TABLE], "public")
+    writer.write_tables(builder.PLAN_B, builder.PLAN_TABLES, "public")
     titles = {
         p.frontmatter.id: (p.frontmatter.title, p.path)
         for p in pages
         if p.frontmatter.type == "source"
     }
-    writer.write_search_db(
-        pages, builder._blocks(titles), [("WTG", "wind turbine generator", "en")]
-    )
+    writer.write_search_db(pages, builder._blocks(titles), [("revision", "indice", "fr")])
     return writer, writer.finalize(
         gates=gate_results([], skipped=builder.SKIPPED_GATES), counts={"pages": len(pages)}
     )
@@ -274,32 +272,35 @@ def test_reader_api_on_the_fixture(builder: ModuleType) -> None:
         "glossary",
         "log",
     }
-    assert [page.id for page in reader.list_pages("topic")] == ["topic:gearbox-oil"]
-    by_id = reader.read_page("topic:gearbox-oil")
-    assert by_id == reader.read_page("topics/gearbox-oil.md")
+    topic_ids = [page.id for page in reader.list_pages("topic")]
+    assert topic_ids == ["topic:schedule-and-window-delivery"]
+    by_id = reader.read_page("topic:schedule-and-window-delivery")
+    assert by_id == reader.read_page("topics/schedule-and-window-delivery.md")
     assert by_id.frontmatter.contradictions == 1  # type: ignore[union-attr]
-    section = reader.read_section("topic:gearbox-oil", "contradictions")
-    assert section.startswith("## Contradictions\n") and "ISO VG 320" in section
+    section = reader.read_section("topic:schedule-and-window-delivery", "contradictions")
+    assert section.startswith("## Contradictions\n") and "70 %" in section and "100 %" in section
     with pytest.raises(KeyError):
-        reader.read_section("topic:gearbox-oil", "Nope")
+        reader.read_section("topic:schedule-and-window-delivery", "Nope")
     with pytest.raises(KeyError):
         reader.read_page("topic:missing")
-    links = reader.links(builder.SOP_A)
-    assert {(e.to, e.kind) for e in links["outgoing"]} >= {("organisation:litware", "mentions")}
+    links = reader.links(builder.PLAN_A)
+    assert {(e.to, e.kind) for e in links["outgoing"]} >= {
+        ("organisation:vanarsdel-menuiseries", "mentions")
+    }
     assert {(e.from_, e.kind) for e in links["backlinks"]} >= {
-        (builder.SOP_B, "supersedes"),
-        ("topic:gearbox-oil", "topic-of"),
+        (builder.PLAN_B, "supersedes"),
+        ("topic:schedule-and-window-delivery", "topic-of"),
     }
 
-    evidence = reader.resolve_evidence(builder.PLAN, "sheet-plan-r0002-r0004")
+    evidence = reader.resolve_evidence(builder.PLAN_B, "sheet-planning-r0006-r0009")
     assert evidence.frontmatter.provenance == "deterministic-table"
-    assert "## Row 3" in evidence.body and evidence.original is None
+    assert "## Row 8" in evidence.body and evidence.original is None
     with pytest.raises(KeyError):
-        reader.resolve_evidence(builder.PLAN, "sheet-plan-r0009-r0009")
+        reader.resolve_evidence(builder.PLAN_B, "sheet-planning-r0009-r0009")
     with pytest.raises(ValueError):
-        reader.resolve_evidence(builder.PLAN, "../x")
-    assert reader.list_evidence(builder.SOP_A) == [f"evidence/{builder.SOP_A}/p0001.md"]
-    assert len(reader.list_evidence()) == 3
+        reader.resolve_evidence(builder.PLAN_B, "../x")
+    assert reader.list_evidence(builder.PLAN_A) == [f"evidence/{builder.PLAN_A}/p0001.md"]
+    assert len(reader.list_evidence()) == 5
 
     skills = reader.list_skills()
     assert [skill.name for skill in skills] == [
@@ -316,32 +317,46 @@ def test_reader_api_on_the_fixture(builder: ModuleType) -> None:
 @pytest.mark.parametrize("fallback", [False, True])
 def test_reader_search_on_the_fixture(builder: ModuleType, fallback: bool) -> None:
     with ReleaseReader.open(FIXTURE_ROOT).open_search(force_fallback=fallback) as index:
-        hits = index.search("cold site oil grade")
-        assert hits[0].page_id in {builder.SOP_B, "topic:gearbox-oil"}
-        block = index.search("drain warm", kinds=["source-block"])[0]
-        assert (block.source_id, block.locator_key) == (builder.SOP_A, "p0001")
-        assert index.search("éolienne")[0].page_id in {"asset:wtg-07", "glossary"}
+        hits = index.search("window delivery postponed")
+        assert hits[0].page_id in {builder.PLAN_B, "topic:schedule-and-window-delivery"}
+        block = index.search("annoncé report", kinds=["source-block"])[0]
+        assert (block.source_id, block.locator_key) == (builder.MINUTES, "para-0011")
+        assert index.search("joinery")[0].page_id in {
+            "work-package:lot-5-menuiseries-exterieures",
+            "glossary",
+        }
 
 
 def test_tables_and_queries(builder: ModuleType) -> None:
     reader = ReleaseReader.open(FIXTURE_ROOT)
-    index = reader.tables(builder.PLAN)
-    entry = index.entry("t01")
+    index = reader.tables(builder.PLAN_B)
+    assert [entry.id for entry in index.tables] == ["t01", "t02"]
+    assert index.entry("t01").row_count == 23
+    entry = index.entry("t02")
     assert [(c.name, c.header, c.type) for c in entry.columns] == [
-        ("asset", "Asset", "VARCHAR"),
-        ("task", "Task", "VARCHAR"),
-        ("oil_grade", "Oil grade", "VARCHAR"),
-        ("due", "Due", "VARCHAR"),
-        ("hours", "Hours", "BIGINT"),
+        ("n_commande", "N° commande", "VARCHAR"),
+        ("date", "Date", "VARCHAR"),
+        ("fournisseur", "Fournisseur", "VARCHAR"),
+        ("objet", "Objet", "VARCHAR"),
+        ("commande_ht", "Commandé HT", "DOUBLE"),
+        ("facture_ht", "Facturé HT", "DOUBLE"),
+        ("statut", "Statut", "VARCHAR"),
     ]
-    assert entry.row_ids == ["r0002", "r0003", "r0004"] and entry.locator.kind == "xlsx-rows"
-    assert reader.table_file(builder.PLAN, "t01").is_file()
+    assert entry.row_ids[:3] == ["r0002", "r0003", "r0004"] and entry.locator.kind == "xlsx-rows"
+    assert reader.table_file(builder.PLAN_B, "t01").is_file()
     result = reader.query_table(
-        builder.PLAN, "SELECT row_id, asset, hours FROM t01 WHERE hours > 5 ORDER BY row_id"
+        builder.PLAN_B,
+        "SELECT row_id, n_commande, facture_ht FROM t02 "
+        "WHERE n_commande LIKE 'BC-%' AND facture_ht > 900 ORDER BY row_id",
     )
-    assert result.columns == ["row_id", "asset", "hours"]
-    assert result.rows == [["r0002", "WTG-07", 6], ["r0004", "WTG-12", 6]] and not result.truncated
-    assert reader.query_table(builder.PLAN, "SELECT * FROM t01", max_rows=2).truncated
+    assert result.columns == ["row_id", "n_commande", "facture_ht"]
+    assert result.rows == [
+        ["r0003", "BC-2026-009", 996.0],
+        ["r0004", "BC-2026-010", 4386.5],
+        ["r0005", "BC-2026-012", 1484.8],
+    ]
+    assert not result.truncated
+    assert reader.query_table(builder.PLAN_B, "SELECT * FROM t01", max_rows=2).truncated
     for bad in (
         "DELETE FROM t01",
         "SELECT 1; SELECT 2",
@@ -351,6 +366,6 @@ def test_tables_and_queries(builder: ModuleType) -> None:
         "not sql",
     ):
         with pytest.raises(TableQueryError):
-            reader.query_table(builder.PLAN, bad)
+            reader.query_table(builder.PLAN_B, bad)
     with pytest.raises(KeyError):
-        reader.tables(builder.SOP_A)
+        reader.tables(builder.PLAN_A)

@@ -9,9 +9,15 @@ from typing import Any
 import pytest
 from engine_stubs import CANARY
 
+from docwiki.contracts.gates import GateResult
+from docwiki.contracts.manifest import ReleaseManifest
 from docwiki.release.publish import read_current_pointer
 from docwiki.release.validate import validate_release
 from docwiki.stages import sitehook
+
+
+def manifest_gates(root: Path) -> list[GateResult]:
+    return ReleaseManifest.from_json((root / "manifest.json").read_bytes()).gates
 
 
 def _fake_lane(monkeypatch: pytest.MonkeyPatch, html: str = "<p>wiki</p>") -> list[dict[str, Any]]:
@@ -39,9 +45,12 @@ async def test_site_is_built_into_the_release_before_it_is_finalized(make_harnes
     manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
     assert "site/index.html" in manifest["files"]
     assert calls[0]["out"] == calls[0]["root"] / "site"
-    assert calls[0]["page_title"] == "Contoso Renewables engine test wiki"
+    assert calls[0]["page_title"] == "Chantier Moreau engine test wiki"
     assert calls[0]["banner"] == "FICTIONAL - NOT FOR OPERATIONAL USE"
     assert calls[0]["base_url"] == "https://docs.example.org"
+    # the staged release has no manifest yet: the run passes its gates and id for the home page
+    assert calls[0]["run_id"] == outcome.report.run_id
+    assert [gate.gate for gate in calls[0]["gates"]] == [gate.gate for gate in manifest_gates(root)]
     assert validate_release(root, canaries=[CANARY]) == []
     quality = (root / "wiki" / "_meta" / "quality.md").read_text(encoding="utf-8")
     assert "## Site" in quality and "Built from this release" in quality

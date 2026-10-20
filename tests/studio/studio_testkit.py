@@ -18,7 +18,16 @@ MCP_TESTS = Path(__file__).resolve().parents[1] / "mcp"
 if str(MCP_TESTS) not in sys.path:
     sys.path.insert(0, str(MCP_TESTS))
 
-from mcp_testkit import FIXTURE_ROOT, RELEASE_ID, seed_work  # noqa: E402
+from mcp_testkit import (  # noqa: E402
+    BROKEN_PATH,
+    DONE_PATH,
+    FIXTURE_ROOT,
+    GONE_PATH,
+    ODD_PATH,
+    RELEASE_ID,
+    seed_work,
+)
+from mcp_testkit import NEW_PATH as PENDING_PATH  # noqa: E402
 
 from docwiki.agents_client.citations import parse_answer  # noqa: E402
 from docwiki.agents_client.client import (  # noqa: E402
@@ -31,13 +40,19 @@ from docwiki.agents_client.client import (  # noqa: E402
 from docwiki.contracts.storage import FolderStorage  # noqa: E402
 
 __all__ = [
+    "BROKEN_PATH",
     "DONE_PATH",
+    "GONE_PATH",
     "NEW_PATH",
+    "NOT_FOUND_TEXT",
+    "ODD_PATH",
     "OWNER",
+    "PENDING_PATH",
     "RAW_FILES",
     "RELEASE_ID",
     "RESEARCHER_TEXT",
     "WIKI_URL",
+    "WINDOWS_TEXT",
     "FakeAgentClient",
     "seed_storage",
 ]
@@ -45,25 +60,46 @@ __all__ = [
 WIKI_URL = "https://wiki.example.org"
 OWNER = str(uuid.UUID(int=0xA11C))
 """Object ID of the signed-in owner in the tests (the allowed principal)."""
-DONE_PATH = "procedures/SOP-GBX-010 rev B.docx"
 NEW_PATH = "uploads/fresh-note.md"
 
 RAW_FILES: dict[str, bytes] = {
     DONE_PATH: b"PK\x03\x04 docx",
-    "procedures/broken-scan.pdf": b"%PDF-1.7 broken scan",
-    "records/odd-export.csv": b"a;b\n1;2\n",
-    "records/new-plan.xlsx": b"PK\x03\x04 xlsx",
-    NEW_PATH: b"# Fresh note\n\nYaw brake pads were replaced on WTG-07.\n",
+    BROKEN_PATH: b"%PDF-1.7 broken scan",
+    ODD_PATH: b"a;b\n1;2\n",
+    PENDING_PATH: b"PK\x03\x04 xlsx",
+    NEW_PATH: b"# Fresh note\n\nThe bay window F1 was installed on 2026-04-21.\n",
 }
 """``raw/`` files: done (in the release), failed, quarantined, pending, and new (no state)."""
 
 RESEARCHER_TEXT = (
-    "Revision B of the gearbox oil change SOP is the current procedure [1]. Revision A is "
-    "superseded and must not be used for new work [2].\n\n"
+    "The windows of the extension are delivered on 2026-04-20, as the site meeting minutes "
+    "record [1]. Indice A of the schedule showed 2026-03-30; it is superseded and must not be "
+    "used for new work [2].\n\n"
     "Sources:\n"
-    "[1] Gearbox oil change SOP rev B — ¶ 4 (native-text) — "
-    "evidence/src-4d9c65e05302/para-0004.md\n"
-    "[2] Gearbox oil change SOP rev A — p. 1 (native-text) — evidence/src-f2750f41f3fa/p0001.md\n"
+    "[1] Site meeting minutes n°3 — ¶ 11 (native-text) — "
+    "evidence/src-165f1d3a109c/para-0011.md\n"
+    "[2] Planning and purchase tracking, indice A — p. 1 (native-text) — "
+    "evidence/src-c6436ec50050/p0001.md\n"
+)
+
+WINDOWS_TEXT = (
+    "The windows of the extension are delivered on 2026-04-20: the site meeting minutes record "
+    "the postponement announced by VanArsdel Menuiseries from 2026-03-30 [1]. The revised "
+    "schedule plans their installation from 2026-04-21 to 2026-04-23 [2]. The windows arrive "
+    "69 days after the contract was signed [1].\n\n"
+    "Sources:\n"
+    "[1] Site meeting minutes n°3 — ¶ 11 (native-text) — "
+    "evidence/src-165f1d3a109c/para-0011.md\n"
+    '[2] Planning and purchase tracking, indice B — sheet "Planning", rows 6–9 '
+    "(deterministic-table) — evidence/src-86eabe3d6d0d/sheet-planning-r0006-r0009.md\n"
+)
+"""Cites two sidecars of the seeded release; its last sentence states a computed delay (from the
+signature of the contract) that the cited minutes do not contain, so filing it shows a number
+warning."""
+
+NOT_FOUND_TEXT = (
+    "Not found in the wiki. I searched for the energy-performance (DPE) rating of the house and "
+    "read the contract page; no source of this release gives one."
 )
 
 
@@ -84,12 +120,19 @@ def seed_storage(root: Path) -> FolderStorage:
 
 
 class FakeAgentClient:
-    """Canned answers: the Researcher cites two sources; the Librarian asks to approve one
-    ``ingest_start`` call and reports what happened."""
+    """Canned answers: the Researcher cites two sources (``researcher_text``); the Librarian asks
+    to approve one ``ingest_start`` call and reports what happened."""
 
-    def __init__(self, *, delay_s: float = 0.0, fail: Exception | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        delay_s: float = 0.0,
+        fail: Exception | None = None,
+        researcher_text: str = RESEARCHER_TEXT,
+    ) -> None:
         self.delay_s = delay_s
         self.fail = fail
+        self.researcher_text = researcher_text
         self.calls: list[tuple[str, str]] = []
         self.closed = False
 
@@ -110,8 +153,8 @@ class FakeAgentClient:
         if agent == "librarian":
             return await self._librarian(approve)
         return AgentAnswer(
-            text=RESEARCHER_TEXT,
-            sources=parse_answer(RESEARCHER_TEXT),
+            text=self.researcher_text,
+            sources=parse_answer(self.researcher_text),
             tool_calls=[
                 ToolCall(
                     name="search",
@@ -121,7 +164,7 @@ class FakeAgentClient:
                 ),
                 ToolCall(
                     name="get_evidence",
-                    arguments={"path": "evidence/src-4d9c65e05302/para-0004.md"},
+                    arguments={"path": "evidence/src-165f1d3a109c/para-0011.md"},
                     status="completed",
                     server_label="docwiki",
                 ),

@@ -1,0 +1,11 @@
+# Contradiction resolution policy, stated on topic pages next to both claims (never applied
+# silently). Authorities are those of taxonomy.yaml.
+order: [authority, recency]
+notes: >-
+  Contractual documents prevail: the amendment (avenant, authority 10) over the works contract
+  (9) on the points it amends, and the contract over the quote (8). Signed site meeting minutes
+  (7) prevail over the schedule (planning, 4), and a delivery note with its handwritten reserves
+  (6) prevails over the supplier invoice (5) for the quantities actually delivered. The schedule
+  and the suppliers' e-mails have the same authority (4): the more recent statement prevails
+  until a new schedule revision (indice) supersedes the old one. Client e-mails (3) are requests;
+  an amendment makes them binding. Site photos (2) never settle a quantity.

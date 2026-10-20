@@ -207,16 +207,19 @@ def _matches(required_path: str | None, required_key: str, cited: ResolvedCitati
 
 
 def citation_recall(
-    question: GoldenQuestion, resolved: Sequence[ResolvedCitation], corpus: CorpusContext
+    question: GoldenQuestion, resolved: Sequence[ResolvedCitation]
 ) -> tuple[float | None, list[dict[str, Any]]]:
     """Share of ``required_citations`` matched by at least one cited locator."""
     if not question.required_citations:
         return None, []
     details: list[dict[str, Any]] = []
     for required in question.required_citations:
-        path = corpus.manifest.canonical(required.source_path) or required.source_path
         units = sorted(
-            {cited.unit for cited in resolved if _matches(path, required.locator_key, cited)}
+            {
+                cited.unit
+                for cited in resolved
+                if _matches(required.source_path, required.locator_key, cited)
+            }
         )
         details.append(
             {
@@ -237,17 +240,12 @@ class _Support:
 
 
 def _support(
-    cited: ResolvedCitation,
-    question: GoldenQuestion,
-    evidence: EvidenceStore,
-    corpus: CorpusContext,
-    wanted: Values,
+    cited: ResolvedCitation, question: GoldenQuestion, evidence: EvidenceStore, wanted: Values
 ) -> _Support:
     if not cited.resolved or cited.path is None or cited.locator_key is None:
         return _Support(False, "unresolved")
     for required in question.required_citations:
-        path = corpus.manifest.canonical(required.source_path) or required.source_path
-        if _matches(path, required.locator_key, cited):
+        if _matches(required.source_path, required.locator_key, cited):
             return _Support(True, "required")
     text = evidence.text(cited.path, cited.locator_key)
     if text is None:
@@ -279,7 +277,7 @@ def citation_precision(
     units: dict[str, list[_Support]] = {}
     details: list[dict[str, Any]] = []
     for cited in resolved:
-        support = _support(cited, question, corpus.evidence, corpus, wanted)
+        support = _support(cited, question, corpus.evidence, wanted)
         units.setdefault(cited.unit, []).append(support)
         details.append(
             {**cited.to_dict(), "supported": support.supported, "reason": support.reason}
@@ -329,7 +327,7 @@ def score_answer(
     else:
         accuracy = None
     numeric, numeric_details = numeric_exactness(question, body_values)
-    recall, recall_details = citation_recall(question, resolved, corpus)
+    recall, recall_details = citation_recall(question, resolved)
     precision, precision_details = citation_precision(question, resolved, corpus)
 
     forbidden = forbidden_found(question.forbidden, text_norm)
@@ -383,7 +381,7 @@ def recall_of(
     question: GoldenQuestion, citations: Sequence[Citation], corpus: CorpusContext
 ) -> float | None:
     """Citation recall of an arbitrary citation list (used for retrieval diagnostics)."""
-    value, _ = citation_recall(question, resolve_citations(citations, corpus), corpus)
+    value, _ = citation_recall(question, resolve_citations(citations, corpus))
     return value
 
 

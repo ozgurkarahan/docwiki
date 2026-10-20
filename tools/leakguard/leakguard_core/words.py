@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import unicodedata
 
-# A word: letters with optional internal apostrophes or hyphens ("O'Neil", "Wind-Farm").
+# A word: letters with optional internal apostrophes or hyphens ("O'Neil", "Sous-Traitance").
 WORD_RE = re.compile(r"[^\W\d_]+(?:['’\-][^\W\d_]+)*")
 
 _POSSESSIVE_RE = re.compile(r"['’]s$", re.IGNORECASE)
@@ -43,7 +43,7 @@ _INFLECTIONS = ("ings", "ing", "ed", "ly", "ments", "ment", "ness")
 def word_stems(key: str) -> list[str]:
     """Candidate base forms of an (already normalised) English word.
 
-    Plurals ("turbines", "bodies"), past tenses and participles ("filed", "drained", "stopped",
+    Plurals ("slabs", "bodies"), past tenses and participles ("filed", "drained", "stopped",
     "applied"), gerunds ("draining", "curating") and adverbs. Agent nouns ("-er") are left out on
     purpose: too many surnames would become common words. Bases have at least three letters.
     """

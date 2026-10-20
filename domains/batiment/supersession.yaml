@@ -1,0 +1,15 @@
+# Supersession rules of the batiment pack (docs/spec/domain-and-corpus.md, section 3.4).
+#
+# Only quotes (devis, DEV-) and schedules (planning, PLN-) carry revisions, called "indices"
+# (indice A, indice B...). The document number must START the candidate (the file name first,
+# then the head of the extracted text), and the revision is the indice that follows that number,
+# so a document that merely cites a quote or a schedule (the contract, the amendment, the
+# minutes, the e-mails, the price study) never joins its revision group and gets no revision.
+# A later indice of the same number supersedes the earlier one; a document saying
+# "annule et remplace" (cancels and replaces) followed by a quote or schedule number supersedes
+# every source of that number. An amendment (avenant) amends the works contract and never
+# supersedes it: it has no document number here and "avenant" is not a reference word.
+doc_number_regex: '^(?P<number>(?:DEV|PLN)-\d{4}-\d{3})(?!\d)'
+revision_regex: '^(?:DEV|PLN)-\d{4}-\d{3}(?:[ _-]+|[ \t]*[–—][ \t]*)(?i:indice)[ _-]?(?P<rev>[A-H])(?![A-Za-z0-9])'
+revision_order: [A, B, C, D, E, F, G, H]
+explicit_reference_regex: '(?i:annule\s+et\s+remplace)\s+(?:(?i:le|la|les)\s+)?(?:(?i:devis|planning)\s+)?(?P<number>(?:DEV|PLN)-\d{4}-\d{3})(?!\d)'

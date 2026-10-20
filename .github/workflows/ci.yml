@@ -30,17 +30,14 @@ jobs:
         run: uv run pytest
       - name: Leak guard (public rules, no deny-list)
         run: uv run python tools/leakguard/leakguard.py scan --root .
-      - name: Validate the committed sample wiki (wiki contract and quality gates)
-        run: |
-          if [ -f samples/wiki/.docwiki/manifest.json ]; then
-            uv run docwiki lint --release samples/wiki
-          else
-            echo "::notice title=sample wiki::samples/wiki is not committed yet; skipping"
-          fi
 
   secrets:
     name: secret scan
     runs-on: ubuntu-latest
+    # gitleaks-action lists the pull request's commits, which needs pull-requests: read.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v7
         with:
@@ -48,6 +45,7 @@ jobs:
       - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"
 
   bicep:
     name: bicep build

@@ -11,7 +11,16 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from infra_testkit import REPO_ROOT
+from infra_testkit import (
+    BLOB_ACTION,
+    REPO_ROOT,
+    STORAGE_BLOB_DATA_CONTRIBUTOR,
+    STORAGE_BLOB_DATA_READER,
+    RolePermissions,
+    bicep_multiline_var,
+    evaluate_condition,
+    role_allows,
+)
 
 from docwiki.contracts.layout import StorageKeys
 from docwiki.contracts.settings import SettingsKeys
@@ -67,7 +76,7 @@ def test_spec_parameters_and_defaults() -> None:
         "enableEventTrigger": "true",
         "reconcileCron": "'0 */6 * * *'",
         "audience": "'internal'",
-        "domainPack": "'wind-om'",
+        "domainPack": "'batiment'",
         "enableFoundrySkillsPreview": "false",
         "enableRoutine": "false",
         "deploymentSku": "'GlobalStandard'",
@@ -393,49 +402,201 @@ def test_studio_app_settings_and_scale() -> None:
     assert "targetPort: 8080" in block and "tcpProbes: true" in block
 
 
+def _resource(text: str, name: str) -> str:
+    """The declaration of ``resource <name>`` in a Bicep file (up to its closing brace)."""
+    return text[text.index(f"resource {name} ") :].split("\n}\n", 1)[0]
+
+
+def _studio_assignments(storage: str) -> list[tuple[str, str, str, str]]:
+    """Every role assignment of the Studio identity in storage.bicep: its name, its scope, the
+    role that seeds its name and the role of its ``roleDefinitionId``."""
+    found: list[tuple[str, str, str, str]] = []
+    for name in re.findall(
+        r"^resource (\w+) 'Microsoft\.Authorization/roleAssignments@", storage, re.MULTILINE
+    ):
+        block = _resource(storage, name)
+        if "principalId: studioPrincipalId" not in block:
+            continue
+        match = re.match(
+            rf"resource {name} '[^']+' = if \(grantStudio\) \{{\s*scope: (\w+)\s*"
+            r"name: guid\(\w+\.id, studioPrincipalId, ([\w.]+)\)",
+            block,
+        )
+        assert match, f"{name}: only with a Studio identity, named after its scope and role"
+        role = re.search(
+            r"roleDefinitionId: subscriptionResourceId\(\s*"
+            r"'Microsoft\.Authorization/roleDefinitions',\s*([\w.]+)\s*\)",
+            block,
+        )
+        assert role, f"{name}: roleDefinitionId"
+        found.append((name, match.group(1), match.group(2), role.group(1)))
+    return found
+
+
 def test_studio_storage_access_is_least_privilege() -> None:
     storage = (INFRA / "modules" / "storage.bicep").read_text(encoding="utf-8")
     assert re.search(r"^param studioPrincipalId string = ''$", storage, re.MULTILINE)
     assert "var grantStudio = !empty(studioPrincipalId)" in storage
     assert re.findall(r"^resource (studio\w+) ", storage, re.MULTILINE) == [
         "studioRawContributor",
-        "studioWorkReader",
+        "studioInboxWriterRole",
+        "studioWorkInboxWriter",
         "studioReleasesReader",
         "studioIngestReader",
     ]
-    assigned = re.findall(
-        r"^resource (studio\w+) '[^']+' = if \(grantStudio\) \{\s*scope: (\w+)\s*"
-        r"name: guid\(\w+\.id, studioPrincipalId, roleIds\.(\w+)\)",
-        storage,
-        re.MULTILINE,
-    )
-    # Uploads to raw/, reads work/ (source states, run reports) and releases/ (pointer, catalog),
-    # peeks the ingest queue: nothing else, and nothing without a Studio identity.
-    assert assigned == [
-        ("studioRawContributor", "rawContainer", "storageBlobDataContributor"),
-        ("studioWorkReader", "workContainer", "storageBlobDataReader"),
-        ("studioReleasesReader", "releasesContainer", "storageBlobDataReader"),
-        ("studioIngestReader", "ingestQueue", "storageQueueDataReader"),
+    assigned = _studio_assignments(storage)
+    # Uploads to raw/; reads work/ (source states, run reports) and files answers into its
+    # inbox with its own role; reads releases/ (pointer, catalog, evidence); peeks the ingest
+    # queue: nothing else, and nothing without a Studio identity.
+    assert [(name, scope, role) for name, scope, _, role in assigned] == [
+        ("studioRawContributor", "rawContainer", "roleIds.storageBlobDataContributor"),
+        ("studioWorkInboxWriter", "workContainer", "studioInboxWriterRole.name"),
+        ("studioReleasesReader", "releasesContainer", "roleIds.storageBlobDataReader"),
+        ("studioIngestReader", "ingestQueue", "roleIds.storageQueueDataReader"),
     ]
-    condition = storage[
-        storage.index("var studioRawCondition") : storage.index("resource storage ")
-    ]
+    for name, _, seed, role in assigned:
+        assert seed == role, f"{name}: the role that seeds the name is the one assigned"
+    condition = bicep_multiline_var(storage, "studioRawCondition")
     delete = (
         "!(ActionMatches{'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete'})"
     )
     assert delete in condition
     assert condition.count("ActionMatches") == 1, "only the delete is withheld from the role"
-    raw = storage[
-        storage.index("resource studioRawContributor") : storage.index("resource studioWorkReader")
-    ]
+    raw = _resource(storage, "studioRawContributor")
     assert "condition: studioRawCondition" in raw and "conditionVersion: '2.0'" in raw
     assert "principalType: 'ServicePrincipal'" in raw
-    for name in ("studioWorkReader", "studioReleasesReader", "studioIngestReader"):
-        block = storage[storage.index(f"resource {name} ") :].split("\n}\n", 1)[0]
-        assert "condition:" not in block, name
+    work = _resource(storage, "studioWorkInboxWriter")
+    assert "condition: studioWorkInboxCondition" in work and "conditionVersion: '2.0'" in work
+    assert "principalType: 'ServicePrincipal'" in work
+    for name in ("studioReleasesReader", "studioIngestReader"):
+        assert "condition:" not in _resource(storage, name), name
     roles = (INFRA / "modules" / "roles.bicep").read_text(encoding="utf-8")
     assert "storageQueueDataReader: '19e7f393-937e-4f77-808e-94535e297925'" in roles
     assert "Studio" in storage[: storage.index("import {")], "the header lists the identities"
+
+
+def test_no_blob_data_contributor_for_the_studio_on_work() -> None:
+    """Storage Blob Data Contributor grants containers/write and containers/delete, which no
+    role assignment condition restricts: the Studio's only role on work/ is its custom role."""
+    storage = (INFRA / "modules" / "storage.bicep").read_text(encoding="utf-8")
+    on_work = [
+        (name, role)
+        for name, scope, _, role in _studio_assignments(storage)
+        if scope == "workContainer"
+    ]
+    assert on_work == [("studioWorkInboxWriter", "studioInboxWriterRole.name")]
+    assert "storageBlobDataContributor" not in _resource(storage, "studioWorkInboxWriter")
+
+
+def test_studio_work_role_is_custom_without_container_management() -> None:
+    """The Studio's role on work/ grants blob read, write and add only: no control-plane action
+    (data access needs none), no blob delete or move, no tags or immutability."""
+    storage = (INFRA / "modules" / "storage.bicep").read_text(encoding="utf-8")
+    role = _resource(storage, "studioInboxWriterRole")
+    header = re.match(
+        r"resource studioInboxWriterRole 'Microsoft\.Authorization/roleDefinitions@"
+        r"(\d{4}-\d{2}-\d{2})' = if \(grantStudio\) \{",
+        role,
+    )
+    assert header and header.group(1) >= "2022-04-01", "a current, non-preview API version"
+    # Deterministic, unique in the tenant (its display name too), assignable in this resource
+    # group only (the deployer needs roleDefinitions/write there).
+    assert "name: guid(resourceGroup().id, 'docwiki-studio-inbox-writer')" in role
+    assert "roleName: 'DocWiki Studio inbox writer (${storageAccountName})'" in role
+    assert "type: 'CustomRole'" in role
+    assert re.search(r"assignableScopes: \[\s*resourceGroup\(\)\.id\s*\]", role)
+    for key in ("actions", "notActions", "dataActions", "notDataActions"):
+        assert re.search(rf"^\s*{key}: \[", role, re.MULTILINE), f"{key} is explicit"
+    assert RolePermissions.from_bicep(role) == RolePermissions(
+        data_actions=(BLOB_ACTION + "read", BLOB_ACTION + "write", BLOB_ACTION + "add/action")
+    )
+
+
+INBOX = StorageKeys.INBOX_QUERIES.removeprefix(StorageKeys.WORK + "/") + "/"
+"""The answers inbox as a blob path of the ``work`` container (``inbox/queries/``)."""
+
+FILING = INBOX + "2026-03-02-window-delivery.md"
+"""A filed answer in the inbox, as a blob path of the ``work`` container."""
+
+
+@pytest.mark.parametrize(
+    ("action", "path", "allowed"),
+    [
+        ("blobs/read", "state/sources/src-165f1d3a109c.json", True),
+        ("blobs/read", "runs/run-1/report.json", True),
+        ("blobs/read", FILING, True),
+        ("blobs/write", FILING, True),
+        ("blobs/add/action", FILING, True),
+        ("blobs/write", "inbox/rejected/2026-03-02-window-delivery.md", False),
+        ("blobs/write", "inbox/queries", False),
+        ("blobs/write", "inbox/queries-old/a.md", False),
+        ("blobs/add/action", "x/" + INBOX + "a.md", False),
+        ("blobs/write", "state/overlay.yaml", False),
+        ("blobs/add/action", "state/sources/src-165f1d3a109c.json", False),
+        ("blobs/write", "reports/health-2026-03-02.md", False),
+        ("blobs/delete", FILING, False),
+        ("blobs/delete", "state/lease", False),
+        ("blobs/move/action", FILING, False),
+        ("blobs/move/action", "runs/run-1/report.json", False),
+        ("blobs/tags/write", FILING, False),
+        ("blobs/immutableStorage/runAsSuperUser/action", FILING, False),
+        ("blobs/permanentDelete/action", FILING, False),
+        ("containers/delete", "", False),
+        ("containers/write", "", False),
+        ("containers/read", "", False),
+        ("containers/setAcl/action", "", False),
+        ("generateUserDelegationKey/action", "", False),
+    ],
+)
+def test_studio_work_role_reads_all_and_writes_only_the_inbox(
+    action: str, path: str, allowed: bool
+) -> None:
+    """The role and its condition together: reads anywhere, writes and creations only in the
+    inbox, never a blob delete or move, nothing on the container itself."""
+    storage = (INFRA / "modules" / "storage.bicep").read_text(encoding="utf-8")
+    role = RolePermissions.from_bicep(_resource(storage, "studioInboxWriterRole"))
+    condition = bicep_multiline_var(storage, "studioWorkInboxCondition")
+    assert role_allows(role, action, condition=condition, path=path, container="work") is allowed
+
+
+def test_a_condition_never_restricts_container_management() -> None:
+    """Why the Studio's work/ role is custom: with Storage Blob Data Contributor, the same
+    condition would still let it delete or rewrite the whole container (source states, cache,
+    run lease, inbox), through ARM or the blob endpoint. Reads stay as open as with the Storage
+    Blob Data Reader assignment that the role replaces."""
+    storage = (INFRA / "modules" / "storage.bicep").read_text(encoding="utf-8")
+    role = RolePermissions.from_bicep(_resource(storage, "studioInboxWriterRole"))
+    condition = bicep_multiline_var(storage, "studioWorkInboxCondition")
+    for action in ("containers/delete", "containers/write"):
+        assert role_allows(STORAGE_BLOB_DATA_CONTRIBUTOR, action, condition=condition)
+        assert not role_allows(role, action, condition=condition)
+    for path in ("state/sources/src-165f1d3a109c.json", FILING):
+        assert role_allows(STORAGE_BLOB_DATA_READER, "blobs/read", path=path)
+        assert role_allows(role, "blobs/read", condition=condition, path=path)
+
+
+def test_studio_work_condition_covers_every_data_action_of_the_role() -> None:
+    """Each data action of the Studio's work/ role that changes a blob (write, add) is named in
+    the condition: one left out would create blobs anywhere. Reads are never restricted; the
+    inbox prefix is the one the code writes to (docwiki.answers.inbox)."""
+    from docwiki.answers.inbox import INBOX_PREFIX
+
+    storage = (INFRA / "modules" / "storage.bicep").read_text(encoding="utf-8")
+    condition = bicep_multiline_var(storage, "studioWorkInboxCondition")
+    role = RolePermissions.from_bicep(_resource(storage, "studioInboxWriterRole"))
+    named = set(re.findall(r"ActionMatches\{'([^']+)'\}", condition))
+    assert named == set(role.data_actions) - {BLOB_ACTION + "read"}
+    assert named == {BLOB_ACTION + "write", BLOB_ACTION + "add/action"}
+    assert "blobs/read" not in condition
+    assert f"{StorageKeys.WORK}/{INBOX}" == INBOX_PREFIX
+    path = "@Resource[Microsoft.Storage/storageAccounts/blobServices/containers/blobs:path]"
+    assert re.findall(rf"{re.escape(path)} (\w+) '([^']*)'", condition) == [
+        ("StringStartsWith", INBOX)
+    ]
+    raw = bicep_multiline_var(storage, "studioRawCondition")
+    for action in ("read", "write", "add/action"):
+        assert evaluate_condition(raw, f"blobs/{action}", path="uploads/a.pdf", container="raw")
+    assert not evaluate_condition(raw, "blobs/delete", path="uploads/a.pdf", container="raw")
 
 
 def test_studio_foundry_access_is_azure_ai_user_only() -> None:
@@ -625,7 +786,11 @@ def test_storage_network_perimeter_is_opt_in() -> None:
     storage = (INFRA / "modules" / "storage.bicep").read_text(encoding="utf-8")
     assert "publicNetworkAccess: networkPerimeter ? 'SecuredByPerimeter' : 'Enabled'" in storage
     # Event Grid's destination checks carry no subscription identity: no subscription inside.
-    assert re.search(r"resource rawToIngest '[^']+' = if \(!networkPerimeter\)", storage)
+    assert re.findall(
+        r"^resource (\w+) 'Microsoft\.EventGrid/systemTopics/eventSubscriptions@[^']+' = (.+) \{$",
+        storage,
+        re.MULTILINE,
+    ) == [("rawToIngest", "if (!networkPerimeter)"), ("inboxToIngest", "if (!networkPerimeter)")]
     perimeter = (INFRA / "modules" / "network-perimeter.bicep").read_text(encoding="utf-8")
     assert "accessMode: 'Enforced'" in perimeter
     assert "direction: 'Inbound'" in perimeter and "id: subscription().id" in perimeter
@@ -700,7 +865,7 @@ def test_engine_resolves_the_image_layout(tmp_path: Path, monkeypatch: pytest.Mo
     (root / "site").mkdir(parents=True)
     (root / "site" / "QUARTZ_VERSION").write_text("v4.5.2\n", encoding="utf-8")
     (root / "skills" / "templates").mkdir(parents=True)
-    (root / "domains" / "wind-om").mkdir(parents=True)
+    (root / "domains" / "batiment").mkdir(parents=True)
     package = root / "src" / "docwiki"
     for module, name in ((site_build, "site/build.py"), (agentkit, "stages/agentkit.py")):
         path = package / name
@@ -717,8 +882,8 @@ def test_engine_resolves_the_image_layout(tmp_path: Path, monkeypatch: pytest.Mo
     assert site_build.read_quartz_version(site_build.default_overlay_dir()) == "v4.5.2"
     assert agentkit.default_templates_dir() == (root / "skills" / "templates").resolve()
     assert (
-        orchestration_settings.resolve_pack_path("wind-om")
-        == (root / "domains" / "wind-om").resolve()
+        orchestration_settings.resolve_pack_path("batiment")
+        == (root / "domains" / "batiment").resolve()
     )
 
 
@@ -805,3 +970,64 @@ def test_compiled_studio_is_fail_closed(compiled: dict[str, Any]) -> None:
     assert app["maxReplicas"] == {"value": 1}
     assert app["dormant"] == {"value": "[not(parameters('enableStudio'))]"}
     assert "variables('studioPublic')" in json.dumps(app["ingressMode"])
+
+
+def _values(resources: Any) -> list[dict[str, Any]]:
+    return list(resources.values() if isinstance(resources, dict) else resources)
+
+
+def test_compiled_inbox_trigger_and_studio_work_role(compiled: dict[str, Any]) -> None:
+    (storage,) = [
+        resource
+        for resource in _values(compiled["resources"])
+        if resource["type"] == "Microsoft.Resources/deployments" and resource["name"] == "storage"
+    ]
+    template = storage["properties"]["template"]
+    nested = _values(template["resources"])
+    (inbox,) = [item for item in nested if "inbox-to-ingest" in json.dumps(item.get("name"))]
+    (raw,) = [item for item in nested if "raw-to-ingest" in json.dumps(item.get("name"))]
+    assert inbox["type"] == "Microsoft.EventGrid/systemTopics/eventSubscriptions"
+    assert inbox["condition"] == raw["condition"] == "[not(parameters('networkPerimeter'))]"
+    assert inbox["properties"]["filter"]["includedEventTypes"] == ["Microsoft.Storage.BlobCreated"]
+    assert inbox["properties"]["filter"]["subjectBeginsWith"] == (
+        "[format('/blobServices/default/containers/{0}/blobs/" + INBOX + "', "
+        "variables('workContainerName'))]"
+    )
+    for key in ("deliveryWithResourceIdentity", "retryPolicy", "eventDeliverySchema"):
+        assert inbox["properties"][key] == raw["properties"][key], key
+    assignments = [
+        item for item in nested if item["type"] == "Microsoft.Authorization/roleAssignments"
+    ]
+    (role,) = [
+        item
+        for item in assignments
+        if item["properties"].get("condition") == "[variables('studioWorkInboxCondition')]"
+    ]
+    assert role["condition"] == "[variables('grantStudio')]"
+    assert role["properties"]["conditionVersion"] == "2.0"
+    # The Studio's only role on work/ is the custom role, created before it is assigned.
+    studio_on_work = [
+        item
+        for item in assignments
+        if item["properties"]["principalId"] == "[parameters('studioPrincipalId')]"
+        and "variables('workContainerName')" in item.get("scope", "")
+    ]
+    assert studio_on_work == [role]
+    (definition,) = [
+        item for item in nested if item["type"] == "Microsoft.Authorization/roleDefinitions"
+    ]
+    assert definition["condition"] == "[variables('grantStudio')]"
+    assert definition["properties"]["assignableScopes"] == ["[resourceGroup().id]"]
+    assert role["properties"]["roleDefinitionId"] == (
+        "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', "
+        f"{definition['name'][1:-1]})]"
+    )
+    assert any(
+        "studioInboxWriterRole" in item or "roleDefinitions" in item for item in role["dependsOn"]
+    )
+    (permission,) = definition["properties"]["permissions"]
+    granted = RolePermissions.from_json(permission)
+    condition = template["variables"]["studioWorkInboxCondition"]
+    assert role_allows(granted, "blobs/write", condition=condition, path=FILING, container="work")
+    for action in ("blobs/delete", "blobs/move/action", "containers/delete", "containers/write"):
+        assert not role_allows(granted, action, condition=condition, path=FILING, container="work")

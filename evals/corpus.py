@@ -1,10 +1,10 @@
 """The corpus as the evaluator sees it (docs/spec/evals.md §2).
 
-* :class:`CorpusManifest` - ``samples/corpus/MANIFEST.json``: paths, SHA-256, sensitivity,
-  quickstart flags and quickstart copies (``copy_of``);
+* :class:`CorpusManifest` - ``samples/corpus/MANIFEST.json``: paths, SHA-256, sensitivity and
+  held-back flags, and the document scopes of a build (``full``, ``all``);
 * :class:`ReleaseCatalog` - the ``sources`` of a release ``catalog.json`` (id, raw path, hash);
 * :class:`SourceResolver` - maps a cited source (SHA-256, ``source_id``, raw path or title) to its
-  canonical corpus path, so that citations of a deployment whose raw paths differ from the corpus
+  corpus path, so that citations of a deployment whose raw paths differ from the corpus
   layout still match the golden ``required_citations``;
 * :class:`ExtractionCache` - ExtractedDocs of the corpus (``docwiki.extract``, local mode by
   default) cached under ``.cache/evals/``;
@@ -19,7 +19,7 @@ import hashlib
 import json
 import os
 import unicodedata
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -46,7 +46,9 @@ __all__ = [
     "restricted_fingerprint",
 ]
 
-SCOPES = ("full", "quickstart", "all")
+SCOPES = ("full", "all")
+"""Document scopes of a baseline build: ``full`` is the documents under ``full/``; ``all`` adds the
+held-back revisions of ``held-back/`` (the corpus once they are ingested)."""
 ExtractMode = Literal["local", "azure"]
 
 
@@ -55,22 +57,15 @@ ExtractMode = Literal["local", "azure"]
 
 @dataclass(frozen=True)
 class CorpusFile:
-    """One MANIFEST entry. ``canonical`` is the original of a quickstart copy."""
+    """One MANIFEST entry."""
 
     path: str
     sha256: str
     format: str = ""
     media_type: str = ""
     sensitivity: str = "public"
-    quickstart: bool = False
-    copy_of: str | None = None
     held_back: bool = False
-    domain: str | None = None
     title: str | None = None
-
-    @property
-    def canonical(self) -> str:
-        return self.copy_of or self.path
 
     @classmethod
     def from_entry(cls, entry: Mapping[str, Any]) -> CorpusFile:
@@ -80,10 +75,7 @@ class CorpusFile:
             format=str(entry.get("format") or ""),
             media_type=str(entry.get("media_type") or ""),
             sensitivity=str(entry.get("sensitivity") or "public"),
-            quickstart=bool(entry.get("quickstart")),
-            copy_of=entry.get("copy_of") or None,
             held_back=bool(entry.get("held_back")),
-            domain=entry.get("domain"),
             title=entry.get("title"),
         )
 
@@ -95,19 +87,12 @@ def _hex(digest: str) -> str:
 class CorpusManifest:
     """``samples/corpus/MANIFEST.json``: every file with its hash, sensitivity and flags."""
 
-    def __init__(
-        self, files: Iterable[CorpusFile], *, sha256: str = "", quickstart: Sequence[str] = ()
-    ) -> None:
+    def __init__(self, files: Iterable[CorpusFile], *, sha256: str = "") -> None:
         self.files: dict[str, CorpusFile] = {entry.path: entry for entry in files}
         self.sha256 = sha256
-        self.quickstart_paths: tuple[str, ...] = tuple(quickstart) or tuple(
-            entry.path
-            for entry in self.files.values()
-            if entry.quickstart and entry.copy_of is None
-        )
         self._by_sha: dict[str, str] = {}
         for entry in self.files.values():
-            self._by_sha.setdefault(entry.sha256, entry.canonical)
+            self._by_sha.setdefault(entry.sha256, entry.path)
 
     @classmethod
     def load(cls, corpus_root: Path) -> CorpusManifest:
@@ -119,20 +104,14 @@ class CorpusManifest:
     @classmethod
     def from_dict(cls, data: Mapping[str, Any], *, sha256: str = "") -> CorpusManifest:
         return cls(
-            (CorpusFile.from_entry(entry) for entry in data.get("files") or []),
-            sha256=sha256,
-            quickstart=tuple(data.get("quickstart") or ()),
+            (CorpusFile.from_entry(entry) for entry in data.get("files") or []), sha256=sha256
         )
 
     def get(self, path: str) -> CorpusFile | None:
         return self.files.get(path)
 
-    def canonical(self, path: str) -> str | None:
-        entry = self.files.get(path)
-        return entry.canonical if entry else None
-
     def by_sha256(self, digest: str) -> str | None:
-        """Canonical path of the file with this raw SHA-256 (``sha256:`` prefix accepted)."""
+        """Path of the file with this raw SHA-256 (``sha256:`` prefix accepted)."""
         return self._by_sha.get(_hex(digest))
 
     def sensitivity(self, path: str) -> str | None:
@@ -140,22 +119,28 @@ class CorpusManifest:
         return entry.sensitivity if entry else None
 
     def documents(self) -> list[CorpusFile]:
-        """Every distinct document (quickstart copies excluded)."""
-        return [entry for entry in self.files.values() if entry.copy_of is None]
+        """Every document of the MANIFEST: restricted and held-back ones included."""
+        return list(self.files.values())
 
     def select(self, scope: str = "full", audience: str = "public") -> list[CorpusFile]:
-        """Documents of a build: ``full`` (``full/``), ``quickstart`` (the MANIFEST list) or
-        ``all`` (everything except held-back files), restricted to what ``audience`` may see."""
-        if scope == "quickstart":
-            paths = [self.canonical(path) or path for path in self.quickstart_paths]
-        elif scope == "full":
-            paths = [entry.path for entry in self.documents() if entry.path.startswith("full/")]
+        """Documents of a build, restricted to what ``audience`` may see: ``full`` (the files
+        under ``full/``) or ``all`` (``full/`` plus the held-back revisions of ``held-back/``).
+
+        An empty selection is an error: a baseline over no document would answer from nothing.
+        """
+        if scope == "full":
+            chosen = [entry for entry in self.files.values() if entry.path.startswith("full/")]
         elif scope == "all":
-            paths = [entry.path for entry in self.documents() if not entry.held_back]
+            chosen = list(self.files.values())
         else:
             raise ValueError(f"unknown corpus scope {scope!r}; use one of {', '.join(SCOPES)}")
-        selected = (self.files[path] for path in dict.fromkeys(paths) if path in self.files)
-        return [entry for entry in selected if allowed_for_audience(entry.sensitivity, audience)]
+        selected = [entry for entry in chosen if allowed_for_audience(entry.sensitivity, audience)]
+        if not selected:
+            raise ValueError(
+                f"the corpus MANIFEST has no document in scope {scope!r} that the {audience!r} "
+                "audience may see: check the corpus root, --scope and --audience"
+            )
+        return selected
 
 
 # ----------------------------------------------------------------------------- catalog
@@ -227,7 +212,7 @@ def _catalog_file(path: Path) -> Path:
 
 @dataclass(frozen=True)
 class ResolvedCitation:
-    """A citation mapped to the corpus: canonical path and locator key (``None`` if unknown)."""
+    """A citation mapped to the corpus: corpus path and locator key (``None`` if unknown)."""
 
     unit: str
     path: str | None
@@ -264,7 +249,7 @@ def _clean_path(path: str) -> str:
 
 
 class SourceResolver:
-    """Map cited sources to canonical corpus paths.
+    """Map cited sources to corpus paths.
 
     Order: SHA-256 (MANIFEST hashes) → ``source_id`` (release catalog first, then ids derived
     from every MANIFEST path and its suffixes, which covers deployments whose raw container holds
@@ -292,7 +277,7 @@ class SourceResolver:
             suffixes = ["/".join(segments[index:]) for index in range(len(segments))]
             suffixes += [prefix + entry.path for prefix in _EXTRA_PREFIXES]
             for suffix in suffixes:
-                derived.setdefault(source_id_for(suffix), set()).add(entry.canonical)
+                derived.setdefault(source_id_for(suffix), set()).add(entry.path)
         mapping = {sid: next(iter(paths)) for sid, paths in derived.items() if len(paths) == 1}
         for source in self.catalog.sources if self.catalog else ():
             path = (self.manifest.by_sha256(source.sha256) if source.sha256 else None) or (
@@ -306,7 +291,7 @@ class SourceResolver:
         candidates: dict[str, set[str]] = {}
         for entry in self.manifest.documents():
             if entry.title:
-                candidates.setdefault(normalize_text(entry.title), set()).add(entry.canonical)
+                candidates.setdefault(normalize_text(entry.title), set()).add(entry.path)
         for source in self.catalog.sources if self.catalog else ():
             path = self._by_id.get(source.source_id)
             if source.title and path:
@@ -314,18 +299,13 @@ class SourceResolver:
         return {title: next(iter(paths)) for title, paths in candidates.items() if len(paths) == 1}
 
     def path_for(self, raw_path: str) -> str | None:
-        """Canonical corpus path of a raw path (exact, else a unique suffix match)."""
+        """Corpus path of a raw path (exact, else a unique suffix match)."""
         value = _clean_path(raw_path)
         if not value:
             return None
-        exact = self.manifest.canonical(value)
-        if exact is not None:
-            return exact
-        matches = {
-            entry.canonical
-            for path, entry in self.manifest.files.items()
-            if path.endswith("/" + value)
-        }
+        if value in self.manifest.files:
+            return value
+        matches = {path for path in self.manifest.files if path.endswith("/" + value)}
         return next(iter(matches)) if len(matches) == 1 else None
 
     def path_for_id(self, source_id: str) -> str | None:
@@ -403,8 +383,8 @@ class ExtractionCache:
         return f"{self.mode}-{CU_ADAPTER_VERSION if self.mode == 'azure' else ADAPTER_VERSION}"
 
     async def load(self, files: Iterable[CorpusFile]) -> dict[str, ExtractedDoc]:
-        """ExtractedDoc per canonical path (copies are extracted once, as their original)."""
-        paths = list(dict.fromkeys(entry.canonical for entry in files))
+        """ExtractedDoc per corpus path."""
+        paths = list(dict.fromkeys(entry.path for entry in files))
         semaphore = asyncio.Semaphore(self.concurrency)
 
         async def one(path: str) -> tuple[str, ExtractedDoc]:

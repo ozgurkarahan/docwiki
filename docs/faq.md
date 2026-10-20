@@ -13,12 +13,12 @@
 
 ## Why not vector RAG?
 
-Because the hard questions in operational documents are cross-document. Which revision of a
-procedure is current? Does the maintenance plan contradict it? Which alarms in a long SCADA log
-match the root cause in an incident report? Retrieval re-discovers those relations from raw
-chunks at every question; DocWiki compiles them once into source, entity and topic pages with
-explicit supersession and contradiction sections, and gives agents a map (indexes, typed links,
-a glossary, a log) instead of a pile of chunks.
+Because the hard questions in operational documents are cross-document. Which revision of a quote
+is current? Does the planning contradict the supplier's e-mail? Which invoiced quantities were not
+delivered, according to a handwritten note on a scanned delivery note? Retrieval re-discovers
+those relations from raw chunks at every question; DocWiki compiles them once into source, entity
+and topic pages with explicit supersession and contradiction sections, and gives agents a map
+(indexes, typed links, a glossary, a log) instead of a pile of chunks.
 
 It does not give up on retrieval: `search.db` indexes page sections **and** every raw extracted
 block, so details that compilation left out stay findable, and `query_table` answers numeric
@@ -85,11 +85,12 @@ sources, Foundry IQ is designed for that.
 
 ## Which languages are supported?
 
-Documents can be in any language the models read; the sample corpus mixes English, French and
-German. The wiki itself is written in **English**, one canonical language that is easy to search,
+Documents can be in any language the models read; the sample corpus is written in French. The
+wiki itself is written in **English**, one canonical language that is easy to search,
 while **quotes stay in their original language** so that verification runs on the source text.
 Glossary synonyms and entity and topic aliases are multilingual, and search expands queries with
-them. The Researcher answers in the language of the question and never translates locator labels.
+them, so a question in French can find pages written in English. The Researcher answers in the
+language of the question and never translates locator labels.
 
 ## How far does it scale?
 
@@ -98,16 +99,16 @@ document, map-reduce for long documents, concurrency limits per deployment), run
 and search runs on SQLite FTS5 inside each release. Every release is a complete snapshot, so
 storage grows with the corpus times the number of retained releases (10 by default). Beyond that
 scale, or for content that changes by the minute, use a managed search service next to the wiki.
-Measured on the 37-document sample: a full ingest took 20.4 minutes; it was only tested at that
-size.
+The pipeline has only been run on small corpora so far (the sample has 12 public documents);
+measure your own before relying on it.
 
 ## What does it cost?
 
 Close to nothing when idle: jobs and apps scale to zero, models are pay-per-token, and there is no
 database or search service. You pay for tokens and Content Understanding pages when you compile,
-and for tokens when an agent answers. Every run writes a cost receipt. On the 37-document sample, a
-full ingest cost about 17 USD and a Researcher answer about 0.12 USD (receipt estimates); details
-and levers in [cost](cost.md).
+and for tokens when an agent answers. Every run writes a cost receipt, so you can measure your own
+corpus; the figures for the sample are pending re-measurement. Details and levers in
+[cost](cost.md).
 
 ## Can I use it offline?
 

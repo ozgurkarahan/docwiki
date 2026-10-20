@@ -1,30 +1,30 @@
 categories:
-  - key: procedures
-    title: Procedures
-    description: Standard operating procedures and work instructions.
-  - key: oem-documentation
-    title: OEM documentation
+  - key: quotes
+    title: Quotes
+    description: Quotes and their revisions.
+  - key: purchasing
+    title: Purchasing
   - key: records
     title: Records and data
 doc_types:
-  - key: sop
-    title: Standard operating procedure
-    category: procedures
+  - key: devis
+    title: Quote (devis)
+    category: quotes
     authority: 7
     rules:
-      - filename_regex: "(?i)^sop[-_ ]"
-      - text_regex: "(?i)standard operating procedure"
+      - filename_regex: "(?i)^dev[-_ ]"
+      - text_regex: "(?i)devis de travaux"
         first_chars: 200
-  - key: service-bulletin
-    title: Service bulletin
-    category: oem-documentation
+  - key: facture
+    title: Supplier invoice (facture)
+    category: purchasing
     authority: 9
     rules:
-      - filename_regex: "(?i)bulletin"
-        text_regex: "(?i)litware"
-  - key: maintenance-plan
-    title: Maintenance plan
+      - filename_regex: "(?i)facture"
+        text_regex: "(?i)zava"
+  - key: etude-de-prix
+    title: Internal price study
     category: records
     authority: 5
     rules:
-      - filename_regex: "(?i)plan.*\\.xlsx$"
+      - filename_regex: "(?i)etude.*\\.xlsx$"

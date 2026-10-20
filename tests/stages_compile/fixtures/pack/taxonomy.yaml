@@ -1,32 +1,41 @@
 categories:
-  - key: procedures
-    title: Procedures
-    description: Standard operating procedures and work instructions.
-  - key: oem-documentation
-    title: OEM documentation
-  - key: records
-    title: Records and data
+  - key: contract-documents
+    title: Quotes and contract
+    description: Quotes, their revisions and the amendments of the works contract.
+  - key: schedule-and-purchases
+    title: Schedule and purchase tracking
+  - key: purchasing
+    title: Invoices and delivery notes
+  - key: internal-costing
+    title: Internal costing
 doc_types:
-  - key: sop
-    title: Standard operating procedure
-    category: procedures
-    authority: 7
+  - key: quote
+    title: Quote (devis)
+    category: contract-documents
+    authority: 8
     rules:
-      - filename_regex: "(?i)^sop[-_ ]"
-  - key: service-bulletin
-    title: Service bulletin
-    category: oem-documentation
-    authority: 9
+      - filename_regex: "^DEV-\\d{4}-\\d{3}"
+  - key: contract-amendment
+    title: Contract amendment (avenant)
+    category: contract-documents
+    authority: 10
     rules:
-      - text_regex: "(?i)service bulletin"
+      - text_regex: "(?i)avenant\\s+n°\\s*\\d+\\s+au\\s+contrat\\s+de\\s+travaux"
         first_chars: 300
-  - key: maintenance-plan
-    title: Maintenance plan
-    category: records
-    authority: 5
+      - filename_regex: "(?i)^avenant"
+  - key: schedule
+    title: Schedule and purchase tracking (planning)
+    category: schedule-and-purchases
+    authority: 4
     rules:
-      - filename_regex: "(?i)plan.*\\.xlsx$"
-  - key: lab-report
-    title: Lab report
-    category: records
-    authority: 6
+      - filename_regex: "(?i)planning.*\\.xlsx$"
+  - key: supplier-invoice
+    title: Supplier invoice (facture)
+    category: purchasing
+    authority: 5
+  - key: price-study
+    title: Internal price study (étude de prix)
+    category: internal-costing
+    authority: 3
+    rules:
+      - filename_regex: "(?i)etude[-_ ]de[-_ ]prix"

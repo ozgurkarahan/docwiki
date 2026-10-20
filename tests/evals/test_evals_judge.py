@@ -21,7 +21,7 @@ from evals.judge import (
 
 ENV = {
     "DOCWIKI_FOUNDRY_PROJECT_ENDPOINT": (
-        "https://contoso-docwiki.services.ai.azure.com/api/projects/docwiki"
+        "https://example-docwiki.services.ai.azure.com/api/projects/docwiki"
     ),
     "DOCWIKI_SMART_DEPLOYMENT": "docwiki-smart",
 }
@@ -97,7 +97,7 @@ def test_evaluators_use_the_smart_deployment_and_entra(monkeypatch: pytest.Monke
     assert any("intent_resolution: RuntimeError" in notice for notice in judge.notices)
     config = FakeEvaluator.created[0]["config"]
     assert config == {
-        "azure_endpoint": "https://contoso-docwiki.services.ai.azure.com",
+        "azure_endpoint": "https://example-docwiki.services.ai.azure.com",
         "azure_deployment": "docwiki-smart",
         "api_version": "2025-04-01-preview",
     }
@@ -146,7 +146,7 @@ def test_evaluate_routes_inputs_and_parses_outputs() -> None:
     assert set(seen) == {"relevance", "intent_resolution"}
     assert results["relevance"]["score"] == 3.0
     assert results["intent_resolution"] == {"score": None, "result": None, "error": "TimeoutError"}
-    calls = judge_tool_calls([{"name": "search", "arguments": {"query": "oil"}}])
+    calls = judge_tool_calls([{"name": "search", "arguments": {"query": "devis"}}])
     full = asyncio.run(
         judge.evaluate(
             query="Q?",
@@ -165,7 +165,7 @@ def test_evaluate_routes_inputs_and_parses_outputs() -> None:
 def test_tool_call_formats() -> None:
     calls = judge_tool_calls(
         [
-            {"name": "search", "arguments": {"query": "oil"}},
+            {"name": "search", "arguments": {"query": "devis"}},
             {"name": "mcp_list_tools", "arguments": {}},
             {"name": "get_evidence", "arguments": "not json"},
         ]
@@ -175,7 +175,7 @@ def test_tool_call_formats() -> None:
             "type": "tool_call",
             "tool_call_id": "call_1",
             "name": "search",
-            "arguments": {"query": "oil"},
+            "arguments": {"query": "devis"},
         },
         {"type": "tool_call", "tool_call_id": "call_3", "name": "get_evidence", "arguments": {}},
     ]

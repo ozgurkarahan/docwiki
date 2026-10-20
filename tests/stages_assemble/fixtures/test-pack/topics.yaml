@@ -1,0 +1,12 @@
+topics:
+  - slug: quotes-contract-and-amendment
+    title: Quotes, contract and amendment
+    description: Quote revisions, the works contract and its amendment.
+    keywords: [quote revision, works contract, amendment]
+    aliases:
+      - {text: devis et avenant, lang: fr}
+    min_score: 2
+    min_sources: 2
+  - slug: site-progress
+    title: Site progress and meetings
+    keywords: [site meeting, progress of the walls]

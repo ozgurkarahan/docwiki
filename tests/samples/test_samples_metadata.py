@@ -11,6 +11,7 @@ from typing import Any
 from PIL import Image
 
 AUTHOR = "DocWiki sample generator"
+STAMP = "FICTIONAL - NOT FOR OPERATIONAL USE"
 _IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff", ".emf", ".wmf")
 
 
@@ -31,8 +32,8 @@ def test_office_metadata_is_neutral(
 ) -> None:
     organisations = {org["key"]: org["name"] for org in bible["organisations"]}
     catalog = {doc["path"]: doc for doc in bible["documents"]}
-    office = [e for e in documents if e["format"] in ("docx", "xlsx", "pptx")]
-    assert len(office) >= 15
+    office = [e for e in documents if e["format"] in ("docx", "xlsx")]
+    assert len(office) == 6
     for entry in office:
         doc = catalog[entry["path"]]
         with zipfile.ZipFile(corpus_root / entry["path"]) as package:
@@ -43,6 +44,8 @@ def test_office_metadata_is_neutral(
             assert _xml_value(core, "dc:creator") == AUTHOR, entry["path"]
             assert _xml_value(core, "cp:lastModifiedBy") == AUTHOR, entry["path"]
             assert _xml_value(core, "cp:revision") == "1", entry["path"]
+            assert _xml_value(core, "dc:subject") == STAMP, entry["path"]
+            assert _xml_value(core, "dc:language") == "fr-FR", entry["path"]
             assert _xml_value(core, "dcterms:created") == f"{doc['date']}T08:30:00Z"
             assert _xml_value(core, "dcterms:modified") == f"{doc['date']}T16:45:00Z"
             assert _xml_value(app, "Application") == AUTHOR, entry["path"]
@@ -57,28 +60,41 @@ def test_office_metadata_is_neutral(
 
 def test_python_libraries_metadata_is_gone(documents: list[dict[str, Any]], extracted) -> None:
     for entry in documents:
-        if entry["format"] in ("docx", "xlsx", "pptx"):
+        if entry["format"] in ("docx", "xlsx"):
             metadata = extracted(entry["path"]).metadata
             assert metadata["author"] == AUTHOR and metadata["last_modified_by"] == AUTHOR
 
 
 def test_pdf_metadata_is_neutral(documents: list[dict[str, Any]], extracted) -> None:
     pdfs = [e for e in documents if e["format"] == "pdf"]
-    assert len(pdfs) >= 10
+    assert len(pdfs) == 4
     for entry in pdfs:
         metadata = extracted(entry["path"]).metadata
         for key in ("Author", "Creator", "Producer"):
             assert metadata.get(key) == AUTHOR, f"{entry['path']} {key}"
+        assert metadata["Subject"] == STAMP, entry["path"]
+        assert metadata["Title"] == entry["title"], entry["path"]
         assert metadata["CreationDate"].startswith("D:" + entry["date"].replace("-", ""))
+
+
+def test_pdfs_embed_a_unicode_font(documents: list[dict[str, Any]], corpus_root: Path) -> None:
+    """Core fonts cannot encode the euro sign or "œ": text PDFs embed a TrueType subset."""
+    for entry in documents:
+        if entry["format"] != "pdf" or entry["stamp"] == "image":
+            continue
+        data = (corpus_root / entry["path"]).read_bytes()
+        assert b"/FontFile2" in data, entry["path"]
+        assert b"/Helvetica" not in data and b"/Times" not in data, entry["path"]
 
 
 def test_images_have_no_exif_or_text_chunks(
     documents: list[dict[str, Any]], corpus_root: Path
 ) -> None:
     images = [e for e in documents if e["format"] in ("jpg", "png")]
-    assert {e["format"] for e in images} == {"jpg", "png"}
+    assert len(images) == 2 and {e["format"] for e in images} == {"jpg"}
     for entry in images:
         data = (corpus_root / entry["path"]).read_bytes()
         _assert_no_exif(data, entry["path"])
         with Image.open(io.BytesIO(data)) as img:
             assert set(img.info) <= {"dpi", "jfif", "jfif_version", "jfif_unit", "jfif_density"}
+            assert "icc_profile" not in img.info, entry["path"]

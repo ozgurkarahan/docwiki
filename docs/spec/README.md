@@ -13,9 +13,9 @@ documents and the contracts derived from them. Changes require a new spec versio
 | [domain-and-corpus.md](domain-and-corpus.md) | Domain packs, fiction rules, sample corpus, golden set |
 | [evals.md](evals.md) | Metrics, baselines, evaluation runner, scoreboard |
 | [infra-ops-security.md](infra-ops-security.md) | Azure resources, identities, operations, threat model, leak guard, release |
-| [site.md](site.md) | Quartz site, evidence microscope, GitHub Pages, private portal |
+| [site.md](site.md) | Quartz site, evidence microscope, portal |
 | [engine-interfaces.md](engine-interfaces.md) | Cross-lane engine signatures (v1 addendum) |
-| [CHANGELOG.md](CHANGELOG.md) | v1.1 clarifications discovered while building |
+| [CHANGELOG.md](CHANGELOG.md) | v1.1 clarifications discovered while building; v1.2 sample-world amendment |
 
 ## 1. Product in one paragraph
 
@@ -37,7 +37,8 @@ Goals:
 - G5. Expose the wiki through an MCP server used by two Foundry prompt agents and by local agents.
 - G6. Detect contradictions and supersession between documents; respect sensitivity tiers.
 - G7. Prove quality with a golden set and baselines; publish honest, reproducible numbers.
-- G8. Ship a public sample (fictional wind-farm operator) browsable on GitHub Pages.
+- G8. Ship a public sample (fictional French construction company: one client, one chantier)
+  browsable on Azure Container Apps.
 
 Non-goals (v1): multi-tenant SaaS, private networking, real-time collaborative editing, audio/video
 beyond transcripts, vector database by default, replacing enterprise search.
@@ -71,7 +72,7 @@ beyond transcripts, vector database by default, replacing enterprise search.
 | D10 | Wiki written in English; original-language quotes preserved; multilingual glossary synonyms. | One searchable canonical language without losing source fidelity. |
 | D11 | Sensitivity tiers (public, internal, restricted); builds per audience; never merge across tiers. | Consolidation must not flatten access rights. |
 | D12 | Golden set authored after the corpus is frozen and before the first full generation; private holdout. | Credible evaluation. |
-| D13 | Quartz static site for humans; GitHub Pages for the public sample; optional private portal on ACA. | No custom UI to maintain; strong navigation features. |
+| D13 | Quartz static site for humans; the public sample is served by the portal on ACA (v1.4: GitHub Pages retired); optional sign-in portal on ACA. | No custom UI to maintain; strong navigation features. |
 
 ## 5. Glossary
 
@@ -84,7 +85,7 @@ beyond transcripts, vector database by default, replacing enterprise search.
 | Provenance | How a block's text was obtained (native-text, ocr, deterministic-table, model-description). |
 | Evidence sidecar | Generated page showing a locator (page image with highlight, row table…) next to the original. |
 | Page | A wiki Markdown file (source, entity, topic, index, query, meta). |
-| Entity | A registry object of the domain (asset, component, part, alarm code, procedure, organisation role…). |
+| Entity | A registry object of the domain (organisation, person role, document type, work package, product, code…). |
 | Topic | A curated subject from the domain's closed topic catalog, synthesised from several sources. |
 | Domain pack | Configuration describing a domain: taxonomy, entities, topics, glossary, rules, skill templates. |
 | Release | Immutable, validated snapshot of the wiki, site, evidence, catalog and search index. |

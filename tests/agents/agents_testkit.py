@@ -33,13 +33,13 @@ DEPLOY_ENV: dict[str, str] = {
 }
 
 ANSWER_TEXT = (
-    "ISO VG 220 applies to WTG-07 at cold sites [1]. The 2026 plan still lists ISO VG 320 for "
-    "WTG-07 [2]; the procedure has the higher authority (authority, then recency) [1][2].\n\n"
+    "The walls of the extension are 70 % complete [1]. Planning indice B still lists 100 % for "
+    "task T05 [2]; the minutes have the higher authority (authority, then recency) [1][2].\n\n"
     "Sources:\n"
-    "[1] Gearbox oil change SOP rev B — ¶ 4 (native-text) — "
-    "evidence/src-4d9c65e05302/para-0004.md\n"
-    '[2] Maintenance plan 2026 — sheet "Plan", rows 2–4 (deterministic-table) — '
-    "evidence/src-43c97f7dfcde/sheet-plan-r0002-r0004.md"
+    "[1] Site meeting minutes n°3 — ¶ 7 (native-text) — "
+    "evidence/src-165f1d3a109c/para-0007.md\n"
+    '[2] Planning and purchase tracking, indice B — sheet "Planning", rows 6–9 '
+    "(deterministic-table) — evidence/src-86eabe3d6d0d/sheet-planning-r0006-r0009.md"
 )
 
 

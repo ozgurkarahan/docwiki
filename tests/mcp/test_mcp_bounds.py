@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 import pytest
-from mcp_testkit import PLAN, SOP_B
+from mcp_testkit import PLAN_B, TOPIC_ID
 
 from docwiki.mcp.bounds import ResultTooLargeError, clip, fit_items, fit_text, result_json
 from docwiki.mcp.config import MIN_MAX_CHARS, McpConfig
@@ -69,12 +69,12 @@ def tight() -> ReadTools:
 
 
 def test_read_page_pages_under_a_tight_budget(tight: ReadTools) -> None:
-    full = json.loads(ReadTools(tight.source, McpConfig()).read_page("topic:gearbox-oil"))
+    full = json.loads(ReadTools(tight.source, McpConfig()).read_page(TOPIC_ID))
     pieces: list[str] = []
     offset: int | None = 0
     labels: set[str] = set()
     while offset is not None:
-        out = tight.read_page("topic:gearbox-oil", offset=offset)
+        out = tight.read_page(TOPIC_ID, offset=offset)
         assert len(out) <= MIN_MAX_CHARS
         data = json.loads(out)
         pieces.append(data["markdown"])
@@ -83,20 +83,26 @@ def test_read_page_pages_under_a_tight_budget(tight: ReadTools) -> None:
             assert data["truncated"] is True and "hint" in data
         offset = data["next_offset"]
     assert "".join(pieces) == full["markdown"]
-    assert labels == {"c1", "c2", "c3"}, "each window carries the citations it references"
+    assert labels == {"c1", "c2", "c3", "c4", "c5"}, "each window carries its citations"
+
+
+CROSS_JOIN = (
+    "SELECT a.row_id, a.n_commande, b.row_id AS other, b.n_commande AS other_order "
+    "FROM t02 AS a, t02 AS b"
+)
 
 
 @pytest.mark.parametrize(
     ("name", "kwargs"),
     [
-        ("search", {"query": "gearbox oil grade turbine plan", "limit": 50}),
+        ("search", {"query": "livraison des menuiseries du planning", "limit": 50}),
         ("read_page", {"page": "index:home"}),
-        ("read_page", {"page": SOP_B}),
+        ("read_page", {"page": PLAN_B}),
         ("get_index", {"scope": "home"}),
-        ("get_links", {"page": "topic:gearbox-oil"}),
+        ("get_links", {"page": TOPIC_ID}),
         ("glossary", {}),
-        ("get_evidence", {"source_id": PLAN, "locator_key": "sheet-plan-r0002-r0004"}),
-        ("query_table", {"source_id": PLAN, "sql": "SELECT * FROM t01, t01 AS b, t01 AS c"}),
+        ("get_evidence", {"source_id": PLAN_B, "locator_key": "sheet-planning-r0006-r0009"}),
+        ("query_table", {"source_id": PLAN_B, "sql": f"{CROSS_JOIN}, t02 AS c"}),
         ("get_skill", {"name": "deep-research"}),
         ("list_skills", {}),
         ("recent_changes", {"limit": 100}),
@@ -114,8 +120,8 @@ def test_every_read_tool_respects_the_budget(
 
 
 def test_query_table_char_budget_drops_rows(tight: ReadTools) -> None:
-    data = json.loads(tight.query_table(PLAN, "SELECT * FROM t01, t01 AS b, t01 AS c"))
-    assert data["truncated"] is True and 0 < data["row_count"] < 27 and "hint" in data
+    data = json.loads(tight.query_table(PLAN_B, CROSS_JOIN))
+    assert data["truncated"] is True and 0 < data["row_count"] < 64 and "hint" in data
 
 
 def test_ops_results_respect_the_budget(

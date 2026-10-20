@@ -6,15 +6,33 @@ Run with ``DOCWIKI_SITE_BUILD=1 uv run pytest tests/site/test_site_integration.p
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import time
 from pathlib import Path
 
 import pytest
-from site_testkit import MOCK_RELEASE, make_portable
+from site_testkit import (
+    MINUTES_PAGE,
+    MOCK_RELEASE,
+    MOCK_RELEASE_DIR,
+    MOCK_RELEASE_ID,
+    PLAN_A,
+    PLAN_A_PAGE,
+    PLAN_B,
+    PLAN_B_PAGE,
+    make_portable,
+)
 
-from docwiki.site import REPO_URL, build_site, check_links, default_allowed_hosts, scan_site
+from docwiki.site import (
+    REPO_URL,
+    build_site,
+    check_links,
+    default_allowed_hosts,
+    resolve_site_path,
+    scan_site,
+)
 from docwiki.site.html import parse_html
 
 pytestmark = pytest.mark.skipif(
@@ -22,7 +40,7 @@ pytestmark = pytest.mark.skipif(
     reason="set DOCWIKI_SITE_BUILD=1 to build the site with the pinned Quartz",
 )
 
-BASE_URL = "docwiki.ozgurkarahan.com"
+BASE_URL = "docwiki.example.com"
 
 
 @pytest.fixture(scope="module")
@@ -74,7 +92,7 @@ def test_every_footnote_opens_an_existing_evidence_sidecar(built_site: Path) -> 
                 assert target.is_relative_to((built_site / "evidence").resolve())
                 checked += 1
     print(f"footnote links to evidence sidecars: {checked}")
-    wiki = MOCK_RELEASE / "releases" / "20260215T090000Z-decd4b59" / "wiki"
+    wiki = MOCK_RELEASE_DIR / "wiki"
     definitions = sum(
         len(re.findall(r"^\[\^c\d+\]: ", md.read_text(encoding="utf-8"), re.MULTILINE))
         for md in wiki.rglob("*.md")
@@ -84,7 +102,7 @@ def test_every_footnote_opens_an_existing_evidence_sidecar(built_site: Path) -> 
 
 
 def test_pages_render_the_docwiki_overlay(built_site: Path) -> None:
-    source = html(built_site, "sources/sop-gbx-010-rev-b.html")
+    source = html(built_site, f"{MINUTES_PAGE}.html")
     assert "Referenced by" not in source  # DocWiki backlinks block stripped
     assert "docwiki:backlinks" not in source
     assert source.count('<h1 class="article-title">') == 1  # body title deduplicated
@@ -92,23 +110,28 @@ def test_pages_render_the_docwiki_overlay(built_site: Path) -> None:
     assert 'class="docwiki-badge-legend"' in source
     assert 'class="docwiki-banner"' in source
     assert "docwiki-notice--fictional" in source
-    topic = html(built_site, "topics/gearbox-oil.html")
+    topic = html(built_site, "topics/schedule-and-window-delivery.html")
     assert "docwiki-badge--table" in topic
-    superseded = html(built_site, "sources/sop-gbx-010-rev-a.html")
+    superseded = html(built_site, f"{PLAN_A_PAGE}.html")
     assert "docwiki-notice--superseded" in superseded
     home = html(built_site, "index.html")
     assert "About DocWiki" in home and REPO_URL in home
     assert "About DocWiki" not in source
+    # one fictional notice on the home page (the site banner); the provenance line comes first
+    assert 'class="docwiki-banner"' in home and "docwiki-notice--fictional" not in home
+    assert 'class="docwiki-about"' in home and "Compiled by" in home
+    assert "quality gates: 12 passed, 3 skipped" in home and "quality report" in home
+    assert home.index('class="docwiki-about"') < home.index('id="how-to-navigate"')
 
 
 def test_evidence_microscope_pages(built_site: Path) -> None:
-    pdf = html(built_site, "evidence/src-f2750f41f3fa/p0001.html")
+    pdf = html(built_site, f"evidence/{PLAN_A}/p0001.html")
     assert 'class="docwiki-specimen"' in pdf and "docwiki-zoom" in pdf
     assert "docwiki-verbatim" in pdf
-    assert (built_site / "evidence" / "src-f2750f41f3fa" / "img" / "p0001.png").is_file()
-    rows = html(built_site, "evidence/src-43c97f7dfcde/sheet-plan-r0002-r0004.html")
-    assert all(f'id="row-{n}"' in rows for n in (2, 3, 4))
-    assert 'href="../../sources/maintenance-plan-2026"' in rows
+    assert (built_site / "evidence" / PLAN_A / "img" / "p0001.png").is_file()
+    rows = html(built_site, f"evidence/{PLAN_B}/sheet-planning-r0006-r0009.html")
+    assert all(f'id="row-{n}"' in rows for n in (6, 7, 8, 9))
+    assert f'href="../../{PLAN_B_PAGE}"' in rows
 
 
 def test_no_third_party_requests_or_analytics(built_site: Path) -> None:
@@ -122,6 +145,69 @@ def test_no_third_party_requests_or_analytics(built_site: Path) -> None:
     for name in ("plausible", "googletagmanager", "umami"):
         assert name not in html(built_site, "postscript.js")
     assert not (built_site / "static" / "giscus").exists()
+
+
+def test_ask_panel_on_every_page(built_site: Path) -> None:
+    """ADR 0007: the drawer's button and empty panel on every page, its data next to them."""
+    payload = json.loads(html(built_site, "static/docwiki/answers.json"))
+    assert payload["schema"] == 1 and payload["release"] == MOCK_RELEASE_ID
+    [answer] = payload["answers"]
+    files = {p.relative_to(built_site).as_posix() for p in built_site.rglob("*") if p.is_file()}
+    targets = [answer["slug"], *(c["href"] for c in answer["citations"]), *answer["pages"]]
+    for target in targets:
+        assert resolve_site_path(files, target.partition("#")[0]), f"no page for {target}"
+    pages = 0
+    for page in sorted(built_site.rglob("*.html")):
+        rel = page.relative_to(built_site).as_posix()
+        text = page.read_text(encoding="utf-8")
+        tags = parse_html(text)
+        fabs = [t for t in tags if t.name == "button" and t.get("class") == "docwiki-ask-fab"]
+        panels = [t for t in tags if t.name == "aside" and t.get("id") == "docwiki-ask"]
+        if rel == "404.html":  # served at any path: no relative links there
+            assert not fabs and not panels
+            continue
+        assert len(fabs) == 1 and len(panels) == 1, rel
+        assert fabs[0].get("aria-expanded") == "false"
+        assert fabs[0].get("aria-controls") == "docwiki-ask"
+        attrs = dict(panels[0].attrs)
+        assert "hidden" in attrs and attrs["aria-label"] == "Ask this wiki", rel
+        assert attrs["data-repo-url"] == REPO_URL
+        assert re.search(r'<aside id="docwiki-ask"[^>]*></aside>', text), f"panel not empty: {rel}"
+        pages += 1
+    assert pages >= 30
+    postscript = html(built_site, "postscript.js")
+    assert "static/docwiki/answers.json" in postscript and "docwiki-ask" in postscript
+
+
+def test_open_drawer_keeps_the_article_readable(built_site: Path) -> None:
+    """The open drawer pushes the page above 1200 px and collapses on a link up to it."""
+    css = re.sub(r"\s+", "", html(built_site, "index.css"))
+    drawer = re.search(r"\.docwiki-ask\{[^}]*?width:min\((\d+)px,100vw\)", css)
+    push = re.search(
+        r"@mediascreenand\(min-width:(\d+)px\)\{\.page:has\(\.docwiki-ask:not\(\[hidden\]\)\)"
+        r"\{margin-right:max\((\d+)px\+2rem,",
+        css,
+    )
+    assert drawer and push, "the drawer width or the push rule is missing from index.css"
+    assert int(push.group(1)) == 1201  # Quartz's tablet layout ends at 1200 px included
+    assert int(push.group(2)) == int(drawer.group(1)) - 320  # Quartz's right-hand panel
+    assert "(max-width: 1200px)" in html(built_site, "postscript.js")  # NARROW_QUERY
+
+
+def test_phone_header_title_shrinks_and_wraps(built_site: Path) -> None:
+    """On phones the title gives way so that the header row never widens the page."""
+    css = re.sub(r"\s+", "", html(built_site, "index.css"))
+    rule = re.search(
+        r"@media\(max-width:800px\)\{\.sidebar\.left\.page-title\{([^}]*)\}([^@]*)", css
+    )
+    assert rule, "the phone title rule is missing from index.css"
+    assert "min-width:0" in rule.group(1)
+    assert ".sidebar.left.page-titlea{overflow-wrap:anywhere}" in rule.group(2)
+    # The open phone menu covers the screen (fixed, not inset by the page padding) and its list
+    # starts below the menu button, which sits at the top of the header row.
+    assert ".sidebar.left.explorer{margin-top:0}" in rule.group(2)
+    menu = re.search(r"\.explorer\.explorer-content\{([^}]*)\}", rule.group(2))
+    assert menu and "position:fixed" in menu.group(1) and "padding-left:1rem" in menu.group(1)
 
 
 @pytest.fixture(scope="module")
@@ -144,6 +230,6 @@ def test_portable_folder_builds_the_same_site(built_site: Path, built_portable_s
     allowed = default_allowed_hosts(BASE_URL, REPO_URL)
     assert scan_site(built_portable_site, allowed) == []
     assert not (built_portable_site / ".docwiki").exists()
-    assert html(built_portable_site, "sources/sop-gbx-010-rev-b.html") == html(
-        built_site, "sources/sop-gbx-010-rev-b.html"
+    assert html(built_portable_site, f"{PLAN_B_PAGE}.html") == html(
+        built_site, f"{PLAN_B_PAGE}.html"
     )

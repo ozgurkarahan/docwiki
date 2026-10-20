@@ -33,10 +33,9 @@ A domain pack may add at most three skills, each with an evaluation task in the 
 
 | Pack | Skill | Use it to |
 |---|---|---|
-| `wind-om` | `troubleshoot-alarm` | Investigate a turbine alarm or unexpected stop: alarm code, OEM guidance, past occurrences in the SCADA log, incidents, work orders, spare parts |
-| `wind-om` | `prepare-maintenance-task` | Prepare a maintenance job: current procedure revision, parts and quantities, tools, torque values, isolation steps, applicable bulletins, stock |
-| `wind-om` | `audit-readiness` | Check compliance readiness: permit conditions, procedures, audit findings, the records that prove compliance and the gaps |
-| `it-runbooks` | `respond-to-alert` | Handle a monitoring alert: the service runbook, severity, first checks, escalation, related postmortems |
+| `batiment` | `check-supplier-invoice` | Check a supplier invoice against its delivery notes (including the handwritten reserves of scanned notes) and the purchase tracking: every difference and the amount at stake |
+| `batiment` | `prepare-site-meeting` | Prepare the next site meeting: progress per task from the current schedule revision, decisions and open actions of the last minutes, late deliveries, contradictions between the schedule and the correspondence, pending change requests |
+| `batiment` | `track-contract-amounts` | Work out the current contract amounts: the current quote revision and the signed contract plus every amendment, the total, the deposit, the payment schedule, the retention and the payments still due |
 
 ## One source, three projections
 
@@ -89,35 +88,46 @@ stays in the evidence, where it is cited and verified.
 
    | Variable | Example |
    |---|---|
-   | `wiki_title` | `Quellmoor Ridge O&M wiki` |
+   | `wiki_title` | `Chantier Moreau job wiki` |
    | `paths.index`, `paths.glossary`, `paths.log` | `index.md`, `glossary.md`, `log.md` |
    | `paths.sources_index`, `paths.entities_index`, `paths.topics_index` | `sources/index.md`, … |
    | `topics` | list of `{slug, title, path}` for the topic pages present in the release |
    | `entity_types` | list of `{key, title, path}` for the entity types with at least one page |
 
-3. Make loops render correctly when the lists are empty (`{% else %}` branches).
+3. Make loops render correctly when the lists are empty (`{% else %}` branches). Put each block
+   tag on its own line, without `-` modifiers: the environment already trims block lines, and
+   `{%-` would run the list items together.
 4. Add a golden-set task for the skill (category `skill`).
 
-An extract of the `it-runbooks` template:
+An extract of the `check-supplier-invoice` template (abridged with `…`):
 
 ```jinja
 ---
-name: respond-to-alert
-description: Respond to a monitoring alert with {{ wiki_title }}. Finds the runbook of the alerting service, its severity, first checks, actions and escalation path, and related postmortems, all with citations. Use when an on-call engineer receives an alert or a user asks how to handle one.
+name: check-supplier-invoice
+description: Check a supplier invoice against its delivery notes and purchase order with {{ wiki_title }}. Compares the quantities and prices billed with what the delivery notes (including the handwritten reserves of scanned notes, read by OCR) and the purchase tracking show, and reports every difference and the amount at stake with citations. Use before an invoice is paid or when a user asks whether an invoice is correct.
 ---
 
-# Respond to an alert
+# Check a supplier invoice
 
-Use this skill with **{{ wiki_title }}**. Cite every step; never improvise commands.
+Use this skill with **{{ wiki_title }}**. The wiki is a map; evidence sidecars are the ground
+truth. Every quantity and amount you report carries a citation to a source page or an evidence
+sidecar, and every amount you compute shows its calculation.
 
 ## Steps
 
-1. Read `{{ paths.index }}` and find the service of the alert in the entity indexes:
-{%- for entity_type in entity_types %}
+1. Read `{{ paths.index }}`, then find the invoice in the sources index
+   (`{{ paths.sources_index }}`) and open its source page. …
+2. Open the delivery notes of the same order. A scanned delivery note is read by OCR: open its
+   evidence sidecar and read the handwritten remarks ("réserves") and the receiver's notes next to
+   the printed lines. …
+4. Look for actions about the invoice in the site meeting minutes, and open the entity pages of
+   the order, the invoice, the delivery note and the articles:
+{% for entity_type in entity_types %}
    - [{{ entity_type.title }}]({{ entity_type.path }})
-{%- else %}
+{% else %}
    - (no entity pages in this release - use full-text search)
-{%- endfor %}
+{% endfor %}
+…
 ```
 
 The core templates additionally receive counts, the pack's languages, the resolution order, the

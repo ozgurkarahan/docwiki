@@ -4,22 +4,35 @@ Answers, expected strings (``must_include``, ``forbidden``) and evidence text ar
 the same normalisation, which extends the quote rules of evidence-contract §4 to answers written
 by models:
 
-1. Unicode NFKC, soft hyphens and zero-width characters removed, case-folded, accents stripped,
-   typographic quotes and dashes unified, a hyphen between two letters read as a space
-   (``high-speed`` = ``high speed``), whitespace collapsed.
+1. Unicode NFKC (which turns no-break, narrow no-break and thin spaces into spaces), soft hyphens
+   and zero-width characters removed, case-folded, accents stripped, typographic quotes and
+   dashes unified, a hyphen between two letters read as a space (``plain-pied`` = ``plain
+   pied``), whitespace collapsed.
 2. Dates: ``31 July 2026``, ``July 31, 2026``, ``31/07/2026``, ``31.07.2026``, ``31 juillet
    2026`` and ``2026/07/31`` become ``2026-07-31``; a day and a month name without a year become
-   ``31 july`` (English, French and German month names).
-3. Numbers: thousands separators removed (``1,450`` and ``1 450`` become ``1450``), decimal
-   commas read as points (``90,4`` becomes ``90.4``).
+   ``31 july`` (English, French and German month names). In a range the first date takes the
+   year of the last one: ``from 30 March to 20 April 2026``, ``from March 9 to April 20, 2026``,
+   ``du 30 mars au 20 avril 2026`` and ``du 30/03 au 20/04/2026`` give ``2026-03-30`` (or
+   ``2026-03-09``) to ``2026-04-20``; ``21-23 April 2026`` and ``du 21 au 23 avril 2026`` give
+   ``2026-04-21`` to ``2026-04-23``. A number that follows a label or a month name is not a day
+   (``week 14 to 20 April 2026``, ``item 7.3 and 2026-04-20``, ``version 1.2 - 2026-03-30``,
+   ``n° 14 au 20/04/2026``); ``8 - 13/03/2026`` is no range either. Inside a range the start
+   carries its inferred year, so an item without a year (``March 9``) no longer finds it: write
+   the date (``2026-03-09``).
+3. Numbers: thousands separators removed (``1,450``, ``1 450`` and ``47 271,60`` become ``1450``
+   and ``47271.60``), decimal commas read as points (``90,4`` becomes ``90.4``).
 4. Units right after a number become one symbol after one space: ``450 N·m``, ``450Nm`` and
    ``450 newton metres`` become ``450 nm``; ``10°C`` and ``10 degrees C`` become ``10 °c``;
-   ``300 metres`` becomes ``300 m``; ``90.4 percent`` becomes ``90.4 %``.
+   ``300 metres`` becomes ``300 m``; ``90.4 percent`` becomes ``90.4 %``; ``30 m²``, ``30 sq m``,
+   ``30 square metres`` and ``30 mètres carrés`` become ``30 m2``; ``47 271,60 €``,
+   ``47,271.60 euros`` and ``47271.60 EUR`` become ``47271.60 eur``. A currency written before
+   the number moves after it: ``€47,271.60``, ``€ 47271,60`` and ``EUR 47,271.60`` become
+   ``47271.60 eur`` as well.
 
-Matching (:func:`contains_item`) is boundary-aware: ``12`` does not match ``WTG-12`` or ``412``,
-``40`` does not match ``40.5``, a word may take a plural ``s``/``es``. Codes such as
-``FGT-P-22328`` also match with other separators (``FGT P 22328``), and numbers with units also
-match by value (``6.0 m/s`` matches ``6 m/s``).
+Matching (:func:`contains_item`) is boundary-aware: ``12`` does not match ``DEV-2026-012`` or
+``412``, ``40`` does not match ``40.5``, a word may take a plural ``s``/``es``. Codes such as
+``ZM-20450`` also match with other separators (``ZM 20450``), and numbers with units also match
+by value (``30 m²`` matches ``30,00 m2``).
 """
 
 from __future__ import annotations
@@ -170,6 +183,7 @@ def _alternation(names: Iterable[str]) -> str:
 
 _ANY_MONTH = _alternation(_MONTHS)
 _FULL_MONTH = _alternation(_FULL_MONTHS)
+_ENGLISH_MONTH = _alternation(_ENGLISH_MONTHS)
 _DAY = r"(?P<day>[0-3]?\d)(?:st|nd|rd|th|er)?\.?"
 _YEAR = r"(?P<year>(?:19|20)\d{2})"
 _DAY_MONTH_YEAR = re.compile(rf"(?<![\w.-]){_DAY} (?P<month>{_ANY_MONTH})\.?,? {_YEAR}(?!\d)")
@@ -184,6 +198,71 @@ _SLASHED_ISO = re.compile(
     r"(?<![\w./-])(?P<year>(?:19|20)\d{2})/(?P<month>\d{1,2})/(?P<day>\d{1,2})(?![\w/.-])"
 )
 _DAY_MONTH = re.compile(rf"(?<![\w.-]){_DAY} (?P<month>{_FULL_MONTH})(?![\w])")
+# "21-23 April 2026": a day range whose month and year follow the second day.
+_DAY_RANGE = re.compile(
+    r"(?<![\w./-])(?P<first>[0-3]?\d)-(?P<last>[0-3]?\d)"
+    rf"(?= (?:{_ANY_MONTH})\.?,? (?:19|20)\d{{2}}(?!\d))"
+)
+# A date without a year that starts a range whose last date is in ISO form by now takes the year
+# of the last date: "march 9", "30 march", "30/03" or a bare day ("21 to 2026-04-23"). A bare day
+# or "30/03" is no date after a label or a month name ("week 14 to 20 April 2026" keeps its
+# week) nor inside a time, a ratio or a decimal number ("08:15 to ...", "1,5 to ..."), and needs
+# a word to join the last date ("8 - 2026-03-13" and "1/2 - 2026-03-30" are not ranges).
+_RANGE_JOIN = r"to|until|till|through|thru|and|jusqu'? ?au|au|et|bis|und|-"
+_RANGE_START = re.compile(
+    r"(?<![\w./:,-])(?:"
+    rf"(?P<mname>{_ANY_MONTH})\.? (?P<mday>[0-3]?\d)(?:st|nd|rd|th)?"
+    rf"|(?P<day>[0-3]?\d) (?P<month>{_ENGLISH_MONTH})"
+    r"|(?P<first>[0-3]?\d)/(?P<second>[01]?\d)(?![\w./]|-\d)"
+    r"|(?P<bare>[0-3]?\d)(?:st|nd|rd|th|er)?(?P<dot>\.)?"
+    r")"
+    rf"(?= (?P<join>{_RANGE_JOIN}) (?:(?:the|le|den|dem) )?"
+    r"(?P<end>(?:19|20)\d{2}-[01]\d-[0-3]\d)(?!\w))"
+)
+# Words that number a thing instead of a day: "week 14", "semaine 14", "item 7/3", "lot 3",
+# "version 2", "indice B", "n° 14", "étape 3", "task 12", "T 14".
+_NUMBERING_LABELS = (
+    "week",
+    "weeks",
+    "wk",
+    "kw",
+    "semaine",
+    "semaines",
+    "sem",
+    "item",
+    "items",
+    "poste",
+    "postes",
+    "lot",
+    "lots",
+    "article",
+    "section",
+    "page",
+    "p",
+    "line",
+    "ligne",
+    "row",
+    "version",
+    "v",
+    "indice",
+    "no",
+    "nr",
+    "num",
+    "numero",
+    "step",
+    "steps",
+    "etape",
+    "etapes",
+    "phase",
+    "task",
+    "tasks",
+    "tache",
+    "taches",
+    "t",
+)
+_AFTER_LABEL = re.compile(
+    rf"(?:(?<![^\W\d_])(?:{_alternation(_NUMBERING_LABELS)}|{_ANY_MONTH})[.,:]?|n°|[#§])\s*$"
+)
 
 
 def _iso(year: int, month: int, day: int) -> str | None:
@@ -216,18 +295,59 @@ def _day_month(match: re.Match[str]) -> str:
     return f"{day} {_ENGLISH_MONTHS[_FULL_MONTHS[match['month']] - 1]}"
 
 
+def _day_range(match: re.Match[str]) -> str:
+    if int(match["first"]) > int(match["last"]):
+        return match[0]
+    return f"{match['first']} to {match['last']}"
+
+
+def _after_label(match: re.Match[str]) -> bool:
+    """Whether a label or a month name stands right before the match (see ``_AFTER_LABEL``)."""
+    return _AFTER_LABEL.search(match.string, max(0, match.start() - 24), match.start()) is not None
+
+
+def _range_start(match: re.Match[str]) -> str:
+    try:
+        end = date.fromisoformat(match["end"])
+    except ValueError:
+        return match[0]
+    if match["mname"]:
+        day, month = int(match["mday"]), _MONTHS[match["mname"]]
+    elif match["day"]:
+        day, month = int(match["day"]), _ENGLISH_MONTHS.index(match["month"]) + 1
+    elif _after_label(match):
+        return match[0]
+    elif match["first"]:
+        if match["join"] == "-":
+            return match[0]
+        first, second = int(match["first"]), int(match["second"])
+        day, month = (first, second) if second <= 12 else (second, first)
+    elif (
+        match["join"] == "-"
+        or int(match["bare"]) > end.day
+        or (match["dot"] and match["join"] not in ("bis", "und"))
+    ):
+        return match[0]  # not a range: a dash, a start after the end, the end of a sentence
+    else:
+        day, month = int(match["bare"]), end.month
+    year = end.year - 1 if (month, day) > (end.month, end.day) else end.year
+    return _iso(year, month, day) or match[0]
+
+
 def _dates(text: str) -> str:
+    text = _DAY_RANGE.sub(_day_range, text)
     text = _DAY_MONTH_YEAR.sub(_named_date, text)
     text = _MONTH_DAY_YEAR.sub(_named_date, text)
     text = _NUMERIC_DATE.sub(_numeric_date, text)
     text = _SLASHED_ISO.sub(_slashed_iso, text)
-    return _DAY_MONTH.sub(_day_month, text)
+    text = _DAY_MONTH.sub(_day_month, text)
+    return _RANGE_START.sub(_range_start, text)
 
 
 # --------------------------------------------------------------------------- step 3: numbers
 
 _THOUSANDS_COMMA = re.compile(r"(?<![\d.,])([1-9]\d{0,2})((?:,\d{3})+)(?!\d|,\d)")
-_THOUSANDS_SPACE = re.compile(r"(?<![\d.,])([1-9]\d{0,2})((?: \d{3})+)(?!\d|[.,]\d)")
+_THOUSANDS_SPACE = re.compile(r"(?<![\d.,])([1-9]\d{0,2})((?: \d{3})+)(?!\d)")
 _DECIMAL_COMMA = re.compile(r"(?<=\d),(?=\d)")
 
 
@@ -249,6 +369,8 @@ _UNIT_SPECS: tuple[tuple[str, str], ...] = (
     ("mm/s", r"mm ?/ ?s"),
     ("m/s", r"m ?/ ?s|met(?:re|er)s? per second"),
     ("km/h", r"km ?/ ?h"),
+    ("m2", r"m2|sq\.? ?m(?:et(?:re|er)s?)?|square ?met(?:re|er)s?|met(?:re|er)s? carres?"),
+    ("m3", r"m3|cubic ?met(?:re|er)s?|cu\.? ?m|met(?:re|er)s? cubes?"),
     ("mm", r"millimet(?:re|er)s?|mm"),
     ("cm", r"centimet(?:re|er)s?|cm"),
     ("km", r"kilomet(?:re|er)s?|km"),
@@ -285,9 +407,15 @@ _UNIT_RES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
     )
     for unit, pattern in _UNIT_SPECS
 )
+# A currency written before the amount ("€47271.60", "€ 47271.60", "eur 47271.60"), unless it
+# follows another amount: in "79.20 € 792.00 €" the first sign belongs to the first amount.
+_CURRENCY_BEFORE = re.compile(
+    r"(?<![\w.])(?<!\d )(?:€|eur) ?(?P<num>[-+]?\d+(?:\.\d+)?)(?![\w/]|\.\d)"
+)
 
 
 def _units(text: str) -> str:
+    text = _CURRENCY_BEFORE.sub(lambda match: f"{match['num']} eur", text)
     for pattern, unit in _UNIT_RES:
         text = pattern.sub(lambda match, unit=unit: f"{match['num']} {unit}", text)
     return text
@@ -361,8 +489,8 @@ def _decimal(text: str) -> Decimal | None:
 def extract_values(text_norm: str) -> Values:
     """Quantities (standalone numbers with an optional unit) and ISO dates of a normalised text.
 
-    Numbers inside codes (``WO-26-0412``, ``A2101``, ``FGT-3200-18-07752``) are not
-    quantities; a range ``40-60 °c`` gives two quantities with the unit.
+    Numbers inside codes (``BC-2026-012``, ``T07``, ``ZM-20450``) are not quantities; a range
+    ``40-60 °c`` gives two quantities with the unit.
     """
     tokens = _tokens(text_norm)
     quantities: list[Quantity] = []
@@ -422,7 +550,7 @@ def _left_ok(term: str, text: str, start: int) -> bool:
         return True
     if previous.isalnum():
         return False
-    # "12" must not match "WTG-12", "0.12", "1,12" or "1/12"; a minus sign changes the value.
+    # "12" must not match "DEV-2026-12", "0.12", "1,12" or "1/12"; a minus sign changes the value.
     return not (first.isdigit() and previous in "-.,/")
 
 
@@ -460,16 +588,17 @@ _CODE_SEPARATOR = r"[\s\-_./]?"
 
 
 def _is_code(term: str) -> bool:
-    """Identifiers (``fgt p-22328``, ``wtg-07``, ``pwg 220``), not quantities (``6.0 m/s``)."""
+    """Identifiers (``zm-20450``, ``bc-2026-012``, ``dev 2026-014``), not quantities
+    (``30 m2``, ``6.0 m/s``)."""
     tokens = _tokens(term)
-    if any(_has_letter_and_digit(token) for token in tokens):
+    if any(_has_letter_and_digit(token) for token in tokens if token not in UNITS):
         return True
     has_word = any(token.isalpha() and token not in UNITS for token in tokens)
     return has_word and any(token.isdigit() for token in tokens)
 
 
 def _find_code(term: str, text: str) -> bool:
-    """Codes match with any single separator between their parts (``FGT P 22328``)."""
+    """Codes match with any single separator between their parts (``ZM 20450``)."""
     parts = _CODE_PARTS.findall(term)
     if len(parts) < 2:
         return False

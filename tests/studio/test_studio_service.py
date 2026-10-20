@@ -4,7 +4,16 @@ from dataclasses import replace
 from datetime import date
 
 import pytest
-from studio_testkit import DONE_PATH, NEW_PATH, RELEASE_ID, WIKI_URL
+from studio_testkit import (
+    BROKEN_PATH,
+    DONE_PATH,
+    GONE_PATH,
+    NEW_PATH,
+    ODD_PATH,
+    PENDING_PATH,
+    RELEASE_ID,
+    WIKI_URL,
+)
 
 from docwiki.contracts.ids import source_id_for
 from docwiki.contracts.storage import FolderStorage
@@ -29,10 +38,10 @@ def test_documents_merge_raw_files_with_pipeline_state(
     by_path = {row["path"]: row for row in data["documents"]}
     assert {path: row["status"] for path, row in by_path.items()} == {
         NEW_PATH: "new",
-        "procedures/broken-scan.pdf": "failed",
-        "records/odd-export.csv": "quarantined",
-        "records/new-plan.xlsx": "pending",
-        "old/manual.txt": "deleted",
+        BROKEN_PATH: "failed",
+        ODD_PATH: "quarantined",
+        PENDING_PATH: "pending",
+        GONE_PATH: "deleted",
         DONE_PATH: "done",
     }
     assert data["counts"] == {
@@ -53,26 +62,26 @@ def test_documents_merge_raw_files_with_pipeline_state(
     ]
     done = by_path[DONE_PATH]
     assert done["in_release"] is True
-    assert done["wiki_url"] == f"{WIKI_URL}/sources/sop-gbx-010-rev-b"
+    assert done["wiki_url"] == f"{WIKI_URL}/sources/2026-03-24-compte-rendu-de-chantier-n3"
     assert by_path[NEW_PATH]["source_id"] == source_id_for(NEW_PATH)
-    assert by_path["procedures/broken-scan.pdf"]["stage"] == "extract"
-    assert "no text layer" in by_path["procedures/broken-scan.pdf"]["last_error"]
+    assert by_path[BROKEN_PATH]["stage"] == "extract"
+    assert "no text layer" in by_path[BROKEN_PATH]["last_error"]
 
 
 def test_upload_writes_raw_and_shows_the_file_as_new(
     storage: FolderStorage, config: StudioConfig
 ) -> None:
     service = _service(storage, config)
-    result = service.upload("uploads/Field report (1).pdf", b"%PDF-1.7 report")
+    result = service.upload("uploads/Compte rendu (1).pdf", b"%PDF-1.7 report")
     assert result == {
-        "path": "uploads/Field report (1).pdf",
+        "path": "uploads/Compte rendu (1).pdf",
         "size": 15,
         "replaced": False,
-        "source_id": source_id_for("uploads/Field report (1).pdf"),
+        "source_id": source_id_for("uploads/Compte rendu (1).pdf"),
     }
-    assert storage.read_bytes("raw/uploads/Field report (1).pdf") == b"%PDF-1.7 report"
+    assert storage.read_bytes("raw/uploads/Compte rendu (1).pdf") == b"%PDF-1.7 report"
     rows = {row["path"]: row for row in service.documents()["documents"]}
-    new = rows["uploads/Field report (1).pdf"]
+    new = rows["uploads/Compte rendu (1).pdf"]
     assert new["status"] == "new"
     assert new["size"] == 15 and new["modified"] is not None
     assert service.uploads_left() == config.daily_uploads - 1

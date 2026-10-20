@@ -30,13 +30,13 @@ from docwiki.contracts.ids import (
 
 
 def test_source_id_matches_spec_formula() -> None:
-    path = "oem/Gearbox Manual.pdf"
+    path = "devis/Devis Extension.pdf"
     expected = "src-" + hashlib.sha256(path.lower().encode("utf-8")).hexdigest()[:12]
     assert source_id_for(path) == expected
 
 
 def test_source_id_is_case_and_normalisation_insensitive() -> None:
-    nfc = "procédures/SOP rev B.docx"
+    nfc = "réunions/Compte rendu n3.docx"
     nfd = unicodedata.normalize("NFD", nfc)
     assert nfc != nfd
     assert source_id_for(nfc) == source_id_for(nfd) == source_id_for(nfc.upper())
@@ -55,11 +55,11 @@ def test_source_id_rejects_non_posix_relative_paths(bad: str) -> None:
 @pytest.mark.parametrize(
     ("text", "slug"),
     [
-        ("Gearbox Manual", "gearbox-manual"),
-        ("Procédure de vidange — Rév. B", "procedure-de-vidange-rev-b"),
-        ("  SOP_GBX__010 (final)  ", "sop-gbx-010-final"),
+        ("Devis Extension", "devis-extension"),
+        ("Réception des travaux — Indice B", "reception-des-travaux-indice-b"),
+        ("  DEV_2026__014 (final)  ", "dev-2026-014-final"),
         ("Straße Œuvre Ærø", "strasse-oeuvre-aero"),
-        ("Getriebeöl-Wechsel", "getriebeol-wechsel"),
+        ("Façade-Élévation", "facade-elevation"),
         ("---", ""),
         ("日本語", ""),
         ("Ａｂｃ　１２３", "abc-123"),
@@ -116,37 +116,50 @@ def test_assign_source_slugs_handles_suffix_clash_long_names_and_empty_stems() -
 
 
 def test_assign_unique_slugs_for_sheets() -> None:
-    assert assign_unique_slugs(["Plan", "plan", "Plan!", "計画"], fallback="sheet") == [
-        "plan",
-        "plan-2",
-        "plan-3",
+    assert assign_unique_slugs(["Planning", "planning", "Planning!", "計画"], fallback="sheet") == [
+        "planning",
+        "planning-2",
+        "planning-3",
         "sheet",
     ]
 
 
 def test_entity_topic_and_query_ids() -> None:
-    assert format_entity_id("asset", "wtg-07") == "asset:wtg-07"
-    assert parse_entity_id("procedure:sop-gbx-010") == ("procedure", "sop-gbx-010")
-    for bad in ("asset", "asset:WTG-07", "topic:x", "asset:", "Asset:x", "asset:a--b"):
+    assert format_entity_id("building-element", "baie-f1") == "building-element:baie-f1"
+    assert parse_entity_id("commercial-document:dev-2026-014") == (
+        "commercial-document",
+        "dev-2026-014",
+    )
+    bad_ids = (
+        "building-element",
+        "building-element:BAIE-F1",
+        "topic:x",
+        "building-element:",
+        "Building-element:x",
+        "building-element:a--b",
+    )
+    for bad in bad_ids:
         with pytest.raises(ValueError):
             parse_entity_id(bad)
-    assert format_topic_id("gearbox-oil") == "topic:gearbox-oil"
-    assert parse_topic_id("topic:gearbox-oil") == "gearbox-oil"
+    assert format_topic_id("site-progress") == "topic:site-progress"
+    assert parse_topic_id("topic:site-progress") == "site-progress"
     with pytest.raises(ValueError):
-        parse_topic_id("topics:gearbox-oil")
-    query_id = format_query_id(date(2026, 3, 4), "oil-grade")
-    assert query_id == "query:2026-03-04-oil-grade"
-    assert parse_query_id(query_id) == (date(2026, 3, 4), "oil-grade")
+        parse_topic_id("topics:site-progress")
+    query_id = format_query_id(date(2026, 3, 31), "window-delivery-date")
+    assert query_id == "query:2026-03-31-window-delivery-date"
+    assert parse_query_id(query_id) == (date(2026, 3, 31), "window-delivery-date")
     with pytest.raises(ValueError):
         parse_query_id("query:2026-3-4-x")
 
 
 def test_page_paths() -> None:
-    assert entity_page_path("asset:wtg-07") == "entities/asset/wtg-07.md"
-    assert topic_page_path("topic:gearbox-oil") == "topics/gearbox-oil.md"
-    assert query_page_path("query:2026-03-04-oil-grade") == "queries/2026-03-04-oil-grade.md"
+    assert entity_page_path("building-element:baie-f1") == "entities/building-element/baie-f1.md"
+    assert topic_page_path("topic:site-progress") == "topics/site-progress.md"
+    assert query_page_path("query:2026-03-31-window-delivery-date") == (
+        "queries/2026-03-31-window-delivery-date.md"
+    )
     assert index_page_path("home") == "index.md"
-    assert index_page_path("entities/asset") == "entities/asset/index.md"
+    assert index_page_path("entities/building-element") == "entities/building-element/index.md"
     with pytest.raises(ValueError):
         index_page_path("glossary")
 
@@ -157,8 +170,8 @@ def test_page_paths() -> None:
         "index.md",
         "AGENTS.md",
         "llms.txt",
-        "sources/gearbox-manual.md",
-        "entities/asset/wtg-07.md",
+        "sources/devis-extension.md",
+        "entities/building-element/baie-f1.md",
         "_meta/quality.md",
         "_meta/runs/run-20260101-120000-0a1b2c3d.md",
         ".agents/skills/wiki-navigator/SKILL.md",
@@ -190,7 +203,7 @@ def test_check_wiki_path_rejects_bad_paths(path: str) -> None:
 
 
 def test_normalize_tags() -> None:
-    assert normalize_tags(["Oil", "gearbox", "oil ", ""]) == ["gearbox", "oil"]
+    assert normalize_tags(["Planning", "windows", "planning ", ""]) == ["planning", "windows"]
 
 
 def test_cache_key_is_deterministic_and_sensitive_to_every_element() -> None:
@@ -233,7 +246,7 @@ def test_release_and_run_ids() -> None:
 
 
 def test_proposal_id_is_deterministic() -> None:
-    first = proposal_id_for("entity", {"type": "asset", "key": "wtg-08"})
-    assert first == proposal_id_for("entity", {"key": "wtg-08", "type": "asset"})
-    assert first != proposal_id_for("glossary", {"type": "asset", "key": "wtg-08"})
+    first = proposal_id_for("entity", {"type": "building-element", "key": "fenetre-f2"})
+    assert first == proposal_id_for("entity", {"key": "fenetre-f2", "type": "building-element"})
+    assert first != proposal_id_for("glossary", {"type": "building-element", "key": "fenetre-f2"})
     assert first.startswith("prop-") and len(first) == 17

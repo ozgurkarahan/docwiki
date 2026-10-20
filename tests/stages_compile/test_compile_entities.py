@@ -8,8 +8,8 @@ from collections.abc import Callable
 import pytest
 from compile_testkit import (
     PLAN,
-    SOP_A,
-    SOP_B,
+    QUOTE_A,
+    QUOTE_B,
     STAMP,
     Corpus,
     build_corpus,
@@ -33,21 +33,21 @@ from docwiki.stages.entities import MAX_OUTPUT_TOKENS, build_entity_pages, fact_
 
 @pytest.fixture
 async def corpus(pack: DomainPack) -> Corpus:
-    return await build_corpus(pack, include_contract=False)
+    return await build_corpus(pack, include_study=False)
 
 
 def summary_handler(request: LlmRequest) -> dict:
     text = request.text
-    if "- id: asset:wtg-07" not in text:
+    if "- id: building-element:baie-f1" not in text:
         return {"sentences": []}
-    first = fact_id(text, "first turbine to switch")
-    interval = fact_id(text, "interval of WTG-07")
+    first = fact_id(text, "is installed first")
+    wide = fact_id(text, "is widened to")
     return {
         "sentences": [
-            {"text": "WTG-07 is the first turbine to switch to ISO VG 220.", "fact_ids": [first]},
-            {"text": "Its oil change interval is 99 months.", "fact_ids": [interval]},
-            {"text": "It is the best turbine.", "fact_ids": ["F99"]},
-            {"text": "Its oil change interval is 12 months.", "fact_ids": [interval.lower()]},
+            {"text": "The bay window F1 is installed first.", "fact_ids": [first]},
+            {"text": "Its width is 99,00 m.", "fact_ids": [wide]},
+            {"text": "It is the best window.", "fact_ids": ["F99"]},
+            {"text": "Its width is 3,00 m.", "fact_ids": [wide.lower()]},
         ]
     }
 
@@ -63,14 +63,17 @@ async def build(corpus: Corpus, pack: DomainPack) -> tuple[dict[str, Page], list
 async def test_pages_for_mentioned_registry_entities(corpus: Corpus, pack: DomainPack) -> None:
     pages, cited, llm = await build(corpus, pack)
     assert sorted(pages) == [
-        "asset:wtg-07",
-        "asset:wtg-12",
-        "organisation:litware",
-        "procedure:sop-gbx-010",
+        "building-element:baie-f1",
+        "building-element:fenetre-f2",
+        "commercial-document:dev-2026-014",
+        "organisation:vanarsdel-menuiseries",
     ]
-    assert "organisation:trey-research" not in pages
+    assert "organisation:zava-materiaux" not in pages
     called = sorted(str(r.metadata["entity_id"]) for r in llm.requests)
-    assert called == ["asset:wtg-07", "asset:wtg-12"], "no summary call without facts"
+    assert called == [
+        "building-element:baie-f1",
+        "building-element:fenetre-f2",
+    ], "no summary call without facts"
     assert all(r.tier == "fast" and r.prompt_version == "entity-summary-v1" for r in llm.requests)
     for page in pages.values():
         assert find_violations(page.body) == []
@@ -78,68 +81,66 @@ async def test_pages_for_mentioned_registry_entities(corpus: Corpus, pack: Domai
     assert cited
 
 
-async def test_wtg07_page(corpus: Corpus, pack: DomainPack) -> None:
+async def test_bay_window_page(corpus: Corpus, pack: DomainPack) -> None:
     pages, _, _ = await build(corpus, pack)
-    page = pages["asset:wtg-07"]
+    page = pages["building-element:baie-f1"]
     fm = page.frontmatter
     assert isinstance(fm, EntityFrontmatter)
-    assert page.path == "entities/asset/wtg-07.md"
+    assert page.path == "entities/building-element/baie-f1.md"
     assert (fm.entity_type, fm.key, fm.title, fm.sensitivity) == (
-        "asset",
-        "wtg-07",
-        "WTG-07",
+        "building-element",
+        "baie-f1",
+        "Baie coulissante F1",
         "internal",
     )
-    assert fm.sources == sorted([SOP_B, SOP_A, PLAN])
-    assert [(a.text, a.lang) for a in fm.aliases] == [("turbine 7", "en"), ("éolienne 7", "fr")]
-    assert fm.summary == (
-        "WTG-07 is the first turbine to switch to ISO VG 220. Its oil change interval is 12 months."
-    )
+    assert fm.sources == sorted([QUOTE_B, QUOTE_A, PLAN])
+    assert [(a.text, a.lang) for a in fm.aliases] == [("bay window F1", "en"), ("baie F1", "fr")]
+    assert fm.summary == "The bay window F1 is installed first. Its width is 3,00 m."
     headings = [h.text for h in extract_headings(page.body)]
-    assert headings == ["WTG-07", "Facts", "Timeline", "Documents", "Sources"]
+    assert headings == ["Baie coulissante F1", "Facts", "Timeline", "Documents", "Sources"]
     body = page.body
     intro = body.split("\n\n")[2]
-    assert intro.startswith("WTG-07 is the first turbine to switch to ISO VG 220.[^c1]")
-    assert "99 months" not in body and "best turbine" not in body
+    assert intro.startswith("The bay window F1 is installed first.[^c1]")
+    assert "99,00 m" not in body and "best window" not in body
     facts = body.split("## Facts\n\n", 1)[1].split("\n\n", 1)[0].splitlines()
     assert facts == [
-        "- WTG-07 is the first turbine to switch to ISO VG 220.[^c1]",
-        "- The oil change interval of WTG-07 is 12 months.[^c2]",
-        "- WTG-07 has a gearbox oil change planned for 2026-03 with ISO VG 320 oil (6 hours).[^c3]",
-        "- Superseded: Revision A specifies ISO VG 320 gearbox oil for all turbines, including "
-        "WTG-07.[^c4]",
+        "- The bay window F1 is installed first.[^c1]",
+        "- The bay window F1 is widened to 3,00 m.[^c1]",
+        "- The bay window F1 costs 4140,00 € HT.[^c2]",
+        "- The bay window F1 is ordered at 2,40 m for delivery on 2026-03-30.[^c3]",
+        "- Superseded: Indice A specifies a width of 2,40 m for all bays, including the bay "
+        "window F1.[^c4]",
     ]
     timeline = body.split("## Timeline\n\n", 1)[1].split("\n\n", 1)[0].splitlines()
     assert timeline == [
-        "- 2026-03: WTG-07 has a gearbox oil change planned for 2026-03 with ISO VG 320 oil "
-        "(6 hours).[^c3]"
+        "- 2026-03-30: The bay window F1 is ordered at 2,40 m for delivery on 2026-03-30.[^c3]"
     ]
     documents = body.split("## Documents\n\n", 1)[1].split("\n\n", 1)[0].splitlines()
     assert documents == [
-        "- [Gearbox oil change SOP rev B](../../sources/sop-gbx-010-rev-b.md)",
-        "- [Maintenance plan 2026](../../sources/maintenance-plan-2026.md)",
-        "- [Gearbox oil change SOP rev A](../../sources/sop-gbx-010-rev-a.md) (superseded)",
+        "- [Quote DEV-2026-014 indice B](../../sources/dev-2026-014-indice-b.md)",
+        "- [Schedule and purchase tracking](../../sources/planning-et-suivi-des-achats.md)",
+        "- [Quote DEV-2026-014 indice A](../../sources/dev-2026-014-indice-a.md) (superseded)",
     ]
     _, defs = extract_footnotes(body)
     targets = [CITATION_RE.match(d.content).group("href") for d in defs]  # type: ignore[union-attr]
     assert all(target.startswith("../../evidence/src-") for target in targets)
     titles = {CITATION_RE.match(d.content).group("title") for d in defs}  # type: ignore[union-attr]
     assert titles == {
-        "Gearbox oil change SOP rev B",
-        "Maintenance plan 2026",
-        "Gearbox oil change SOP rev A",
+        "Quote DEV-2026-014 indice B",
+        "Schedule and purchase tracking",
+        "Quote DEV-2026-014 indice A",
     }
     assert defs[2].content.endswith(" · table")
 
 
 async def test_entity_without_facts(corpus: Corpus, pack: DomainPack) -> None:
     pages, _, _ = await build(corpus, pack)
-    page = pages["organisation:litware"]
+    page = pages["organisation:vanarsdel-menuiseries"]
     assert "No verified facts name this entity yet." in page.body
     assert "No dated facts." in page.body
     assert page.frontmatter.summary == (
-        "Litware is an entity of type organisation in the domain registry, mentioned in 1 "
-        "source document."
+        "VanArsdel Menuiseries is an entity of type organisation in the domain registry, "
+        "mentioned in 1 source document."
     )
     assert "No evidence is cited on this page." in page.body
 
@@ -147,10 +148,10 @@ async def test_entity_without_facts(corpus: Corpus, pack: DomainPack) -> None:
 async def test_results_without_source_pages_are_ignored(corpus: Corpus, pack: DomainPack) -> None:
     llm = FakeLlmClient({"entity_summary": {"sentences": []}})
     pages, _ = await build_entity_pages(
-        list(corpus.results.values()), {SOP_B: corpus.pages[SOP_B]}, pack, llm, stamp=STAMP
+        list(corpus.results.values()), {QUOTE_B: corpus.pages[QUOTE_B]}, pack, llm, stamp=STAMP
     )
-    wtg07 = next(page for page in pages if page.frontmatter.id == "asset:wtg-07")
-    assert wtg07.frontmatter.sources == [SOP_B]  # type: ignore[union-attr]
+    bay_window = next(page for page in pages if page.frontmatter.id == "building-element:baie-f1")
+    assert bay_window.frontmatter.sources == [QUOTE_B]  # type: ignore[union-attr]
 
 
 def _truncated(request: LlmRequest) -> dict:
@@ -181,7 +182,7 @@ async def test_failed_summary_keeps_the_deterministic_introduction(
     error: str,
 ) -> None:
     def handler(request: LlmRequest) -> dict:
-        if "- id: asset:wtg-07" in request.text:
+        if "- id: building-element:baie-f1" in request.text:
             return failure(request)
         return summary_handler(request)
 
@@ -192,25 +193,26 @@ async def test_failed_summary_keeps_the_deterministic_introduction(
         )
     by_id = {page.frontmatter.id: page for page in pages}
     assert sorted(by_id) == [
-        "asset:wtg-07",
-        "asset:wtg-12",
-        "organisation:litware",
-        "procedure:sop-gbx-010",
+        "building-element:baie-f1",
+        "building-element:fenetre-f2",
+        "commercial-document:dev-2026-014",
+        "organisation:vanarsdel-menuiseries",
     ]
-    page = by_id["asset:wtg-07"]
+    page = by_id["building-element:baie-f1"]
     intro = (
-        "WTG-07 is an entity of type asset in the domain registry, mentioned in 3 source documents."
+        "Baie coulissante F1 is an entity of type building element in the domain registry, "
+        "mentioned in 3 source documents."
     )
     assert page.frontmatter.summary == intro
     assert page.body.split("\n\n")[2] == intro
     facts = page.body.split("## Facts\n\n", 1)[1].split("\n\n", 1)[0].splitlines()
-    assert len(facts) == 4 and all("[^c" in line for line in facts)
+    assert len(facts) == 5 and all("[^c" in line for line in facts)
     assert find_violations(page.body) == []
     assert cited
     warnings = [r.getMessage() for r in caplog.records if r.name == "docwiki.stages.entities"]
     assert warnings == [
-        f"entity asset:wtg-07: summary call failed ({error}); the page keeps the deterministic "
-        "introduction"
+        f"entity building-element:baie-f1: summary call failed ({error}); the page keeps the "
+        "deterministic introduction"
     ]
 
 
@@ -238,14 +240,14 @@ async def test_summary_budget_leaves_room_for_reasoning(corpus: Corpus, pack: Do
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
-        ("Planned for 2026-03 with 6 hours.", "2026-03"),
-        ("Done on 2026-02-01, then 2026-03.", "2026-02-01"),
-        ("Inspected on 12 March 2026.", "2026-03-12"),
+        ("Delivery planned for 2026-03 with 6 weeks of lead time.", "2026-03"),
+        ("Ordered on 2026-02-01, then 2026-03.", "2026-02-01"),
+        ("Delivered on 12 March 2026.", "2026-03-12"),
         ("Due March 5, 2026 at the latest.", "2026-03-05"),
         ("Planned for Sept 2026.", "2026-09"),
         ("Valid since 2026 only.", None),
         ("Invalid 2026-13 month.", None),
-        ("SOP-GBX-010 revision B.", None),
+        ("DEV-2026-014 indice B.", None),
     ],
 )
 def test_fact_dates(text: str, expected: str | None) -> None:

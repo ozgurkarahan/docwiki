@@ -38,20 +38,22 @@ async def _settle(jobs: AgentJobs, job_id: str, *statuses: str) -> dict[str, Any
 async def test_researcher_answer_with_linked_sources() -> None:
     client = FakeAgentClient()
     jobs = _jobs(client)
-    job = jobs.start("Researcher", "  Which SOP revision is current?  ", "owner")
+    job = jobs.start("Researcher", "  When are the windows delivered?  ", "owner")
     view = await _settle(jobs, job.id, "done")
     assert view["agent"] == "researcher"
-    assert view["question"] == "Which SOP revision is current?"
+    assert view["question"] == "When are the windows delivered?"
     answer = view["answer"]
-    assert answer["body"].startswith("Revision B") and "Sources:" not in answer["body"]
+    assert answer["body"].startswith("The windows") and "Sources:" not in answer["body"]
     assert [(source["n"], source["url"]) for source in answer["sources"]] == [
-        (1, f"{WIKI_URL}/evidence/src-4d9c65e05302/para-0004"),
-        (2, f"{WIKI_URL}/evidence/src-f2750f41f3fa/p0001"),
+        (1, f"{WIKI_URL}/evidence/src-165f1d3a109c/para-0011"),
+        (2, f"{WIKI_URL}/evidence/src-c6436ec50050/p0001"),
     ]
     assert [call["name"] for call in answer["tool_calls"]] == ["search", "get_evidence"]
     assert answer["usage"]["total_tokens"] == 5610
     assert (answer["agent"], answer["version"]) == ("docwiki-researcher", "3")
-    assert client.calls == [("researcher", "Which SOP revision is current?")]
+    assert client.calls == [("researcher", "When are the windows delivered?")]
+    finished = jobs.get(job.id).finished_at
+    assert finished is not None and finished >= job.created_at, "the answer's date"
 
 
 async def test_librarian_waits_for_approval_then_runs_the_tool() -> None:
@@ -110,7 +112,7 @@ async def test_one_question_at_a_time_and_a_daily_cap() -> None:
 
 @pytest.mark.parametrize(
     ("agent", "question"),
-    [("writer", "Which oil?"), ("researcher", "   "), ("researcher", "x" * 2001)],
+    [("writer", "Which window?"), ("researcher", "   "), ("researcher", "x" * 2001)],
 )
 async def test_invalid_questions(agent: str, question: str) -> None:
     with pytest.raises(QuestionError):

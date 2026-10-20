@@ -27,7 +27,7 @@ async def test_retention_failure_after_the_swap_is_a_warning(make_harness, corpu
             raise StorageError("connection reset while deleting")
 
     remote.on_delete = transient_failure
-    (corpus / "notes" / "extra.txt").write_text("Gearbox oil note for WTG-12.\n", encoding="utf-8")
+    (corpus / "notes" / "extra.txt").write_text("Note about window F2.\n", encoding="utf-8")
     second = await harness.run()
     assert second.status == "succeeded", second.errors
     assert second.published

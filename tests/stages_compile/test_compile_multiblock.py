@@ -6,13 +6,13 @@ from pathlib import Path
 
 from compile_testkit import (
     FIXED_NOW,
+    amendment_doc,
     compile_handler,
     compiled,
     fact,
     make_state,
     no_repair,
     section,
-    yaw_doc,
 )
 
 from docwiki.contracts.markdown import extract_footnotes, markdown_to_text
@@ -26,37 +26,37 @@ from docwiki.stages.classify import classify_source
 from docwiki.stages.compile import compile_source
 from docwiki.stages.render import render_source_page
 
-TITLE = "Yaw bolt procedure"
+TITLE = "Amendment n°1"
 
 
-def yaw_output() -> dict:
+def amendment_output() -> dict:
     return compiled(
         TITLE,
-        "Fictional procedure for the yaw bolts.",
+        "Fictional amendment for the roof window.",
         [
             fact(
-                "The yaw bolts are tightened to 450 Nm.",
+                "The amendment amounts to 2328,00 € TTC.",
                 "b0001,b0002",
-                "Tighten the yaw bolts to 450 Nm",
-                ["450 Nm"],
+                "Le montant de l'avenant n°1 est de 2328,00 € TTC",
+                ["2328,00 €"],
             ),
             fact(
-                "The main bearing is checked before the yaw bolts are tightened.",
+                "The roof opening is checked before the amendment amount is stated.",
                 "b0001,b0002",
-                "check the main bearing. Tighten the yaw bolts",
+                "contrôler l'ouverture de la toiture. Le montant de l'avenant",
             ),
         ],
-        [section("Start-up", "Check the main bearing, then tighten the yaw bolts.[[cite:b1,b2]]")],
+        [section("Start of works", "Check the roof opening, then read the amount.[[cite:b1,b2]]")],
     )
 
 
 async def test_multi_block_quotes_point_to_evidence_holding_them(
     tmp_path: Path, pack: DomainPack
 ) -> None:
-    doc = yaw_doc()
+    doc = amendment_doc()
     sid = doc.source_id
     llm = FakeLlmClient(
-        {"compile": compile_handler({sid: yaw_output}), "compile_repair": no_repair}
+        {"compile": compile_handler({sid: amendment_output}), "compile_repair": no_repair}
     )
     classification = await classify_source(doc, pack, llm)
     result = await compile_source(doc, classification, pack, llm)
@@ -81,14 +81,14 @@ async def test_multi_block_quotes_point_to_evidence_holding_them(
         doc,
         classification,
         make_state(doc),
-        slug="sop-yaw-002",
+        slug="avenant-n1",
         stamp=writer.stamp,
         pack=pack,
     )
     facts = page.body.split("## Key facts\n\n", 1)[1].split("\n\n", 1)[0].splitlines()
     assert facts == [
-        "- The yaw bolts are tightened to 450 Nm.[^c1]",
-        "- The main bearing is checked before the yaw bolts are tightened.[^c2]",
+        "- The amendment amounts to 2328,00 € TTC.[^c1]",
+        "- The roof opening is checked before the amendment amount is stated.[^c2]",
     ]
     _, definitions = extract_footnotes(page.body)
     assert [d.content for d in definitions] == [
@@ -97,7 +97,7 @@ async def test_multi_block_quotes_point_to_evidence_holding_them(
         f"[{TITLE} — ¶ 1](../evidence/{sid}/para-0001.md) · paraphrase",
     ]
 
-    raw = tmp_path / "SOP-YAW-002 yaw bolts.docx"
+    raw = tmp_path / "avenant-n1.docx"
     raw.write_bytes(b"placeholder: the evidence of a paragraph never reads the original")
     writer.write_page(page)
     written = build_evidence(
@@ -122,10 +122,11 @@ async def test_multi_block_quotes_point_to_evidence_holding_them(
         return markdown_to_text(EvidencePage.parse(text, rel).body)
 
     second = sidecar("para-0002")
-    assert "Tighten the yaw bolts to 450 Nm." in second and "main bearing" not in second
+    assert "Le montant de l'avenant n°1 est de 2328,00 € TTC." in second
+    assert "toiture" not in second
     first = sidecar("para-0001")
-    assert "¶ 1" in first and "Before start-up, check the main bearing." in first
-    assert "¶ 2" in first and "Tighten the yaw bolts to 450 Nm." in first
+    assert "¶ 1" in first and "Avant la pose, contrôler l'ouverture de la toiture." in first
+    assert "¶ 2" in first and "Le montant de l'avenant n°1 est de 2328,00 € TTC." in first
 
     violations = validate_release(writer.root, require_manifest=False, audience="internal")
     relevant = [

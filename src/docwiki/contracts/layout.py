@@ -102,6 +102,10 @@ class StorageKeys:
     RUNS_DIR = "work/runs"
     PROPOSALS_DIR = "work/proposals"
     REPORTS_DIR = "work/reports"
+    INBOX_QUERIES = "work/inbox/queries"
+    """Reviewed research answers waiting for the next run (ADR 0007), one query page each."""
+    INBOX_REJECTED = "work/inbox/rejected"
+    """Inbox items a run could not merge, kept with the reason for the owner."""
 
 
 def source_state_key(source_id: str) -> str:

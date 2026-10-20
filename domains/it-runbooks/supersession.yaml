@@ -1,5 +1,0 @@
-# Supersession rules of the it-runbooks pack.
-doc_number_regex: '^(RB-[A-Z]{3}-\d{3}|PRC-[A-Z]{2}-\d{3}|PM-\d{4}-\d{3})(?![0-9])'
-revision_regex: '\b[Vv](\d+)\b'
-revision_order: numeric
-explicit_reference_regex: '(?i)\b(?:supersedes|replaces)\s+((?:RB|PRC)-[A-Z]{2,3}-\d{3})'

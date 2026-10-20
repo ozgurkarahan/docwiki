@@ -26,6 +26,8 @@ from .config import (
     load_ignore,
     load_site_vendor,
     load_termset,
+    merge_termsets,
+    parse_termset,
 )
 from .extract import (
     CELL_EXTS,
@@ -49,6 +51,10 @@ from .rules import (
 
 MAX_FILE_BYTES = 256 * 1024 * 1024
 HISTORY_PATH = "git-history"
+# Repository paths of the word lists (the fiction allowlist is added from the scanner settings):
+# every version of them found in the scanned history also counts when history is judged.
+_COMMON_WORDS_REPO_PATH = "tools/leakguard/common_words.txt"
+_TECH_ALLOWLIST_REPO_PATH = "tools/leakguard/tech_allowlist.txt"
 # File types whose added lines in history are checked by the closed-world rule.
 _HISTORY_PROSE_EXTS = MARKDOWN_EXTS | CELL_EXTS | {
     ".txt", ".json", ".jsonl", ".yaml", ".yml", ".eml", ".vtt", ".srt", ""
@@ -141,6 +147,7 @@ class Scanner:
         self.stats: Counter[str] = Counter()
         self._seen: set[tuple[str, str, str, str, str, str]] = set()
         self._closed_world: list[tuple[str, str, Chunk, Severity, str | None]] = []
+        self._history_vocabulary: Vocabulary | None = None
 
     # ---------------------------------------------------------------------------------------
     # configuration helpers
@@ -164,6 +171,53 @@ class Scanner:
             return path.resolve().relative_to(self.root).as_posix()
         except ValueError:
             return None
+
+    def _vocabulary_for(self, source: str) -> Vocabulary:
+        """The vocabulary a closed-world candidate is judged against.
+
+        The working tree and the site folders use the current word lists. History is judged
+        against the current lists and against every version of the word lists found in the
+        scanned commits (built once, only when history is scanned): a name that was valid in the
+        sample world of its time is not reported again after the world has been replaced.
+        """
+        if source != "history":
+            return self.vocabulary
+        if self._history_vocabulary is None:
+            self._history_vocabulary = self._build_history_vocabulary()
+        return self._history_vocabulary
+
+    def _build_history_vocabulary(self) -> Vocabulary:
+        current = {
+            "allow": self.vocabulary.allow,
+            "tech": self.vocabulary.tech,
+            "common": self.vocabulary.common,
+        }
+        role_of = {DEFAULT_ALLOWLIST.as_posix(): "allow"}
+        if self.allowlist_rel is not None:
+            role_of[self.allowlist_rel] = "allow"
+        role_of[_COMMON_WORDS_REPO_PATH] = "common"
+        role_of[_TECH_ALLOWLIST_REPO_PATH] = "tech"
+        commits = gitsource.reachable_commits(self.root, self.options.commits)
+        versions = gitsource.file_versions(self.root, commits, list(role_of))
+        sets = {role: [terms] for role, terms in current.items()}
+        for path, contents in versions.items():
+            role = role_of[path]
+            for number, data in enumerate(contents, start=1):
+                origin = f"{path} (version {number} in history)"
+                text = data.decode("utf-8", errors="replace")
+                try:
+                    terms = parse_termset(text, current[role].name, origin)
+                except ConfigError as exc:
+                    self.notices.append(Notice(path, "config", f"word list version skipped: {exc}"))
+                    continue
+                sets[role].append(terms)
+                self.stats["history_word_list_versions"] += 1
+        return Vocabulary(
+            merge_termsets(current["allow"].name, sets["allow"]),
+            merge_termsets(current["tech"].name, sets["tech"]),
+            merge_termsets(current["common"].name, sets["common"]),
+            learned=self.vocabulary.learned,
+        )
 
     # ---------------------------------------------------------------------------------------
     # entry point
@@ -317,7 +371,9 @@ class Scanner:
         self._text_rules(path, identifier_chunks, source, commit, vendor=vendor,
                          lockfile=is_lock_or_registry_file(path))
         for issue in metadata_issues(
-            extraction.metadata, in_samples=in_samples, known_word=self.vocabulary.knows
+            extraction.metadata,
+            in_samples=in_samples,
+            known_word=self._vocabulary_for(source).knows,
         ):
             self._add(Finding(rule=issue.rule, severity=issue.severity, path=path,
                               location=issue.location, message=issue.message,
@@ -510,7 +566,8 @@ class Scanner:
     def _run_closed_world(self) -> None:
         aggregated: dict[tuple[str, str, str], Finding] = {}
         for path, source, chunk, severity, commit in self._closed_world:
-            for candidate in find_candidates(chunk.text, chunk.sentence_start, self.vocabulary):
+            vocabulary = self._vocabulary_for(source)
+            for candidate in find_candidates(chunk.text, chunk.sentence_start, vocabulary):
                 term_key = candidate.term.casefold()
                 group = "history" if source == "history" else source
                 marker = (path, group, term_key)

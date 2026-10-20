@@ -1,3 +1,0 @@
-# Sensitivity of the it-runbooks sample: internal by default.
-default: internal
-rules: []

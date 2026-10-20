@@ -19,13 +19,13 @@ also trigger work. This page describes the threat model and the controls. The no
 
 | Threat | Example | Mitigations |
 |---|---|---|
-| Prompt injection in documents | An e-mail tells "AI assistants" to approve a purchase order | Data-only prompts with delimited document sections; strict structured outputs; no tools and no web access during compilation; flagged sentences dropped from pages and replaced by a visible placeholder in evidence; injection proposals for human review; template-only skills; agent instructions that treat every tool result as data |
+| Prompt injection in documents | An e-mail tells "AI assistants" to confirm an early payment to a supplier | Data-only prompts with delimited document sections; strict structured outputs; no tools and no web access during compilation; flagged sentences dropped from pages and replaced by a visible placeholder in evidence; injection proposals for human review; template-only skills; agent instructions that treat every tool result as data |
 | Persistent poisoning of agents | Injected text lands in `AGENTS.md` or a skill read by every future agent | Skills and `AGENTS.md` rendered only from reviewed templates with validated values; canary gate G08 over `AGENTS.md`, skills, indexes, evidence and the built site |
 | Malicious Markdown or HTML | A document smuggles `<script>`, an `iframe` or a `javascript:` link | No raw HTML in compiled content, sanitiser after every model call, gate G05; Quartz raw-HTML rendering disabled; a security scan of the built site; strict Content Security Policy on the private portal |
 | Exfiltration through links or images | Compiled text embeds an image URL that leaks data when rendered | No external links or images in compiled content; bare URLs become inline code; site scan limited to the repository and site hosts |
 | The Researcher misusing operations | An injected instruction asks the Researcher to start an ingest | Distinct Entra agent identities; app roles per agent; server-side role check per tool; operations tools hidden from the Researcher; human approval for every mutating call of the Librarian |
 | Forged identity | A caller sends its own principal header, for example while the platform's built-in authentication is missing or disabled | Built-in authentication validates issuer, audience and allowed client IDs and replaces the header; the server trusts the header only in `easyauth` mode and never alone: it validates the forwarded bearer token itself (RS256 signature with the tenant's keys, issuer, audience, lifetime, allowed client IDs) and takes the caller and roles from it, so a forged header without a valid token gets 401; the MCP app gets external ingress only after built-in authentication is verified; the post-deploy smoke test sends a forged header (must get 401) and checks that built-in authentication is enabled |
-| Access-right flattening | A summary mixes a restricted rate card into a public page | Sensitivity tiers; one audience per build; sources above it excluded from pages, evidence, catalog, search rows and tables (gate G07); no consolidation across tiers |
+| Access-right flattening | A summary mixes the margins of a restricted price study into a public page | Sensitivity tiers; one audience per build; sources above it excluded from pages, evidence, catalog, search rows and tables (gate G07); no consolidation across tiers |
 | Cost abuse | Someone hammers a public endpoint that calls a model | No public endpoint calls a model; the public demo is a static site; bounded work per run and per question; budget alerts; scale to zero |
 | Secret leakage | A key or connection string is committed | Zero secrets by design; gitleaks in CI; secret scanning and push protection on the public repository; the leak guard |
 | Private data in the public repository | A real name, an internal host or a document's metadata ends up in a commit | Closed fictional world; leak guard over the tree, the history and binary metadata; fail-closed pre-push hook |
@@ -39,7 +39,7 @@ also trigger work. This page describes the threat model and the controls. The no
 | Jobs identity (`ingest`, `reconcile`) | Read `raw`; read and write `work` and `releases`; process the `ingest` queue; call Foundry models and Content Understanding; pull images |
 | MCP identity | Read `releases`; write in `work` only under `reports/`, `proposals/` and `state/overlay.yaml` (role-assignment condition); send to the `ingest` queue; pull images. Nothing on `raw`, nothing on Foundry |
 | Portal identity | Read `releases`; pull images |
-| Studio identity | Upload to `raw` (a role-assignment condition denies deletes); read `work` and `releases`; peek the `ingest` queue; ask the Foundry agents; pull images |
+| Studio identity | Upload to `raw` (a role-assignment condition denies deletes); read `work` and write filed answers only under `work/inbox/queries/` (a custom role with blob read, write and create only, so no delete, move or container management, and a condition that denies every other write); read `releases`; peek the `ingest` queue; ask the Foundry agents; pull images |
 | Event Grid system topic | Send to the `ingest` queue |
 | Researcher agent identity | App role `Wiki.Read` on the MCP API |
 | Librarian agent identity | App roles `Wiki.Read` and `Wiki.Operate` on the MCP API |
@@ -52,6 +52,12 @@ no token store and no client secret, external ingress only once it is verified, 
 validation in the server (`DOCWIKI_MCP_TOKEN_VALIDATION=required`). The full role list and how to
 verify it are in
 [BOOTSTRAP.md, step 7](../BOOTSTRAP.md#step-7--verify-resources-security-settings-and-rbac).
+
+A role-assignment condition filters data actions only, never control-plane actions such as
+deleting or rewriting a container. The Studio's role on `work` is therefore a custom role with
+no control-plane action at all (blob read, write and create only) rather than Storage Blob Data
+Contributor; the deployer creates it, which needs `Microsoft.Authorization/roleDefinitions/write`
+on the resource group (included in Owner and User Access Administrator).
 
 The MCP authorization chain has four independent layers: Entra refuses tokens to unassigned
 principals, built-in authentication accepts only the right audience from allow-listed clients,
@@ -111,8 +117,9 @@ why its findings become proposals for a human rather than silent deletions of fa
 
 Every source gets a tier from the domain pack (`sensitivity.yaml`: a default plus rules by path
 glob or document type; the highest matching tier wins). A build targets one audience; anything
-above it is excluded completely. The public sample includes a restricted contractor rate card
-precisely to test that it never reaches the public wiki, evidence, catalog, search index or site.
+above it is excluded completely. The public sample includes a restricted internal price study (the
+builder's margins) precisely to test that it never reaches the public wiki, evidence, catalog,
+search index or site.
 
 Tiers are coarse, document-level access control. DocWiki v1 does not do per-user permissions:
 build one release per audience and protect each with its own access (see the
@@ -131,7 +138,9 @@ DocWiki is developed in public with fictional data, so publication safety is par
 Rules cover GUIDs, Azure resource IDs, e-mail addresses (except reserved example domains), home
 paths, internal host names, keys and tokens, package mirrors and lock files, forbidden files,
 Office and PDF authors, EXIF blocks, and a **closed-world check**: capitalised names in sample
-content must come from the fiction bible or the technology allowlist. An optional private
+content must come from the fiction bible or the technology allowlist (history is judged against
+every version of these lists it contains, so a replaced sample world stays valid in the commits
+that describe it, while the current tree is held to the current lists). An optional private
 deny-list, kept outside the repository, adds terms that must never appear; with `--redact` (the
 default in CI) the output never prints matched text.
 
@@ -156,8 +165,8 @@ visibility:
 4. A new public repository is created and pushed; secret scanning with push protection, Dependabot
    alerts and updates, CodeQL default setup, private vulnerability reporting and branch protection
    are enabled.
-5. GitHub Pages is configured with the custom domain after DNS verification, with HTTPS enforced.
-6. The rendered repository and site are checked, and the published commit is recorded.
+5. The public demo is deployed on Azure Container Apps with a public-audience build.
+6. The rendered repository and the demo are checked, and the published commit is recorded.
 
 ## Responsible AI
 
@@ -170,4 +179,7 @@ visibility:
 - **Honest evaluation.** Baselines, denominators, versions, costs and failures are published with
   every score ([evaluation](evaluation.md)).
 - **Fictional sample.** The sample corpus is invented: **FICTIONAL — NOT FOR OPERATIONAL USE**.
-  Its procedures and values must never be used as real operating, maintenance or safety guidance.
+  Its quotes, contract terms, schedules and amounts must never be used as real commercial, legal
+  or construction guidance. The two site photos are AI-generated images, not photographs of a real
+  site; their model and prompts are recorded in
+  [`samples/generators/assets/photos/PROVENANCE.md`](../samples/generators/assets/photos/PROVENANCE.md).

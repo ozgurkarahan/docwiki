@@ -16,7 +16,16 @@ from azure.core.exceptions import (
     ResourceModifiedError,
     ResourceNotFoundError,
 )
-from mcp_testkit import FIXTURE_ROOT, NOW, RELEASE_ID, copy_fixture, stage_release
+from mcp_testkit import (
+    FIXTURE_ROOT,
+    MINUTES,
+    NOW,
+    PLAN_B,
+    RELEASE_ID,
+    TOPIC_ID,
+    copy_fixture,
+    stage_release,
+)
 
 from docwiki.contracts.storage import FolderStorage, KeyNotFoundError, PreconditionFailedError
 from docwiki.mcp.blob import AzureBlobStorage
@@ -55,8 +64,8 @@ def test_folder_source_swaps_atomically_when_the_pointer_moves(tmp_path: Path) -
     first = source.current()
     assert first.release_id == RELEASE_ID
     before = _files(root / "releases" / RELEASE_ID)
-    reads.search("gearbox")
-    reads.query_table("src-43c97f7dfcde", "SELECT row_id FROM t01")
+    reads.search("menuiseries")
+    reads.query_table(PLAN_B, "SELECT row_id FROM t01")
     assert _files(root / "releases" / RELEASE_ID) == before, "the server never writes releases"
 
     staged = stage_release(tmp_path / "s2", created_at=NOW, topic_note="Second release note.")
@@ -65,7 +74,7 @@ def test_folder_source_swaps_atomically_when_the_pointer_moves(tmp_path: Path) -
     clock.advance(31)
     second = source.current()
     assert second.release_id == staged.release_id
-    assert "Second release note." in json.loads(reads.read_page("topic:gearbox-oil"))["markdown"]
+    assert "Second release note." in json.loads(reads.read_page(TOPIC_ID))["markdown"]
     clock.advance(31)
     assert source.current() is second, "an unchanged pointer does not reload"
 
@@ -112,7 +121,7 @@ def test_search_index_is_verified_and_served_from_memory(tmp_path: Path) -> None
     with pytest.raises(sqlite3.OperationalError, match="readonly"):
         snapshot.search._conn.execute("DELETE FROM meta")
     search_db.rename(moved)  # refused on Windows while a handle is open
-    assert json.loads(reads.search("gearbox"))["hits"]
+    assert json.loads(reads.search("menuiseries"))["hits"]
     moved.rename(search_db)
 
     tampered = bytearray(search_db.read_bytes())
@@ -133,7 +142,7 @@ def test_concurrent_reads_during_a_swap(tmp_path: Path) -> None:
     def worker() -> None:
         for _ in range(25):
             try:
-                seen.add(json.loads(reads.search("gearbox oil"))["release_id"])
+                seen.add(json.loads(reads.search("livraison menuiseries"))["release_id"])
             except BaseException as exc:
                 errors.append(exc)
 
@@ -165,7 +174,7 @@ def test_storage_source_materializes_verifies_swaps_and_prunes(tmp_path: Path) -
     assert first.release_id == staged[0].release_id
     assert (cache / first.release_id / "manifest.json").is_file()
     assert not list(cache.glob(".staging-*"))
-    assert json.loads(ReadTools(source, McpConfig()).search("gearbox"))["hits"]
+    assert json.loads(ReadTools(source, McpConfig()).search("menuiseries"))["hits"]
 
     publish_release(remote, staged[1])
     clock.advance(31)
@@ -298,5 +307,5 @@ def test_blob_adapter_serves_a_published_release(tmp_path: Path) -> None:
     publish_release(blob, staged)
     source = StorageReleaseSource(blob, tmp_path / "cache")
     assert source.current().release_id == staged.release_id
-    data = json.loads(ReadTools(source, McpConfig()).get_evidence("src-4d9c65e05302", "para-0004"))
+    data = json.loads(ReadTools(source, McpConfig()).get_evidence(MINUTES, "para-0011"))
     assert data["provenance"] == "native-text"

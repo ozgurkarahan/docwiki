@@ -1,18 +1,22 @@
 # Domain packs: adapting DocWiki to your industry
 
-DocWiki's engine knows nothing about wind turbines. Everything domain-specific (document types,
-the entities worth a page, the topics worth a synthesis, the glossary, who may read what, how
-revisions and contradictions are resolved) lives in a **domain pack**: a folder of YAML and a few
-templates under `domains/<pack>/`. This page shows how to write one. The normative format is in
+DocWiki's engine knows nothing about building sites, or about any other industry. Everything
+domain-specific (document types, the entities worth a page, the topics worth a synthesis, the
+glossary, who may read what, how revisions and contradictions are resolved) lives in a **domain
+pack**: a folder of YAML and a few templates under `domains/<pack>/`. This page shows how to write
+one, with excerpts of the sample pack. The normative format is in
 [domain and corpus](spec/domain-and-corpus.md#1-domain-pack-format) and
 [`CONTRACT.md`](../src/docwiki/contracts/CONTRACT.md) §15.
 
-Two packs ship with the repository:
+One pack ships with the repository:
 
 | Pack | Content |
 |---|---|
-| [`wind-om`](../domains/wind-om/README.md) | Operations and maintenance of the fictional Quellmoor Ridge Wind Farm: 12 categories, 30 document types, 9 entity types with 101 registry entries, 10 topics, English, French and German |
-| [`it-runbooks`](../domains/it-runbooks/README.md) | A deliberately tiny pack for the fictional IT platform team of Relecloud: runbooks, a failover procedure, an on-call handbook, a postmortem and a service catalog. It proves the engine is generic, and it is the best template to copy |
+| [`batiment`](../domains/batiment/README.md) | The paperwork of a small French general contractor (fictional): quotes with revisions, a works contract and its amendment, a planning workbook, a merchant's invoice and a scanned delivery note, site minutes, e-mails and two AI-generated site photos ([provenance](../samples/generators/assets/photos/PROVENANCE.md)). French documents and an English wiki, closed topics, a French-English glossary, a restricted tier and domain skills |
+
+The engine has no pack-specific code. The small test packs under `tests/` (for example
+[`tests/domain/fixtures/mini-pack`](../tests/domain/fixtures/mini-pack)) exercise it with domains
+other than the sample's, and are the smallest examples of a valid pack.
 
 ## The files
 
@@ -34,151 +38,194 @@ The loader is strict: unknown keys, unknown files, duplicate YAML keys, referenc
 categories, entity types, document types or pages, and alias languages not declared in
 `pack.yaml` are errors, reported with file and location.
 
-## Walk-through with `it-runbooks`
+## Walk-through with `batiment`
+
+The excerpts come from [`domains/batiment/`](../domains/batiment/), abridged where marked with `…`.
 
 ### `pack.yaml`
 
 ```yaml
-name: it-runbooks
-title: IT operations runbooks
+name: batiment
+title: Building works - general contractor job file
 description: >-
-  Runbooks, procedures, on-call rules, postmortems and the service catalog of an IT platform
-  operations team.
-default_audience: internal
-languages: [en]
-wiki_title: Relecloud operations wiki
+  The job file of a small French general contractor for one client and one site: quotes and
+  their revisions, the works contract and its amendment, … The documents are in French.
+default_audience: public
+languages: [fr, en]
+wiki_title: Chantier Moreau job wiki
 fictional: true
 banner: >-
-  FICTIONAL SAMPLE - Relecloud, its services and people are invented. Not for operational use.
+  FICTIONAL SAMPLE - … every organisation, person, product, amount and date in this wiki are
+  invented. Not for operational use.
 ```
 
-`languages` lists the languages allowed in aliases and glossary synonyms. The wiki itself is
-always written in English; quotes keep their original language.
+`languages` lists the languages allowed in aliases and glossary synonyms (`fr`: the documents are
+French). The wiki itself is always written in English; quotes keep their original language.
 
 ### `taxonomy.yaml`: categories, document types, authority
 
 ```yaml
 categories:
-  - {key: operations, title: "Operations", description: "Runbooks, procedures and on-call rules."}
-  - {key: learning, title: "Learning from incidents", description: "Postmortems."}
+  - {key: contract-documents, title: "Quotes and contract", description: "Quotes (devis) and their revisions (indices), the works contract and its amendments (avenants)."}
+  - {key: purchasing, title: "Invoices and delivery notes", description: "Supplier invoices (factures) and delivery notes (bons de livraison)."}
+  # …
 doc_types:
-  - key: procedure
-    title: Procedure
-    category: operations
+  - key: quote
+    title: Quote (devis)
+    category: contract-documents
     authority: 8
     rules:
-      - {filename_regex: '^PRC-[A-Z]{2}-\d{3}'}
-  - key: postmortem
-    title: Postmortem
-    category: learning
-    authority: 5
+      - {filename_regex: '^DEV-\d{4}-\d{3}(?!\d)'}
+      - {filename_regex: '(?i)(?:^|[_ -])devis(?:[_ .-]|$)'}
+      # …
+  - key: delivery-note
+    title: Delivery note (bon de livraison)
+    category: purchasing
+    authority: 6
     rules:
-      - {filename_regex: '^PM-\d{4}-\d{3}'}
-      - {text_regex: '(?i)blameless postmortem - \d{4}-\d{2}-\d{2}', first_chars: 2000}
+      - {filename_regex: '(?i)(?:^|[_ -])(?:bon[_ -]de[_ -]livraison|BL-\d{4}-\d{4})'}
+      - {filename_regex: '(?i)\.pdf$', text_regex: '(?im)^[ \t]*bon\s+de\s+livraison\s+(?:n°\s*)?BL-\d{4}-\d{4}(?!\d)', first_chars: 1000}
+  # …
 ```
 
 The first document type whose rule matches wins (`filename_regex` is searched in the file name,
 `text_regex` in the first `first_chars` characters; all regexes of a rule must match). Only
 documents that no rule matches are classified by the `fast` model, so good rules make runs
 cheaper and more predictable. **Authority** drives contradiction handling: when two current
-sources disagree, the higher authority is presented as the rule's winner.
+sources disagree, the higher authority is presented as the rule's winner. In the sample, an
+amendment outranks the contract, which outranks the quote, and a delivery note outranks the
+invoice for the quantities actually delivered.
 
 ### `entities.yaml`: what deserves a page
 
 ```yaml
 types:
-  - {key: service, title: Services, description: Services in the service catalog.}
-  - {key: alert, title: Alerts, description: Monitoring alerts with their conditions.}
+  - {key: building-element, title: Building elements, description: "Parts of the building that the documents follow individually: openings, windows and the slab."}
+  - {key: material, title: Materials, description: "Articles supplied by the builders' merchant, with their article codes."}
+  # …
 registry:
-  - {type: service, key: orders-db, label: orders-db,
-     aliases: [{text: orders-db, lang: en}, {text: orders database, lang: en}],
-     attributes: {tier: 1, technology: PostgreSQL}}
-  - {type: alert, key: ticketingapihighlatency, label: TicketingApiHighLatency,
-     aliases: [{text: TicketingApiHighLatency, lang: en}], attributes: {service: ticketing-api}}
+  - type: building-element
+    key: baie-f1
+    label: Baie coulissante F1
+    aliases:
+      - {text: baie F1, lang: fr}
+      - {text: bay window F1, lang: en}
+      - {text: sliding bay window, lang: en}
+      # …
+    attributes: {mark: F1}
+  - type: material
+    key: zm-20450
+    label: Bloc béton creux 20 x 20 x 50 cm (ZM-20450)
+    aliases:
+      - {text: ZM-20450, lang: fr}
+      - {text: bloc béton creux, lang: fr}
+      - {text: hollow concrete block, lang: en}
+      # …
+    attributes: {code: ZM-20450, sale_unit: palette de 48 blocs}
+  # …
 ```
 
-Entity-type `title`s are plural display names ("Services", "Spare parts"): they title the
+Entity-type `title`s are plural display names ("Building elements", "Materials"): they title the
 `entities/<type>/index.md` pages and group related entities, with a naive singular for a group of
-one. Each registry entry with at least one mention gets a page, `entities/<type>/<key>.md`, whose facts
-and timeline are aggregated by code. Aliases drive deterministic autolinking. Entities the model
-meets but the registry does not know become **proposals**; once a human accepts one, it is merged
-into a runtime overlay (`work/state/overlay.yaml`) and used from the next run, without editing the
-pack.
+one. Each registry entry with at least one mention gets a page, `entities/<type>/<key>.md`, whose
+facts and timeline are aggregated by code. Aliases, in the language of the documents and in
+English, drive deterministic autolinking. Entities the model meets but the registry does not know
+become **proposals**; once a human accepts one, it is merged into a runtime overlay
+(`work/state/overlay.yaml`) and used from the next run, without editing the pack.
 
 ### `topics.yaml`: the syntheses you want
 
 ```yaml
 topics:
-  - slug: database-operations
-    title: Database operations
-    description: The orders database, replication, failover and recovery targets.
-    keywords: [orders-db, database, failover, standby, replication, RPO, RTO, PostgreSQL]
-    aliases: []
+  - slug: payments-deposit-and-retention
+    title: Payments, deposit and retention
+    description: >-
+      The payment schedule of the works contract, the deposit, the instalments, the retention
+      and its release, the payment of the amendment, and the payment terms of supplier invoices.
+    keywords: [payment schedule, payment, payments, paid, payable, deposit, deposits, instalment, instalments, installment, installments, retention, down payment, due date, payment terms]
+    aliases:
+      - {text: échéancier, lang: fr}
+      - {text: acompte, lang: fr}
+      - {text: retenue de garantie, lang: fr}
+      # …
+    min_score: 2
 ```
 
 Each source section is scored against each topic: keyword and alias occurrences weighted 3 in
-titles, 2 in headings and 1 in body text. A source feeds a topic when its score reaches
-`min_score` (default 3.0), and a topic is synthesised only when at least `min_sources` (default 2)
-sources feed it; otherwise it is skipped with the reason `insufficient_evidence`. The catalog is
-closed on purpose: the model never invents topics.
+titles, 2 in headings and 1 in body text. Topics are routed on the compiled English text, so a
+French alias counts where the wiki keeps the French term next to its English gloss, as the pack's
+`hints.md` asks. A source feeds a topic when its score reaches `min_score` (default 3.0), and a
+topic is synthesised only when at least `min_sources` (default 2) sources feed it; otherwise it
+is skipped with the reason `insufficient_evidence`. The catalog is closed on purpose: the model
+never invents topics.
 
 ### `glossary.yaml`
 
 ```yaml
 terms:
-  - term: recovery point objective
-    definition: Maximum amount of data, expressed as time, that may be lost in an incident.
-    synonyms: {en: [RPO]}
-    see_also: [topic:database-operations]
+  - term: retention
+    definition: A share of the contract price held back by the client as a guarantee that defects noted at handover are put right, and released after an agreed period.
+    synonyms: {fr: [retenue de garantie], en: [retention money, holdback]}
+    see_also: [topic:payments-deposit-and-retention]
 ```
 
-Synonyms feed the glossary page and **query expansion** in `search.db`: a question about "RPO", or
-about "multiplicateur" or "Getriebe" in the wind pack, finds the pages that use the canonical
-term ("recovery point objective", "gearbox").
+Synonyms feed the glossary page and **query expansion** in `search.db`: a question in French
+about the "retenue de garantie" finds the pages that use the canonical term ("retention").
 
 ### `sensitivity.yaml`
 
 ```yaml
-default: internal
-rules: []
+default: public
+rules:
+  - {tier: restricted, path_glob: "**/restricted/**"}
+  - {tier: restricted, doc_type: price-study}
 ```
 
-The wind pack shows the other case: public by default, `restricted` for anything under a
-`restricted/` folder and for the rate-card document type. The highest matching tier wins, and a
-build for a given audience excludes every source above it entirely.
+The sample is public by default, and `restricted` for anything under a `restricted/` folder and
+for the internal price study document type; a pack for private documents would use
+`default: internal`, usually with few rules. The highest matching tier wins, and a build for a
+given audience excludes every source above it entirely.
 
 ### `supersession.yaml` and `resolution.yaml`
 
 ```yaml
-doc_number_regex: '^(RB-[A-Z]{3}-\d{3}|PRC-[A-Z]{2}-\d{3}|PM-\d{4}-\d{3})(?![0-9])'
-revision_regex: '\b[Vv](\d+)\b'
-revision_order: numeric
-explicit_reference_regex: '(?i)\b(?:supersedes|replaces)\s+((?:RB|PRC)-[A-Z]{2,3}-\d{3})'
+doc_number_regex: '^(?P<number>(?:DEV|PLN)-\d{4}-\d{3})(?!\d)'
+revision_regex: '^(?:DEV|PLN)-\d{4}-\d{3}(?:[ _-]+|[ \t]*[–—][ \t]*)(?i:indice)[ _-]?(?P<rev>[A-H])(?![A-Za-z0-9])'
+revision_order: [A, B, C, D, E, F, G, H]
+explicit_reference_regex: '(?i:annule\s+et\s+remplace)\s+(?:(?i:le|la|les)\s+)?(?:(?i:devis|planning)\s+)?(?P<number>(?:DEV|PLN)-\d{4}-\d{3})(?!\d)'
 ```
 
 ```yaml
 order: [authority, recency]
 notes: >-
-  Procedures win over runbooks, runbooks over the handbook and the handbook over postmortems.
-  With equal authority the more recent document wins.
+  Contractual documents prevail: the amendment (avenant, authority 10) over the works contract
+  (9) on the points it amends, and the contract over the quote (8). … The schedule and the
+  suppliers' e-mails have the same authority (4): the more recent statement prevails until a new
+  schedule revision (indice) supersedes the old one. …
 ```
 
 Two documents with the same number and different revisions form a revision group: the latest is
-`current`, the others `superseded`. A document that says "supersedes PRC-DB-007" supersedes it
-explicitly. Contradictions between current sources are shown with both claims and the notes of
-`resolution.yaml`; the rule is stated, never applied silently. Anchor the number pattern at the
-start (`^`) so that a document that merely mentions another document's number is not grouped with
-it, and keep words such as "amends" out of the reference regex if, in your domain, an amendment
-does not replace the whole document.
+`current`, the others `superseded`. A document that says "annule et remplace le devis
+DEV-2026-014" supersedes it explicitly. The regexes may name their groups `number` and `rev`
+(otherwise group 1 is used). Contradictions between current sources are shown with both claims
+and the notes of `resolution.yaml`; the rule is stated, never applied silently. Anchor the number
+pattern at the start (`^`) so that a document that merely mentions another document's number is
+not grouped with it, and keep words such as "amends" out of the reference regex if, in your
+domain, an amendment does not replace the whole document: in the sample, the amendment (avenant)
+amends the contract and never supersedes it.
 
 ### `hints.md`
 
-Reviewed notes for the compile prompt, for example identifier conventions:
+Reviewed notes for the compile prompt, for example conventions for terms and amounts:
 
 ```markdown
-- Service names are lower-case identifiers such as `ticketing-api` and `orders-db`; keep them
-  exactly as written.
-- Severity levels are `SEV1` (highest) to `SEV4`.
+- The documents are written in French; write the wiki in English. The first time a French trade
+  term appears, keep it in quotes after its English gloss, for example quote ("devis"), contract
+  amendment ("avenant"), deposit ("acompte"), retention ("retenue de garantie"), … Quotes from the
+  documents stay in French, exactly as written.
+- Copy every amount exactly as printed, with its comma decimal separator and without adding a
+  thousands separator (`12500,00 €`, never `12,500.00 €` or `12 500,00 €`), … Never round,
+  convert or recompute an amount.
 ```
 
 Hints are operator text, reviewed like code. Never paste document text into them: documents are
@@ -186,17 +233,17 @@ data, and hints are instructions.
 
 ### Domain skills
 
-Up to three `skills/<skill>/SKILL.md.j2` templates, for example `respond-to-alert` in
-`it-runbooks`. They receive only validated values (wiki title, fixed paths, the topics and entity
+Up to three `skills/<skill>/SKILL.md.j2` templates, for example `check-supplier-invoice` in
+`batiment`. They receive only validated values (wiki title, fixed paths, the topics and entity
 types present in the release). See [skills](skills.md#writing-a-domain-skill).
 
 ## Workflow for a new pack
 
-1. Copy `domains/it-runbooks` to `domains/<your-pack>` and edit `pack.yaml`.
+1. Copy `domains/batiment` to `domains/<your-pack>` and edit `pack.yaml`.
 2. Write taxonomy rules for your file naming conventions first; they make classification
    deterministic.
-3. Seed the registry with the entities people ask about (assets, systems, products, procedures,
-   roles) and their aliases in every language you declared.
+3. Seed the registry with the entities people ask about (parties, products, documents, roles) and
+   their aliases in every language you declared.
 4. Define 5 to 10 topics that combine several documents: those are where the wiki adds the most
    value.
 5. Set sensitivity rules before the first run, including a `restricted/` convention if you need
@@ -223,7 +270,7 @@ affects.
 ## Fictional samples
 
 If you publish a pack with sample documents, follow the repository's fiction rules: every
-organisation, person, site and product comes from a closed list (the `wind-om` sample uses
+organisation, person, site and product comes from a closed list (the `batiment` sample uses
 [`samples/fiction/bible.yaml`](../samples/fiction/bible.yaml)), procedure-like documents carry
 "FICTIONAL — NOT FOR OPERATIONAL USE", and the leak guard checks the closed world. Real procedures
 from your organisation belong in your private deployment, not in a public pack.

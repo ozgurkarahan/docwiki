@@ -32,17 +32,17 @@ from docwiki.contracts.strict_schema import check_strict_schema, is_nullable, st
 
 NOW = datetime(2026, 1, 31, 8, 5, 9, tzinfo=UTC)
 SOURCE_ID = "src-0123456789ab"
-VERSIONS = VersionInfo(docwiki="0.1.0", domain_pack="mini-wind", domain_pack_hash="abc")
+VERSIONS = VersionInfo(docwiki="0.1.0", domain_pack="mini-batiment", domain_pack_hash="abc")
 
 
 def extracted(**overrides: object) -> dict[str, object]:
     data: dict[str, object] = {
         "schema": 1,
         "source_id": SOURCE_ID,
-        "source_path": "records/plan.xlsx",
+        "source_path": "planning/planning.xlsx",
         "source_hash": "sha256:" + "b" * 64,
         "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "lang": "en",
+        "lang": "fr",
         "title_hint": None,
         "metadata": {
             "doc_number": None,
@@ -54,20 +54,30 @@ def extracted(**overrides: object) -> dict[str, object]:
             {
                 "id": "b0001",
                 "kind": "paragraph",
-                "text": "Maintenance plan",
-                "locator": {"kind": "xlsx-rows", "sheet": "Plan", "row_start": 1, "row_end": 1},
+                "text": "Planning de chantier",
+                "locator": {
+                    "kind": "xlsx-rows",
+                    "sheet": "Planning",
+                    "row_start": 1,
+                    "row_end": 1,
+                },
                 "provenance": "deterministic-table",
             }
         ],
         "tables": [
             {
                 "id": "t01",
-                "locator": {"kind": "xlsx-rows", "sheet": "Plan", "row_start": 1, "row_end": 3},
+                "locator": {
+                    "kind": "xlsx-rows",
+                    "sheet": "Planning",
+                    "row_start": 1,
+                    "row_end": 3,
+                },
                 "provenance": "deterministic-table",
-                "columns": ["Asset", "Task"],
+                "columns": ["Tâche", "Désignation"],
                 "rows": [
-                    {"row_id": "r0002", "cells": ["WTG-07", "Oil change"]},
-                    {"row_id": "r0003", "cells": ["WTG-07", "Inspection"]},
+                    {"row_id": "r0002", "cells": ["T07", "Livraison des menuiseries"]},
+                    {"row_id": "r0003", "cells": ["T08", "Pose des menuiseries"]},
                 ],
                 "artifact": "tables/t01.parquet",
             }
@@ -81,10 +91,10 @@ def extracted(**overrides: object) -> dict[str, object]:
 
 def test_extracted_doc_json_round_trip_and_helpers() -> None:
     doc = ExtractedDoc.model_validate_json(json.dumps(extracted()))
-    assert doc.block("b0001").locator_key == "sheet-plan-r0001-r0001"
+    assert doc.block("b0001").locator_key == "sheet-planning-r0001-r0001"
     assert doc.table("t01").rows[1].row_id == row_id_for(3)
     assert ExtractedDoc.from_json(doc.to_json()) == doc
-    assert doc.text() == "Maintenance plan"
+    assert doc.text() == "Planning de chantier"
 
 
 @pytest.mark.parametrize(
@@ -113,7 +123,7 @@ def test_table_shape_and_figures_are_validated() -> None:
         "id": "f01",
         "locator": {"kind": "pdf-page", "page": 1},
         "image": "figures/f01.png",
-        "description": "An exploded view.",
+        "description": "A photo of delivered pallets.",
         "description_provenance": None,
     }
     with pytest.raises(ValidationError, match="go together"):
@@ -157,20 +167,20 @@ def test_compiled_source_strict_schema() -> None:
     assert not is_nullable(citation["properties"]["block_id"])
     assert CompiledSource.response_format()["strict"] is True
     output = {
-        "title": "Gearbox oil change SOP",
-        "summary": "Rev B procedure.",
+        "title": "Quote DEV-2026-014 indice B",
+        "summary": "Current revision of the quote.",
         "key_facts": [
             {
-                "text": "Use ISO VG 320.",
+                "text": "The total is 44943,60 € including VAT.",
                 "citations": [{"block_id": "b0004", "quote": None}],
-                "numbers": ["320"],
+                "numbers": ["44943,60 €"],
             }
         ],
         "sections": [
-            {"heading": "Steps", "body": "Drain the oil.[[cite:b0005]]", "table_refs": []}
+            {"heading": "Totals", "body": "Check the totals.[[cite:b0005]]", "table_refs": []}
         ],
-        "entity_mentions": [{"entity_id": "asset:wtg-07", "block_ids": ["b0001"]}],
-        "unknown_entities": [{"label": "Pump P-2", "type_guess": None, "block_ids": []}],
+        "entity_mentions": [{"entity_id": "building-element:baie-f1", "block_ids": ["b0001"]}],
+        "unknown_entities": [{"label": "Pergola P-2", "type_guess": None, "block_ids": []}],
         "glossary_candidates": [],
         "injection_flags": [],
     }
@@ -217,7 +227,7 @@ def test_event_grid_and_cloud_events_become_ingest_messages() -> None:
     event = {
         "id": "evt-1",
         "eventType": "Microsoft.Storage.BlobCreated",
-        "subject": "/blobServices/default/containers/raw/blobs/oem/manual.pdf",
+        "subject": "/blobServices/default/containers/raw/blobs/devis/devis-b.pdf",
         "eventTime": "2026-01-31T08:05:09.1234567Z",
         "data": {},
         "dataVersion": "",
@@ -231,7 +241,7 @@ def test_event_grid_and_cloud_events_become_ingest_messages() -> None:
     )
     assert message.hints == {
         "event_type": "Microsoft.Storage.BlobCreated",
-        "blob": "oem/manual.pdf",
+        "blob": "devis/devis-b.pdf",
     }
     assert message.created_at == NOW
     cloud = {
@@ -251,8 +261,8 @@ def test_event_grid_and_cloud_events_become_ingest_messages() -> None:
 
 def test_source_state_shard() -> None:
     state = SourceState(
-        source_id="src-" + __import__("hashlib").sha256(b"oem/manual.pdf").hexdigest()[:12],
-        raw_path="oem/manual.pdf",
+        source_id="src-" + __import__("hashlib").sha256(b"devis/devis-b.pdf").hexdigest()[:12],
+        raw_path="devis/devis-b.pdf",
         content_hash="sha256:" + "c" * 64,
         size=10,
         media_type="application/pdf",
@@ -264,7 +274,9 @@ def test_source_state_shard() -> None:
     assert state.quarantined
     assert SourceState.from_json(state.to_json()) == state
     with pytest.raises(ValidationError, match="does not match raw_path"):
-        SourceState.model_validate({**state.model_dump(by_alias=True), "raw_path": "oem/other.pdf"})
+        SourceState.model_validate(
+            {**state.model_dump(by_alias=True), "raw_path": "devis/autre.pdf"}
+        )
     with pytest.raises(ValidationError, match="go together"):
         SourceState.model_validate({**state.model_dump(by_alias=True), "deleted": True})
     with pytest.raises(ValidationError):
@@ -291,10 +303,12 @@ def test_run_report_minimal() -> None:
 
 
 def test_proposals_are_typed_and_deterministic() -> None:
-    payload = EntityProposalPayload(type="asset", key="wtg-08", label="WTG-08")
+    payload = EntityProposalPayload(type="building-element", key="fenetre-f2", label="Fenêtre F2")
     proposal = new_proposal("entity", payload, created_at=NOW)
     again = new_proposal(
-        "entity", EntityProposalPayload(type="asset", key="wtg-08", label="WTG-08"), created_at=NOW
+        "entity",
+        EntityProposalPayload(type="building-element", key="fenetre-f2", label="Fenêtre F2"),
+        created_at=NOW,
     )
     assert proposal.id == again.id
     assert parse_proposal(proposal.to_json()) == proposal
@@ -383,19 +397,19 @@ def test_gate_results_fold_violations() -> None:
 def test_catalog_validation_and_page_entries() -> None:
     fm = parse_frontmatter(
         {
-            "id": "topic:gearbox-oil",
+            "id": "topic:site-progress",
             "type": "topic",
-            "title": "Gearbox oil",
-            "summary": "Oil grade.",
+            "title": "Site progress",
+            "summary": "Progress of the works.",
             "sensitivity": "public",
             "updated": "2026-01-31",
             "docwiki": {"schema": 1, "release": "20260131T080509Z-01234567"},
-            "topic_slug": "gearbox-oil",
+            "topic_slug": "site-progress",
             "sources": [SOURCE_ID],
             "confidence": "medium",
         }
     )
-    entry = catalog_page_for(fm, "topics/gearbox-oil.md")
+    entry = catalog_page_for(fm, "topics/site-progress.md")
     assert entry.sources == [SOURCE_ID] and entry.status is None
     base = {
         "schema": 1,
@@ -407,7 +421,7 @@ def test_catalog_validation_and_page_entries() -> None:
         json.dumps({**base, "pages": [entry.to_json_dict()], "edges": []})
     )
     assert catalog.to_json_dict()["schema"] == 1
-    edge = {"from": "topic:gearbox-oil", "to": "src-ffffffffffff", "kind": "cites"}
+    edge = {"from": "topic:site-progress", "to": "src-ffffffffffff", "kind": "cites"}
     with pytest.raises(ValidationError, match="unknown page"):
         Catalog.model_validate_json(
             json.dumps({**base, "pages": [entry.to_json_dict()], "edges": [edge]})

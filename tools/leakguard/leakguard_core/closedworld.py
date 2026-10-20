@@ -57,7 +57,7 @@ _CLEAN_RES = (
 _RUN_SPLIT_WORDS = 4
 # Alphanumeric compounds (letters, digits, "_" joined by "-", ".", ":", "/", "+", "#").
 _COMPOUND_RE = re.compile(r"\w(?:[\w.:/+#-]*\w)?")
-# Format placeholders such as NN, XX, YYYY (as in "WTG-NN" or "YYYY-MM-DD").
+# Format placeholders such as NN, XX, YYYY (as in "BC-2026-NNN" or "YYYY-MM-DD").
 _PLACEHOLDER_RE = re.compile(r"([A-Z])\1+")
 # Humps of a camel-case token: "PDFContext" -> PDF, Context; "iZorb" -> i, Zorb.
 _CAMEL_HUMP_RE = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+")
@@ -144,9 +144,10 @@ class Vocabulary:
 def identifier_spans(text: str) -> list[tuple[int, int]]:
     """Spans of alphanumeric identifiers: compounds containing a digit or an underscore.
 
-    Examples: release ids (``20260215T090000Z-decd4b59``), ISO timestamps, source ids
-    (``src-43c97f7dfcde``), locators (``p0003``, ``b0042``), asset tags (``WTG-07``), document
-    numbers (``SOP-GBX-010``), code identifiers (``FIXTURE_DIR``). Words inside them are not names.
+    Examples: release ids (``20260401T090000Z-7ce99a3f``), ISO timestamps, source ids
+    (``src-c6436ec50050``), locators (``p0003``, ``b0042``), delivery note numbers
+    (``BL-2026-0391``), document numbers (``DEV-2026-014``), code identifiers (``FIXTURE_DIR``).
+    Words inside them are not names.
     """
     return [
         match.span()
@@ -178,8 +179,8 @@ def find_candidates(text: str, sentence_start: bool, vocabulary: Vocabulary) -> 
 
     A single capitalised word is not a candidate when it starts a sentence, or when it opens a
     phrase (start of the text, a quoted value, a cell, a line, or after a colon) and is followed
-    by lower-case prose ("Drain the oil", ``"summary": "Curated syntheses"``). A capitalised word
-    standing alone in such a position ("Supplier: Zorblax") is still checked.
+    by lower-case prose ("Deliver the windows", ``"summary": "Curated syntheses"``). A capitalised
+    word standing alone in such a position ("Supplier: Zorblax") is still checked.
     """
     clean = clean_text(text)
     fragments = identifier_spans(clean)
@@ -227,7 +228,7 @@ def find_candidates(text: str, sentence_start: bool, vocabulary: Vocabulary) -> 
             and fragments[fragment_index][0] <= match.start()
             and match.end() <= fragments[fragment_index][1]
         ):
-            flush()  # part of an identifier such as WTG-07 or 20260215T090000Z-decd4b59
+            flush()  # part of an identifier such as BC-2026-009 or 20260401T090000Z-7ce99a3f
             continue
         core = strip_elision(word)
         if core and is_capitalised(core):

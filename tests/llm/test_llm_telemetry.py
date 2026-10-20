@@ -11,7 +11,7 @@ sdk_trace = pytest.importorskip("opentelemetry.sdk.trace")
 in_memory = pytest.importorskip("opentelemetry.sdk.trace.export.in_memory_span_exporter")
 export = pytest.importorskip("opentelemetry.sdk.trace.export")
 
-SECRET_TEXT = "Confidential gearbox inspection notes"
+SECRET_TEXT = "Confidential internal price study notes"
 
 
 class Verdict(BaseModel):

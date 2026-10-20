@@ -19,6 +19,6 @@ Text recognised from pixels and model-written figure descriptions are not quotes
 
 ## Consequences
 
-- One click from any claim to the evidence, on GitHub Pages and in private deployments.
+- One click from any claim to the evidence, on the public demo and in private deployments.
 - Honest badges; OCR and generated descriptions are visibly weaker evidence.
 - Builds produce more files; the link checker validates every citation.

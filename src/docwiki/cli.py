@@ -430,6 +430,107 @@ def ask(
     typer.echo(answer.model_dump_json(indent=2) if as_json else format_answer(answer))
 
 
+@app.command("file-answer")
+def file_answer(
+    question: Annotated[str, typer.Argument(help="The question, as it will appear in the wiki.")],
+    from_json: Annotated[
+        Path | None,
+        typer.Option(
+            "--from-json",
+            help="An answer saved with `docwiki ask --json` (default: ask the Researcher now).",
+        ),
+    ] = None,
+    release: Annotated[
+        str,
+        typer.Option(
+            "--release",
+            help="The release that answered: current, a release id, or a folder (a release, a "
+            "portable wiki or a storage root).",
+        ),
+    ] = "current",
+    yes: Annotated[
+        bool, typer.Option("--yes", help="File without asking for confirmation.")
+    ] = False,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Print the page and the warnings; file nothing.")
+    ] = False,
+    work_dir: Annotated[Path | None, typer.Option("--work-dir", help="Work folder.")] = None,
+) -> None:
+    """File a reviewed Researcher answer into the wiki (ADR 0007).
+
+    The answer becomes a query page in the inbox work/inbox/queries/; the next run publishes it
+    (every model output is cached, so that run costs nothing).
+    """
+    from datetime import UTC, datetime
+
+    from docwiki.answers import (
+        FilingError,
+        FolderRelease,
+        StorageRelease,
+        build_query_page,
+        write_inbox,
+    )
+    from docwiki.contracts.storage import FolderStorage
+    from docwiki.orchestration.context import open_storage
+
+    settings = _settings(work_dir=work_dir)
+    if from_json is not None:
+        agent_answer = _delegate("docwiki.agents_client", "AgentAnswer")
+        try:
+            answer = agent_answer.model_validate_json(from_json.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise _fail(f"cannot read the answer in {from_json}: {exc}") from exc
+    else:
+        ask_fn = _delegate("docwiki.agents_client", "ask")
+        client_error = _delegate("docwiki.agents_client", "AgentsClientError")
+        try:
+            answer = asyncio.run(ask_fn(question, agent="researcher"))
+        except client_error as exc:
+            raise _fail(str(exc)) from exc
+    candidate = Path(release)
+    from_folder = release != "current" and candidate.is_dir()
+    # A release folder needs no storage until filing: a dry run on a folder writes nothing.
+    storage = None if from_folder else open_storage(settings)
+    try:
+        lookup: FolderRelease | StorageRelease
+        if storage is not None:
+            lookup = StorageRelease(storage, None if release == "current" else release)
+        elif (candidate / "releases" / "current.json").is_file():  # a storage root
+            lookup = StorageRelease(FolderStorage(candidate))
+        else:  # a release folder or a portable wiki
+            lookup = FolderRelease(candidate)
+        filed = build_query_page(
+            answer,
+            question=question,
+            release=lookup,
+            filed_on=datetime.now(UTC).date(),
+        )
+    except FilingError as exc:
+        raise _fail(f"cannot file this answer: {exc}") from exc
+    typer.echo(filed.page.render())
+    typer.echo(f"page: {filed.page.path} (from release {lookup.release_id})")
+    for warning in filed.warnings:
+        typer.echo(f"warning: {warning}")
+    if dry_run:
+        return
+    if not yes:
+        if not sys.stdin.isatty():
+            raise _fail("refusing to file without --yes outside an interactive terminal")
+        if not typer.confirm("File this answer into the wiki?", default=False):
+            raise typer.Exit(EXIT_FAILED)
+    key = write_inbox(storage or open_storage(settings), filed.page)
+    typer.echo(f"filed: {key}")
+    typer.echo(
+        "the next run publishes it ("
+        + (
+            "the ingest job wakes on the inbox"
+            if settings.mode == "azure"
+            else "run `docwiki run` to publish it now"
+        )
+        + ")"
+    )
+
+
 @app.command()
 def studio(
     host: Annotated[str, typer.Option("--host", help="Interface to listen on.")] = "127.0.0.1",

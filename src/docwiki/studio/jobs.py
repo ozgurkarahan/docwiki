@@ -95,6 +95,8 @@ class AgentJob:
     answer: AgentAnswer | None = None
     error: str | None = None
     finished: float | None = None
+    finished_at: datetime | None = None
+    """When the agent finished (UTC): the date of the answer."""
     task: asyncio.Task[None] | None = None
 
     @property
@@ -206,6 +208,7 @@ class AgentJobs:
             job.status = "done"
         finally:
             job.finished = self._clock()
+            job.finished_at = datetime.now(UTC).replace(microsecond=0)
             for approval in job.approvals:
                 if approval.state == "pending":
                     approval.state = "expired"

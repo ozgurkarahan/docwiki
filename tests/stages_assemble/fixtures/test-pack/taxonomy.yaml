@@ -1,0 +1,25 @@
+categories:
+  - key: contract-documents
+    title: Quotes and contract
+    description: Quotes and their revisions, the works contract and its amendment.
+  - key: schedule-and-purchases
+    title: Schedule and purchase tracking
+  - key: correspondence
+    title: Correspondence
+doc_types:
+  - key: quote
+    title: Quote
+    category: contract-documents
+    authority: 8
+    rules:
+      - filename_regex: "(?i)^dev-"
+  - key: schedule
+    title: Schedule
+    category: schedule-and-purchases
+    authority: 4
+    rules:
+      - filename_regex: "(?i)^pln-.*\\.csv$"
+  - key: note
+    title: Note
+    category: correspondence
+    authority: 3

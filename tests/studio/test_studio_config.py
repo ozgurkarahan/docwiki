@@ -13,7 +13,7 @@ def test_defaults_require_sign_in_and_disable_agents_without_foundry() -> None:
     assert config.agents_enabled is False
     assert config.wiki_url is None
     assert config.max_upload_bytes == 50 * 1024 * 1024
-    assert (config.daily_questions, config.daily_uploads) == (100, 10)
+    assert (config.daily_questions, config.daily_uploads, config.daily_filings) == (100, 10, 20)
 
 
 def test_local_mode_skips_sign_in_whatever_the_environment_says() -> None:
@@ -30,6 +30,7 @@ def test_values_are_parsed_and_principals_normalised() -> None:
             "DOCWIKI_STUDIO_MAX_UPLOAD_MB": "2",
             "DOCWIKI_STUDIO_DAILY_QUESTIONS": "7",
             "DOCWIKI_STUDIO_DAILY_UPLOADS": "3",
+            "DOCWIKI_STUDIO_DAILY_FILINGS": "4",
             "DOCWIKI_STUDIO_APPROVAL_TIMEOUT_SECONDS": "30",
             "DOCWIKI_STUDIO_QUESTION_TIMEOUT_SECONDS": "90",
             "DOCWIKI_STUDIO_REQUIRE_SIGN_IN": "false",
@@ -39,7 +40,7 @@ def test_values_are_parsed_and_principals_normalised() -> None:
     assert config.wiki_url == "https://wiki.example.org"
     assert config.allowed_principals == frozenset({"aaa-1", "bbb-2"})
     assert config.max_upload_bytes == 2 * 1024 * 1024
-    assert (config.daily_questions, config.daily_uploads) == (7, 3)
+    assert (config.daily_questions, config.daily_uploads, config.daily_filings) == (7, 3, 4)
     assert (config.approval_timeout_s, config.question_timeout_s) == (30.0, 90.0)
     assert config.require_sign_in is False
     assert config.agents_enabled is True
@@ -51,6 +52,7 @@ def test_values_are_parsed_and_principals_normalised() -> None:
         {"DOCWIKI_STUDIO_REQUIRE_SIGN_IN": "maybe"},
         {"DOCWIKI_STUDIO_MAX_UPLOAD_MB": "-1"},
         {"DOCWIKI_STUDIO_DAILY_QUESTIONS": "lots"},
+        {"DOCWIKI_STUDIO_DAILY_FILINGS": "0"},
         {"DOCWIKI_STUDIO_WIKI_URL": "ftp://wiki.example.org"},
         {"DOCWIKI_STUDIO_WIKI_URL": "https://wiki.example.org/?x=1"},
     ],
@@ -64,8 +66,8 @@ def test_invalid_values_are_refused(env: dict[str, str]) -> None:
     "path",
     [
         "uploads/report.pdf",
-        "uploads/Shift handover (v2).docx",
-        "a/b/c/plan-2026_rev+1.xlsx",
+        "uploads/Compte rendu (v2).docx",
+        "a/b/c/planning-2026_indice+1.xlsx",
         "notes.md",
     ],
 )
@@ -105,12 +107,12 @@ def test_unsupported_type_lists_the_supported_ones() -> None:
     ("path", "expected"),
     [
         (
-            "evidence/src-4d9c65e05302/para-0004.md",
-            "https://wiki.example.org/evidence/src-4d9c65e05302/para-0004",
+            "evidence/src-165f1d3a109c/para-0011.md",
+            "https://wiki.example.org/evidence/src-165f1d3a109c/para-0011",
         ),
         (
-            "sources/sop-gbx-010-rev-b.md#overview",
-            "https://wiki.example.org/sources/sop-gbx-010-rev-b",
+            "sources/2026-03-24-compte-rendu-de-chantier-n3.md#overview",
+            "https://wiki.example.org/sources/2026-03-24-compte-rendu-de-chantier-n3",
         ),
         ("index.md", "https://wiki.example.org/"),
         ("topics/index.md", "https://wiki.example.org/topics/"),
@@ -139,4 +141,4 @@ def test_untrusted_paths_never_become_links(path: str | None) -> None:
 
 
 def test_no_wiki_url_means_no_links() -> None:
-    assert wiki_link(None, "evidence/src-4d9c65e05302/para-0004.md") is None
+    assert wiki_link(None, "evidence/src-165f1d3a109c/para-0011.md") is None

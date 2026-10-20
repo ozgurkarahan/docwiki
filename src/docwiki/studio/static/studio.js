@@ -790,7 +790,8 @@
       h("div", { class: "answer-body" }, answer.body ? renderMarkdown(answer.body, bySource) : h("p", { class: "muted", text: "The agent returned no text." })),
       sources.length ? h("section", { class: "sources" }, h("h4", { text: "Sources" }), h("ul", null, sources.map(sourceItem))) : null,
       calls.length ? h("details", { class: "trace" }, h("summary", { text: `How the agent worked · ${plural(calls.length, "tool call")}` }), h("ol", { class: "tool-list" }, calls.map(toolItem))) : null,
-      h("p", { class: "receipt", text: receipt }));
+      h("p", { class: "receipt", text: receipt }),
+      t.agent === "researcher" && answer.body ? filingArea(t) : null);
   }
 
   function sourceItem(s) {
@@ -814,6 +815,122 @@
       call.server_label ? h("span", { class: "muted", text: call.server_label }) : null,
       call.error ? h("p", { class: "tool-error", text: call.error }) : null,
       args ? h("details", { class: "tool-args" }, h("summary", { text: "arguments" }), h("pre", { text: args })) : null);
+  }
+
+  /* ---------- File to wiki: a reviewed Researcher answer becomes a wiki page ---------- */
+  const FILING_NOTE = "The next pipeline run publishes this answer as a public wiki page that visitors also find in the wiki's Ask panel. That run takes about three minutes and costs no model tokens; the Pipeline panel shows when it starts.";
+  const filingUrl = (t, action) => `/api/questions/${encodeURIComponent(t.jobId)}/${action}`;
+  const domId = (t) => String(t.jobId).replace(/[^A-Za-z0-9_-]/g, "");
+
+  function filingArea(t) {
+    if (!t.filing) {
+      const filed = t.job && t.job.filed;
+      t.filing = filed ? { state: "filed", result: filed } : { state: "idle" };
+    }
+    t.fileEl = h("div", { class: "filing" });
+    renderFiling(t);
+    return t.fileEl;
+  }
+
+  /* Rebuild the filing area of a turn; `focus` moves the keyboard focus to the part that changed. */
+  function renderFiling(t, focus) {
+    const f = t.filing;
+    if (!t.fileEl || !f) return;
+    let target = null;
+    if (f.state === "filed") {
+      const path = (f.result && f.result.path) || "";
+      target = h("p", { class: "filing-done", role: "status", tabindex: "-1" }, icon("check"),
+        h("span", null, f.result && f.result.repeated ? "Already filed as " : "Filed as ", h("code", { text: path }), "; it appears after the next run."));
+      fill(t.fileEl, target);
+    } else if (f.state === "review" || f.state === "filing") {
+      fill(t.fileEl, filingPanel(t));
+      target = focus === "error" ? t.fileEl.querySelector(".filing-error") : t.fileEl.querySelector(".filing-title");
+    } else {
+      const loading = f.state === "loading";
+      const button = h("button", { type: "button", class: "btn btn-secondary btn-sm", disabled: loading, "aria-describedby": `filing-hint-${domId(t)}`, onclick: () => openFiling(t) },
+        loading ? h("span", { class: "spinner", "aria-hidden": "true" }) : icon("book"), loading ? "Preparing the page…" : "File to wiki");
+      fill(t.fileEl,
+        h("div", { class: "filing-start" }, button,
+          h("span", { id: `filing-hint-${domId(t)}`, class: "filing-hint", text: "Preview the wiki page this answer would become, then file it." })),
+        f.error ? h("p", { class: "filing-error", role: "alert", text: f.error }) : null);
+      target = button;
+    }
+    if (focus && target) target.focus();
+  }
+
+  function filingPanel(t) {
+    const f = t.filing;
+    const p = f.preview;
+    const busy = f.state === "filing";
+    const titleId = `filing-title-${domId(t)}`;
+    const warnings = Array.isArray(p.warnings) ? p.warnings : [];
+    const facts = [`sensitivity ${p.sensitivity}`, p.not_found ? "no source cited" : plural(p.sources, "source") + " cited", `release ${p.release_id}`];
+    const left = state.me && typeof state.me.filings_left === "number" ? state.me.filings_left : p.filings_left;
+    const panel = h("section", { class: "filing-panel", role: "group", "aria-labelledby": titleId, "aria-busy": busy ? "true" : null },
+      h("h4", { id: titleId, class: "filing-title", tabindex: "-1", text: "File this answer to the wiki?" }),
+      h("p", { class: "filing-path" }, "Wiki page ", h("code", { text: p.path })),
+      h("p", { class: "filing-facts", text: facts.join(" · ") }),
+      p.not_found ? h("p", { class: "filing-abstain", text: "This is an honest “Not found in the wiki.” answer: it files without sources." }) : null,
+      p.filed ? h("p", { class: "filing-facts", text: "Already filed from this Studio; an unchanged page is not filed twice." }) : null,
+      warnings.length ? h("div", { class: "filing-warnings", role: "note" },
+        h("p", { class: "filing-warnings-head" }, icon("alert"), h("strong", { text: `Review ${warnings.length === 1 ? "this warning" : `these ${warnings.length} warnings`} before filing` })),
+        h("ul", null, warnings.map((w) => h("li", { text: String(w) })))) : null,
+      h("p", { class: "filing-note", text: FILING_NOTE }),
+      h("details", { class: "filing-md" }, h("summary", { text: "Show the page Markdown" }), h("pre", { text: String(p.markdown || "") })),
+      f.error ? h("p", { class: "filing-error", role: "alert", tabindex: "-1", text: f.error }) : null,
+      h("div", { class: "filing-actions" },
+        h("button", { type: "button", class: "btn btn-primary btn-sm", disabled: busy, onclick: () => fileIt(t) }, busy ? h("span", { class: "spinner", "aria-hidden": "true" }) : icon("check"), busy ? "Filing…" : "File it"),
+        h("button", { type: "button", class: "btn btn-secondary btn-sm", disabled: busy, onclick: () => cancelFiling(t) }, "Cancel"),
+        typeof left === "number" ? h("span", { class: "filing-left", text: `${plural(left, "filing")} left today` }) : null));
+    panel.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && t.filing.state === "review") { e.preventDefault(); cancelFiling(t); }
+    });
+    return panel;
+  }
+
+  async function openFiling(t) {
+    const f = t.filing;
+    if (f.state !== "idle") return;
+    Object.assign(f, { state: "loading", error: "" });
+    renderFiling(t);
+    try {
+      const preview = await api(filingUrl(t, "filing"));
+      if (preview.filed && !t.job.filed) t.job.filed = preview.filed;
+      Object.assign(f, { state: "review", preview });
+      renderFiling(t, "panel");
+    } catch (err) {
+      if (err.expired) return;
+      Object.assign(f, { state: "idle", error: err.message });
+      renderFiling(t, "button");
+    }
+  }
+
+  function cancelFiling(t) {
+    Object.assign(t.filing, { state: "idle", preview: null, error: "" });
+    renderFiling(t, "button");
+  }
+
+  async function fileIt(t) {
+    const f = t.filing;
+    if (f.state !== "review") return;
+    Object.assign(f, { state: "filing", error: "" });
+    renderFiling(t);
+    try {
+      const result = await api(filingUrl(t, "file"), { method: "POST", json: { digest: f.preview.digest } });
+      Object.assign(f, { state: "filed", result, preview: null });
+      t.job.filed = result;
+      if (state.me && typeof result.filings_left === "number") state.me.filings_left = result.filings_left;
+      toast(`Filed as ${result.path}`, "success");
+      renderFiling(t, "done");
+    } catch (err) {
+      if (err.expired) return;
+      if (err.status === 409) {
+        /* The page changed since the preview (a new release, a new day): show the new one. */
+        try { f.preview = await api(filingUrl(t, "filing")); } catch { /* keep the old preview */ }
+      }
+      Object.assign(f, { state: "review", error: err.message });
+      renderFiling(t, "error");
+    }
   }
 
   /* The server keeps the questions of this Studio (every browser): add the ones this page does not show yet,

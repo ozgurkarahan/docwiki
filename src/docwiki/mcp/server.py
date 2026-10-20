@@ -1,7 +1,7 @@
 """DocWiki MCP server: stdio for local agents, stateless streamable HTTP at ``/mcp`` for Foundry.
 
 ```text
-python -m docwiki.mcp.server --stdio --release samples/wiki            # local agents
+python -m docwiki.mcp.server --stdio --release <dir>                    # local agents
 python -m docwiki.mcp.server --http 127.0.0.1:8765 --release <dir>     # local HTTP
 python -m docwiki.mcp.server --http :8080 --storage blob               # Azure (easyauth)
 ```

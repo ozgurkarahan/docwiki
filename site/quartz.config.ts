@@ -55,7 +55,7 @@ const config: QuartzConfig = {
     transformers: [
       Plugin.FrontMatter(),
       Plugin.CreatedModifiedDate({ priority: ["frontmatter"] }),
-      DocWiki({ releaseDate: settings.releaseDate }),
+      DocWiki({ releaseDate: settings.releaseDate, siteBanner: !!settings.banner }),
       Plugin.SyntaxHighlighting({
         theme: { light: "github-light", dark: "github-dark" },
         keepBackground: false,

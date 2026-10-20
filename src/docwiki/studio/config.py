@@ -15,6 +15,7 @@ ALLOWED_PRINCIPALS_ENV = "DOCWIKI_STUDIO_ALLOWED_PRINCIPALS"
 MAX_UPLOAD_MB_ENV = "DOCWIKI_STUDIO_MAX_UPLOAD_MB"
 DAILY_QUESTIONS_ENV = "DOCWIKI_STUDIO_DAILY_QUESTIONS"
 DAILY_UPLOADS_ENV = "DOCWIKI_STUDIO_DAILY_UPLOADS"
+DAILY_FILINGS_ENV = "DOCWIKI_STUDIO_DAILY_FILINGS"
 APPROVAL_TIMEOUT_ENV = "DOCWIKI_STUDIO_APPROVAL_TIMEOUT_SECONDS"
 QUESTION_TIMEOUT_ENV = "DOCWIKI_STUDIO_QUESTION_TIMEOUT_SECONDS"
 FOUNDRY_ENDPOINT_ENV = "DOCWIKI_FOUNDRY_PROJECT_ENDPOINT"
@@ -22,6 +23,7 @@ FOUNDRY_ENDPOINT_ENV = "DOCWIKI_FOUNDRY_PROJECT_ENDPOINT"
 DEFAULT_MAX_UPLOAD_MB = 50
 DEFAULT_DAILY_QUESTIONS = 100
 DEFAULT_DAILY_UPLOADS = 10
+DEFAULT_DAILY_FILINGS = 20
 DEFAULT_APPROVAL_TIMEOUT_S = 600.0
 DEFAULT_QUESTION_TIMEOUT_S = 1200.0
 
@@ -77,6 +79,8 @@ class StudioConfig:
     daily_questions: int = DEFAULT_DAILY_QUESTIONS
     daily_uploads: int = DEFAULT_DAILY_UPLOADS
     """Each upload of a new or changed file triggers a pipeline run (model calls cost money)."""
+    daily_filings: int = DEFAULT_DAILY_FILINGS
+    """Each answer filed to the wiki triggers a pipeline run (cached: no model cost)."""
     approval_timeout_s: float = DEFAULT_APPROVAL_TIMEOUT_S
     question_timeout_s: float = DEFAULT_QUESTION_TIMEOUT_S
     """Overall deadline of one question, approvals and retries included."""
@@ -106,6 +110,9 @@ class StudioConfig:
             ),
             daily_uploads=int(
                 _positive(values.get(DAILY_UPLOADS_ENV), DEFAULT_DAILY_UPLOADS, DAILY_UPLOADS_ENV)
+            ),
+            daily_filings=int(
+                _positive(values.get(DAILY_FILINGS_ENV), DEFAULT_DAILY_FILINGS, DAILY_FILINGS_ENV)
             ),
             approval_timeout_s=_positive(
                 values.get(APPROVAL_TIMEOUT_ENV), DEFAULT_APPROVAL_TIMEOUT_S, APPROVAL_TIMEOUT_ENV

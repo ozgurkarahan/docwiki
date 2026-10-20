@@ -36,7 +36,7 @@ KEY = "a" * 64
 def test_settings_from_environment_and_overrides():
     env = {
         "DOCWIKI_MODE": "azure",
-        "DOCWIKI_STORAGE_ACCOUNT": "contosowiki01",
+        "DOCWIKI_STORAGE_ACCOUNT": "lamnawiki01",
         "DOCWIKI_AUDIENCE": "public",
         "DOCWIKI_DEBOUNCE_SECONDS": "5",
         "DOCWIKI_LEASE_SECONDS": "45",
@@ -52,8 +52,8 @@ def test_settings_from_environment_and_overrides():
     assert settings.canaries == ("A", "B")
     assert settings.orchestrator == "async"
     assert settings.content_understanding is True
-    assert settings.blob_account_url == "https://contosowiki01.blob.core.windows.net"
-    assert settings.queue_account_url == "https://contosowiki01.queue.core.windows.net"
+    assert settings.blob_account_url == "https://lamnawiki01.blob.core.windows.net"
+    assert settings.queue_account_url == "https://lamnawiki01.queue.core.windows.net"
     assert settings.build_site is None and settings.site_enabled
     defaults = EngineSettings.from_env({})
     assert (defaults.mode, defaults.audience, defaults.debounce_s) == ("local", "internal", 30.0)
@@ -73,9 +73,9 @@ def test_settings_from_environment_and_overrides():
     with pytest.raises(SettingsError):
         _ = EngineSettings.from_env({}).blob_account_url
     url = EngineSettings.from_env(
-        {"DOCWIKI_STORAGE_ACCOUNT": "https://contosowiki01.blob.core.windows.net/"}
+        {"DOCWIKI_STORAGE_ACCOUNT": "https://lamnawiki01.blob.core.windows.net/"}
     )
-    assert url.queue_account_url == "https://contosowiki01.queue.core.windows.net"
+    assert url.queue_account_url == "https://lamnawiki01.queue.core.windows.net"
 
 
 def test_dotenv_parsing_and_pack_resolution(tmp_path: Path):
@@ -300,7 +300,7 @@ def test_overlay_sync_skips_items_already_merged_by_the_mcp_server(tmp_path: Pat
     storage = FolderStorage(tmp_path / "work", fsync=False)
     proposal = new_proposal(
         "glossary",
-        GlossaryProposalPayload(term="LOTO", definition="Lockout/tagout.", synonyms={}),
+        GlossaryProposalPayload(term="HT", definition="Price excluding VAT.", synonyms={}),
         created_at=datetime(2026, 2, 1, tzinfo=UTC),
     ).model_copy(
         update={
@@ -320,7 +320,7 @@ def test_overlay_sync_skips_items_already_merged_by_the_mcp_server(tmp_path: Pat
     assert storage.read_bytes(StorageKeys.OVERLAY) == merged
     assert json.loads(storage.read_bytes(APPLIED_KEY))["applied"] == [proposal.id]
     domain, _ = store.domain_pack(pack)
-    assert [term.term for term in domain.glossary.terms if term.term == "LOTO"] == ["LOTO"]
+    assert [term.term for term in domain.glossary.terms if term.term == "HT"] == ["HT"]
 
 
 def test_lane_package_versions_feed_the_stage_version(monkeypatch: pytest.MonkeyPatch):

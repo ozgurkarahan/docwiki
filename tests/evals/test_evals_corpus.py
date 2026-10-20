@@ -7,20 +7,27 @@ import json
 from pathlib import Path
 
 import pytest
-from evals.corpus import CorpusContext, CorpusManifest, ExtractionCache, ReleaseCatalog
+from evals.corpus import (
+    CorpusContext,
+    CorpusFile,
+    CorpusManifest,
+    ExtractionCache,
+    ReleaseCatalog,
+    SourceResolver,
+)
 from evals.locators import compact_keys, is_key, keys_match, locator_key_from_label
 from evals.records import Citation
 from evals_testkit import (
-    CHECKLIST,
     DECK,
-    LOG,
+    HELD_BACK,
     MAIL,
-    MANUAL,
+    MINUTES,
     NOTE,
-    QS_MANUAL,
-    RATES,
-    SOP,
-    STOCK,
+    ORDERS,
+    PHOTO,
+    PLAN,
+    QUOTE,
+    STUDY,
     TALK,
     cite,
     file_sha,
@@ -37,32 +44,57 @@ from docwiki.contracts.locators import CsvRowsLocator, DocxTableLocator, XlsxRow
 def test_manifest_scopes_and_audience(corpus: CorpusContext) -> None:
     manifest = corpus.manifest
     full = {entry.path for entry in manifest.select("full", "public")}
-    assert MANUAL in full and RATES not in full
+    assert QUOTE in full and STUDY not in full and HELD_BACK not in full
     assert all(path.startswith("full/") for path in full)
-    assert RATES in {entry.path for entry in manifest.select("full", "restricted")}
-    assert [entry.path for entry in manifest.select("quickstart")] == [MANUAL, MAIL, CHECKLIST]
-    assert not any(entry.held_back for entry in manifest.select("all", "restricted"))
-    with pytest.raises(ValueError, match="unknown corpus scope"):
-        manifest.select("everything")
+    assert STUDY in {entry.path for entry in manifest.select("full", "restricted")}
+    # "all" is full/ plus the held-back revisions of held-back/
+    assert {entry.path for entry in manifest.select("all", "public")} == full | {HELD_BACK}
+    assert STUDY in {entry.path for entry in manifest.select("all", "restricted")}
+    for scope in ("quickstart", "everything"):
+        with pytest.raises(ValueError, match="unknown corpus scope"):
+            manifest.select(scope)
 
 
-def test_manifest_canonical_copies_and_hashes(corpus: CorpusContext) -> None:
+def test_an_empty_selection_is_an_error() -> None:
+    study = CorpusFile(path="full/restricted/etude.xlsx", sha256="0" * 64, sensitivity="restricted")
+    manifest = CorpusManifest([study])
+    with pytest.raises(ValueError, match=r"no document in scope 'full' that the 'public' audience"):
+        manifest.select("full", "public")
+    assert [entry.path for entry in manifest.select("full", "restricted")] == [study.path]
+    with pytest.raises(ValueError, match="no document in scope 'all'"):
+        CorpusManifest([]).select("all")
+    held_back_only = CorpusManifest([CorpusFile(path="held-back/planning.xlsx", sha256="1" * 64)])
+    with pytest.raises(ValueError, match="no document in scope 'full'"):
+        held_back_only.select("full")
+    assert len(held_back_only.select("all")) == 1
+
+
+def test_manifest_hashes_and_sensitivity(corpus: CorpusContext) -> None:
     manifest = corpus.manifest
-    assert manifest.canonical(QS_MANUAL) == MANUAL
-    assert manifest.canonical(MANUAL) == MANUAL
-    assert manifest.by_sha256("sha256:" + file_sha(MANUAL)) == MANUAL
-    assert manifest.by_sha256(file_sha(MANUAL).upper()) == MANUAL
-    assert manifest.sensitivity(RATES) == "restricted"
-    assert QS_MANUAL not in {entry.path for entry in manifest.documents()}
+    assert manifest.by_sha256("sha256:" + file_sha(QUOTE)) == QUOTE
+    assert manifest.by_sha256(file_sha(QUOTE).upper()) == QUOTE
+    assert manifest.by_sha256("0" * 64) is None
+    assert manifest.sensitivity(STUDY) == "restricted"
+    assert manifest.sensitivity(QUOTE) == "public"
+    assert manifest.sensitivity("full/unknown.pdf") is None
+    assert {entry.path for entry in manifest.documents()} == set(manifest.files)
 
 
 def test_real_manifest_loads(repo_root: Path) -> None:
     manifest = CorpusManifest.load(repo_root / "samples" / "corpus")
     assert len(manifest.sha256) == 64
-    assert len(manifest.select("quickstart")) == 12
-    assert all(entry.copy_of is None for entry in manifest.select("quickstart"))
+    assert len(manifest.documents()) == 14
+    full = manifest.select("full")
+    assert len(full) == 12 and all(entry.path.startswith("full/") for entry in full)
     restricted = [entry for entry in manifest.documents() if entry.sensitivity == "restricted"]
-    assert restricted and not set(restricted) & set(manifest.select("full", "public"))
+    assert len(restricted) == 1 and not set(restricted) & set(full)
+    assert len(manifest.select("full", "restricted")) == 13
+    held_back = [entry for entry in manifest.documents() if entry.held_back]
+    assert len(held_back) == 1 and held_back[0].path.startswith("held-back/")
+    assert {entry.path for entry in manifest.select("all")} == {
+        *(entry.path for entry in full),
+        held_back[0].path,
+    }
 
 
 # ------------------------------------------------------------------------------ resolver
@@ -78,44 +110,44 @@ def _resolve(
 @pytest.mark.parametrize(
     "raw_path",
     [
-        MANUAL,
-        QS_MANUAL,
-        MANUAL.removeprefix("full/"),
-        "LWS-MM-GBX-32_RevD_manual.pdf",
-        "samples/corpus/" + MANUAL,
+        QUOTE,
+        QUOTE.removeprefix("full/"),
+        "DEV-2026-014_indice-B_devis-extension-et-cuisine.pdf",
+        "samples/corpus/" + QUOTE,
     ],
 )
 def test_source_ids_derived_from_deployment_paths(corpus: CorpusContext, raw_path: str) -> None:
     """A release built from full/, from its content or from the repository maps back to full/."""
-    citation = Citation(source_id=source_id_for(raw_path), locator_key="p0003")
-    assert _resolve(corpus, citation) == (MANUAL, "p0003", "source_id")
+    citation = Citation(source_id=source_id_for(raw_path), locator_key="p0002")
+    assert _resolve(corpus, citation) == (QUOTE, "p0002", "source_id")
 
 
 def test_hash_mapping_through_the_release_catalog() -> None:
     corpus = mini_corpus(renamed_catalog())
-    path, key, via = _resolve(corpus, Citation(source_id="src-0123456789ab", locator_key="p0004"))
-    assert (path, key, via) == (MANUAL, "p0004", "source_id")
-    # the stock list has no hash in that catalog and an unknown raw path: unresolved
+    path, key, via = _resolve(corpus, Citation(source_id="src-0123456789ab", locator_key="p0002"))
+    assert (path, key, via) == (QUOTE, "p0002", "source_id")
+    # the purchase tracking has no hash in that catalog and an unknown raw path: unresolved
     assert _resolve(corpus, Citation(source_id="src-ba9876543210", locator_key="p0001"))[0] is None
     # catalog source titles also identify sources
-    title = Citation(title="Gearbox manual (LT-32, Rev. D)", label="p. 3")
-    assert _resolve(corpus, title) == (MANUAL, "p0003", "title")
+    title = Citation(title="Quote DEV-2026-014 (indice B)", label="p. 2")
+    assert _resolve(corpus, title) == (QUOTE, "p0002", "title")
 
 
-def test_sha256_wins_and_quickstart_copies_are_canonical(corpus: CorpusContext) -> None:
-    citation = Citation(sha256="sha256:" + file_sha(QS_MANUAL), locator_key="p0003")
-    assert _resolve(corpus, citation) == (MANUAL, "p0003", "sha256")
-    assert _resolve(corpus, cite(QS_MANUAL, "p0001"))[0] == MANUAL
+def test_sha256_wins_over_the_other_hints(corpus: CorpusContext) -> None:
+    citation = Citation(sha256="sha256:" + file_sha(QUOTE), source_path=PLAN, locator_key="p0002")
+    assert _resolve(corpus, citation) == (QUOTE, "p0002", "sha256")
+    assert _resolve(corpus, cite(QUOTE, "p0001")) == (QUOTE, "p0001", "path")
 
 
 @pytest.mark.parametrize(
     ("raw_path", "expected"),
     [
-        (STOCK, STOCK),
-        ("records/spare-parts-stock-2026-07-21.xlsx", STOCK),
-        ("raw/full/records/spare-parts-stock-2026-07-21.xlsx", STOCK),
-        ("full\\records\\spare-parts-stock-2026-07-21.xlsx", STOCK),
-        ("./" + STOCK, STOCK),
+        (PLAN, PLAN),
+        ("planning/PLN-2026-003_indice-A_planning-et-suivi-des-achats.xlsx", PLAN),
+        ("raw/full/planning/PLN-2026-003_indice-A_planning-et-suivi-des-achats.xlsx", PLAN),
+        ("full\\planning\\PLN-2026-003_indice-A_planning-et-suivi-des-achats.xlsx", PLAN),
+        ("./" + PLAN, PLAN),
+        ("planning/PLN-2026-003_indice-B_planning-et-suivi-des-achats.xlsx", HELD_BACK),
         ("unknown/file.pdf", None),
         ("", None),
     ],
@@ -126,10 +158,10 @@ def test_path_mapping(corpus: CorpusContext, raw_path: str, expected: str | None
 
 def test_manifest_titles_identify_sources(corpus: CorpusContext) -> None:
     citation = Citation(
-        title="RE: Applicability of SB-LWS-2025-07 to Quellmoor Ridge",
-        label="message body, lines 10–12",
+        title="Report de livraison - commande BC-2026-009 (chantier Moreau, Valbrise)",
+        label="message body, lines 5–9",
     )
-    assert _resolve(corpus, citation) == (MAIL, "msg-body-l0010-l0012", "title")
+    assert _resolve(corpus, citation) == (MAIL, "msg-body-l0005-l0009", "title")
 
 
 def test_unresolvable_citation(corpus: CorpusContext) -> None:
@@ -138,7 +170,7 @@ def test_unresolvable_citation(corpus: CorpusContext) -> None:
 
 
 def test_restricted_sources_carry_their_sensitivity(corpus: CorpusContext) -> None:
-    resolved = corpus.resolver.resolve(cite(RATES, "sheet-rates-2026-r0002-r0002"), unit="1")
+    resolved = corpus.resolver.resolve(cite(STUDY, "sheet-etude-de-prix-r0002-r0002"), unit="1")
     assert resolved.sensitivity == "restricted"
 
 
@@ -155,8 +187,8 @@ def test_restricted_sources_carry_their_sensitivity(corpus: CorpusContext) -> No
         ("tbl-02-r0005-r0005", "tbl-02-r0003-r0007", True),
         ("tbl-02-r0005-r0005", "tbl-01-r0005-r0005", False),
         ("tbl-02-r0005-r0005", "tbl-02-r0006-r0008", False),
-        ("sheet-stock-r0002-r0002", "sheet-stock-r0001-r0024", True),
-        ("sheet-stock-r0002-r0002", "sheet-movements-r0002-r0002", False),
+        ("sheet-achats-r0002-r0002", "sheet-achats-r0001-r0024", True),
+        ("sheet-achats-r0002-r0002", "sheet-planning-r0002-r0002", False),
         ("r0026-r0026", "r0020-r0030", True),
         ("r0026-r0026", "r0027-r0030", False),
         ("slide-04", "slide-04", True),
@@ -191,12 +223,12 @@ def test_compact_keys_merges_adjacent_ranges() -> None:
         "l0001-l0011",
         "l0020-l0021",
     ]
-    assert compact_keys(["sheet-stock-r0001-r0001", "sheet-stock-r0002-r0002"]) == [
-        "sheet-stock-r0001-r0002"
+    assert compact_keys(["sheet-achats-r0001-r0001", "sheet-achats-r0002-r0002"]) == [
+        "sheet-achats-r0001-r0002"
     ]
-    assert compact_keys(["sheet-stock-r0002-r0002", "sheet-movements-r0003-r0003"]) == [
-        "sheet-stock-r0002-r0002",
-        "sheet-movements-r0003-r0003",
+    assert compact_keys(["sheet-achats-r0002-r0002", "sheet-planning-r0003-r0003"]) == [
+        "sheet-achats-r0002-r0002",
+        "sheet-planning-r0003-r0003",
     ]
     assert compact_keys(["p0001", "p0002", "p0001"]) == ["p0001", "p0002"]
     assert compact_keys(["para-0001", "para-0002"]) == ["para-0001", "para-0002"]
@@ -214,8 +246,8 @@ def test_compact_keys_merges_adjacent_ranges() -> None:
         ("¶ 42", "para-0042"),
         ("table 2, rows 3–7", "tbl-02-r0003-r0007"),
         ("table 2, row 5", "tbl-02-r0005-r0005"),
-        ('sheet "Stock", rows 12–20', "sheet-stock-r0012-r0020"),
-        ('sheet "Plan 2026", row 4', "sheet-plan-2026-r0004-r0004"),
+        ('sheet "Achats", rows 12–20', "sheet-achats-r0012-r0020"),
+        ('sheet "Planning 2026", row 4', "sheet-planning-2026-r0004-r0004"),
         ("rows 12–20", "r0012-r0020"),
         ("row 26", "r0026-r0026"),
         ("slide 5", "slide-05"),
@@ -249,15 +281,15 @@ def test_query_table_labels_need_the_document(corpus: CorpusContext) -> None:
         )
         return corpus.docs[path].model_copy(update={"tables": [table]})
 
-    csv_doc = with_table(LOG, CsvRowsLocator(row_start=1, row_end=5))
+    csv_doc = with_table(ORDERS, CsvRowsLocator(row_start=1, row_end=5))
     assert locator_key_from_label("table t01, rows r0002–r0004", doc=csv_doc) == "r0002-r0004"
     assert locator_key_from_label("table t01, row r0003", doc=csv_doc) == "r0003-r0003"
     assert locator_key_from_label("table t09, rows r0002–r0004", doc=csv_doc) is None
     assert locator_key_from_label("table t01, rows r0002–r0004") is None
-    sheet_doc = with_table(STOCK, XlsxRowsLocator(sheet="Stock", row_start=1, row_end=24))
+    sheet_doc = with_table(PLAN, XlsxRowsLocator(sheet="Achats", row_start=1, row_end=9))
     label = "table t01, rows r0002–r0004"
-    assert locator_key_from_label(label, doc=sheet_doc) == "sheet-stock-r0002-r0004"
-    docx_doc = with_table(SOP, DocxTableLocator(table=2, row_start=1, row_end=3))
+    assert locator_key_from_label(label, doc=sheet_doc) == "sheet-achats-r0002-r0004"
+    docx_doc = with_table(MINUTES, DocxTableLocator(table=2, row_start=1, row_end=3))
     assert locator_key_from_label(label, doc=docx_doc) == "tbl-02-r0002-r0004"
 
 
@@ -266,22 +298,22 @@ def test_query_table_labels_need_the_document(corpus: CorpusContext) -> None:
 
 def test_evidence_text_at_metric_granularity(corpus: CorpusContext) -> None:
     evidence = corpus.evidence
-    page = evidence.text(MANUAL, "p0003") or ""
-    assert "410 L" in page and "PWG 320" in page and "4.5 mm/s" not in page
-    rows = evidence.text(STOCK, "sheet-stock-r0001-r0003") or ""
-    assert "FGT-P-22328" in rows and "LWS-P-30418" in rows and "FGT-P-11872" not in rows
-    assert "CCV" in (evidence.text(MAIL, "msg-body") or "")
-    assert "KW 40" in (evidence.text(NOTE, "l0010-l0010") or "")
-    assert "300 metres" in (evidence.text(TALK, "cue-00-02-01") or "")
-    assert "high-speed" in (evidence.text(DECK, "slide-04") or "")
-    assert "280 Nm" in (evidence.text(SOP, "tbl-02-r0002-r0003") or "")
-    assert evidence.text(CHECKLIST, "*") == ""  # OCR without OCR: the locator exists, no text
-    assert evidence.text(MANUAL, "p0009") is None
+    page = evidence.text(QUOTE, "p0002") or ""
+    assert "44943,60 €" in page and "TVA 20 %" in page and "2,40 m" not in page
+    rows = evidence.text(PLAN, "sheet-achats-r0001-r0003") or ""
+    assert "BC-2026-008" in rows and "BC-2026-009" in rows and "T07" not in rows
+    assert "BC-2026-009" in (evidence.text(MAIL, "msg-body") or "")
+    assert "semaine 17" in (evidence.text(NOTE, "l0010-l0010") or "")
+    assert "2,40 mètres" in (evidence.text(TALK, "cue-00-02-01") or "")
+    assert "Baie de liaison" in (evidence.text(DECK, "slide-04") or "")
+    assert "27/03/2026" in (evidence.text(MINUTES, "tbl-02-r0002-r0003") or "")
+    assert evidence.text(PHOTO, "*") == ""  # OCR without OCR: the locator exists, no text
+    assert evidence.text(QUOTE, "p0009") is None
     assert evidence.text("full/unknown.pdf", "p0001") is None
 
 
 def test_restricted_fingerprint(corpus: CorpusContext) -> None:
-    assert corpus.fingerprint == {"18400", "42000", "ts-600c-02"}
+    assert corpus.fingerprint == {"3324.26", "34518.74", "zm-61078"}
 
 
 # ---------------------------------------------------------------------------- catalog io
@@ -291,12 +323,12 @@ def test_release_catalog_loading(tmp_path: Path, repo_root: Path) -> None:
     mock = repo_root / "samples" / "fixtures" / "mock-release"
     for location in (mock, mock / "releases"):
         catalog = ReleaseCatalog.load(location)
-        assert catalog.release_id == "20260215T090000Z-decd4b59"
+        assert catalog.release_id == "20260401T090000Z-7ce99a3f"
         assert catalog.audience == "public"
         assert {source.source_id for source in catalog.sources} == {
-            "src-43c97f7dfcde",
-            "src-4d9c65e05302",
-            "src-f2750f41f3fa",
+            "src-165f1d3a109c",
+            "src-86eabe3d6d0d",
+            "src-c6436ec50050",
         }
         assert all(source.sha256 and len(source.sha256) == 64 for source in catalog.sources)
         assert any(source.title for source in catalog.sources)
@@ -312,19 +344,33 @@ def test_release_catalog_loading(tmp_path: Path, repo_root: Path) -> None:
         ReleaseCatalog.load(tmp_path / "missing")
 
 
+def test_mock_release_sources_map_to_the_corpus(repo_root: Path) -> None:
+    """The release fixture and the sample corpus agree on raw paths (no hash in the fixture)."""
+    manifest = CorpusManifest.load(repo_root / "samples" / "corpus")
+    catalog = ReleaseCatalog.load(repo_root / "samples" / "fixtures" / "mock-release")
+    resolver = SourceResolver(manifest, catalog)
+    assert resolver.path_for_id("src-165f1d3a109c") == (
+        "full/chantier/2026-03-24_compte-rendu-de-chantier-n3.docx"
+    )
+    assert resolver.path_for_id("src-86eabe3d6d0d") == (
+        "held-back/planning/PLN-2026-003_indice-B_planning-et-suivi-des-achats.xlsx"
+    )
+    assert resolver.path_for_id("src-000000000000") is None
+
+
 # -------------------------------------------------------------------------- extraction
 
 
 def test_extraction_cache_extracts_once_and_reuses(tmp_path: Path, repo_root: Path) -> None:
     corpus_root = repo_root / "samples" / "corpus"
     manifest = CorpusManifest.load(corpus_root)
-    target = manifest.get("full/field/2026-08-03_lieferantenhinweis-fabrikam.txt")
+    target = manifest.get(MAIL)
     assert target is not None
     cache = ExtractionCache(corpus_root, tmp_path / "cache")
     docs = asyncio.run(cache.load([target]))
     doc = docs[target.path]
     assert doc.source_id == source_id_for(target.path)
-    assert any("PO-76994" in block.text for block in doc.blocks)
+    assert any("BC-2026-009" in block.text for block in doc.blocks)
     cached = list((tmp_path / "cache" / "extract").rglob("*.json"))
     assert len(cached) == 1 and cache.version().startswith("local-")
     again = asyncio.run(ExtractionCache(corpus_root, tmp_path / "cache").load([target]))

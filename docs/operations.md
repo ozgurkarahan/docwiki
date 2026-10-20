@@ -31,7 +31,8 @@ The hooks keep a local record of the Entra objects they created in
    `azcopy login`, or `az storage blob upload-batch … --auth-mode login`). Paths become source
    IDs, so keep a stable folder layout; replacing a file with the same path is a new revision
    of the same source.
-2. Event Grid turns every BlobCreated/BlobDeleted under `raw/` into a message on `ingest`.
+2. Event Grid turns every BlobCreated/BlobDeleted under `raw/` into a message on `ingest` (and
+   every answer filed into `work/inbox/queries/`, see [agents](agents.md#filing-an-answer-into-the-wiki)).
    KEDA polls the queue every 30 s and starts one execution of the ingest job (never more than
    one). The job takes the blob lease `work/state/lease`, waits 30 s to batch bursts, diffs
    `raw/` against the state shards, compiles only what changed and publishes a new release.
@@ -48,6 +49,10 @@ az containerapp job start --name $(azd env get-value DOCWIKI_RECONCILE_JOB_NAME)
 The reconcile job also runs on its schedule (`DOCWIKI_RECONCILE_CRON`, default every 6 hours)
 and catches lost wake-ups. Starting the ingest job by hand is equivalent when
 `DOCWIKI_ENABLE_EVENT_TRIGGER=false` (the ingest job is then a manual job).
+
+To replace every document and every release at once (for example when the sample corpus or its
+domain pack changes), follow [Reset the sample data](../BOOTSTRAP.md#reset-the-sample-data): it
+backs the data up, pauses the writers and starts from empty containers.
 
 ## Recompile sources with hints
 
@@ -161,10 +166,9 @@ the pointer forward again; pause the triggers first if that is not wanted
   currency) notifies the action group at 50, 80 and 100 % of actual cost. Contacts come from
   `BUDGET_CONTACT_EMAILS`; without contacts no budget is created. Change either with
   `azd env set …` and `azd provision`.
-- Expect one-time costs while experimenting: a full ingest of the 38-document sample cost about
-  USD 19 in the first live run (gpt-5.5 / gpt-5.4-mini, Data Zone list prices from the
-  unverified price table), so the 50 alert can fire in the first days of tests and re-ingests.
-  An idle environment costs close to nothing.
+- Expect one-time costs while experimenting: a full ingest compiles every document and rebuilds
+  every entity summary and topic synthesis (see [cost](cost.md)), so the 50 alert can fire in the
+  first days of tests and re-ingests. An idle environment costs close to nothing.
 - Cost drivers: tokens on `fast` and `smart` (pay-per-token), Content Understanding pages, Log
   Analytics ingestion, the Basic registry, storage. Everything else scales to zero (the disabled
   portal app is kept at zero replicas by a `dormant` cron scale rule that is never active); keep
@@ -231,8 +235,13 @@ minute per capacity unit).
     with an attribute-based condition), enqueues on `ingest`; no `raw/`, no Foundry;
   - portal (`DOCWIKI_PORTAL_IDENTITY_*`): reads `releases/`;
   - Studio (`DOCWIKI_STUDIO_IDENTITY_*`): uploads to `raw/` (Blob Data Contributor with a
-    condition that denies deletes), reads `work/` and `releases/`, peeks the `ingest` queue, asks
-    the Foundry agents (Azure AI User).
+    condition that denies deletes), reads `work/` and writes filed answers only under
+    `work/inbox/queries/` (the custom role "DocWiki Studio inbox writer (<storage account>)":
+    blob read, write and create only, no delete, move or container management, with a
+    condition that allows no other write), reads `releases/`, peeks the `ingest` queue, asks
+    the Foundry agents (Azure AI User). An environment provisioned before this change keeps its
+    former Blob Data Reader assignment on `work`: harmless (read only), delete it by hand if
+    you wish.
 
   List them with
   `az role assignment list --assignee $(azd env get-value DOCWIKI_MCP_IDENTITY_PRINCIPAL_ID) --all --output table`
@@ -302,10 +311,11 @@ minute per capacity unit).
 `DOCWIKI_NETWORK_PERIMETER=true` (then `azd provision`) secures the storage account with a
 network security perimeter: only managed identities of the subscription and the CIDR ranges in
 `DOCWIKI_ALLOWED_IP_RANGES` (operator uploads; kept in the azd environment, never committed)
-get through. Event Grid cannot create or re-create its `raw-to-ingest` subscription inside the
-perimeter: create it first with a provision without the perimeter (it keeps delivering
-afterwards), or temporarily turn the perimeter off to re-create it. Without the subscription,
-uploads are picked up by the reconcile schedule, a manual job start or an ingest message.
+get through. Event Grid cannot create or re-create its `raw-to-ingest` and `inbox-to-ingest`
+subscriptions inside the perimeter: create them first with a provision without the perimeter (they
+keep delivering afterwards), or temporarily turn the perimeter off to re-create them. Without the
+subscriptions, uploads and filed answers are picked up by the reconcile schedule, a manual job
+start or an ingest message.
 
 ## Logs and queries
 

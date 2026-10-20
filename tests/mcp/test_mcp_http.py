@@ -154,7 +154,7 @@ def test_researcher_lists_every_tool_but_calls_read_tools_only(
     # Not filtered per role: Agent Service caches a connection's tool list across the agents
     # that share it, so a Researcher's list would hide the Librarian's operations tools.
     assert tool_names(rpc(easyauth, "tools/list", caller=RESEARCHER)) == ALL_TOOLS
-    found = call(easyauth, "search", {"query": "gearbox oil"}, RESEARCHER)
+    found = call(easyauth, "search", {"query": "livraison des menuiseries"}, RESEARCHER)
     assert found["ok"] is True and found["hits"]
     with caplog.at_level(logging.INFO, logger="docwiki.mcp.auth"):
         denied = call(easyauth, "ingest_start", {"reason": "try"}, RESEARCHER)

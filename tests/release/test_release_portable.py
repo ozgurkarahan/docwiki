@@ -23,8 +23,9 @@ from docwiki.release import (
 )
 
 FIXTURE_ROOT = Path(__file__).resolve().parents[2] / "samples" / "fixtures" / "mock-release"
-RELEASE = "20260215T090000Z-decd4b59"
-SOP_A, SOP_B, PLAN = "src-f2750f41f3fa", "src-4d9c65e05302", "src-43c97f7dfcde"
+RELEASE = "20260401T090000Z-7ce99a3f"
+PLAN_A, PLAN_B, MINUTES = "src-c6436ec50050", "src-86eabe3d6d0d", "src-165f1d3a109c"
+TOPIC = "topics/schedule-and-window-delivery.md"
 CANARY = "DOCWIKI-CANARY-TEST-TOKEN"
 
 
@@ -68,9 +69,10 @@ def test_export_layout_and_validation(portable: Path) -> None:
         ".docwiki/manifest.json",
         ".docwiki/search.db",
         ".docwiki/tables",
-        f".docwiki/tables/{PLAN}",
-        f".docwiki/tables/{PLAN}/index.json",
-        f".docwiki/tables/{PLAN}/t01.parquet",
+        f".docwiki/tables/{PLAN_B}",
+        f".docwiki/tables/{PLAN_B}/index.json",
+        f".docwiki/tables/{PLAN_B}/t01.parquet",
+        f".docwiki/tables/{PLAN_B}/t02.parquet",
     ]
     release = FIXTURE_ROOT / "releases" / RELEASE
     assert (portable / ".docwiki/manifest.json").read_bytes() == (
@@ -96,28 +98,34 @@ def test_reader_on_the_portable_folder(portable: Path) -> None:
     assert reader.file_for("wiki/index.md") == portable / "index.md"
     assert reader.file_for("site/index.html") is None
 
-    page = reader.read_page("topic:gearbox-oil")
+    page = reader.read_page("topic:schedule-and-window-delivery")
     assert page.frontmatter.contradictions == 1  # type: ignore[union-attr]
-    assert reader.read_page("sources/sop-gbx-010-rev-a.md").frontmatter.status == "superseded"  # type: ignore[union-attr]
-    assert "ISO VG 320" in reader.read_section("topic:gearbox-oil", "Contradictions")
-    assert {edge.kind for edge in reader.links(SOP_A)["backlinks"]} >= {"supersedes", "topic-of"}
-    evidence = reader.resolve_evidence(SOP_B, "para-0004")
-    assert evidence.path == f"evidence/{SOP_B}/para-0004.md" and "ISO VG 220" in evidence.body
-    assert reader.content_file(evidence.path) == portable / "evidence" / SOP_B / "para-0004.md"
-    assert reader.list_evidence(SOP_A) == [f"evidence/{SOP_A}/p0001.md"]
-    assert len(reader.list_evidence()) == 3
+    old_plan = reader.read_page("sources/pln-2026-003-indice-a-planning-et-suivi-des-achats.md")
+    assert old_plan.frontmatter.status == "superseded"  # type: ignore[union-attr]
+    contradictions = reader.read_section("topic:schedule-and-window-delivery", "Contradictions")
+    assert "70 %" in contradictions
+    assert {edge.kind for edge in reader.links(PLAN_A)["backlinks"]} >= {"supersedes", "topic-of"}
+    evidence = reader.resolve_evidence(MINUTES, "para-0011")
+    assert evidence.path == f"evidence/{MINUTES}/para-0011.md" and "20/04/2026" in evidence.body
+    assert reader.content_file(evidence.path) == portable / "evidence" / MINUTES / "para-0011.md"
+    assert reader.list_evidence(PLAN_A) == [f"evidence/{PLAN_A}/p0001.md"]
+    assert len(reader.list_evidence()) == 5
 
-    assert reader.sources_with_tables() == [PLAN]
-    assert reader.table_file(PLAN, "t01") == portable / ".docwiki" / "tables" / PLAN / "t01.parquet"
-    result = reader.query_table(PLAN, "SELECT row_id, asset FROM t01 WHERE hours = 2")
-    assert result.rows == [["r0003", "WTG-07"]]
-    assert read_tables_index(portable, PLAN).entry("t01").row_count == 3
-    assert query_tables(portable, PLAN, "SELECT count(*) FROM t01").rows == [[3]]
+    assert reader.sources_with_tables() == [PLAN_B]
+    assert reader.table_file(PLAN_B, "t01") == (
+        portable / ".docwiki" / "tables" / PLAN_B / "t01.parquet"
+    )
+    result = reader.query_table(
+        PLAN_B, "SELECT row_id, tache FROM t01 WHERE lot = '5' AND intervenant LIKE 'VanArsdel%'"
+    )
+    assert result.rows == [["r0008", "T07"]]
+    assert read_tables_index(portable, PLAN_B).entry("t01").row_count == 23
+    assert query_tables(portable, PLAN_B, "SELECT count(*) FROM t01").rows == [[23]]
 
     for fallback in (False, True):
         with reader.open_search(force_fallback=fallback) as index:
-            hits = index.search("drain warm", kinds=["source-block"])
-            assert (hits[0].source_id, hits[0].locator_key) == (SOP_A, "p0001")
+            hits = index.search("annoncé report", kinds=["source-block"])
+            assert (hits[0].source_id, hits[0].locator_key) == (MINUTES, "para-0011")
     assert [skill.name for skill in reader.list_skills()] == [
         "cite-sources",
         "deep-research",
@@ -239,17 +247,17 @@ def edit(path: Path, old: str, new: str) -> None:
 
 def test_validator_reports_portable_paths(portable: Path) -> None:
     edit(
-        portable / "topics" / "gearbox-oil.md",
-        "(../entities/asset/wtg-12.md)",
-        "(../entities/asset/wtg-13.md)",
+        portable / TOPIC,
+        "(../entities/work-package/lot-3-gros-oeuvre.md)",
+        "(../entities/work-package/lot-13-gros-oeuvre.md)",
     )
     (portable / "notes.md").write_text("# Notes\n", encoding="utf-8")
     (portable / ".docwiki" / "search.db").unlink()
     (portable / ".git").mkdir()
     (portable / ".git" / "HEAD").write_text("ref\n", encoding="utf-8")
     found = {(v.gate, v.code, v.path) for v in validate_release(portable)}
-    assert ("G02", "link-unresolved", "topics/gearbox-oil.md") in found
-    assert ("G01", "file-hash-mismatch", "topics/gearbox-oil.md") in found
+    assert ("G02", "link-unresolved", TOPIC) in found
+    assert ("G01", "file-hash-mismatch", TOPIC) in found
     assert ("G01", "file-unlisted", "notes.md") in found
     assert ("G01", "frontmatter-invalid", "notes.md") in found
     assert ("G01", "file-missing", ".docwiki/search.db") in found

@@ -1,6 +1,6 @@
 """Invoke the deployed DocWiki agents through the project's Responses API (``docwiki ask``).
 
-    answer = await ask("Which gearbox oil grade applies to WTG-07 in winter?")
+    answer = await ask("When are the windows of the extension delivered?")
     print(answer.text, answer.sources)
 
 The call follows the Foundry pattern for prompt agents (verified against azure-ai-projects 2.9 and

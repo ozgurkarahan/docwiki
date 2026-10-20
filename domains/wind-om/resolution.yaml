@@ -1,8 +1,0 @@
-# Contradiction resolution policy, stated on topic pages (never applied silently).
-order: [authority, recency]
-notes: >-
-  When two current sources disagree, the source with the higher document-type authority wins
-  (environmental permit 10; service bulletin and grid instruction 9; maintenance manual and
-  management of change 8; procedures, laboratory and inspection reports 7). With equal
-  authority the more recent source wins. A service bulletin that amends a manual section for
-  some turbines is shown next to the manual value, with the turbines it applies to.

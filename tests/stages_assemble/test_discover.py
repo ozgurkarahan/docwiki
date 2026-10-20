@@ -14,7 +14,10 @@ from docwiki.contracts.storage import FolderStorage
 from docwiki.stages.discover import SupersessionRecord, discover, resolve_supersession
 from docwiki.storage.routed import DirectorySource, RoutedStorage
 
-NOW = datetime(2026, 2, 15, 9, 0, tzinfo=UTC)
+NOW = datetime(2026, 4, 1, 9, 0, tzinfo=UTC)
+QUOTE_A = "devis/DEV-2026-014 indice A.txt"
+QUOTE_B = "devis/DEV-2026-014 indice B.txt"
+PRICE_STUDY = "restricted/etude de prix.txt"
 
 
 class CountingStorage(RoutedStorage):
@@ -35,9 +38,9 @@ def _write(root: Path, rel: str, text: str) -> None:
 
 def _setup(tmp_path: Path) -> tuple[CountingStorage, Path]:
     raw = tmp_path / "raw"
-    _write(raw, "procedures/SOP-GBX-010 rev A.txt", "rev A\n")
-    _write(raw, "procedures/SOP-GBX-010 rev B.txt", "rev B supersedes nothing\n")
-    _write(raw, "contracts/rate card.txt", "rates\n")
+    _write(raw, QUOTE_A, "indice A\n")
+    _write(raw, QUOTE_B, "indice B without any explicit reference\n")
+    _write(raw, PRICE_STUDY, "prices\n")
     _write(raw, "images/diagram.svg", "<svg/>")
     _write(raw, ".git/config", "ignored")
     storage = CountingStorage(
@@ -51,13 +54,13 @@ def test_new_unchanged_changed_and_deleted_sources(tmp_path: Path):
     storage, raw = _setup(tmp_path)
     domain = pack()
     plan = discover(storage, domain, now=NOW)
-    rev_a = source_id_for("procedures/SOP-GBX-010 rev A.txt")
-    rev_b = source_id_for("procedures/SOP-GBX-010 rev B.txt")
-    card = source_id_for("contracts/rate card.txt")
-    assert sorted(plan.new) == sorted([rev_a, rev_b, card])
+    rev_a = source_id_for(QUOTE_A)
+    rev_b = source_id_for(QUOTE_B)
+    study = source_id_for(PRICE_STUDY)
+    assert sorted(plan.new) == sorted([rev_a, rev_b, study])
     assert [skipped.raw_path for skipped in plan.skipped] == ["images/diagram.svg"]
-    assert plan.items[card].state.sensitivity == "restricted"
-    assert plan.items[rev_a].state.revision_group == "SOP-GBX-010"
+    assert plan.items[study].state.sensitivity == "restricted"
+    assert plan.items[rev_a].state.revision_group == "DEV-2026-014"
     assert plan.supersedes == [(rev_b, rev_a)]
     assert plan.has_changes
     shard = SourceState.from_json(storage.read_bytes(source_state_key(rev_a)))
@@ -65,30 +68,30 @@ def test_new_unchanged_changed_and_deleted_sources(tmp_path: Path):
 
     storage.reads.clear()
     again = discover(storage, domain, now=NOW + timedelta(minutes=1))
-    assert sorted(again.unchanged) == sorted([rev_a, rev_b, card])
+    assert sorted(again.unchanged) == sorted([rev_a, rev_b, study])
     assert not again.has_changes
     assert [key for key in storage.reads if key.startswith("raw/")] == []
 
-    _write(raw, "procedures/SOP-GBX-010 rev B.txt", "rev B changed\n")
-    (raw / "contracts" / "rate card.txt").unlink()
+    _write(raw, QUOTE_B, "indice B changed\n")
+    (raw / "restricted" / "etude de prix.txt").unlink()
     later = discover(storage, domain, now=NOW + timedelta(minutes=2))
     assert later.changed == [rev_b]
-    assert later.deleted == [card]
-    tombstone = SourceState.from_json(storage.read_bytes(source_state_key(card)))
+    assert later.deleted == [study]
+    tombstone = SourceState.from_json(storage.read_bytes(source_state_key(study)))
     assert tombstone.deleted and tombstone.deleted_at == NOW + timedelta(minutes=2)
     assert tombstone.first_seen_at == NOW
 
-    _write(raw, "contracts/rate card.txt", "rates again\n")
+    _write(raw, PRICE_STUDY, "prices again\n")
     back = discover(storage, domain, now=NOW + timedelta(minutes=3))
-    assert back.new == [card]
-    revived = SourceState.from_json(storage.read_bytes(source_state_key(card)))
+    assert back.new == [study]
+    revived = SourceState.from_json(storage.read_bytes(source_state_key(study)))
     assert not revived.deleted and revived.first_seen_at == NOW
 
 
 def test_recompile_scopes_and_restricted_runs(tmp_path: Path):
     storage, _ = _setup(tmp_path)
     domain = pack()
-    rev_a = source_id_for("procedures/SOP-GBX-010 rev A.txt")
+    rev_a = source_id_for(QUOTE_A)
     first = discover(storage, domain, now=NOW, recompile={rev_a: "notes", "src-000000000000": None})
     assert first.forced == [rev_a]
     assert first.items[rev_a].hints == "notes"
@@ -103,16 +106,16 @@ def test_recompile_scopes_and_restricted_runs(tmp_path: Path):
 def test_resolve_supersession_revisions_explicit_references_and_cycles():
     domain = pack()
     records = [
-        SupersessionRecord("src-00000000000a", "SOP-GBX-010", "A"),
-        SupersessionRecord("src-00000000000b", "SOP-GBX-010", "B"),
-        SupersessionRecord("src-00000000000c", "SOP-GBX-010", "C"),
-        SupersessionRecord("src-00000000000d", "SOP-GBX-011", "Z"),
-        SupersessionRecord("src-00000000000e", "SOP-GBX-012", None, ("SOP-GBX-010",)),
-        SupersessionRecord("src-00000000000f", "SOP-GBX-013", None, ("SOP-GBX-014",)),
-        SupersessionRecord("src-000000000010", "SOP-GBX-014", None, ("SOP-GBX-013",)),
+        SupersessionRecord("src-00000000000a", "DEV-2026-014", "A"),
+        SupersessionRecord("src-00000000000b", "DEV-2026-014", "B"),
+        SupersessionRecord("src-00000000000c", "DEV-2026-014", "C"),
+        SupersessionRecord("src-00000000000d", "DEV-2026-015", "Z"),
+        SupersessionRecord("src-00000000000e", "DEV-2026-016", None, ("DEV-2026-014",)),
+        SupersessionRecord("src-00000000000f", "DEV-2026-017", None, ("DEV-2026-018",)),
+        SupersessionRecord("src-000000000010", "DEV-2026-018", None, ("DEV-2026-017",)),
     ]
     groups, pairs = resolve_supersession(domain, records)
-    assert groups == {"SOP-GBX-010": ["src-00000000000a", "src-00000000000b", "src-00000000000c"]}
+    assert groups == {"DEV-2026-014": ["src-00000000000a", "src-00000000000b", "src-00000000000c"]}
     assert ("src-00000000000b", "src-00000000000a") in pairs
     assert ("src-00000000000c", "src-00000000000b") in pairs
     assert ("src-00000000000e", "src-00000000000c") in pairs

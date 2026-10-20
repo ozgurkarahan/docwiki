@@ -33,26 +33,26 @@ def keys(doc: ExtractedDoc) -> list[str]:
 
 
 async def test_pdf_paragraphs_headings_figures_and_page_images(corpus: Corpus) -> None:
-    result = await corpus.extract("docs/sop-gbx-010.pdf")
+    result = await corpus.extract("docs/devis-indice-a.pdf")
     doc = result.doc
-    assert doc.source_id == source_id_for("docs/sop-gbx-010.pdf")
+    assert doc.source_id == source_id_for("docs/devis-indice-a.pdf")
     assert doc.source_hash.startswith("sha256:")
     assert doc.media_type == "application/pdf"
     assert doc.metadata.page_count == 2
-    assert doc.title_hint == "Gearbox oil change SOP"
+    assert doc.title_hint == "Devis DEV-2026-014 indice A"
     assert str(doc.metadata.authored) == "2026-01-15"
     assert doc.extraction.adapter == "local"
     assert doc.extraction.warnings == [] == result.warnings
 
     texts = [block.text for block in doc.blocks]
-    assert texts[0] == "Gearbox oil change"
+    assert texts[0] == "Devis de l'extension"
     assert doc.blocks[0].kind == "heading" and doc.blocks[0].level == 1
     assert any("FICTIONAL - NOT FOR OPERATIONAL USE" in text for text in texts)
-    assert "Drain the oil while it is still warm." in texts
+    assert "Nettoyer la dalle avant la pose." in texts
     lists = [block for block in doc.blocks if block.kind == "list"]
     assert [block.text for block in lists] == [
-        "1. Stop the turbine and lock the rotor.",
-        "2. Open the drain valve.",
+        "1. Fermer l'ouverture provisoire.",
+        "2. Contrôler la livraison.",
     ]
     for block in doc.blocks:
         assert isinstance(block.locator, PdfPageLocator)
@@ -65,7 +65,7 @@ async def test_pdf_paragraphs_headings_figures_and_page_images(corpus: Corpus) -
     assert locator_label(doc.blocks[0].locator) == "p. 1"
 
     stamp = next(b for b in doc.blocks if b.text.startswith("FICTIONAL"))
-    paragraph = next(b for b in doc.blocks if b.text.startswith("Use ISO VG 320"))
+    paragraph = next(b for b in doc.blocks if b.text.startswith("Toutes les baies"))
     assert stamp.locator.bbox[1] < paragraph.locator.bbox[1]  # top-left origin, reading order
 
     assert [figure.id for figure in doc.figures] == ["f01"]
@@ -80,7 +80,7 @@ async def test_pdf_paragraphs_headings_figures_and_page_images(corpus: Corpus) -
 
 
 async def test_scanned_pdf_needs_ocr(corpus: Corpus) -> None:
-    result = await corpus.extract("docs/crane-lift-plan-scan.pdf")
+    result = await corpus.extract("docs/bon-de-livraison-scan.pdf")
     doc = result.doc
     assert len(doc.blocks) == 1
     block = doc.blocks[0]
@@ -102,9 +102,9 @@ async def test_pdf_max_pages(corpus: Corpus, tmp_path: Path) -> None:
 
 
 async def test_docx_paragraph_indices_follow_python_docx(corpus: Corpus) -> None:
-    result = await corpus.extract("docs/sop-gbx-010-rev-b.docx")
+    result = await corpus.extract("docs/avenant-n1.docx")
     doc = result.doc
-    paragraphs = Document(str(corpus.path("docs/sop-gbx-010-rev-b.docx"))).paragraphs
+    paragraphs = Document(str(corpus.path("docs/avenant-n1.docx"))).paragraphs
     text_blocks = [b for b in doc.blocks if isinstance(b.locator, DocxParagraphLocator)]
     assert [b.locator.paragraph for b in text_blocks] == [1, 2, 4, 5, 7, 9]
     for block in text_blocks:
@@ -112,17 +112,17 @@ async def test_docx_paragraph_indices_follow_python_docx(corpus: Corpus) -> None
     assert paragraphs[2].text == "" and paragraphs[5].text == ""  # empty ones keep their index
     title, scope = text_blocks[0], text_blocks[2]
     assert (title.kind, title.level) == ("heading", 1)
-    assert (scope.kind, scope.level, scope.text) == ("heading", 1, "Scope")
+    assert (scope.kind, scope.level, scope.text) == ("heading", 1, "Objet")
     assert text_blocks[4].kind == "list"
     assert keys(doc)[4:6] == ["tbl-01-r0002-r0002", "tbl-01-r0003-r0003"]
-    assert doc.blocks[4].text == "Asset: WTG-07; Task: Gearbox oil change; Oil grade: ISO VG 220"
+    assert doc.blocks[4].text == "Repère: FT1; Désignation: Fenêtre de toit; Montant HT: 1160,00 €"
     assert doc.blocks[4].provenance == "deterministic-table"
     assert locator_label(doc.blocks[4].locator) == "table 1, row 2"
 
     (table,) = doc.tables
     assert table.id == "t01" and table.artifact == "tables/t01.parquet"
     assert table.locator == DocxTableLocator(table=1, row_start=1, row_end=3)
-    assert table.columns == ["Asset", "Task", "Oil grade"]
+    assert table.columns == ["Repère", "Désignation", "Montant HT"]
     assert [row.row_id for row in table.rows] == ["r0002", "r0003"]
     assert table.provenance == "deterministic-table"
 
@@ -133,33 +133,33 @@ async def test_docx_paragraph_indices_follow_python_docx(corpus: Corpus) -> None
 
 
 async def test_xlsx_values_rows_slugs_and_merges(corpus: Corpus) -> None:
-    result = await corpus.extract("plans/maintenance-plan-2026.xlsx")
+    result = await corpus.extract("plans/planning-chantier.xlsx")
     doc = result.doc
-    plan, notes = doc.tables
-    assert plan.locator == XlsxRowsLocator(sheet="Plan", row_start=1, row_end=6)
-    assert plan.columns == ["Asset", "Task", "Hours", "Due", "Share", "Double"]
-    rows = {row.row_id: row.cells for row in plan.rows}
+    planning, notes = doc.tables
+    assert planning.locator == XlsxRowsLocator(sheet="Planning", row_start=1, row_end=6)
+    assert planning.columns == ["Tâche", "Désignation", "Durée", "Début", "Avancement", "Double"]
+    rows = {row.row_id: row.cells for row in planning.rows}
     assert list(rows) == ["r0002", "r0003", "r0004", "r0006"]  # Excel numbers, empty row 5 skipped
-    assert rows["r0002"] == ["WTG-07", "Gearbox oil change", "6", "2026-03-01", "25%", "12"]
-    assert rows["r0003"][2:4] == ["2.5", "2026-04-02 13:30:00"]
-    assert rows["r0006"][:3] == ["Merged remark", "Merged remark", "1"]  # merged A6:B6 expanded
+    assert rows["r0002"] == ["T05", "Élévation des murs", "6", "2026-03-17", "20%", "12"]
+    assert rows["r0003"][2:4] == ["2.5", "2026-03-30 13:30:00"]
+    assert rows["r0006"][:3] == ["Remarque fusionnée", "Remarque fusionnée", "1"]  # A6:B6 merged
     assert all("=" not in cell for cells in rows.values() for cell in cells)  # values, not formulas
-    assert plan.provenance == notes.provenance == "deterministic-table"
-    assert notes.locator.sheet == "Notes & \u00d6lstand"
+    assert planning.provenance == notes.provenance == "deterministic-table"
+    assert notes.locator.sheet == "Notes & R\u00e9serves"
     assert {block.provenance for block in doc.blocks} == {"deterministic-table"}
     assert keys(doc) == [
-        "sheet-plan-r0001-r0001",
-        "sheet-plan-r0002-r0002",
-        "sheet-plan-r0003-r0003",
-        "sheet-plan-r0004-r0004",
-        "sheet-plan-r0006-r0006",
-        "sheet-notes-olstand-r0001-r0001",
-        "sheet-notes-olstand-r0002-r0002",
+        "sheet-planning-r0001-r0001",
+        "sheet-planning-r0002-r0002",
+        "sheet-planning-r0003-r0003",
+        "sheet-planning-r0004-r0004",
+        "sheet-planning-r0006-r0006",
+        "sheet-notes-reserves-r0001-r0001",
+        "sheet-notes-reserves-r0002-r0002",
     ]
-    assert locator_label(doc.blocks[1].locator) == 'sheet "Plan", row 2'
-    assert doc.blocks[0].kind == "heading" and doc.blocks[0].text == "Plan"
+    assert locator_label(doc.blocks[1].locator) == 'sheet "Planning", row 2'
+    assert doc.blocks[0].kind == "heading" and doc.blocks[0].text == "Planning"
     # the workbook really stores a formula with a cached value
-    sheet = load_workbook(corpus.path("plans/maintenance-plan-2026.xlsx"))["Plan"]
+    sheet = load_workbook(corpus.path("plans/planning-chantier.xlsx"))["Planning"]
     assert sheet["F2"].value == "=C2*2"
 
 
@@ -170,13 +170,13 @@ async def test_xlsx_colliding_sheet_slugs_and_formula_without_value(tmp_path: Pa
 
     workbook = Workbook()
     first = workbook.active
-    first.title = "Plan"
+    first.title = "Planning"
     first.append(["A", "B"])
     first.append([1, "=A2*2"])
-    second = workbook.create_sheet("plan!")
+    second = workbook.create_sheet("planning!")
     second.append(["A"])
     second.append(["x"])
-    third = workbook.create_sheet("Plan{2026}")
+    third = workbook.create_sheet("Planning{2026}")
     third.append(["A"])
     third.append(["y"])
     path = tmp_path / "book.xlsx"
@@ -184,14 +184,14 @@ async def test_xlsx_colliding_sheet_slugs_and_formula_without_value(tmp_path: Pa
     result = await extract_source(path, rel_path="book.xlsx", settings=ExtractSettings())
     locators = [table.locator for table in result.doc.tables]
     # slugs come from slugify_ascii(raw sheet name); labels drop Markdown-significant characters
-    assert [loc.sheet for loc in locators] == ["Plan", "plan!", "Plan2026"]
-    assert [loc.sheet_slug for loc in locators] == [None, "plan-2", "plan-2026"]
+    assert [loc.sheet for loc in locators] == ["Planning", "planning!", "Planning2026"]
+    assert [loc.sheet_slug for loc in locators] == [None, "planning-2", "planning-2026"]
     assert [b.locator_key for b in result.doc.blocks if b.kind == "table-ref"] == [
-        "sheet-plan-r0002-r0002",
-        "sheet-plan-2-r0002-r0002",
-        "sheet-plan-2026-r0002-r0002",
+        "sheet-planning-r0002-r0002",
+        "sheet-planning-2-r0002-r0002",
+        "sheet-planning-2026-r0002-r0002",
     ]
-    assert any(w.startswith('xlsx-formula-no-value: sheet "Plan": 1') for w in result.warnings)
+    assert any(w.startswith('xlsx-formula-no-value: sheet "Planning": 1') for w in result.warnings)
     assert result.doc.tables[0].rows[0].cells == ["1", ""]
 
 
@@ -205,34 +205,37 @@ def test_extractor_versions() -> None:
 
 
 async def test_csv_bom_dialect_and_record_numbers(corpus: Corpus) -> None:
-    doc = (await corpus.extract("plans/work-orders.csv")).doc
+    doc = (await corpus.extract("plans/commandes.csv")).doc
     (table,) = doc.tables
-    assert table.columns == ["Asset", "Task", "Hours"]  # BOM stripped, ';' sniffed
+    assert table.columns == ["Commande", "Désignation", "Montant HT"]  # BOM stripped, ';' sniffed
     assert table.locator == CsvRowsLocator(row_start=1, row_end=4)
     assert [(row.row_id, row.cells) for row in table.rows] == [
-        ("r0002", ["WTG-07", "Gearbox oil change\nwith flush", "6"]),
-        ("r0004", ["WTG-12", "Vibration check", "2"]),
+        ("r0002", ["BC-2026-009", "Baie coulissante F1\navec quincaillerie", "3320,00"]),
+        ("r0004", ["BC-2026-010", "Fenêtre F2 PVC", "1020,00"]),
     ]
     assert keys(doc) == ["r0002-r0002", "r0004-r0004"]
     assert locator_label(doc.blocks[1].locator) == "row 4"
-    assert doc.blocks[0].text == "Asset: WTG-07; Task: Gearbox oil change with flush; Hours: 6"
+    assert doc.blocks[0].text == (
+        "Commande: BC-2026-009; Désignation: Baie coulissante F1 avec quincaillerie; "
+        "Montant HT: 3320,00"
+    )
 
 
 async def test_pptx_slides_notes_tables_pictures(corpus: Corpus) -> None:
-    result = await corpus.extract("slides/gearbox-review.pptx")
+    result = await corpus.extract("slides/support-reunion-chantier.pptx")
     doc = result.doc
     assert doc.metadata.page_count == 3
-    assert doc.title_hint == "Gearbox maintenance review"
+    assert doc.title_hint == "Réunion de chantier n°3"
     assert all(isinstance(block.locator, PptxSlideLocator) for block in doc.blocks)
     assert keys(doc) == ["slide-01"] * 2 + ["slide-02"] * 3 + ["slide-03"] * 3
     kinds = [(block.kind, block.text) for block in doc.blocks]
     assert kinds[2:5] == [
-        ("heading", "Oil change steps"),
-        ("slide", "Drain the oil\nRefill with ISO VG 320"),
-        ("note", "Mention the cold-site exception."),
+        ("heading", "Décisions"),
+        ("slide", "Fermer les ouvertures\nAvancer la cuisine"),
+        ("note", "Rappeler le report de livraison des menuiseries."),
     ]
     assert doc.blocks[4].locator == PptxSlideLocator(slide=2, shape="notes")
-    assert kinds[6] == ("table-ref", "Asset: WTG-07; Due: 2026-03")
+    assert kinds[6] == ("table-ref", "Tâche: T07; Date: 2026-04-20")
     (table,) = doc.tables
     assert table.provenance == "native-text"
     assert [row.row_id for row in table.rows] == ["r0002", "r0003"]
@@ -242,40 +245,48 @@ async def test_pptx_slides_notes_tables_pictures(corpus: Corpus) -> None:
 
 
 async def test_eml_headers_body_lines_and_attachments(corpus: Corpus) -> None:
-    doc = (await corpus.extract("mail/oil-change-schedule.eml")).doc
-    assert doc.title_hint == "Gearbox oil change schedule"
-    assert str(doc.metadata.authored) == "2026-01-12"
+    doc = (await corpus.extract("mail/report-de-livraison.eml")).doc
+    assert doc.title_hint == "Report de livraison des menuiseries"
+    assert str(doc.metadata.authored) == "2026-03-18"
     header = doc.blocks[0]
     assert header.kind == "email-header"
     assert header.locator == EmlPartLocator(part="headers")
-    assert header.text.splitlines()[0] == "From: Maintenance planner <planner@example.org>"
-    assert "Subject: Gearbox oil change schedule" in header.text
+    assert header.text.splitlines()[0] == (
+        "From: Erwan Gouzelin <erwan.gouzelin@vanarsdel-menuiseries.example>"
+    )
+    assert "Subject: Report de livraison des menuiseries" in header.text
     body = [b for b in doc.blocks if b.kind == "email-body"]
     assert [(b.locator.line_start, b.locator.line_end) for b in body] == [(1, 1), (3, 4), (6, 7)]
-    assert body[1].text == "WTG-07 gearbox oil change is planned for March.\nUse ISO VG 320."
+    assert body[1].text == (
+        "La livraison de la commande BC-2026-009 est reportée au lundi 20 avril 2026.\n"
+        "Pénurie de profilés aluminium."
+    )
     assert locator_label(body[1].locator) == "message body, lines 3–4"
     attachment = doc.blocks[-1]
-    assert attachment.locator == EmlPartLocator(part="attachment:checklist.pdf")
-    assert attachment.locator_key == "msg-att-checklist-pdf"
-    assert attachment.text.startswith("Attachment: checklist.pdf (application/pdf")
+    assert attachment.locator == EmlPartLocator(part="attachment:bon-de-commande.pdf")
+    assert attachment.locator_key == "msg-att-bon-de-commande-pdf"
+    assert attachment.text.startswith("Attachment: bon-de-commande.pdf (application/pdf")
     assert "alert" not in doc.text()
 
 
 async def test_eml_html_only_body_is_converted_safely(corpus: Corpus) -> None:
     result = await corpus.extract("mail/html-only.eml")
     body = [b.text for b in result.doc.blocks if b.kind == "email-body"]
-    assert body == ["Hello team,", "WTG-07 gearbox oil change is planned for March."]
+    assert body == [
+        "Bonjour,",
+        "La livraison de la commande BC-2026-009 est reportée au 20/04/2026.",
+    ]
     assert "alert" not in result.doc.text() and "color" not in result.doc.text()
     assert any(w.startswith("eml-html-body") for w in result.warnings)
 
 
 async def test_vtt_cues(corpus: Corpus) -> None:
-    doc = (await corpus.extract("meetings/standup.vtt")).doc
+    doc = (await corpus.extract("meetings/reunion-de-chantier.vtt")).doc
     first, second = doc.blocks
     assert first.locator == VttCueLocator(cue_start="00:00:01", cue_end="00:00:04")
-    assert first.text == "Technician: Gearbox oil level checked on WTG-07."
+    assert first.text == "Chef d'équipe: Livraison des palettes contrôlée sur le chantier."
     assert second.locator == VttCueLocator(cue_start="00:03:15", cue_end="00:03:42")
-    assert second.text == "Switch to ISO VG 220 & log it\nbefore winter."
+    assert second.text == "Fermer les ouvertures & noter la date\navant le 07/04."
     assert (first.locator_key, second.locator_key) == ("cue-00-00-01", "cue-00-03-15")
     assert locator_label(second.locator) == "03:15–03:42"
     assert {b.kind for b in doc.blocks} == {"cue"}
@@ -283,7 +294,10 @@ async def test_vtt_cues(corpus: Corpus) -> None:
 
 @pytest.mark.parametrize(
     ("rel", "first_kind"),
-    [("notes/gearbox-oil.md", "heading"), ("notes/gearbox-oil.txt", "paragraph")],
+    [
+        ("notes/consignes-de-pose.md", "heading"),
+        ("notes/consignes-de-pose.txt", "paragraph"),
+    ],
 )
 async def test_text_line_ranges(corpus: Corpus, rel: str, first_kind: str) -> None:
     doc = (await corpus.extract(rel)).doc
@@ -293,13 +307,13 @@ async def test_text_line_ranges(corpus: Corpus, rel: str, first_kind: str) -> No
         TextLinesLocator(line_start=7, line_end=7),
     ]
     assert doc.blocks[0].kind == first_kind
-    assert doc.blocks[1].text == "Use ISO VG 320 for all turbines.\nRecord the level."
+    assert doc.blocks[1].text == "La baie F1 mesure 3,00 x 2,15 m.\nNoter la mesure."
     assert doc.blocks[2].kind == "list"
     assert locator_label(doc.blocks[1].locator) == "lines 3–4"
 
 
 async def test_image_figure_and_ocr_placeholder(corpus: Corpus) -> None:
-    result = await corpus.extract("photos/checklist.png")
+    result = await corpus.extract("photos/photo-palettes.png")
     doc = result.doc
     region = ImageRegionLocator(region=1, bbox=[0.0, 0.0, 1.0, 1.0])
     (block,) = doc.blocks
@@ -344,9 +358,9 @@ async def test_unsupported_and_damaged_files_raise(tmp_path: Path) -> None:
 
 async def test_invalid_settings_raise_value_error(corpus: Corpus) -> None:
     with pytest.raises(ValueError, match="max_pages"):
-        await corpus.extract("notes/gearbox-oil.txt", ExtractSettings(max_pages=0))
+        await corpus.extract("notes/consignes-de-pose.txt", ExtractSettings(max_pages=0))
     with pytest.raises(ValueError, match="cu_endpoint"):
-        await corpus.extract("docs/sop-gbx-010.pdf", ExtractSettings(mode="azure"))
+        await corpus.extract("docs/devis-indice-a.pdf", ExtractSettings(mode="azure"))
 
 
 @pytest.mark.parametrize("rel", CORPUS_FILES)
@@ -360,5 +374,5 @@ async def test_extraction_is_deterministic(corpus: Corpus, rel: str) -> None:
 
 
 def test_docx_fixture_is_a_real_docx(corpus: Corpus) -> None:
-    data = corpus.path("docs/sop-gbx-010-rev-b.docx").read_bytes()
+    data = corpus.path("docs/avenant-n1.docx").read_bytes()
     assert len(Document(io.BytesIO(data)).tables) == 1

@@ -43,9 +43,13 @@
 
 - HTTP mode runs behind Azure Container Apps built-in authentication configured to return 401 for
   unauthenticated calls and to accept tokens whose audience is the MCP API app registration.
-- The server trusts the `X-MS-CLIENT-PRINCIPAL` header **only** when `DOCWIKI_AUTH_MODE=easyauth`;
-  it decodes the claims, reads app-role claims (`roles`) and enforces the role required by each
-  tool. Missing role → MCP error `forbidden` (and a log line with principal id hash, never the token).
+- In `DOCWIKI_AUTH_MODE=easyauth` the server validates the forwarded RS256 bearer token itself
+  (the tenant's v2 signing keys, issuer, audience, `exp`/`nbf`, and the `azp`/`appid` allow-list),
+  takes the caller and the app-role claims (`roles`) from that token and enforces the role required
+  by each tool. The `X-MS-CLIENT-PRINCIPAL` header identifies the caller only and never adds roles.
+  Missing role → `forbidden` result (and a log line with principal id hash, never the token).
+  The tool list is not filtered per role; authorization is enforced on each call (D9;
+  [CHANGELOG](CHANGELOG.md) v1.1).
 - Local stdio mode: read tools only, unless started with `--allow-ops` (development).
 - `DOCWIKI_AUTH_MODE=none` is allowed only with stdio or loopback binding.
 
@@ -102,11 +106,11 @@ that only uses non-approval tools (`run_status`, `quality_report`, `list_sources
 
 ## 3. Local agents (no Azure)
 
-The repository ships configuration to use the committed sample wiki with local agents:
+The repository ships configuration to use a release folder on disk with local agents:
 
 - `.vscode/mcp.json` (VS Code / GitHub Copilot), `.mcp.json` (Claude Code), and documented Copilot
-  CLI configuration, all launching `docwiki serve --stdio --release samples/wiki`.
-- The sample wiki contains its skills in `.agents/skills`, `.claude/skills` and `.github/skills`.
+  CLI configuration, all launching `docwiki serve --stdio --release <release folder>`.
+- A wiki contains its skills in `.agents/skills`, `.claude/skills` and `.github/skills`.
 - Smoke tests verify that each client can discover the skills folder layout (static validation of
   names, frontmatter and size limits) and that the stdio server answers `list_skills` and `search`.
 

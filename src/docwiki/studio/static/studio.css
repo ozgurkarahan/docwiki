@@ -276,6 +276,28 @@ textarea { min-height: 84px; line-height: 1.5; resize: vertical; }
 .tool-args pre { margin-top: 4px; max-height: 160px; overflow: auto; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: #f8f7f2; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .receipt { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 
+/* file to wiki */
+.filing { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+.filing-start { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.filing-hint, .filing-left, .filing-facts, .filing-md > summary { color: var(--muted); font-size: 12.5px; }
+.filing-panel { display: grid; gap: 9px; }
+.filing-title { color: var(--green-dark); font-size: 15px; font-weight: 650; }
+.filing-title:focus:not(:focus-visible), .filing-done:focus:not(:focus-visible), .filing-error:focus:not(:focus-visible) { outline: none; }
+.filing-path { font-size: 13.5px; }
+.filing-path code, .filing-done code { padding: 1px 6px; border: 1px solid var(--line); border-radius: 5px; background: #fff; font-size: 12.5px; overflow-wrap: anywhere; }
+.filing-abstain { color: var(--sage); font-size: 13.5px; }
+.filing-warnings { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid #e8cf86; border-radius: 8px; background: #fffaeb; color: #6f4800; font-size: 13px; }
+.filing-warnings-head { display: flex; align-items: center; gap: 7px; }
+.filing-warnings ul { display: grid; gap: 4px; padding-left: 20px; list-style: disc; overflow-wrap: anywhere; }
+.filing-note { color: #38423c; font-size: 13.5px; }
+.filing-md pre { max-height: 240px; margin-top: 6px; overflow: auto; padding: 9px 11px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.filing-error { color: #a4261d; font-size: 13px; overflow-wrap: anywhere; }
+.filing-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.filing-left { margin-left: auto; }
+.filing-done { display: flex; align-items: flex-start; gap: 7px; color: #2d6a4a; font-size: 13.5px; }
+.filing-done .icon { margin-top: 3px; }
+.filing .spinner { width: 13px; height: 13px; border-color: rgba(31, 42, 36, .18); border-top-color: currentColor; }
+
 /* dialog and toasts */
 .dialog { width: min(520px, calc(100vw - 32px)); padding: 0; border: 0; border-radius: 14px; color: var(--ink); box-shadow: 0 24px 64px rgba(20, 30, 24, .35); }
 .dialog::backdrop { background: rgba(20, 30, 24, .5); backdrop-filter: blur(2px); }

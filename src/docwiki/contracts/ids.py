@@ -100,7 +100,7 @@ _SUSPICIOUS_SEGMENTS = frozenset({"none", "null", "nan", "undefined"})
 
 
 def is_kebab(value: str, *, max_len: int = 64) -> bool:
-    """True for ASCII kebab-case keys such as ``wtg-07``."""
+    """True for ASCII kebab-case keys such as ``baie-f1``."""
     return bool(KEBAB_RE.match(value)) and len(value) <= max_len
 
 

@@ -3,4 +3,4 @@ rules:
   - tier: public
     path_glob: "public/**"
   - tier: restricted
-    path_glob: "**/contracts/**"
+    path_glob: "**/restricted/**"

@@ -95,13 +95,13 @@ Every tool returns JSON with `ok`; check it before using a result.
 Format example (illustrative values, not facts from this wiki):
 
 ```text
-The current procedure requires grade A at cold sites [1]. The 2026 plan still lists grade B for
-the same turbine [2]; the procedure has the higher authority, so grade A applies (rule: authority,
-then recency) [1][2].
+The signed contract sets a 15 % deposit [1]. The 2026 schedule still lists 10 % for the same
+job [2]; the contract has the higher authority, so 15 % applies (rule: authority, then
+recency) [1][2].
 
 Sources:
-[1] Example procedure rev B — ¶ 4 (native-text) — evidence/src-0123456789ab/para-0004.md
-[2] Example plan 2026 — sheet "Plan", rows 2–4 (deterministic-table) — evidence/src-ba9876543210/sheet-plan-r0002-r0004.md
+[1] Example contract — ¶ 4 (native-text) — evidence/src-0123456789ab/para-0004.md
+[2] Example schedule 2026 — sheet "Plan", rows 2–4 (deterministic-table) — evidence/src-ba9876543210/sheet-plan-r0002-r0004.md
 ```
 
 ## Abstain rather than guess

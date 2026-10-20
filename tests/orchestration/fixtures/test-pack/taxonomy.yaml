@@ -1,22 +1,22 @@
 categories:
-  - key: procedures
-    title: Procedures
-    description: Standard operating procedures.
-  - key: records
-    title: Records and data
+  - key: contract-documents
+    title: Quotes and contract
+    description: Quotes and their revisions (indice).
+  - key: schedule-and-purchases
+    title: Schedule and purchase tracking
   - key: correspondence
     title: Correspondence
 doc_types:
-  - key: sop
-    title: Standard operating procedure
-    category: procedures
-    authority: 7
+  - key: quote
+    title: Quote (devis)
+    category: contract-documents
+    authority: 8
     rules:
-      - filename_regex: "(?i)^sop[-_ ]"
-  - key: maintenance-plan
-    title: Maintenance plan
-    category: records
-    authority: 5
+      - filename_regex: "(?i)^dev[-_ ]"
+  - key: schedule
+    title: Purchase plan
+    category: schedule-and-purchases
+    authority: 4
     rules:
       - filename_regex: "(?i)plan.*\\.csv$"
   - key: note

@@ -142,8 +142,8 @@ identity**, created with the agent and kept across its versions:
 3. Container Apps built-in authentication accepts only that audience and the two agents' client
    IDs.
 4. The MCP server validates the forwarded token again (so a forged principal header never
-   suffices), reads its role claims, hides the tools the caller may not use and answers a
-   forbidden call with a `forbidden` result.
+   suffices), reads its role claims, checks the role on every call (the tool list is not filtered per role) and
+   answers a forbidden call with a `forbidden` result.
 
 The identity spike verified each layer (the server's own token validation was added later, see
 [`src/docwiki/mcp/README.md`](../src/docwiki/mcp/README.md#bearer-token-validation)): the two
@@ -165,7 +165,7 @@ consequences:
 ```bash
 uv run python agents/deploy.py --dry-run          # exact request bodies, no Azure call
 uv run python agents/deploy.py                    # a new version only when the definition changed
-uv run docwiki ask "Which gearbox oil grade applies to WTG-07 in winter?"
+uv run docwiki ask "What is the total contract amount including amendment no. 1?"
 uv run docwiki ask "What is the status of the last run?" --agent librarian
 ```
 
@@ -175,9 +175,43 @@ Each version stores the SHA-256 of its resolved definition, so an unchanged defi
 followed by a one-line receipt (agent version, tool calls, tokens, latency); `--json` prints the
 full record and `--conversation` continues a conversation.
 
+## Filing an answer into the wiki
+
+A good Researcher answer can become a page of the wiki ([ADR 0007](adr/0007-answers-in-the-wiki.md)):
+visitors read it in the site's "Ask this wiki" panel, and people and agents can search and link it.
+
+```bash
+uv run docwiki ask "What does the kitchen renovation include, and at which VAT rate is it quoted?" --json > answer.json
+uv run docwiki file-answer "What does the kitchen renovation include, and at which VAT rate is it quoted?" --from-json answer.json --dry-run
+uv run docwiki file-answer "What does the kitchen renovation include, and at which VAT rate is it quoted?" --from-json answer.json
+```
+
+Without `--from-json` the command asks the Researcher itself. The page is built by code, not by a
+model:
+
+- every `[n]` citation becomes a footnote to its evidence sidecar, with the source title, the
+  locator label and an honest badge (`paraphrase` for native text, `table`, `OCR`, `generated
+  description`); an answer whose citation does not resolve in the release is refused;
+- the numbers of each cited sentence are checked against the cited evidence; numbers that are not
+  there (computed totals, rounding) are listed for your review and disclosed on the page;
+- the text passes the content-safety rules (no raw HTML, no external links), the answer's headings
+  become bold lines, and a "How this answer was produced" section records the agent and its
+  version, the release, the tool calls and your review (`approved_by: owner`, never a name);
+- "Not found in the wiki." files as an honest answer without sources.
+
+`file-answer` prints the page and the warnings, asks for confirmation (or `--yes`) and writes it to
+the inbox `work/inbox/queries/`. The next run merges the inbox into `queries/`; it is never a no-op,
+and every model output is cached, so it costs nothing. Every run re-cites filed answers from its
+own release: each citation gets the current source title, locator label and badge, and the page
+tier is the highest current tier of its sources. A withdrawn source removes its citations with a
+warning, a superseded source adds a banner naming the current revision, and an answer whose sources
+are above the audience of a build is left out of it entirely (moved to `work/inbox/rejected/` with
+the reason). An answer that would still fail the release checks is left out with a warning in the
+run report instead of blocking the release: a new filing moves to `work/inbox/rejected/` with the
+reason, a published one gets a `withdraw` entry in the log. A run only consumes the inbox files it
+read: an answer filed again while a run works stays in the inbox for the next run.
+
 ## Known gaps
 
-- Filing an approved research answer back into `queries/` is part of the wiki format, but no tool
-  writes query pages yet; existing query pages are carried into new releases.
 - With the MCP app scaled to zero, the first agent turn after a pause takes about 30 s longer (38.8 s
   cold versus about 8 s warm in the identity spike). Set `DOCWIKI_MCP_MIN_REPLICAS=1` for demos.

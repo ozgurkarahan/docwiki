@@ -121,7 +121,7 @@ param reconcileCron string = '0 */6 * * *'
 param audience string = 'internal'
 
 @description('Domain pack used by the pipeline (DOCWIKI_DOMAIN).')
-param domainPack string = 'wind-om'
+param domainPack string = 'batiment'
 
 @description('Extract with Azure Content Understanding (prebuilt-layout); false uses the local adapters.')
 param contentUnderstanding bool = true

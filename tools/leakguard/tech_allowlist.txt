@@ -305,10 +305,6 @@ Wi-Fi
 Bluetooth
 Ethernet
 IoT
-IIoT
-OPC
-OPC UA
-Modbus
 
 # --- licences ---
 MIT
@@ -325,7 +321,7 @@ ND
 NC
 Creative Commons
 
-# --- standards bodies and generic industry acronyms ---
+# --- standards bodies and generic acronyms ---
 ISO
 IEC
 IEEE
@@ -341,49 +337,18 @@ CE
 UL
 NEMA
 SAE
-VG
-ISO VG
 IP
-LOTO
 PPE
-SOP
-SOPs
-MOC
-OEM
-OEMs
 HSE
 EHS
 HSSE
 QHSE
 KPI
 KPIs
-MTBF
-MTTR
-MTTF
-RCA
-CAPA
-FMEA
-HAZOP
-HAZID
-JSA
-JHA
-PTW
 SDS
 MSDS
-CMMS
-EAM
 ERP
-MES
-SCADA
-PLC
-HMI
-DCS
-RTU
 UPS
-CMS
-NDT
-UT
-MPI
 RPM
 RMS
 FFT
@@ -393,34 +358,14 @@ HV
 MV
 LV
 PV
-SF6
 CO2
 NOx
 H2S
 O2
 N2
-WTG
-WTGs
-BOP
-BoP
 EPC
-PPA
-TSO
-DSO
-AEP
-LCOE
-O&M
-OM
-SPL
-FAT
-SAT
 QC
 QA/QC
-NCR
-CoC
-RAMS
-WI
-WO
 PO
 SKU
 ETA
@@ -430,9 +375,6 @@ Q1
 Q2
 Q3
 Q4
-8D
-5S
-ALARP
 
 # --- units ---
 kW
@@ -460,7 +402,6 @@ MPa
 kPa
 hPa
 GPa
-cSt
 dB
 dBA
 pH
@@ -503,28 +444,6 @@ NULL
 DISTINCT
 AVG
 
-# --- chemical element symbols (oil analysis wear metals and additives) ---
-Fe
-Cu
-Cr
-Al
-Si
-Pb
-Sn
-Ni
-Mo
-Zn
-Ca
-Mg
-Na
-Ti
-Ag
-Ba
-Mn
-Co
-Cd
-Li
-
 # --- ISO 4217 currency codes ---
 EUR
 USD
@@ -538,29 +457,14 @@ CAD
 AUD
 
 # --- further generic acronyms and units ---
-HSS
-LSS
-IMS
-GBX
-NDE
-ICP
-PAO
-KOH
-TAN
-TBN
-OT
 CR
 LF
-RTO
-RPO
 TTL
-SRE
 NFC
 NFD
 NFKC
 NFKD
 degC
-dT
 PostgreSQL
 Bing
 PYTHONHASHSEED

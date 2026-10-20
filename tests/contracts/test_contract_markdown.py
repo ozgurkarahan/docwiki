@@ -21,7 +21,7 @@ from docwiki.contracts.markdown import (
         ("Page 12", "page-12"),
         ("Key facts", "key-facts"),
         ("Superseded information", "superseded-information"),
-        ("Gearbox oil: grade & viscosity", "gearbox-oil-grade--viscosity"),
+        ("Window delivery: date & planning", "window-delivery-date--planning"),
         ("C++ (v2.0)", "c-v20"),
         ("Already-dashed_and_underscored", "already-dashed_and_underscored"),
         ("  Trimmed  ", "trimmed"),
@@ -45,11 +45,11 @@ def test_slugger_deduplicates_like_github() -> None:
 
 
 def test_extract_headings_uses_rendered_text() -> None:
-    markdown = "# Title\n\n## The `oil` [grade](x.md) *now*\n\nSetext\n------\n\n## Title\n"
+    markdown = "# Title\n\n## The `window` [delivery](x.md) *date*\n\nSetext\n------\n\n## Title\n"
     headings = extract_headings(markdown)
     assert [(h.level, h.text, h.anchor, h.line) for h in headings] == [
         (1, "Title", "title", 1),
-        (2, "The oil grade now", "the-oil-grade-now", 3),
+        (2, "The window delivery date", "the-window-delivery-date", 3),
         (2, "Setext", "setext", 5),
         (2, "Title", "title-1", 8),
     ]
@@ -60,7 +60,7 @@ def test_extract_links_sees_inline_reference_autolink_image_and_footnotes() -> N
         "See [a](../a.md#x) and ![img](img/p.png) and <https://example.org/x>.\n"
         "Ref [b][r].\n\n[r]: other.md\n\n"
         "Fact.[^c1]\n\n"
-        "[^c1]: [Manual — p. 3](../evidence/src-0123456789ab/p0003.md) · ✓ quote verified\n"
+        "[^c1]: [Quote — p. 3](../evidence/src-0123456789ab/p0003.md) · ✓ quote verified\n"
         "`[not](a link)`\n"
     )
     links = extract_links(markdown)
@@ -86,18 +86,22 @@ def test_extract_footnotes_ignores_code() -> None:
     ("source", "target", "link"),
     [
         ("sources/a.md", "sources/b.md", "b.md"),
-        ("sources/a.md", "entities/asset/wtg-07.md", "../entities/asset/wtg-07.md"),
+        (
+            "sources/a.md",
+            "entities/building-element/baie-f1.md",
+            "../entities/building-element/baie-f1.md",
+        ),
         (
             "sources/a.md",
             "evidence/src-0123456789ab/p0003.md",
             "../evidence/src-0123456789ab/p0003.md",
         ),
         (
-            "entities/asset/wtg-07.md",
+            "entities/building-element/baie-f1.md",
             "evidence/src-0123456789ab/p0003.md",
             "../../evidence/src-0123456789ab/p0003.md",
         ),
-        ("index.md", "topics/gearbox-oil.md#overview", "topics/gearbox-oil.md#overview"),
+        ("index.md", "topics/site-progress.md#overview", "topics/site-progress.md#overview"),
         ("evidence/src-0123456789ab/p0003.md", "sources/a.md", "../../sources/a.md"),
         ("sources/a.md", "sources/a.md", "a.md"),
     ],

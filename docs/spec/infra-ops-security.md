@@ -8,13 +8,13 @@
   regions where Foundry models, agents and Content Understanding are available.
 - Container images built remotely in the registry (no local Docker required):
   `docker/job.Dockerfile` (Python + Node 22 + pinned Quartz for the site stage),
-  `docker/mcp.Dockerfile`, `docker/portal.Dockerfile`.
+  `docker/mcp.Dockerfile`, `docker/portal.Dockerfile`, `docker/studio.Dockerfile` (four images).
 - Parameters (with defaults): `fastModel`/`fastModelVersion`/`fastCapacity`,
-  `smartModel`/`smartModelVersion`/`smartCapacity`, `deploymentSku` (`DataZoneStandard` where
-  available, else `GlobalStandard`), `mcpMinReplicas` (0; set 1 for demos), `enablePortal` (false),
+  `smartModel`/`smartModelVersion`/`smartCapacity`, `deploymentSku` (`GlobalStandard` by
+  default; `DataZoneStandard` for data residency), `mcpMinReplicas` (0; set 1 for demos), `enablePortal` (false),
   `enableEventTrigger` (true), `reconcileCron` (`0 */6 * * *`), `budgetAmount` (monthly, USD),
   `budgetContactEmails` (passed at deploy time, never committed), `audience` (`internal`),
-  `domainPack` (`wind-om`), `enableFoundrySkillsPreview` (false), `enableRoutine` (false).
+  `domainPack` (`batiment`), `enableFoundrySkillsPreview` (false), `enableRoutine` (false).
 - Preflight script (`scripts/preflight.py`): azd/az versions, logged-in account, region allowed,
   model availability and quota in the region, deployer roles (Owner or Contributor + User Access
   Administrator; Entra Application Developer), Python and Node versions. Never switches region or
@@ -88,5 +88,5 @@ See architecture.md §6. Additional rules:
 3. Squash to a single commit "Initial public release" authored with the GitHub noreply address.
 4. Create a new public repository; push; enable secret scanning + push protection, Dependabot
    alerts and updates, CodeQL default setup, private vulnerability reporting, branch protection.
-5. GitHub Pages with the custom domain after DNS verification (TXT) and CNAME; enforce HTTPS.
+5. Deploy the public demo on Azure Container Apps (portal with a public-audience build).
 6. Verify the rendered repository and site; record the published commit.

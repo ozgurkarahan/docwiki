@@ -1,13 +1,13 @@
 topics:
-  - slug: gearbox-oil
-    title: Gearbox oil
-    description: Oil grade, change intervals and oil analysis.
-    keywords: [gearbox oil, oil grade, viscosity grade, oil change]
+  - slug: window-delivery
+    title: Window delivery
+    description: Delivery dates of the windows, delays and the roof window.
+    keywords: [window delivery, delivery date, bay window, roof window]
     aliases:
-      - {text: huile de boîte de vitesses, lang: fr}
-      - {text: Getriebeöl, lang: de}
-  - slug: cold-weather
-    title: Cold-weather operation
-    keywords: [cold weather, low temperature]
+      - {text: livraison des menuiseries, lang: fr}
+      - {text: fenêtre de toit, lang: fr}
+  - slug: payments
+    title: Payments and retention
+    keywords: [retention, deposit]
     min_score: 2
     min_sources: 1

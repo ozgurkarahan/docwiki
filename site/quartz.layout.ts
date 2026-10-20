@@ -32,7 +32,8 @@ const toolbar = Component.Flex({
 export const sharedPageComponents: SharedLayout = {
   head: DocWiki.Head(),
   header: [DocWiki.Banner()],
-  afterBody: [DocWiki.About()],
+  // "Ask this wiki": filed research answers in a drawer on every page (none without answers).
+  afterBody: [DocWiki.AskPanel()],
   footer: DocWiki.Footer(),
 }
 
@@ -41,6 +42,8 @@ export const defaultContentPageLayout: PageLayout = {
     DocWiki.Breadcrumbs(),
     Component.ArticleTitle(),
     Component.ContentMeta(),
+    // Home page only: how the release was built, then a collapsible "About DocWiki".
+    DocWiki.About(),
     DocWiki.EvidenceHeader(),
     Component.TagList(),
   ],

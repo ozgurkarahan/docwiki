@@ -65,7 +65,7 @@ worked.
 {"ok": true, "release_id": "...", "...": "..."}
 {"ok": false, "tool": "read_page",
  "error": {"code": "not_found", "message": "unknown page 'topic:x'. Did you mean: ...?",
-           "retryable": false, "details": {"suggestions": ["topic:gearbox-oil"]}}}
+           "retryable": false, "details": {"suggestions": ["topic:quotes-contract-and-amendment"]}}}
 ```
 
 | `error.code` | Meaning | What the agent should do |
@@ -160,7 +160,7 @@ then, and only then, opt out with `azd env set DOCWIKI_MCP_TOKEN_VALIDATION off`
 uv sync --all-extras --no-extra evals                 # once
 
 # Local agents (stdio): read tools on a release folder
-uv run python -m docwiki.mcp.server --stdio --release samples/wiki
+uv run python -m docwiki.mcp.server --stdio --release samples/fixtures/mock-release
 
 # Local HTTP for development (loopback only without authentication)
 uv run python -m docwiki.mcp.server --http 127.0.0.1:8765 --release samples/fixtures/mock-release
@@ -173,7 +173,7 @@ python -m docwiki.mcp.server --http :8080 --storage blob
 ```
 
 `--release` accepts a **portable wiki folder** (the content namespace as a plain folder with
-its machine files in `.docwiki/`, CONTRACT.md §19 — the committed `samples/wiki` uses it), a
+its machine files in `.docwiki/`, CONTRACT.md §19), a
 release folder, a `releases/` folder with `current.json`, or a folder that contains
 `releases/current.json`. Without `--release`, local mode serves `<work-dir>/releases` and
 `--storage blob` serves the `releases` container: the release is downloaded into `--cache-dir`
@@ -206,7 +206,7 @@ HTTP endpoints: `POST /mcp` (stateless streamable HTTP, JSON responses; no trail
 ## Local agents
 
 The repository ships two project configurations that launch the server over stdio on the
-committed sample wiki (`samples/wiki`, a portable wiki folder):
+current release of your own deployment (`--storage blob`; set `DOCWIKI_STORAGE_ACCOUNT`):
 
 - `.vscode/mcp.json` — GitHub Copilot in VS Code (agent mode).
 - `.mcp.json` — Claude Code (project-scoped servers; approve it when Claude Code asks).
@@ -221,14 +221,14 @@ or `/mcp add` inside the CLI). Run the CLI from the repository root and add:
       "type": "local",
       "command": "uv",
       "args": ["run", "--extra", "mcp", "python", "-m", "docwiki.mcp.server", "--stdio",
-               "--release", "samples/wiki"],
+               "--release", "samples/fixtures/mock-release"],
       "tools": ["*"]
     }
   }
 }
 ```
 
-The sample wiki also ships its skills for each client (`.agents/skills`, `.claude/skills`,
+A wiki also ships its skills for each client (`.agents/skills`, `.claude/skills`,
 `.github/skills`); `list_skills` and `get_skill` expose the same skills through MCP.
 
 ## Foundry agents

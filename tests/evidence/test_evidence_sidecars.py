@@ -30,22 +30,22 @@ from docwiki.release.writer import ReleaseWriter
 async def test_pdf_page_sidecar_with_highlights_original_and_figure(
     corpus: Corpus, writer: ReleaseWriter
 ) -> None:
-    rel = "docs/sop-gbx-010.pdf"
+    rel = "docs/devis-indice-a.pdf"
 
     def select(doc: ExtractedDoc) -> list[CitedLocator]:
         figure_ref = next(b for b in doc.blocks if b.kind == "figure-ref")
-        return cite(doc, by_text(doc, "Use ISO VG 320"), by_text(doc, "Drain"), figure_ref)
+        return cite(doc, by_text(doc, "Toutes les baies"), by_text(doc, "Nettoyer"), figure_ref)
 
     built = await build(corpus, writer, rel, select, llm=describer(), publish_original=True)
     page = built.page("p0001")
     check_page(page, "p0001", "native-text", TITLES[rel])
     body = page.body
-    assert "](../../sources/sop-gbx-010.md)" in body
+    assert "](../../sources/devis-indice-a.md)" in body
     assert "[original.pdf, p. 1](original.pdf#page=1)" in body
     assert "Provenance: ✓ quote verified (native text)" in body
-    assert "![Page 1 of Gearbox oil change SOP rev A with the cited regions highlighted]" in body
-    assert "## Text" in body and "> Drain the oil while it is still warm." in body
-    assert "Litware turbines" in body
+    assert "![Page 1 of Quote DEV-2026-014 indice A with the cited regions highlighted]" in body
+    assert "## Text" in body and "> Nettoyer la dalle avant la pose." in body
+    assert "mesurent 2,40 x 2,15 m" in body
     assert "## Figure f01" in body and "**Generated description**" in body
     assert DESCRIPTION in body
     assert "Figures: generated description" in body
@@ -58,7 +58,7 @@ async def test_pdf_page_sidecar_with_highlights_original_and_figure(
 async def test_page_images_are_rendered_when_not_provided(
     corpus: Corpus, writer: ReleaseWriter, tmp_path: Path
 ) -> None:
-    rel = "docs/sop-gbx-010.pdf"
+    rel = "docs/devis-indice-a.pdf"
     built = await build(corpus, writer, rel, lambda d: cite(d, d.blocks[2]), use_page_images=False)
     rendered = built.asset("img/p0001.png")
     other = ReleaseWriter(
@@ -73,10 +73,10 @@ async def test_page_images_are_rendered_when_not_provided(
 
 async def test_scanned_page_sidecar_is_ocr(corpus: Corpus, writer: ReleaseWriter) -> None:
     built = await build(
-        corpus, writer, "docs/crane-lift-plan-scan.pdf", lambda d: cite(d, d.blocks[0])
+        corpus, writer, "docs/bon-de-livraison-scan.pdf", lambda d: cite(d, d.blocks[0])
     )
     page = built.page("p0001")
-    check_page(page, "p0001", "ocr", "Crane lift plan")
+    check_page(page, "p0001", "ocr", "Delivery note scan")
     assert "Provenance: OCR (" in page.body
     assert "## OCR text" in page.body and "local extraction does not run OCR" in page.body
     assert "OCR confidence: not reported" in page.body
@@ -84,23 +84,23 @@ async def test_scanned_page_sidecar_is_ocr(corpus: Corpus, writer: ReleaseWriter
 
 
 async def test_docx_paragraph_table_and_figure(corpus: Corpus, writer: ReleaseWriter) -> None:
-    rel = "docs/sop-gbx-010-rev-b.docx"
+    rel = "docs/avenant-n1.docx"
 
     def select(doc: ExtractedDoc) -> list[CitedLocator]:
         row = next(b for b in doc.blocks if b.locator_key == "tbl-01-r0002-r0002")
         figure_ref = next(b for b in doc.blocks if b.kind == "figure-ref")
-        return cite(doc, by_text(doc, "At cold sites"), row, figure_ref)
+        return cite(doc, by_text(doc, "En cas de gel"), row, figure_ref)
 
     built = await build(corpus, writer, rel, select, llm=describer())
     paragraph = built.page("para-0005")
     check_page(paragraph, "para-0005", "native-text", TITLES[rel])
-    assert "> At cold sites, where the ambient temperature can fall below -20 °C" in paragraph.body
+    assert "> En cas de gel, lorsque la température peut descendre sous -5 °C" in paragraph.body
 
     table = built.page("tbl-01-r0002-r0002")
     check_page(table, "tbl-01-r0002-r0002", "deterministic-table", TITLES[rel])
     assert "Provenance: table (parsed deterministically)" in table.body
-    assert "## Row 2\n\n| Asset | Task | Oil grade |\n| --- | --- | --- |\n" in table.body
-    assert "| WTG-07 | Gearbox oil change | ISO VG 220 |" in table.body
+    assert "## Row 2\n\n| Repère | Désignation | Montant HT |\n| --- | --- | --- |\n" in table.body
+    assert "| FT1 | Fenêtre de toit | 1160,00 € |" in table.body
 
     figure = built.page("para-0008")
     check_page(figure, "para-0008", "model-description", TITLES[rel])
@@ -110,36 +110,36 @@ async def test_docx_paragraph_table_and_figure(corpus: Corpus, writer: ReleaseWr
 
 
 async def test_xlsx_rows_with_row_headings(corpus: Corpus, writer: ReleaseWriter) -> None:
-    rel = "plans/maintenance-plan-2026.xlsx"
+    rel = "plans/planning-chantier.xlsx"
 
     def select(doc: ExtractedDoc) -> list[CitedLocator]:
-        rows = XlsxRowsLocator(sheet="Plan", row_start=2, row_end=5)
-        single = next(b for b in doc.blocks if b.locator_key == "sheet-notes-olstand-r0002-r0002")
+        rows = XlsxRowsLocator(sheet="Planning", row_start=2, row_end=5)
+        single = next(b for b in doc.blocks if b.locator_key == "sheet-notes-reserves-r0002-r0002")
         return [
             CitedLocator(doc.source_id, rows, (), provenance="deterministic-table"),
             *cite(doc, single),
         ]
 
     built = await build(corpus, writer, rel, select)
-    page = built.page("sheet-plan-r0002-r0005")
-    frontmatter = check_page(page, "sheet-plan-r0002-r0005", "deterministic-table", TITLES[rel])
-    assert locator_label(frontmatter.locator) == 'sheet "Plan", rows 2–5'
+    page = built.page("sheet-planning-r0002-r0005")
+    frontmatter = check_page(page, "sheet-planning-r0002-r0005", "deterministic-table", TITLES[rel])
+    assert locator_label(frontmatter.locator) == 'sheet "Planning", rows 2–5'
     assert [line for line in page.body.splitlines() if line.startswith("## ")] == [
         "## Row 2",
         "## Row 3",
         "## Row 4",
     ]
-    assert "| WTG-07 | Gearbox oil change | 6 | 2026-03-01 | 25% | 12 |" in page.body
-    notes = built.page("sheet-notes-olstand-r0002-r0002")
-    assert locator_label(notes.frontmatter.locator) == 'sheet "Notes & Ölstand", row 2'  # type: ignore[union-attr]
-    assert "| Oil level checked |" in notes.body
+    assert "| T05 | Élévation des murs | 6 | 2026-03-17 | 20% | 12 |" in page.body
+    notes = built.page("sheet-notes-reserves-r0002-r0002")
+    assert locator_label(notes.frontmatter.locator) == 'sheet "Notes & Réserves", row 2'  # type: ignore[union-attr]
+    assert "| Réserves levées |" in notes.body
 
 
 async def test_csv_rows(corpus: Corpus, writer: ReleaseWriter) -> None:
-    built = await build(corpus, writer, "plans/work-orders.csv", lambda d: cite(d, *d.blocks))
+    built = await build(corpus, writer, "plans/commandes.csv", lambda d: cite(d, *d.blocks))
     first = built.page("r0002-r0002")
-    check_page(first, "r0002-r0002", "deterministic-table", "Work orders")
-    assert "| WTG-07 | Gearbox oil change with flush | 6 |" in first.body
+    check_page(first, "r0002-r0002", "deterministic-table", "Purchase orders")
+    assert "| BC-2026-009 | Baie coulissante F1 avec quincaillerie | 3320,00 |" in first.body
     assert "## Row 4" in built.page("r0004-r0004").body
 
 
@@ -147,54 +147,63 @@ async def test_pptx_slide_with_notes(corpus: Corpus, writer: ReleaseWriter) -> N
     built = await build(
         corpus,
         writer,
-        "slides/gearbox-review.pptx",
+        "slides/support-reunion-chantier.pptx",
         lambda d: cite(d, *[b for b in d.blocks if b.locator_key == "slide-02"]),
     )
     page = built.page("slide-02")
-    frontmatter = check_page(page, "slide-02", "native-text", "Gearbox review")
+    frontmatter = check_page(page, "slide-02", "native-text", "Site meeting slides")
     assert frontmatter.locator.shape is None  # type: ignore[union-attr]
-    assert "> *Speaker notes*\\\n> Mention the cold-site exception." in page.body
-    assert "> Drain the oil\\\n> Refill with ISO VG 320" in page.body
+    assert "> *Speaker notes*\\\n> Rappeler le report de livraison des menuiseries." in page.body
+    assert "> Fermer les ouvertures\\\n> Avancer la cuisine" in page.body
 
 
 async def test_eml_parts(corpus: Corpus, writer: ReleaseWriter) -> None:
     def select(doc: ExtractedDoc) -> list[CitedLocator]:
-        return cite(doc, doc.blocks[0], by_text(doc, "WTG-07"), doc.blocks[-1])
+        return cite(doc, doc.blocks[0], by_text(doc, "La livraison"), doc.blocks[-1])
 
-    built = await build(corpus, writer, "mail/oil-change-schedule.eml", select)
+    built = await build(corpus, writer, "mail/report-de-livraison.eml", select)
     headers = built.page("msg-headers")
-    check_page(headers, "msg-headers", "native-text", "Oil change schedule")
-    assert "`planner@example.org`" in headers.body  # e-mail addresses are not clickable
+    check_page(headers, "msg-headers", "native-text", "Delivery postponement")
+    # e-mail addresses are not clickable
+    assert "`erwan.gouzelin@vanarsdel-menuiseries.example`" in headers.body
     body = built.page("msg-body-l0003-l0004")
     assert locator_label(body.frontmatter.locator) == "message body, lines 3–4"  # type: ignore[union-attr]
-    assert "> WTG\\-07 gearbox oil change" not in body.body
-    assert "> WTG-07 gearbox oil change is planned for March.\\\n> Use ISO VG 320." in body.body
-    attachment = built.page("msg-att-checklist-pdf")
-    assert 'attachment "checklist.pdf"' in attachment.frontmatter.title
+    assert "> La livraison de la commande BC\\-2026\\-009" not in body.body
+    assert (
+        "> La livraison de la commande BC-2026-009 est reportée au lundi 20 avril 2026.\\\n"
+        "> Pénurie de profilés aluminium." in body.body
+    )
+    attachment = built.page("msg-att-bon-de-commande-pdf")
+    assert 'attachment "bon-de-commande.pdf"' in attachment.frontmatter.title
 
 
 async def test_vtt_cue(corpus: Corpus, writer: ReleaseWriter) -> None:
-    built = await build(corpus, writer, "meetings/standup.vtt", lambda d: cite(d, d.blocks[1]))
+    built = await build(
+        corpus, writer, "meetings/reunion-de-chantier.vtt", lambda d: cite(d, d.blocks[1])
+    )
     page = built.page("cue-00-03-15")
-    frontmatter = check_page(page, "cue-00-03-15", "native-text", "Stand-up")
+    frontmatter = check_page(page, "cue-00-03-15", "native-text", "Site meeting")
     assert locator_label(frontmatter.locator) == "03:15–03:42"
-    assert "> **03:15–03:42**\\\n> Switch to ISO VG 220 & log it\\\n> before winter." in page.body
+    assert (
+        "> **03:15–03:42**\\\n> Fermer les ouvertures & noter la date\\\n> avant le 07/04."
+        in page.body
+    )
 
 
 async def test_text_lines(corpus: Corpus, writer: ReleaseWriter) -> None:
-    built = await build(corpus, writer, "notes/gearbox-oil.txt", lambda d: cite(d, *d.blocks))
-    check_page(built.page("l0003-l0004"), "l0003-l0004", "native-text", "Gearbox oil notes")
-    assert "> \\- WTG\\-07 switches" not in built.page("l0007-l0007").body
-    assert "> \\- WTG-07 switches to ISO VG 220." in built.page("l0007-l0007").body
+    built = await build(corpus, writer, "notes/consignes-de-pose.txt", lambda d: cite(d, *d.blocks))
+    check_page(built.page("l0003-l0004"), "l0003-l0004", "native-text", "Installation notes")
+    assert "> \\- BC\\-2026\\-009 est livrée" not in built.page("l0007-l0007").body
+    assert "> \\- BC-2026-009 est livrée le 20/04/2026." in built.page("l0007-l0007").body
 
 
 async def test_image_region_with_ocr_and_description(corpus: Corpus, writer: ReleaseWriter) -> None:
     built = await build(
-        corpus, writer, "photos/checklist.png", lambda d: cite(d, *d.blocks), llm=describer()
+        corpus, writer, "photos/photo-palettes.png", lambda d: cite(d, *d.blocks), llm=describer()
     )
     page = built.page("img-b01")
-    check_page(page, "img-b01", "ocr", "Checklist photo")
-    assert "![Image of Checklist photo](img/img-b01.png)" in page.body
+    check_page(page, "img-b01", "ocr", "Pallets photo")
+    assert "![Image of Pallets photo](img/img-b01.png)" in page.body
     assert "## OCR text" in page.body and "## Figure f01" in page.body
     assert DESCRIPTION in page.body
     assert built.asset("img/img-b01-f01.png").startswith(b"\x89PNG")
@@ -202,16 +211,16 @@ async def test_image_region_with_ocr_and_description(corpus: Corpus, writer: Rel
 
 async def test_index_and_release_validation(corpus: Corpus, writer: ReleaseWriter) -> None:
     selections: dict[str, Callable[[ExtractedDoc], Sequence[CitedLocator]]] = {
-        "docs/sop-gbx-010.pdf": lambda d: cite(d, *d.blocks),
-        "docs/crane-lift-plan-scan.pdf": lambda d: cite(d, *d.blocks),
-        "docs/sop-gbx-010-rev-b.docx": lambda d: cite(d, *d.blocks),
-        "plans/maintenance-plan-2026.xlsx": lambda d: cite(d, *d.blocks),
-        "plans/work-orders.csv": lambda d: cite(d, *d.blocks),
-        "slides/gearbox-review.pptx": lambda d: cite(d, *d.blocks),
-        "mail/oil-change-schedule.eml": lambda d: cite(d, *d.blocks),
-        "meetings/standup.vtt": lambda d: cite(d, *d.blocks),
-        "notes/gearbox-oil.txt": lambda d: cite(d, *d.blocks),
-        "photos/checklist.png": lambda d: cite(d, *d.blocks),
+        "docs/devis-indice-a.pdf": lambda d: cite(d, *d.blocks),
+        "docs/bon-de-livraison-scan.pdf": lambda d: cite(d, *d.blocks),
+        "docs/avenant-n1.docx": lambda d: cite(d, *d.blocks),
+        "plans/planning-chantier.xlsx": lambda d: cite(d, *d.blocks),
+        "plans/commandes.csv": lambda d: cite(d, *d.blocks),
+        "slides/support-reunion-chantier.pptx": lambda d: cite(d, *d.blocks),
+        "mail/report-de-livraison.eml": lambda d: cite(d, *d.blocks),
+        "meetings/reunion-de-chantier.vtt": lambda d: cite(d, *d.blocks),
+        "notes/consignes-de-pose.txt": lambda d: cite(d, *d.blocks),
+        "photos/photo-palettes.png": lambda d: cite(d, *d.blocks),
     }
     built: list[Built] = []
     for rel, select in selections.items():

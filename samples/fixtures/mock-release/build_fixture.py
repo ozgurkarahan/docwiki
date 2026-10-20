@@ -2,8 +2,9 @@
 
 The Markdown (wiki pages, evidence sidecars, skills, llms.txt) is written by hand and committed.
 This script regenerates everything derived from it: the page image of the PDF sidecar, the
-Parquet table, ``catalog.json`` (release root and ``wiki/``), ``search.db``, ``manifest.json``
-and ``current.json``; then it runs ``validate_release`` and fails on any violation.
+Parquet tables of the workbook, ``catalog.json`` (release root and ``wiki/``), ``search.db``,
+``manifest.json`` and ``current.json``; then it runs ``validate_release`` and fails on any
+violation.
 
     uv run python samples/fixtures/mock-release/build_fixture.py            # rebuild in place
     uv run python samples/fixtures/mock-release/build_fixture.py --out DIR  # rebuild a copy
@@ -30,6 +31,7 @@ from docwiki.contracts.catalog import (
 )
 from docwiki.contracts.extracted import Table, TableRow
 from docwiki.contracts.gates import gate_results
+from docwiki.contracts.ids import source_id_for
 from docwiki.contracts.layout import SKILL_PROJECTIONS, ReleaseFiles
 from docwiki.contracts.locators import XlsxRowsLocator
 from docwiki.contracts.manifest import CurrentPointer, ReleaseInputs, ReleaseManifest
@@ -53,70 +55,202 @@ from docwiki.release.writer import hash_release_files
 from docwiki.search.index import SearchBlock, build_search_db
 
 HERE = Path(__file__).resolve().parent
-RELEASE_ID = "20260215T090000Z-decd4b59"
-CREATED_AT = datetime(2026, 2, 15, 9, 0, 0, tzinfo=UTC)
+RELEASE_ID = "20260401T090000Z-7ce99a3f"
+CREATED_AT = datetime(2026, 4, 1, 9, 0, 0, tzinfo=UTC)
 AUDIENCE = "public"
-RUN_ID = "run-20260215-090000-0a1b2c3d"
+RUN_ID = "run-20260401-090000-0a1b2c3d"
 VERSIONS = VersionInfo(
     docwiki="0.1.0",
-    domain_pack="wind-om-mock",
+    domain_pack="batiment-mock",
     domain_pack_hash="mock-pack-v1",
     prompts={"compile": "mock-1"},
     extractors={"local": "mock-1"},
 )
-SOP_A, SOP_B, PLAN = "src-f2750f41f3fa", "src-4d9c65e05302", "src-43c97f7dfcde"
+# Schedule indice A (PDF, superseded), schedule indice B (XLSX, current) and the minutes (DOCX).
+PLAN_A, PLAN_B, MINUTES = "src-c6436ec50050", "src-86eabe3d6d0d", "src-165f1d3a109c"
 SKIPPED_GATES = ("G04", "G10", "G15")
 
 GLOSSARY = [
-    ("ISO VG", {"de": ["ISO-Viskositätsklasse"], "fr": ["grade de viscosité ISO"]}, "iso-vg"),
-    ("SOP", {"de": ["Standardarbeitsanweisung"], "fr": ["procédure opératoire standard"]}, "sop"),
+    ("revision", {"en": ["revision letter"], "fr": ["indice"]}, "revision"),
     (
-        "WTG",
-        {"de": ["Windenergieanlage"], "en": ["wind turbine generator"], "fr": ["éolienne"]},
-        "wtg",
+        "schedule",
+        {
+            "en": ["works schedule", "programme"],
+            "fr": ["planning", "planning de travaux", "calendrier des travaux"],
+        },
+        "schedule",
+    ),
+    (
+        "windows and external doors",
+        {"en": ["exterior joinery", "joinery"], "fr": ["menuiseries extérieures", "menuiseries"]},
+        "windows-and-external-doors",
     ),
 ]
 
-PLAN_TABLE = Table(
-    id="t01",
-    locator=XlsxRowsLocator(sheet="Plan", row_start=1, row_end=4),
-    provenance="deterministic-table",
-    columns=["Asset", "Task", "Oil grade", "Due", "Hours"],
-    rows=[
-        TableRow(
-            row_id="r0002", cells=["WTG-07", "Gearbox oil change", "ISO VG 320", "2026-03", "6"]
-        ),
-        TableRow(row_id="r0003", cells=["WTG-07", "Vibration check", "", "2026-04", "2"]),
-        TableRow(
-            row_id="r0004", cells=["WTG-12", "Gearbox oil change", "ISO VG 220", "2026-05", "6"]
-        ),
-    ],
-    artifact="tables/t01.parquet",
+LAMNA, VANARSDEL, ADATUM, ZAVA = (
+    "Lamna Bâtiment",
+    "VanArsdel Menuiseries",
+    "Adatum Électricité",
+    "Zava Matériaux",
+)
+DONE, TODO = "100 %", "0 %"
+
+
+def _row(number: int, *cells: str) -> TableRow:
+    return TableRow(row_id=f"r{number:04d}", cells=list(cells))
+
+
+# The two sheets of the workbook of indice B as the local extractor reads them: one table per
+# sheet, and spreadsheet row n has the row id r000n (the blank row 20 has none).
+# fmt: off
+PLANNING_COLUMNS = [
+    "Tâche", "Désignation", "Lot", "Intervenant", "Début", "Fin", "Avancement", "Observations",
+]
+PLANNING_ROWS = [
+    _row(2, "T01", "Installation de chantier", "1", LAMNA, "2026-02-23", "2026-02-23", DONE, ""),
+    _row(3, "T02", "Terrassement", "2", LAMNA, "2026-02-24", "2026-02-27", DONE, ""),
+    _row(4, "T03", "Fondations", "2", LAMNA, "2026-03-02", "2026-03-06", DONE, ""),
+    _row(5, "T04", "Dallage", "3", LAMNA, "2026-03-09", "2026-03-12", DONE,
+         "Dalle coulée le 12/03/2026"),
+    _row(6, "T05", "Élévation des murs", "3", LAMNA, "2026-03-16", "2026-03-27", DONE, ""),
+    _row(7, "T06", "Charpente, couverture et fenêtre de toit", "4 et avenant n°1", LAMNA,
+         "2026-03-30", "2026-04-03", TODO, ""),
+    _row(8, "T07", "Livraison des menuiseries", "5", VANARSDEL, "2026-04-20", "2026-04-20", TODO,
+         "Livraison reportée (courriel de VanArsdel Menuiseries du 18/03/2026)"),
+    _row(9, "T08", "Pose des menuiseries", "5", LAMNA, "2026-04-21", "2026-04-23", TODO, ""),
+    _row(10, "T18", "Fermeture provisoire des baies (panneaux bois)", "5", LAMNA, "2026-04-07",
+         "2026-04-07", TODO, "Décision de la réunion de chantier n°3"),
+    _row(11, "T09", "Électricité 1er œuvre", "6", ADATUM, "2026-04-07", "2026-04-10", TODO, ""),
+    _row(12, "T10", "Ouverture du mur existant (baie de liaison)", "3", LAMNA, "2026-04-27",
+         "2026-04-29", TODO, "Après la pose des menuiseries"),
+    _row(13, "T11", "Isolation et plâtrerie", "7", LAMNA, "2026-04-13", "2026-04-24", TODO, ""),
+    _row(14, "T12", "Cuisine : dépose et plomberie", "8", LAMNA, "2026-04-07", "2026-04-10",
+         TODO, "Avancée (réunion de chantier n°3)"),
+    _row(15, "T13", "Électricité 2nd œuvre", "6 et 8", ADATUM, "2026-05-04", "2026-05-06",
+         TODO, ""),
+    _row(16, "T14", "Carrelage et faïence", "7 et 8", LAMNA, "2026-05-04", "2026-05-07",
+         TODO, ""),
+    _row(17, "T15", "Pose des meubles de cuisine", "8", LAMNA, "2026-05-11", "2026-05-12",
+         TODO, ""),
+    _row(18, "T16", "Finitions et nettoyage", "-", LAMNA, "2026-05-13", "2026-05-13", TODO, ""),
+    _row(19, "T17", "Réception des travaux", "-", "Lamna Bâtiment et clients", "2026-05-15",
+         "2026-05-15", TODO, ""),
+    _row(21, "Document", "Planning et suivi des achats PLN-2026-003 indice B du 27/03/2026",
+         "", "", "", "", "", ""),
+    _row(22, "Établi par", "Inès Roux, conductrice de travaux, Lamna Bâtiment",
+         "", "", "", "", "", ""),
+    _row(23, "Avancement au", "2026-03-27", "", "", "", "", "", ""),
+    _row(24, "Observations",
+         "Cet indice annule et remplace le planning PLN-2026-003 indice A du 17/03/2026.",
+         "", "", "", "", "", ""),
+    _row(25, "Observations",
+         "Motif : report de la livraison des menuiseries au 20/04/2026 (courriel de VanArsdel "
+         "Menuiseries du 18/03/2026) et décisions de la réunion de chantier n°3 du 24/03/2026.",
+         "", "", "", "", "", ""),
+]
+ACHATS_COLUMNS = [
+    "N° commande", "Date", "Fournisseur", "Objet", "Commandé HT", "Facturé HT", "Statut",
+]
+ACHATS_ROWS = [
+    _row(2, "BC-2026-008", "2026-02-12", ADATUM,
+         "Sous-traitance électricité (extension et cuisine)", "2390", "0",
+         "Intervention à partir du 07/04/2026"),
+    _row(3, "BC-2026-009", "2026-02-16", VANARSDEL, "Menuiseries extérieures F1, F2 et F3",
+         "3320", "996",
+         "Acompte de 30 % facturé ; livraison reportée au 20/04/2026 (courriel du 18/03/2026)"),
+    _row(4, "BC-2026-010", "2026-02-18", ZAVA,
+         "Béton, aciers, hérisson et isolant (fondations et dallage)", "4386.5", "4386.5",
+         "Livré et facturé (FA-2026-0174)"),
+    _row(5, "BC-2026-012", "2026-03-02", ZAVA, "Blocs béton, mortier, aciers et linteau (murs)",
+         "1484.8", "1484.8", "Livré le 13/03/2026, facture FA-2026-0217 en cours de vérification"),
+    _row(6, "BC-2026-013", "2026-03-09", ZAVA, "Bois de charpente, tuiles et zinguerie",
+         "2964", "0", "Livré le 27/03/2026"),
+    _row(7, "BC-2026-016", "2026-03-11", ZAVA,
+         "Fenêtre de toit 78 x 98 cm et raccord (avenant n°1)", "612", "0",
+         "Livré le 27/03/2026"),
+    _row(8, "Total commandé (HT)", "", "", "", "15157.3", "", ""),
+    _row(9, "Achats facturés à date (HT)", "", "", "", "", "6867.3", ""),
+]
+# fmt: on
+PLAN_TABLES = [
+    Table(
+        id="t01",
+        locator=XlsxRowsLocator(sheet="Planning", row_start=1, row_end=25),
+        provenance="deterministic-table",
+        columns=PLANNING_COLUMNS,
+        rows=PLANNING_ROWS,
+        artifact="tables/t01.parquet",
+    ),
+    Table(
+        id="t02",
+        locator=XlsxRowsLocator(sheet="Achats", row_start=1, row_end=9),
+        provenance="deterministic-table",
+        columns=ACHATS_COLUMNS,
+        rows=ACHATS_ROWS,
+        artifact="tables/t02.parquet",
+    ),
+]
+
+SHEET_6_9 = (
+    "Row 6: Tâche: T05; Désignation: Élévation des murs; Lot: 3; Intervenant: Lamna Bâtiment; "
+    "Début: 2026-03-16; Fin: 2026-03-27; Avancement: 100 %. "
+    "Row 7: Tâche: T06; Désignation: Charpente, couverture et fenêtre de toit; Lot: 4 et "
+    "avenant n°1; Intervenant: Lamna Bâtiment; Début: 2026-03-30; Fin: 2026-04-03; "
+    "Avancement: 0 %. "
+    "Row 8: Tâche: T07; Désignation: Livraison des menuiseries; Lot: 5; Intervenant: "
+    "VanArsdel Menuiseries; Début: 2026-04-20; Fin: 2026-04-20; Avancement: 0 %; "
+    "Observations: Livraison reportée (courriel de VanArsdel Menuiseries du 18/03/2026). "
+    "Row 9: Tâche: T08; Désignation: Pose des menuiseries; Lot: 5; Intervenant: Lamna "
+    "Bâtiment; Début: 2026-04-21; Fin: 2026-04-23; Avancement: 0 %."
+)
+SHEET_24_25 = (
+    "Row 24: Observations: Cet indice annule et remplace le planning PLN-2026-003 indice A "
+    "du 17/03/2026. "
+    "Row 25: Observations: Motif : report de la livraison des menuiseries au 20/04/2026 "
+    "(courriel de VanArsdel Menuiseries du 18/03/2026) et décisions de la réunion de "
+    "chantier n°3 du 24/03/2026."
 )
 
 
 def _blocks(titles: dict[str, tuple[str, str]]) -> list[SearchBlock]:
     """Extracted blocks of the (fictional) originals, indexed as ``source-block`` rows."""
     raw = [
-        (SOP_A, "p0001", "p. 1", "Use ISO VG 320 gearbox oil for all turbines."),
-        (SOP_A, "p0001", "p. 1", "Drain the oil while it is still warm."),
         (
-            SOP_B,
-            "para-0004",
-            "¶ 4",
-            "At cold sites, where the ambient temperature can fall below -20 °C, use ISO VG 220 "
-            "gearbox "
-            "oil. WTG-07 is the first turbine to switch to ISO VG 220. This revision supersedes "
-            "SOP-GBX-010 rev A for Litware gearboxes.",
+            PLAN_A,
+            "p0001",
+            "p. 1",
+            "Planning et suivi des achats PLN-2026-003 indice A du 17/03/2026",
         ),
         (
-            PLAN,
-            "sheet-plan-r0002-r0004",
-            'sheet "Plan", rows 2–4',
-            "Row 2: WTG-07, Gearbox oil change, ISO VG 320, due 2026-03, 6 hours. "
-            "Row 3: WTG-07, Vibration check, due 2026-04, 2 hours. "
-            "Row 4: WTG-12, Gearbox oil change, ISO VG 220, due 2026-05, 6 hours.",
+            PLAN_A,
+            "p0001",
+            "p. 1",
+            "T05 Élévation des murs 3 Lamna Bâtiment 2026-03-16 2026-03-27 20 %",
         ),
+        (
+            PLAN_A,
+            "p0001",
+            "p. 1",
+            "T07 Livraison des menuiseries 5 VanArsdel Menuiseries 2026-03-30 2026-03-30 0 % "
+            "Commande BC-2026-009",
+        ),
+        (
+            PLAN_A,
+            "p0001",
+            "p. 1",
+            "T08 Pose des menuiseries 5 Lamna Bâtiment 2026-03-31 2026-04-02 0 %",
+        ),
+        (MINUTES, "para-0007", "¶ 7", "Élévation des murs : avancement 70 %."),
+        (
+            MINUTES,
+            "para-0011",
+            "¶ 11",
+            "VanArsdel Menuiseries a annoncé par courriel du 18/03/2026 le report de la livraison "
+            "des menuiseries (commande BC-2026-009) du 30/03/2026 au 20/04/2026. Pose prévue du "
+            "21/04 au 23/04/2026.",
+        ),
+        (PLAN_B, "sheet-planning-r0006-r0009", 'sheet "Planning", rows 6–9', SHEET_6_9),
+        (PLAN_B, "sheet-planning-r0024-r0025", 'sheet "Planning", rows 24–25', SHEET_24_25),
     ]
     return [
         SearchBlock(
@@ -128,8 +262,8 @@ def _blocks(titles: dict[str, tuple[str, str]]) -> list[SearchBlock]:
             section=label,
             text=text,
             sensitivity="public",
-            status="superseded" if source_id == SOP_A else "current",
-            lang="en",
+            status="superseded" if source_id == PLAN_A else "current",
+            lang="fr",
         )
         for source_id, key, label, text in raw
     ]
@@ -227,6 +361,10 @@ def build(root: Path = HERE) -> list[str]:
     _clean(release, root)
     pages = _load_pages(wiki)
     sources = [page for page in pages if isinstance(page.frontmatter, SourceFrontmatter)]
+    for page in sources:
+        fm = page.frontmatter
+        if source_id_for(fm.source_path) != fm.source_id:  # type: ignore[union-attr]
+            raise SystemExit(f"{page.path}: source_id does not derive from source_path")
     inputs = ReleaseInputs(
         sources={page.frontmatter.source_id: page.frontmatter.source_hash for page in sources}  # type: ignore[union-attr]
     )
@@ -236,10 +374,10 @@ def build(root: Path = HERE) -> list[str]:
     if expected != RELEASE_ID:
         raise SystemExit(f"release identity changed: expected folder {expected}, have {RELEASE_ID}")
 
-    image = release / "evidence" / SOP_A / "img" / "p0001.png"
+    image = release / "evidence" / PLAN_A / "img" / "p0001.png"
     image.parent.mkdir(parents=True, exist_ok=True)
     image.write_bytes(_png(48, 64, (4, 10, 44, 22)))
-    write_source_tables(release, PLAN, [PLAN_TABLE], "public")
+    write_source_tables(release, PLAN_B, PLAN_TABLES, "public")
 
     catalog = Catalog(
         release_id=RELEASE_ID,
@@ -268,14 +406,15 @@ def build(root: Path = HERE) -> list[str]:
         for lang, values in by_lang.items()
         for synonym in values
     ] + [
-        ("WTG-07", "turbine 7", "en"),
-        ("WTG-07", "éolienne 7", "fr"),
-        ("WTG-12", "turbine 12", "en"),
+        (p.frontmatter.title, alias.text, alias.lang)
+        for p in pages
+        if isinstance(p.frontmatter, EntityFrontmatter)
+        for alias in p.frontmatter.aliases
     ]
     build_search_db(
         pages,
         _blocks(titles),
-        synonyms,
+        list(dict.fromkeys(synonyms)),
         release / ReleaseFiles.SEARCH_DB,
         release_id=RELEASE_ID,
         audience=AUDIENCE,
@@ -298,7 +437,7 @@ def build(root: Path = HERE) -> list[str]:
             "pages": len(pages),
             "queries": sum(isinstance(p.frontmatter, QueryFrontmatter) for p in pages),
             "sources": len(sources),
-            "tables": 1,
+            "tables": len(PLAN_TABLES),
             "topics": sum(isinstance(p.frontmatter, TopicFrontmatter) for p in pages),
         },
         gates=gate_results([], skipped=SKIPPED_GATES),

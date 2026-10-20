@@ -1,6 +1,7 @@
 # Evaluation
 
-> The questions refer to the **fictional** Quellmoor Ridge sample corpus in `samples/corpus`.
+> The questions refer to the **fictional** Chantier Moreau sample corpus in `samples/corpus`
+> (Lamna Bâtiment, the Moreau household, Valbrise): French documents of one building job.
 
 This folder measures DocWiki against two baselines on the golden set, with deterministic metrics,
 optional model-judged metrics, costs and latencies (`docs/spec/evals.md`). Only the systems under
@@ -18,13 +19,26 @@ in `tests/evals/`, which PR CI runs; live runs are manual (see "CI").
 | `results/` | Result files (`<UTC date>-<system>-<split>.json`) and `latest.json` |
 | `golden/` | The public dev split, sealed (owned by the corpus lane, see `golden/README.md`) |
 
+## Corpus and questions
+
+The corpus (`samples/corpus/`, `MANIFEST.json` lists every file with its SHA-256 and sensitivity)
+holds 12 public documents under `full/` (PDF, DOCX, XLSX, EML and JPG; the delivery note is an
+image-only scan), one restricted document under `full/restricted/` (the internal price study) and
+one revision under `held-back/` that only the time-travel demonstration adds. There is no smaller
+subset: the baselines index the public documents of `full/` (`--scope all` adds the held-back
+revision).
+
+The dev split `golden/dev.jsonl` is public and sealed. The **holdout** is a private JSONL file of
+about 5 questions that never enters the repository: it is kept outside it and run with
+`--split-name holdout` (see "Holdout privacy"); only its aggregates are published.
+
 ## Systems
 
 | System | What answers |
 |---|---|
 | `docwiki-researcher` | The deployed Foundry Researcher agent, through `docwiki.agents_client.ask`, using the MCP server over the current release. The agent version is resolved once and pinned for the run. |
-| `baseline-rag` | Naive RAG: every corpus document visible to the audience is extracted with `docwiki.extract` (local mode), its blocks packed into ~800-token chunks that keep their locators, ranked with `docwiki.search`'s BM25 (k1 1.2, b 0.75; question function words dropped, no synonyms), top 8 chunks in one `smart` call with a structured output `{answer, citations: [{chunk_id}]}`. |
-| `baseline-long-context` | The extracted text of the 12 quickstart documents in one `smart` call, each passage preceded by a reference such as `[S01:p0003]`, when the prompt fits the token budget (default 120,000 tokens, 4 characters per token, output included); otherwise the run is recorded as `skipped: too_large`. |
+| `baseline-rag` | Naive RAG: every document of the selected scope that the audience may see (the public documents of `full/` by default) is extracted with `docwiki.extract` (local mode), its blocks packed into ~800-token chunks that keep their locators, ranked with `docwiki.search`'s BM25 (k1 1.2, b 0.75; question function words dropped, no synonyms), top 8 chunks in one `smart` call with a structured output `{answer, citations: [{chunk_id}]}`. |
+| `baseline-long-context` | The extracted text of the same documents (the public documents of `full/` by default) in one `smart` call, each passage preceded by a reference such as `[S01:p0003]`, when the prompt fits the token budget (default 120,000 tokens, 4 characters per token, output included); otherwise the run is recorded as `skipped: too_large`. |
 
 The baselines follow the Researcher's answer rules: use only the documents, cite, abstain with
 "Not found in the documents." rather than guess, prefer current revisions, state contradictions,
@@ -44,6 +58,11 @@ uv run python evals/run.py --system baseline-long-context --questions evals/gold
 uv run python evals/run.py --system docwiki-researcher --questions evals/golden/dev.jsonl `
     --catalog <release folder or its catalog.json>
 uv run python evals/scoreboard.py
+
+# private holdout (a file outside the repository): aggregates only in evals/results
+uv run python evals/run.py --system docwiki-researcher --questions <private holdout file> `
+    --split-name holdout --private-out <folder outside the repository> `
+    --catalog <release folder or its catalog.json>
 ```
 
 Use `--limit 3` for a smoke run (the file name gets `-limit3`). A system that is not configured
@@ -61,7 +80,7 @@ stops before any question with exit code 2 and a message naming the missing sett
 | `--catalog PATH` | none | `catalog.json`, a release folder or a `releases/` folder: maps the release's source ids to corpus files and records the release id |
 | `--release-id` | none | Release id to record when no catalog is given |
 | `--audience` | `public` | Sources the baselines may index (as a DocWiki build for that audience) |
-| `--scope` | `full` | `baseline-rag` corpus: `full`, `quickstart` or `all` |
+| `--scope` | `full` | Documents of the baselines: `full` (the files under `full/`) or `all` (`full/` plus the held-back revisions of `held-back/`, the corpus after the time-travel ingest); restricted documents also need `--audience restricted`. An empty selection stops the run with exit code 2 |
 | `--extract-mode` | `local` | `azure` extracts PDFs and images with Content Understanding (OCR), for metrics and baselines |
 | `--top-k`, `--chunk-tokens`, `--budget-tokens` | 8, 800, 120000 | Baseline parameters |
 | `--concurrency` | 1 | Questions answered in parallel |
@@ -101,19 +120,37 @@ tokens, cost, latency, error and judge scores. `baseline-rag` adds the retrieved
 ## Metrics
 
 Answers are compared after one normalisation (`textnorm.py`): Unicode NFKC, case and accents
-folded, quotes and dashes unified, `high-speed` = `high speed`; numbers lose thousands separators
-and read decimal commas (`1,450` = `1 450` = `1450`, `90,4` = `90.4`); units are canonical
-(`450 N·m` = `450Nm` = `450 newton metres`; `10 °C` = `10 degrees C`; `300 m` = `300 metres`);
-dates in English, French and German forms become ISO dates (`31 July 2026` = `31/07/2026` =
-`2026-07-31`). Matching respects token boundaries: `12` does not match `WTG-12`, `40` does not
-match `410`, a word may take a plural `s`; codes match with other separators (`FGT P 22328`) and
-numbers with units also match by value (`6.0 m/s` = `6 m/s`, but `4.5 m/s` ≠ `4.5 mm/s`).
+folded, quotes and dashes unified, `plain-pied` = `plain pied`. French formats read like English
+ones:
+
+- **Numbers** lose their thousands separators (a space, a no-break space or a narrow no-break
+  space, or a comma) and read decimal commas: `1 450` = `1,450` = `1450`, `90,4` = `90.4`.
+- **Amounts** are numbers with the unit `eur`, whichever side of the number the currency sign is
+  written: `47 271,60 €` = `47271,60 €` = `47,271.60 euros` = `€47,271.60` = `€ 47271,60` =
+  `EUR 47,271.60`. In `79,20 € 792,00 €` each sign stays with the amount before it.
+- **Units** are canonical: `30 m²` = `30 m2` = `30 sq m` = `30 square metres` = `30 mètres carrés`
+  (areas; `m³` for volumes), `450 N·m` = `450Nm` = `450 newton metres`, `10 °C` = `10 degrees C`,
+  `300 m` = `300 metres`.
+- **Dates** in English, French and German forms become ISO dates: `20 April 2026` = `20/04/2026` =
+  `20 avril 2026` = `lundi 20 avril 2026` = `2026-04-20`. In a range the first date takes the year
+  of the last one: `from 30 March to 20 April 2026` = `from March 9 to April 20, 2026` (`2026-03-09`)
+  = `du 30 mars au 20 avril 2026` = `du 30/03 au 20/04/2026` (`2026-03-30` to `2026-04-20`),
+  `21-23 April 2026` = `du 21 au 23 avril 2026`. A number after a label or a month name is no
+  day: `week 14 to 20 April 2026`, `semaine 14 au 20/04/2026`, `item 7.3 and 2026-04-20`,
+  `version 1.2 - 2026-03-30` and `n° 14 au 20/04/2026` keep their numbers, and `8 - 13/03/2026`
+  is no range. The start of a range carries its inferred year, so write such an item as a date
+  (`2026-03-09`), not as `March 9`.
+
+Matching respects token boundaries: `12` does not match `DEV-2026-012` or `412`, `40` does not
+match `410`, a word may take a plural `s`; codes match with other separators (`BC 2026 012`) and
+numbers with units also match by value (`30,00 m²` = `30 m2`, `6.0 m/s` = `6 m/s`, but `4.5 m/s`
+≠ `4.5 mm/s` and `47271,60` ≠ `47271,60 €`).
 
 | Metric | Per question | Applies to |
 |---|---|---|
 | Answer accuracy | 1 if every `must_include` item is in the answer body; for `abstain=true`, 1 if the abstention is correct | questions with `must_include` items or `abstain=true` |
 | Must-include coverage | share of the `must_include` items in the answer body | questions with `must_include` items |
-| Numeric exactness | 1 if every number (with its unit when the item has one) and date of `must_include` appears exactly | `numeric` and `table` questions whose items hold numbers (codes such as `PO-76994` are not numbers) |
+| Numeric exactness | 1 if every number (with its unit when the item has one) and date of `must_include` appears exactly | `numeric` and `table` questions whose items hold numbers (codes such as `BC-2026-012` are not numbers) |
 | Citation precision | share of cited units whose evidence supports the answer | answers that cite something |
 | Citation recall | share of `required_citations` matched by a cited locator | questions with required citations |
 | Abstention accuracy | `abstain=true`: the answer says not found (EN/FR/DE phrases) and cites nothing; otherwise the answer does not abstain | every question |
@@ -125,7 +162,7 @@ that a cited file name cannot satisfy them. An answer counts as an abstention wh
 "Not found" (or its French/German equivalent), or, when it cites nothing, when it says that the
 wiki or documents do not contain the answer.
 
-**Citation recall** matches at the granularity of the golden set: same canonical source, and the
+**Citation recall** matches at the granularity of the golden set: same source, and the
 same PDF page, DOCX paragraph, slide, cue start or image region; overlapping row ranges of the
 same sheet, DOCX table or CSV file; overlapping line ranges of a text file or of the same e-mail
 part (a part cited without lines covers all of them). `*` (images, whose region numbers depend on
@@ -151,10 +188,9 @@ Golden `required_citations` use paths relative to `samples/corpus` (`full/...`).
 have other raw paths, so cited sources are mapped to corpus files by, in order: SHA-256 (MANIFEST
 hashes, also through `catalog.sources[].hash` of the release), `source_id` (the release catalog,
 else ids derived from every MANIFEST path and its suffixes, which covers releases built from
-`full/` or from the content of `full/`), raw path (exact or unique suffix) and source title.
-Quickstart copies map to their originals (`copy_of`). A citation without a sidecar path is mapped
-from its locator label (`p. 3`, `sheet "Stock", rows 2–4`, `table t01, rows r0002–r0004` for
-`query_table` rows).
+`full/` or from the content of `full/`), raw path (exact or unique suffix) and source title. A
+citation without a sidecar path is mapped from its locator label (`p. 3`, `sheet "Achats", rows
+2–4`, `table t01, rows r0002–r0004` for `query_table` rows).
 
 ### Judge (optional)
 
@@ -177,7 +213,8 @@ are not priced. Latency is the wall time of each system call.
 
 ## Holdout privacy
 
-The private holdout never enters the repository. For any split other than `dev`:
+The private holdout (a JSONL file of about 5 questions, kept outside the repository and authored
+apart from the dev set) never enters the repository. For any split other than `dev`:
 
 - the file written to `--out` holds aggregates only: no question, answer, citation, failed id or
   error message (`public_view` in `runner.py`, tested in `tests/evals/test_evals_runner.py`);
@@ -220,10 +257,10 @@ From `docs/spec/evals.md` §4, enforced by the tooling where possible:
 
 Known limitations, stated rather than hidden:
 
-- Local extraction has no OCR: the scanned lift plan and the checklist photo have no text for the
-  baselines (and for the precision check, where only the required citation supports them). Use
-  `--extract-mode azure` to give the baselines the same Content Understanding text as DocWiki.
-- `must_include` matching is lexical: a correct paraphrase that changes a value's form (`0.9 m` as
-  `90 cm`) fails; the judge's response completeness covers semantic correctness.
+- Local extraction has no OCR: the scanned delivery note and the two site photos have no text for
+  the baselines (and for the precision check, where only the required citation supports them).
+  Use `--extract-mode azure` to give the baselines the same Content Understanding text as DocWiki.
+- `must_include` matching is lexical: a correct paraphrase that changes a value's form (`3,00 m`
+  as `300 cm`) fails; the judge's response completeness covers semantic correctness.
 - The restricted-value check is a heuristic fingerprint (distinctive numbers and codes); the
   `restricted` category's `forbidden` strings are exact.

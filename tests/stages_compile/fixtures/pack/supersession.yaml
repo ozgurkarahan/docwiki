@@ -1,4 +1,4 @@
-doc_number_regex: "(?P<number>SOP-[A-Z]{3}-\\d{3})"
-revision_regex: "(?i)\\brev(?:ision)?[ ._-]?(?P<rev>[A-Z])\\b"
+doc_number_regex: "(?P<number>DEV-\\d{4}-\\d{3})"
+revision_regex: "(?i)\\bindice[ ._-]?(?P<rev>[A-Z])\\b"
 revision_order: [A, B, C]
-explicit_reference_regex: "(?i)supersedes\\s+(?P<number>SOP-[A-Z]{3}-\\d{3})"
+explicit_reference_regex: "(?i)annule\\s+et\\s+remplace\\s+(?:le\\s+devis\\s+)?(?P<number>DEV-\\d{4}-\\d{3})"

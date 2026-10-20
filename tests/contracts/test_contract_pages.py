@@ -27,24 +27,24 @@ def source_fm(**overrides: object) -> dict[str, object]:
     data: dict[str, object] = {
         "id": SOURCE_ID,
         "type": "source",
-        "title": "Gearbox manual",
-        "summary": "Litware gearbox maintenance manual excerpt.",
+        "title": "Quote DEV-2026-014 indice B",
+        "summary": "Current revision of the quote for the extension and the kitchen.",
         "lang": "en",
         "sensitivity": "public",
         "updated": date(2026, 1, 31),
-        "tags": ["gearbox", "oil"],
+        "tags": ["extension", "quote"],
         "docwiki": {"schema": 1, "release": RELEASE},
         "source_id": SOURCE_ID,
-        "source_path": "oem/gearbox-manual.pdf",
+        "source_path": "devis/DEV-2026-014_indice-B_devis-extension-et-cuisine.pdf",
         "source_hash": "sha256:" + "a" * 64,
         "media_type": "application/pdf",
-        "doc_type": "oem-manual",
-        "category": "oem-documentation",
+        "doc_type": "quote",
+        "category": "contract-documents",
         "status": "current",
-        "original_lang": "en",
-        "pages": 12,
-        "entities": ["asset:wtg-07"],
-        "topics": ["topic:gearbox-oil"],
+        "original_lang": "fr",
+        "pages": 2,
+        "entities": ["building-element:baie-f1"],
+        "topics": ["topic:quotes-and-contract"],
         "authority": 8,
         "extraction": {
             "adapter": "local",
@@ -64,11 +64,11 @@ def test_frontmatter_round_trip_keeps_order_types_and_lf() -> None:
         "flag": True,
         "none": None,
         "list": [],
-        "uni": "Ölwechsel",
+        "uni": "Façade",
     }
     text = write_frontmatter(data, "\n\n# Body\r\nline\n\n\n")
     assert text.startswith("---\nid: x\nzeta: '1.0'\nalpha: 2026-01-02\n")
-    assert "uni: Ölwechsel" in text and "\r" not in text
+    assert "uni: Façade" in text and "\r" not in text
     assert text.endswith("---\n\n# Body\nline\n")
     parsed, body = read_frontmatter(text)
     assert parsed == data and list(parsed) == list(data)
@@ -99,9 +99,9 @@ def test_split_without_block_returns_text() -> None:
 
 def test_page_render_parse_round_trip() -> None:
     page = Page(
-        path="sources/gearbox-manual.md",
+        path="sources/dev-2026-014-indice-b-devis-extension-et-cuisine.md",
         frontmatter=parse_frontmatter(source_fm()),
-        body="# Gearbox manual\n",
+        body="# Quote DEV-2026-014 indice B\n",
     )
     text = page.render()
     assert text.index("id:") < text.index("type:") < text.index("source_id:")
@@ -111,14 +111,14 @@ def test_page_render_parse_round_trip() -> None:
 @pytest.mark.parametrize(
     ("overrides", "message"),
     [
-        ({"tags": ["oil", "gearbox"]}, "sorted"),
-        ({"tags": ["Oil"]}, "pattern"),
+        ({"tags": ["quote", "extension"]}, "sorted"),
+        ({"tags": ["Quote"]}, "pattern"),
         ({"status": "superseded"}, "superseded_by"),
         ({"superseded_by": ["src-aaaaaaaaaaaa"]}, "current sources"),
         ({"id": "src-ffffffffffff"}, "equal source_id"),
         ({"authority": 11}, "less than or equal"),
-        ({"pages": "12"}, "valid integer"),
-        ({"entities": ["wtg-07"]}, "invalid entity id"),
+        ({"pages": "2"}, "valid integer"),
+        ({"entities": ["baie-f1"]}, "invalid entity id"),
         ({"updated": "2026-1-31"}, "YYYY-MM-DD"),
         ({"summary": "two\nlines"}, "single line"),
         ({"unknown": 1}, "Extra inputs"),
@@ -141,30 +141,39 @@ def test_frontmatter_accepts_iso_date_strings_from_json() -> None:
 
 def test_discriminated_union_dispatches_and_checks_ids() -> None:
     common = {
-        "title": "WTG-07",
-        "summary": "Turbine 7.",
+        "title": "Baie F1",
+        "summary": "Sliding bay window F1.",
         "sensitivity": "internal",
         "updated": date(2026, 1, 31),
         "docwiki": {"schema": 1, "release": RELEASE},
     }
     entity = parse_frontmatter(
-        {**common, "id": "asset:wtg-07", "type": "entity", "entity_type": "asset", "key": "wtg-07"}
+        {
+            **common,
+            "id": "building-element:baie-f1",
+            "type": "entity",
+            "entity_type": "building-element",
+            "key": "baie-f1",
+        }
     )
     assert isinstance(entity, EntityFrontmatter)
     with pytest.raises(ValidationError, match="entity_type"):
         parse_frontmatter(
             {
                 **common,
-                "id": "asset:wtg-08",
+                "id": "building-element:fenetre-f2",
                 "type": "entity",
-                "entity_type": "asset",
-                "key": "wtg-07",
+                "entity_type": "building-element",
+                "key": "baie-f1",
             }
         )
     with pytest.raises(ValidationError):
         parse_frontmatter({**common, "id": "x", "type": "wiki"})
     assert (
-        parse_frontmatter({**common, "id": "index:entities/asset", "type": "index"}).type == "index"
+        parse_frontmatter(
+            {**common, "id": "index:entities/building-element", "type": "index"}
+        ).type
+        == "index"
     )
     assert (
         parse_frontmatter(
@@ -178,19 +187,19 @@ def test_discriminated_union_dispatches_and_checks_ids() -> None:
         parse_frontmatter({**common, "id": "glossary-2", "type": "glossary"})
     topic = {
         **common,
-        "id": "topic:gearbox-oil",
+        "id": "topic:site-progress",
         "type": "topic",
-        "topic_slug": "gearbox-oil",
+        "topic_slug": "site-progress",
         "confidence": "high",
     }
     assert parse_frontmatter(topic).type == "topic"
     query = {
         **common,
-        "id": "query:2026-01-31-oil-grade",
+        "id": "query:2026-01-31-window-delivery-date",
         "type": "query",
-        "question": "Which oil grade?",
+        "question": "When are the windows delivered?",
         "asked_by": "researcher",
-        "approved_by": "maintenance lead",
+        "approved_by": "site manager",
         "sources": ["src-0123456789ab"],
     }
     assert parse_frontmatter(query).type == "query"
@@ -198,7 +207,8 @@ def test_discriminated_union_dispatches_and_checks_ids() -> None:
 
 def test_evidence_page_checks_id_against_locator() -> None:
     text = (
-        "---\nid: evidence:src-0123456789ab:p0003\ntype: evidence\ntitle: Gearbox manual — p. 3\n"
+        "---\nid: evidence:src-0123456789ab:p0003\ntype: evidence\n"
+        "title: Quote DEV-2026-014 — p. 3\n"
         "source_id: src-0123456789ab\nlocator:\n  kind: pdf-page\n  page: 3\n"
         "provenance: native-text\n"
         "sensitivity: public\n---\n\n# p. 3\n"

@@ -166,11 +166,14 @@ def changes_since(
     *,
     day: date,
     removed: Mapping[str, str] | None = None,
+    removed_queries: Mapping[str, str] | None = None,
 ) -> list[LogEntry]:
     """Log entries for this release compared with the previous release's catalog.
 
     ``removed`` explains why a source that had a page is gone (``source_id`` → reason text);
-    the default reason is a deleted raw file.
+    the default reason is a deleted raw file. ``removed_queries`` explains why research answers
+    are left out of this release (page id → reason text): those the previous release published
+    get a ``withdraw`` entry. Answers left out for the audience are not passed (no mention).
     """
     prev_sources = {source.source_id: source for source in (previous.sources if previous else [])}
     prev_pages = {page.id: page for page in (previous.pages if previous else [])}
@@ -215,6 +218,23 @@ def changes_since(
             or before_page.summary != fm.summary
         ):
             entries.append(LogEntry(day, "topic", fm.title, (link(page),)))
+    for page in _by_title(p for p in pages if isinstance(p.frontmatter, QueryFrontmatter)):
+        fm = page.frontmatter
+        assert isinstance(fm, QueryFrontmatter)
+        before_page = prev_pages.get(fm.id)
+        if before_page is None or before_page.summary != fm.summary:
+            entries.append(LogEntry(day, "query", fm.title, (link(page),)))
+    queries_removed = removed_queries or {}
+    gone = [
+        prev_pages[page_id]
+        for page_id in queries_removed
+        if page_id in prev_pages and page_id not in by_id
+    ]
+    for before_page in sorted(gone, key=lambda item: (item.title.casefold(), item.path)):
+        reason = inline_text(queries_removed[before_page.id])
+        entries.append(
+            LogEntry(day, "withdraw", before_page.title, (f"Research answer removed: {reason}.",))
+        )
     return entries
 
 

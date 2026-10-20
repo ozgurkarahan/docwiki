@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
@@ -64,7 +64,7 @@ from docwiki.contracts.safety import find_violations
 from docwiki.release.layout import PORTABLE_META_DIR, ReleaseLayout
 from docwiki.release.tables import SourceTablesIndex
 
-__all__ = ["CITATION_RE", "validate_release"]
+__all__ = ["CITATION_RE", "validate_page", "validate_release"]
 
 CITATION_RE = re.compile(
     r"^\[(?P<title>.+) — (?P<label>[^\]]+)\]\((?P<href>[^)\s]+)\) · (?P<badge>.+)$"
@@ -721,6 +721,7 @@ def _check_catalog(state: _State, manifest: ReleaseManifest | None) -> None:
                 )
     edges = {(edge.from_, edge.to, edge.kind) for edge in catalog.edges}
     page_ids = {page.frontmatter.id: page for page in state.pages.values()}
+    tiers = {page_id: page.frontmatter.sensitivity for page_id, page in page_ids.items()}
     for page in state.pages.values():
         fm = page.frontmatter
         rel = state.wiki_display(page.path)
@@ -751,30 +752,16 @@ def _check_catalog(state: _State, manifest: ReleaseManifest | None) -> None:
                         f"missing edge {fm.id} supersedes {older}",
                         ReleaseFiles.CATALOG,
                     )
-        if isinstance(fm, EntityFrontmatter | TopicFrontmatter | QueryFrontmatter):
-            tiers = []
+        _check_page_sources(state, page, tiers, rel)
+        if isinstance(fm, TopicFrontmatter):
             for source_id in fm.sources:
-                source_page = page_ids.get(source_id)
-                if source_page is None:
+                if source_id in page_ids and (fm.id, source_id, "topic-of") not in edges:
                     state.add(
-                        "G02", "source-ref-missing", f"{source_id} has no page in this release", rel
+                        "G01",
+                        "edge-missing",
+                        f"missing edge {fm.id} topic-of {source_id}",
+                        ReleaseFiles.CATALOG,
                     )
-                else:
-                    tiers.append(source_page.frontmatter.sensitivity)
-                    if (
-                        isinstance(fm, TopicFrontmatter)
-                        and (fm.id, source_id, "topic-of") not in edges
-                    ):
-                        state.add(
-                            "G01",
-                            "edge-missing",
-                            f"missing edge {fm.id} topic-of {source_id}",
-                            ReleaseFiles.CATALOG,
-                        )
-            if tiers and fm.sensitivity != max_sensitivity(*tiers):
-                state.add(
-                    "G07", "page-tier", "page sensitivity must be the maximum of its sources", rel
-                )
     glossary_anchors = state.headings.get(WikiFiles.GLOSSARY, set())
     for entry in catalog.glossary:
         anchor = entry.page.split("#", 1)[1]
@@ -782,6 +769,23 @@ def _check_catalog(state: _State, manifest: ReleaseManifest | None) -> None:
             state.add(
                 "G02", "glossary-anchor", f"{entry.page} does not resolve", ReleaseFiles.CATALOG
             )
+
+
+def _check_page_sources(state: _State, page: Page, tiers: Mapping[str, str], rel: str) -> None:
+    """The ``sources`` of an entity, topic or query page have a page in the release (G02) and
+    the page tier is their highest tier (G07); ``tiers`` maps page ids to their sensitivity."""
+    fm = page.frontmatter
+    if not isinstance(fm, EntityFrontmatter | TopicFrontmatter | QueryFrontmatter):
+        return
+    found: list[str] = []
+    for source_id in fm.sources:
+        tier = tiers.get(source_id)
+        if tier is None:
+            state.add("G02", "source-ref-missing", f"{source_id} has no page in this release", rel)
+        else:
+            found.append(tier)
+    if found and fm.sensitivity != max_sensitivity(*found):
+        state.add("G07", "page-tier", "page sensitivity must be the maximum of its sources", rel)
 
 
 def _intro_targets(page: Page) -> set[str | None]:
@@ -1209,6 +1213,58 @@ def validate_release(
                 parse_locator_key(locator_key(fm.locator))
             except ValueError as exc:
                 state.add("G09", "locator-key", str(exc), ns)
+    return sorted(
+        state.violations, key=lambda v: (v.path or "", v.line or 0, v.gate, v.code, v.message)
+    )
+
+
+def validate_page(
+    page: Page,
+    *,
+    sources: Mapping[str, Page],
+    evidence: Mapping[str, EvidencePage],
+    canaries: Iterable[str] = (),
+) -> list[Violation]:
+    """The checks of :func:`validate_release` that one content page passes on its own, run on a
+    page that is not written yet (the pipeline checks carried and filed research answers).
+
+    ``sources`` are the source pages of the release by source id and ``evidence`` its sidecars
+    by content path (``evidence/<source_id>/<locator_key>.md``). Covered: footnotes and
+    citations (G02, G03, G06), cited-fact lists (G03), the cited sources and the page tier
+    (G02, G07), safe content (G05) and canaries (G08). Links to other pages need the whole
+    release: :func:`validate_release` checks them. Paths are reported as in a release folder.
+    """
+    layout = ReleaseLayout("release", Path("."))
+    state = _State(root=layout.root, layout=layout)
+    state.evidence.update(evidence)
+    shown = state.wiki_display(page.path)
+    text = page.render()
+    try:
+        page = Page.parse(text, page.path)  # what the release validator reads from the file
+    except (FrontmatterError, ValidationError) as exc:
+        message = _summarize(exc) if isinstance(exc, ValidationError) else str(exc)
+        state.add("G01", "frontmatter-invalid", message, shown)
+        return state.violations
+    state.offsets[page.path] = text[: len(text) - len(page.body)].count("\n")
+    titles = {
+        source_id: source.frontmatter.title
+        for source_id, source in sources.items()
+        if isinstance(source.frontmatter, SourceFrontmatter)
+    }
+    tiers = {source_id: source.frontmatter.sensitivity for source_id, source in sources.items()}
+    _check_footnotes(state, page.path, page, titles)
+    _check_cited_lists(state, page.path, page)
+    _check_page_sources(state, page, tiers, shown)
+    for finding in find_violations(text):
+        state.add(
+            _SAFETY_GATE,
+            finding.kind,
+            finding.message + (f": {finding.excerpt}" if finding.excerpt else ""),
+            shown,
+            finding.line,
+        )
+    if any(canary and canary in text for canary in canaries):
+        state.add("G08", "canary-present", "injection canary found", shown)
     return sorted(
         state.violations, key=lambda v: (v.path or "", v.line or 0, v.gate, v.code, v.message)
     )

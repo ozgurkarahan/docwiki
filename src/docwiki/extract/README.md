@@ -12,7 +12,10 @@ from docwiki.evidence import build_evidence
 from docwiki.extract import extract_source
 
 result = await extract_source(
-    raw_file, rel_path="docs/sop-gbx-010.pdf", settings=ExtractSettings(), llm=llm_or_none
+    raw_file,
+    rel_path="devis/DEV-2026-014_indice-A.pdf",
+    settings=ExtractSettings(),
+    llm=llm_or_none,
 )
 result.doc  # ExtractedDoc (blocks b0001…, tables t01…, figures f01…)
 result.figures  # {"f01": png bytes}
@@ -23,8 +26,8 @@ paths = build_evidence(
     doc=result.doc,
     raw_file=raw_file,
     cited=cited_locators,
-    source_title="Gearbox oil change SOP rev A",
-    source_page_path="sources/sop-gbx-010-rev-a.md",
+    source_title="Quote DEV-2026-014 indice A",
+    source_page_path="sources/dev-2026-014-indice-a.md",
     sensitivity="public",
     publish_original=True,
     writer=release_writer,
@@ -220,4 +223,7 @@ evidence of every fixture format.
 and image-only PDFs, DOCX, XLSX, CSV, PPTX, EML, VTT, MD/TXT, PNG) and covers locators, labels,
 provenance, determinism, the Content Understanding REST flow with a mock transport, record and
 replay, local/CU parity, figure descriptions with `FakeLlmClient`, sidecars for every locator
-kind, highlight boxes and sanitisation of hostile text. No test touches the network.
+kind, highlight boxes and sanitisation of hostile text. The sample corpus only uses PDF, DOCX,
+XLSX, EML and JPG (the JPG files are its two AI-generated site photos, see
+`samples/generators/assets/photos/PROVENANCE.md`): these generated fixtures are what exercises the
+other adapters. No test touches the network.

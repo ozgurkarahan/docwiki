@@ -12,8 +12,8 @@
 
 ## 2. Configuration
 
-- `pageTitle` from the domain pack `wiki_title`; `baseUrl` from settings (public sample:
-  `docwiki.ozgurkarahan.com`).
+- `pageTitle` from the domain pack `wiki_title`; `baseUrl` from settings (set to the host that serves
+  the site).
 - Enabled: full-text search, graph view, backlinks panel, popover previews, table of contents,
   breadcrumbs, explorer, tag pages, last-modified dates from frontmatter.
 - Fonts served locally (no third-party font CDN); no analytics; no external scripts.
@@ -31,12 +31,11 @@
   original file (PDF links use `#page=N`).
 - Every citation link is checked by the build (no 404) and by a link checker on the deployed site.
 
-## 4. Public sample on GitHub Pages
+## 4. Public sample on Azure Container Apps
 
-- Workflow `pages.yml`: on changes to `samples/wiki/**` or `site/**`, build the site from the
-  committed sample release with Node 22 and the pinned Quartz, then deploy to GitHub Pages.
-- Custom domain `docwiki.ozgurkarahan.com` (CNAME file in the build output) after the domain is
-  verified for the GitHub account; HTTPS enforced.
+- The public demo is served by the `portal` container (§5) from the current release of a
+  public-audience build; there is no separate static host and no committed copy of the wiki.
+  (v1.4: GitHub Pages retired.)
 - The published sample includes the original sample documents (CC BY 4.0) under the evidence tree.
 
 ## 5. Private portal (optional)

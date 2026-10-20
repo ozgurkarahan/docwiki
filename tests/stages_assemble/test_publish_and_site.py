@@ -11,9 +11,10 @@ from pathlib import Path
 from assemble_helpers import STAMP, source_page
 
 from docwiki.contracts.extracted import Block, ExtractedDoc, ExtractionInfo
-from docwiki.contracts.gates import Violation, gate_results
+from docwiki.contracts.gates import GateResult, Violation, gate_results
 from docwiki.contracts.ids import source_id_for
 from docwiki.contracts.locators import TextLinesLocator
+from docwiki.contracts.manifest import ReleaseManifest
 from docwiki.contracts.pages import DocwikiStamp, Page, QueryFrontmatter
 from docwiki.contracts.runs import CostReceipt, LlmUsage, RunReport, VersionInfo
 from docwiki.contracts.storage import FolderStorage
@@ -24,15 +25,17 @@ from docwiki.stages.publish import finalize_and_publish, run_receipt_page
 from docwiki.stages.sitehook import build_site_for_release
 
 MOCK = Path(__file__).resolve().parents[2] / "samples" / "fixtures" / "mock-release"
-MOCK_ID = "20260215T090000Z-decd4b59"
-VERSIONS = VersionInfo(docwiki="0.1.0", domain_pack="wind-om-mock", domain_pack_hash="h")
+MOCK_ID = "20260401T090000Z-7ce99a3f"
+VERSIONS = VersionInfo(docwiki="0.1.0", domain_pack="batiment-mock", domain_pack_hash="h")
+CREATED = datetime(2026, 4, 1, 9, 0, tzinfo=UTC)
+RUN_ID = "run-20260401-090000-0a1b2c3d"
 
 
 def _writer(tmp_path: Path) -> ReleaseWriter:
     """A writer whose staging folder holds a copy of the (valid) mock release content."""
     writer = ReleaseWriter(
         tmp_path / "staging",
-        created_at=datetime(2026, 2, 15, 9, 0, tzinfo=UTC),
+        created_at=CREATED,
         audience="public",
         versions=VERSIONS,
     )
@@ -60,20 +63,15 @@ def test_final_validation_blocks_an_invalid_release(tmp_path: Path):
 
 def test_valid_release_is_published_and_dry_runs_are_not(tmp_path: Path):
     source = MOCK / "releases" / MOCK_ID
+    committed = ReleaseManifest.from_json((source / "manifest.json").read_bytes())
     for name, dry in (("published", False), ("dry", True)):
         writer = ReleaseWriter(
             tmp_path / name,
-            created_at=datetime(2026, 2, 15, 9, 0, tzinfo=UTC),
+            created_at=committed.created_at,
             audience="public",
-            versions=VersionInfo(
-                docwiki="0.1.0",
-                domain_pack="wind-om-mock",
-                domain_pack_hash="mock-pack-v1",
-                prompts={"compile": "mock-1"},
-                extractors={"local": "mock-1"},
-            ),
-            run_id="run-20260215-090000-0a1b2c3d",
-            inputs=_mock_inputs(source),
+            versions=committed.versions,
+            run_id=committed.run_id,
+            inputs=committed.inputs,
         )
         assert writer.release_id == MOCK_ID
         for item in source.rglob("*"):
@@ -94,12 +92,6 @@ def test_valid_release_is_published_and_dry_runs_are_not(tmp_path: Path):
         assert (pointer is None) is dry
         if pointer is not None:
             assert pointer[0].release_id == MOCK_ID
-
-
-def _mock_inputs(source: Path):
-    from docwiki.contracts.manifest import ReleaseManifest
-
-    return ReleaseManifest.from_json((source / "manifest.json").read_bytes()).inputs
 
 
 def test_site_hook_skips_builds_and_reports_failures(tmp_path: Path, monkeypatch):
@@ -136,6 +128,21 @@ def test_site_hook_skips_builds_and_reports_failures(tmp_path: Path, monkeypatch
     assert built.status == "built" and built.path == tmp_path / "site"
     assert calls == [(tmp_path, tmp_path / "site", "https://docs.example.org", "Wiki", "FICTIONAL")]
 
+    # a staged release has no manifest yet: the run's gates and id are forwarded when given
+    forwarded: list[dict[str, object]] = []
+
+    def build_staged(release_root, out_dir, **options):
+        forwarded.append(options)
+        return out_dir
+
+    gates = [GateResult(gate="G01", name="frontmatter", blocking=True, status="pass")]
+    staged = build_site_for_release(
+        tmp_path, gates=gates, run_id="run-20260215-090000-0a1b2c3d", builder=build_staged
+    )
+    assert staged.status == "built"
+    assert forwarded[0]["gates"] == gates
+    assert forwarded[0]["run_id"] == "run-20260215-090000-0a1b2c3d"
+
     def no_node(release_root, out_dir, **_):
         raise RuntimeError("node is required to build the site (Node 22+ with npm, and git)")
 
@@ -166,13 +173,15 @@ def test_site_hook_skips_builds_and_reports_failures(tmp_path: Path, monkeypatch
 
 def test_run_receipt_page_lists_stages_costs_and_versions():
     report = RunReport(
-        run_id="run-20260215-090000-0a1b2c3d",
+        run_id=RUN_ID,
         kind="ingest",
         requested_by="cli",
         status="running",
-        started_at=datetime(2026, 2, 15, 9, 0, tzinfo=UTC),
+        started_at=CREATED,
         audience="public",
-        versions=VersionInfo(docwiki="0.1.0", domain_pack="test-wind", domain_pack_hash="a" * 64),
+        versions=VersionInfo(
+            docwiki="0.1.0", domain_pack="test-batiment", domain_pack_hash="a" * 64
+        ),
         cost=CostReceipt(
             price_table="prices.yaml",
             llm=[
@@ -190,9 +199,9 @@ def test_run_receipt_page_lists_stages_costs_and_versions():
         ),
         errors=["ValueError: something with <b>html</b>"],
     )
-    page = run_receipt_page(report, stamp=STAMP, updated=date(2026, 2, 15), sensitivity="public")
-    assert page.path == "_meta/runs/run-20260215-090000-0a1b2c3d.md"
-    assert page.frontmatter.id == "meta:runs/run-20260215-090000-0a1b2c3d"
+    page = run_receipt_page(report, stamp=STAMP, updated=date(2026, 4, 1), sensitivity="public")
+    assert page.path == f"_meta/runs/{RUN_ID}.md"
+    assert page.frontmatter.id == f"meta:runs/{RUN_ID}"
     assert "| smart | `smart-dep` | `model-x` | 2 | 100 | 0 | 50 | 0.001200 |" in page.body
     assert "Total estimated cost: 0.001200 USD" in page.body
     assert "<b>" not in page.body and "1 error recorded" in page.body
@@ -202,21 +211,22 @@ def test_carried_queries_lose_withdrawn_citations_and_get_a_banner():
     kept_raw, gone_raw = "notes/kept.txt", "notes/gone.txt"
     kept, gone = source_id_for(kept_raw), source_id_for(gone_raw)
     body = (
-        "# Which oil?\n\nISO VG 220.[^c1] Older answer.[^c2] Again.[^c1]\n\n## Sources\n\n"
+        "# When are the windows delivered?\n\n"
+        "On 2026-04-20.[^c1] Older answer.[^c2] Again.[^c1]\n\n## Sources\n\n"
         f"[^c1]: [Kept — line 1](../evidence/{kept}/l0001-l0001.md) · ✓ quote verified\n"
         f"[^c2]: [Gone — line 1](../evidence/{gone}/l0001-l0001.md) · ✓ quote verified\n"
     )
     stamp = DocwikiStamp(release="20260101T000000Z-00000000")
     query = Page(
-        path="queries/2026-01-02-which-oil.md",
+        path="queries/2026-03-31-window-delivery.md",
         frontmatter=QueryFrontmatter(
-            id="query:2026-01-02-which-oil",
-            title="Which oil?",
+            id="query:2026-03-31-window-delivery",
+            title="When are the windows delivered?",
             summary="Answer.",
             sensitivity="public",
-            updated=date(2026, 1, 2),
+            updated=date(2026, 3, 31),
             docwiki=stamp,
-            question="Which oil?",
+            question="When are the windows delivered?",
             asked_by="researcher",
             sources=sorted([kept, gone]),
             approved_by="librarian",
@@ -233,7 +243,7 @@ def test_carried_queries_lose_withdrawn_citations_and_get_a_banner():
             Block(
                 id="b0001",
                 kind="paragraph",
-                text="ISO VG 220",
+                text="2026-04-20",
                 locator=TextLinesLocator(line_start=1, line_end=1),
                 provenance="native-text",
             )
@@ -241,12 +251,12 @@ def test_carried_queries_lose_withdrawn_citations_and_get_a_banner():
         extraction=ExtractionInfo(adapter="local", adapter_version="1"),
     )
     pages = {kept: source_page(kept_raw, "Kept", "# Kept\n", slug="kept")}
-    carried, cited = carry_queries([query], pages, {kept: doc}, stamp=STAMP, day=date(2026, 2, 15))
+    carried, cited = carry_queries([query], pages, {kept: doc}, stamp=STAMP, day=date(2026, 4, 1))
     (page,) = carried
     assert page.frontmatter.sources == [kept]
     assert page.frontmatter.docwiki == STAMP
     assert "> **Warning:** this answer cited sources that were withdrawn" in page.body
     assert "[^c2]" not in page.body and page.body.count("[^c1]") == 3
     assert [item.source_id for item in cited] == [kept]
-    again, _ = carry_queries([page], pages, {kept: doc}, stamp=STAMP, day=date(2026, 2, 15))
+    again, _ = carry_queries([page], pages, {kept: doc}, stamp=STAMP, day=date(2026, 4, 1))
     assert again[0].body.count("**Warning:**") == 1

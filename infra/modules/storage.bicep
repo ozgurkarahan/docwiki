@@ -1,8 +1,9 @@
 // Storage account (Entra-only), containers raw/work/releases, queues ingest/ingest-poison,
-// Event Grid system topic delivering raw/ BlobCreated/BlobDeleted events to the ingest queue
-// with its managed identity, and the data-plane role assignments of architecture.md §6 for
-// four runtime identities: the jobs, the MCP app, the portal and the Studio (least privilege per
-// app).
+// Event Grid system topic delivering raw/ BlobCreated/BlobDeleted events and the BlobCreated
+// events of filed answers (work/inbox/queries/) to the ingest queue with its managed identity,
+// and the data-plane role assignments of architecture.md §6 for four runtime identities: the
+// jobs, the MCP app, the portal and the Studio (least privilege per app; the Studio's work/
+// assignment uses a custom role without container management).
 
 import { roleIds } from 'roles.bicep'
 
@@ -88,6 +89,25 @@ var mcpWorkWriteCondition = '''
 var studioRawCondition = '''
 (
  !(ActionMatches{'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete'})
+)
+'''
+
+// Attribute-based condition on the Studio's work/ role ("File to wiki", ADR 0007): it reads
+// everything (source states, run reports) and writes or creates blobs only under inbox/queries/
+// (the answers inbox; the blob path excludes the container name). It targets both data actions
+// of the role that change a blob; the role (studioInboxWriterRole) has no delete, move or
+// container action at all, and the jobs identity consumes the inbox.
+var studioWorkInboxCondition = '''
+(
+ (
+  !(ActionMatches{'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write'})
+  AND
+  !(ActionMatches{'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action'})
+ )
+ OR
+ (
+  @Resource[Microsoft.Storage/storageAccounts/blobServices/containers/blobs:path] StringStartsWith 'inbox/queries/'
+ )
 )
 '''
 
@@ -337,8 +357,10 @@ resource portalReleasesReader 'Microsoft.Authorization/roleAssignments@2022-04-0
 
 // ---------------------------------------------------------------------------
 // Studio identity (owner-only web app): uploads documents to raw/ and never deletes one, reads
-// the work/ state and run reports and the releases/ pointer and catalog, and peeks the ingest
-// queue. No write access to work/ or releases/, no queue send.
+// the work/ state and run reports and writes filed answers only under work/inbox/queries/ (never
+// deletes, moves or manages the container there), reads the releases/ pointer, catalog and
+// evidence, and peeks the ingest queue. No other write access to work/, none to releases/, no
+// queue send.
 // ---------------------------------------------------------------------------
 
 resource studioRawContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (grantStudio) {
@@ -357,13 +379,52 @@ resource studioRawContributor 'Microsoft.Authorization/roleAssignments@2022-04-0
   }
 }
 
-resource studioWorkReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (grantStudio) {
+// The Studio's role on work/: read, write and create blobs, nothing else. Storage Blob Data
+// Contributor would also grant the control-plane actions containers/write and containers/delete
+// (change, lease or delete the whole container, through ARM or the blob endpoint), which role
+// assignment conditions never restrict, plus blob delete and move. Data access needs no
+// control-plane action. Assignable in this resource group only; the deployer needs
+// Microsoft.Authorization/roleDefinitions/write here (Owner or User Access Administrator), and
+// the role name is unique in the tenant (one role per environment).
+resource studioInboxWriterRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = if (grantStudio) {
+  name: guid(resourceGroup().id, 'docwiki-studio-inbox-writer')
+  properties: {
+    roleName: 'DocWiki Studio inbox writer (${storageAccountName})'
+    description: 'DocWiki Studio: read blobs and write or create blobs (its assignment condition limits writes to inbox/queries/); no delete, move, tags, immutability or container management.'
+    type: 'CustomRole'
+    permissions: [
+      {
+        actions: []
+        notActions: []
+        dataActions: [
+          'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read'
+          'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write'
+          'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action'
+        ]
+        notDataActions: []
+      }
+    ]
+    assignableScopes: [
+      resourceGroup().id
+    ]
+  }
+}
+
+// One assignment for work/: the custom role above, whose condition keeps reads open and limits
+// writes to the answers inbox (it replaces a plain Blob Data Reader assignment).
+resource studioWorkInboxWriter 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (grantStudio) {
   scope: workContainer
-  name: guid(workContainer.id, studioPrincipalId, roleIds.storageBlobDataReader)
+  name: guid(workContainer.id, studioPrincipalId, studioInboxWriterRole.name)
   properties: {
     principalId: studioPrincipalId
     principalType: 'ServicePrincipal'
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.storageBlobDataReader)
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      studioInboxWriterRole.name
+    )
+    condition: studioWorkInboxCondition
+    conditionVersion: '2.0'
+    description: 'DocWiki Studio: read work/, write filed answers under inbox/queries/ only; no delete, move or container management'
   }
 }
 
@@ -498,7 +559,8 @@ resource eventGridQueueSender 'Microsoft.Authorization/roleAssignments@2022-04-0
 // perimeter and is only declared without one. A subscription created before the perimeter
 // keeps delivering, because deliveries are authenticated with the topic's managed identity:
 // provision once with DOCWIKI_NETWORK_PERIMETER=false, then turn the perimeter on. Without it,
-// uploads are picked up by the reconcile schedule, a manual job start or an ingest message.
+// uploads and filed answers are picked up by the reconcile schedule, a manual job start or an
+// ingest message.
 module perimeter 'network-perimeter.bicep' = if (networkPerimeter) {
   name: 'networkPerimeter'
   params: {
@@ -542,6 +604,45 @@ resource rawToIngest 'Microsoft.EventGrid/systemTopics/eventSubscriptions@2025-0
   }
   dependsOn: [
     eventGridQueueSender
+  ]
+}
+
+// Filed research answers (ADR 0007): a query page written to work/inbox/queries/ (the Studio's
+// "File to wiki", the owner's `docwiki file-answer`) wakes the ingest job like an upload; the
+// job is level-triggered and merges the whole inbox. Creations only: the job deletes consumed
+// items and moves rejected ones to inbox/rejected/, neither of which may wake it again.
+resource inboxToIngest 'Microsoft.EventGrid/systemTopics/eventSubscriptions@2025-02-15' = if (!networkPerimeter) {
+  parent: systemTopic
+  name: 'inbox-to-ingest'
+  properties: {
+    eventDeliverySchema: 'EventGridSchema'
+    filter: {
+      includedEventTypes: [
+        'Microsoft.Storage.BlobCreated'
+      ]
+      subjectBeginsWith: '/blobServices/default/containers/${workContainerName}/blobs/inbox/queries/'
+    }
+    deliveryWithResourceIdentity: {
+      identity: {
+        type: 'SystemAssigned'
+      }
+      destination: {
+        endpointType: 'StorageQueue'
+        properties: {
+          resourceId: storage.id
+          queueName: ingestQueue.name
+        }
+      }
+    }
+    retryPolicy: {
+      maxDeliveryAttempts: 30
+      eventTimeToLiveInMinutes: 1440
+    }
+  }
+  // One subscription change at a time on the system topic.
+  dependsOn: [
+    eventGridQueueSender
+    rawToIngest
   ]
 }
 

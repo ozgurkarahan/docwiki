@@ -7,8 +7,20 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
-from site_testkit import MOCK_RELEASE, MOCK_RELEASE_DIR, OVERLAY, FakeTools, write_site
+from site_testkit import (
+    MOCK_RELEASE,
+    MOCK_RELEASE_DIR,
+    MOCK_RELEASE_ID,
+    MOCK_TITLE,
+    OVERLAY,
+    PLAN_A,
+    PLAN_B,
+    PLAN_B_PAGE,
+    FakeTools,
+    write_site,
+)
 
+from docwiki.contracts.gates import GateResult
 from docwiki.contracts.markdown import BACKLINKS_END, BACKLINKS_START
 from docwiki.site import (
     DEFAULT_BANNER,
@@ -40,8 +52,8 @@ def test_invalid_quartz_version(tmp_path: Path) -> None:
     [
         (None, None),
         ("  ", None),
-        ("docwiki.ozgurkarahan.com", "docwiki.ozgurkarahan.com"),
-        ("https://docwiki.ozgurkarahan.com/", "docwiki.ozgurkarahan.com"),
+        ("docwiki.example.com", "docwiki.example.com"),
+        ("https://docwiki.example.com/", "docwiki.example.com"),
         ("HTTP://Docs.Example.org/Wiki/", "docs.example.org/Wiki"),
         ("localhost:8080", "localhost:8080"),
     ],
@@ -70,8 +82,8 @@ def test_detect_fictional() -> None:
 def test_open_release_locations(location: Path) -> None:
     release = open_release(location)
     assert release.root.resolve() == MOCK_RELEASE_DIR.resolve()
-    assert release.release_id == "20260215T090000Z-decd4b59"
-    assert release.release_date == "2026-02-15"
+    assert release.release_id == MOCK_RELEASE_ID
+    assert release.release_date == "2026-04-01"
     assert release.audience == "public"
 
 
@@ -79,7 +91,7 @@ def test_open_release_without_manifest(tmp_path: Path) -> None:
     """The pipeline's site stage runs on the staged release, before manifest.json exists."""
     staged = tmp_path / "staged"
     shutil.copytree(MOCK_RELEASE_DIR / "wiki", staged / "wiki")
-    assert open_release(staged).release_id == "20260215T090000Z-decd4b59"
+    assert open_release(staged).release_id == MOCK_RELEASE_ID
     (staged / "wiki" / "catalog.json").unlink()
     with pytest.raises(SiteBuildError, match="no catalog"):
         open_release(staged)
@@ -93,12 +105,12 @@ def test_assemble_content_mounts_evidence(tmp_path: Path) -> None:
     count = assemble_content(MOCK_RELEASE_DIR, content)
     assert not (content / "stale").exists()
     assert (content / "index.md").is_file()
-    assert (content / "sources" / "sop-gbx-010-rev-b.md").is_file()
-    assert (content / "evidence" / "src-f2750f41f3fa" / "p0001.md").is_file()
-    assert (content / "evidence" / "src-f2750f41f3fa" / "img" / "p0001.png").is_file()
+    assert (content / f"{PLAN_B_PAGE}.md").is_file()
+    assert (content / "evidence" / PLAN_A / "p0001.md").is_file()
+    assert (content / "evidence" / PLAN_A / "img" / "p0001.png").is_file()
     assert count == sum(1 for p in content.rglob("*") if p.is_file())
     assert not any(part.startswith(".") for p in content.rglob("*") for part in p.parts[-1:])
-    page = (content / "sources" / "sop-gbx-010-rev-b.md").read_text(encoding="utf-8")
+    page = (content / f"{PLAN_B_PAGE}.md").read_text(encoding="utf-8")
     assert BACKLINKS_START in page and BACKLINKS_END in page  # stripped by the transformer
 
 
@@ -138,38 +150,51 @@ def test_site_settings_from_the_mock_release() -> None:
     release = open_release(MOCK_RELEASE)
     settings = site_settings(
         release,
-        base_url="docwiki.ozgurkarahan.com",
+        base_url="docwiki.example.com",
         page_title=None,
         banner=None,
         repo_url="https://github.com/ozgurkarahan/docwiki",
         quartz_version="v4.5.2",
     )
-    assert settings["pageTitle"] == "Contoso Renewables mock wiki"
+    assert settings["pageTitle"] == MOCK_TITLE
     assert settings["banner"] == DEFAULT_BANNER
-    assert settings["releaseId"] == "20260215T090000Z-decd4b59"
-    assert settings["releaseDate"] == "2026-02-15"
-    assert settings["sources"]["src-4d9c65e05302"] == {
-        "page": "sources/sop-gbx-010-rev-b",
-        "title": "Gearbox oil change SOP rev B",
+    assert settings["releaseId"] == MOCK_RELEASE_ID
+    assert settings["releaseDate"] == "2026-04-01"
+    assert settings["documents"] == {"current": 2, "superseded": 1}
+    assert settings["runId"] == "run-20260401-090000-0a1b2c3d"
+    assert settings["runPage"] is None  # the mock wiki has no run receipt page
+    assert settings["qualityPage"] == "_meta/quality"
+    assert settings["quality"] == {
+        "gates": 15,
+        "passed": 12,
+        "warned": 0,
+        "failed": 0,
+        "skipped": 3,
+        "blockingFailed": 0,
+    }
+    assert settings["sources"][PLAN_B] == {
+        "page": PLAN_B_PAGE,
+        "title": "Planning and purchase tracking, indice B",
         "original": None,
     }
     assert len(settings["sources"]) == 3
+    assert settings["answers"] == 1  # queries/2026-03-31-window-delivery-date.md
     custom = site_settings(
         release,
         base_url=None,
-        page_title="Wind O&M wiki",
+        page_title="Lamna & Moreau wiki",
         banner="",
         repo_url="https://github.com/ozgurkarahan/docwiki",
         quartz_version="v4.5.2",
     )
-    assert custom["pageTitle"] == "Wind O&M wiki"
+    assert custom["pageTitle"] == "Lamna & Moreau wiki"
     assert custom["banner"] is None and custom["baseUrl"] is None
 
 
 def test_site_settings_lists_published_originals(tmp_path: Path) -> None:
     release_dir = tmp_path / "release"
     shutil.copytree(MOCK_RELEASE_DIR, release_dir)
-    (release_dir / "evidence" / "src-f2750f41f3fa" / "original.pdf").write_bytes(b"%PDF-")
+    (release_dir / "evidence" / PLAN_A / "original.pdf").write_bytes(b"%PDF-")
     settings = site_settings(
         open_release(release_dir),
         base_url=None,
@@ -178,25 +203,65 @@ def test_site_settings_lists_published_originals(tmp_path: Path) -> None:
         repo_url="https://github.com/ozgurkarahan/docwiki",
         quartz_version="v4.5.2",
     )
-    assert settings["sources"]["src-f2750f41f3fa"]["original"] == (
-        "evidence/src-f2750f41f3fa/original.pdf"
-    )
+    assert settings["sources"][PLAN_A]["original"] == f"evidence/{PLAN_A}/original.pdf"
+
+
+def test_site_settings_of_a_staged_release_use_the_run_gates(tmp_path: Path) -> None:
+    """The pipeline builds the site before manifest.json exists and passes the run's gates."""
+    staged = tmp_path / "staged"
+    shutil.copytree(MOCK_RELEASE_DIR / "wiki", staged / "wiki")
+    run_id = "run-20260401-090000-0a1b2c3d"
+    receipt = staged / "wiki" / "_meta" / "runs" / f"{run_id}.md"
+    receipt.parent.mkdir(parents=True)
+    receipt.write_text("---\ntitle: Run receipt\n---\n", encoding="utf-8")
+    release = open_release(staged)
+    assert release.manifest() is None
+
+    def settings_with(**extra: object) -> dict[str, object]:
+        return site_settings(
+            release,
+            base_url=None,
+            page_title=None,
+            banner=None,
+            repo_url="https://github.com/ozgurkarahan/docwiki",
+            quartz_version="v4.5.2",
+            **extra,  # type: ignore[arg-type]
+        )
+
+    bare = settings_with()
+    assert bare["runId"] is None and bare["runPage"] is None and bare["quality"] is None
+    gates = [
+        GateResult(gate="G01", name="frontmatter", blocking=True, status="pass"),
+        GateResult(gate="G13", name="orphans", blocking=False, status="warn", violations=2),
+        GateResult(gate="G15", name="extraction", blocking=False, status="skipped"),
+    ]
+    staged_settings = settings_with(gates=gates, run_id=run_id)
+    assert staged_settings["runId"] == run_id
+    assert staged_settings["runPage"] == f"_meta/runs/{run_id}"
+    assert staged_settings["quality"] == {
+        "gates": 3,
+        "passed": 1,
+        "warned": 1,
+        "failed": 0,
+        "skipped": 1,
+        "blockingFailed": 0,
+    }
 
 
 def test_build_site_orchestration_is_idempotent(tmp_path: Path, tools: FakeTools) -> None:
     cache, out = tmp_path / "cache", tmp_path / "out"
     result = build_site(
-        MOCK_RELEASE, out, base_url="https://docwiki.ozgurkarahan.com", cache_dir=cache,
+        MOCK_RELEASE, out, base_url="https://docwiki.example.com", cache_dir=cache,
         runner=tools, env={},
     )
     assert result == out.resolve()
     assert (out / "index.html").read_text(encoding="utf-8").startswith(
-        "<title>Contoso Renewables mock wiki</title>"
+        f"<title>{MOCK_TITLE}</title>"
     )
     checkout = cache / "v4.5.2"
     settings = json.loads((checkout / "docwiki-site.json").read_text(encoding="utf-8"))
-    assert settings["baseUrl"] == "docwiki.ozgurkarahan.com"
-    assert (checkout / "content" / "evidence" / "src-43c97f7dfcde" / "index.md").is_file()
+    assert settings["baseUrl"] == "docwiki.example.com"
+    assert (checkout / "content" / "evidence" / PLAN_B / "index.md").is_file()
     assert (checkout / "quartz" / "plugins" / "transformers" / "docwiki.ts").is_file()
     assert not (checkout / "quartz" / "static" / "giscus").exists()
     tools_used = [command[:2] for command in tools.commands]

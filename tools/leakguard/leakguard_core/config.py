@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -26,14 +27,8 @@ FINDING_ID_RE = re.compile(r"LG-[0-9a-f]{10}")
 BUILTIN_EMAIL_DOMAINS = frozenset({"users.noreply.github.com", "example.com", "example.org"})
 
 
-def read_entries(path: Path) -> list[tuple[int, str]]:
+def entries_from_text(text: str) -> list[tuple[int, str]]:
     """Non-blank lines that are not full-line ``#`` comments, with 1-based line numbers."""
-    try:
-        text = path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        raise ConfigError(f"file not found: {path}") from None
-    except (OSError, UnicodeDecodeError) as exc:
-        raise ConfigError(f"cannot read {path}: {exc}") from None
     entries: list[tuple[int, str]] = []
     for number, raw in enumerate(text.splitlines(), start=1):
         line = raw.strip().lstrip("\ufeff")
@@ -41,6 +36,17 @@ def read_entries(path: Path) -> list[tuple[int, str]]:
             continue
         entries.append((number, line))
     return entries
+
+
+def read_entries(path: Path) -> list[tuple[int, str]]:
+    """Entries of a configuration file (see :func:`entries_from_text`)."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        raise ConfigError(f"file not found: {path}") from None
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ConfigError(f"cannot read {path}: {exc}") from None
+    return entries_from_text(text)
 
 
 def split_comment(line: str) -> tuple[str, str]:
@@ -73,19 +79,18 @@ class TermSet:
         return any(regex.fullmatch(text) for regex in self.regexes)
 
 
-def load_termset(path: Path, name: str, *, required: bool) -> TermSet:
-    """Load an allowlist file: one term per line, ``# comments``, ``re:<regex>`` patterns."""
-    if not path.is_file():
-        if required:
-            raise ConfigError(f"{name} not found: {path}")
-        return TermSet(name=name, present=False)
+def parse_termset(text: str, name: str, origin: str) -> TermSet:
+    """Parse an allowlist: one term per line, ``# comments``, ``re:<regex>`` patterns.
+
+    ``origin`` says where the text comes from (a path, or a path in a commit) in error messages.
+    """
     terms = TermSet(name=name)
-    for number, line in read_entries(path):
+    for number, line in entries_from_text(text):
         if line.startswith("re:"):
             try:
                 terms.regexes.append(re.compile(line[3:].strip(), re.IGNORECASE))
             except re.error as exc:
-                message = f"{path} line {number}: invalid regular expression: {exc}"
+                message = f"{origin} line {number}: invalid regular expression: {exc}"
                 raise ConfigError(message) from None
             terms.entries += 1
             continue
@@ -93,6 +98,35 @@ def load_termset(path: Path, name: str, *, required: bool) -> TermSet:
         if value:
             terms.add_term(value)
     return terms
+
+
+def load_termset(path: Path, name: str, *, required: bool) -> TermSet:
+    """Load an allowlist file: one term per line, ``# comments``, ``re:<regex>`` patterns."""
+    if not path.is_file():
+        if required:
+            raise ConfigError(f"{name} not found: {path}")
+        return TermSet(name=name, present=False)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ConfigError(f"cannot read {path}: {exc}") from None
+    return parse_termset(text, name, str(path))
+
+
+def merge_termsets(name: str, termsets: Iterable[TermSet]) -> TermSet:
+    """The union of several term sets: every word and every ``re:`` pattern of every set."""
+    merged = TermSet(name=name, present=False)
+    patterns: set[tuple[str, int]] = set()
+    for terms in termsets:
+        merged.words |= terms.words
+        for regex in terms.regexes:
+            marker = (regex.pattern, regex.flags)
+            if marker not in patterns:
+                patterns.add(marker)
+                merged.regexes.append(regex)
+        merged.entries += terms.entries
+        merged.present = merged.present or terms.present
+    return merged
 
 
 @dataclass(frozen=True, slots=True)

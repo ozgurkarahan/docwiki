@@ -155,23 +155,24 @@ def test_me(client: TestClient, config: StudioConfig) -> None:
     assert data["wiki_url"] == WIKI_URL
     assert data["agents"] == ["researcher", "librarian"]
     assert (data["questions_left"], data["uploads_left"]) == (100, config.daily_uploads)
+    assert data["filings_left"] == config.daily_filings
     assert ".pdf" in data["extensions"] and data["max_upload_mb"] == 50
     assert data["sign_out_url"] == "/.auth/logout"
 
 
 def test_upload_flow(client: TestClient, storage: FolderStorage) -> None:
     response = client.put(
-        "/api/documents/uploads/Field%20report.md", content=b"# Field", headers=WRITE
+        "/api/documents/uploads/Compte%20rendu.md", content=b"# Compte rendu", headers=WRITE
     )
     assert response.status_code == 201, response.text
-    assert response.json()["path"] == "uploads/Field report.md"
+    assert response.json()["path"] == "uploads/Compte rendu.md"
     assert response.json()["uploads_left"] == 9
-    assert storage.read_bytes("raw/uploads/Field report.md") == b"# Field"
+    assert storage.read_bytes("raw/uploads/Compte rendu.md") == b"# Compte rendu"
     rows = {
         row["path"]: row
         for row in client.get("/api/documents", headers=SIGNED_IN).json()["documents"]
     }
-    assert rows["uploads/Field report.md"]["status"] == "new"
+    assert rows["uploads/Compte rendu.md"]["status"] == "new"
     conflict = client.put(f"/api/documents/{NEW_PATH}", content=b"again", headers=WRITE)
     assert conflict.status_code == 409
     replaced = client.put(f"/api/documents/{NEW_PATH}?replace=1", content=b"again", headers=WRITE)
@@ -218,15 +219,17 @@ def test_pipeline(client: TestClient) -> None:
 
 def test_researcher_question(client: TestClient) -> None:
     response = client.post(
-        "/api/ask", json={"agent": "researcher", "question": "Which revision?"}, headers=WRITE
+        "/api/ask",
+        json={"agent": "researcher", "question": "When are the windows delivered?"},
+        headers=WRITE,
     )
     assert response.status_code == 202, response.text
     assert response.json()["questions_left"] == 99
     view = _settle(client, response.json()["job_id"], "done")
     urls = [source["url"] for source in view["answer"]["sources"]]
     assert urls == [
-        f"{WIKI_URL}/evidence/src-4d9c65e05302/para-0004",
-        f"{WIKI_URL}/evidence/src-f2750f41f3fa/p0001",
+        f"{WIKI_URL}/evidence/src-165f1d3a109c/para-0011",
+        f"{WIKI_URL}/evidence/src-c6436ec50050/p0001",
     ]
 
 

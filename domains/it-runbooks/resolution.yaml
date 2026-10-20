@@ -1,5 +1,0 @@
-# Contradiction resolution policy of the it-runbooks pack.
-order: [authority, recency]
-notes: >-
-  Procedures win over runbooks, runbooks over the handbook and the handbook over postmortems.
-  With equal authority the more recent document wins.
