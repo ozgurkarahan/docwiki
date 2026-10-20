@@ -157,6 +157,28 @@ async def test_conversation_and_pinned_version_are_passed_through() -> None:
     assert answer.text == "Not found in the wiki."
 
 
+async def test_per_call_headers_go_to_every_responses_call() -> None:
+    first, second = _ingest_flow(approved_output=True)
+    client = _client(first, second)
+    await ask(
+        "Start the ingest",
+        agent="librarian",
+        approve=lambda request: True,
+        headers={"X-Visitor-IP": "hash-1"},
+        client=client,
+    )
+    first_call, second_call = _calls(client)
+    assert first_call["extra_headers"] == {"X-Visitor-IP": "hash-1"}
+    assert second_call["extra_headers"] == {"X-Visitor-IP": "hash-1"}
+
+
+async def test_no_headers_means_no_extra_headers_argument() -> None:
+    client = _client(response(message("Not found in the wiki.")))
+    await client.ask(QUESTION)
+    (call,) = _calls(client)
+    assert "extra_headers" not in call
+
+
 def _ingest_flow(*, approved_output: bool) -> tuple[Any, ...]:
     first = response(
         list_tools("ingest_start", "run_status"),

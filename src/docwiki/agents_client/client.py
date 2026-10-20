@@ -273,12 +273,15 @@ class AgentClient:
         conversation_id: str | None = None,
         approve: ApprovalCallback | None = None,
         version: str | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> AgentAnswer:
         """Ask a deployed agent (``researcher``, ``librarian`` or a Foundry agent name).
 
         ``approve`` is called for every MCP tool call that needs approval and must return ``True``
         to approve it; without a callback every such call is denied. ``version`` pins an agent
-        version; by default the latest version is resolved and pinned.
+        version; by default the latest version is resolved and pinned. ``headers`` are extra HTTP
+        headers of every Responses API call of this question (a gateway reads them, for example
+        to rate-limit per visitor).
         """
         if not question.strip():
             raise ValueError("the question is empty")
@@ -292,6 +295,8 @@ class AgentClient:
         request: dict[str, Any] = {"input": question, "extra_body": {"agent_reference": reference}}
         if conversation_id:
             request["conversation"] = conversation_id
+        if headers:
+            request["extra_headers"] = dict(headers)
         response = await self._create(openai, name, request)
         responses = [response]
         approvals: list[ApprovalDecision] = []
@@ -341,6 +346,8 @@ class AgentClient:
                 "previous_response_id": _get(response, "id"),
                 "extra_body": {"agent_reference": reference},
             }
+            if headers:
+                follow_up["extra_headers"] = dict(headers)
             response = await self._create(openai, name, follow_up)
             responses.append(response)
             tool_calls.extend(_tool_calls(response))
@@ -379,6 +386,7 @@ async def ask(
     conversation_id: str | None = None,
     approve: ApprovalCallback | None = None,
     version: str | None = None,
+    headers: Mapping[str, str] | None = None,
     client: AgentClient | None = None,
 ) -> AgentAnswer:
     """Ask a deployed DocWiki agent; see :meth:`AgentClient.ask`.
@@ -386,14 +394,18 @@ async def ask(
     Without ``client`` a client is built from the environment (``DOCWIKI_FOUNDRY_PROJECT_ENDPOINT``,
     ``DefaultAzureCredential``) and closed afterwards.
     """
+    options: dict[str, Any] = {
+        "agent": agent,
+        "conversation_id": conversation_id,
+        "approve": approve,
+        "version": version,
+    }
+    if headers:  # callers that pass their own client keep working without the new argument
+        options["headers"] = headers
     if client is not None:
-        return await client.ask(
-            question, agent=agent, conversation_id=conversation_id, approve=approve, version=version
-        )
+        return await client.ask(question, **options)
     async with AgentClient() as owned:
-        return await owned.ask(
-            question, agent=agent, conversation_id=conversation_id, approve=approve, version=version
-        )
+        return await owned.ask(question, **options)
 
 
 async def prompt_approval(request: ApprovalRequest) -> bool:
