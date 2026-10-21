@@ -1,6 +1,8 @@
 # ADR 0007 — Answers in the wiki: filed Researcher answers and an "Ask this wiki" panel
 
-- Status: Proposed (spec v1.3, owner review pending)
+- Status: Superseded in part by [0008](0008-one-experience-live-agent-in-the-wiki.md) (decision 1,
+  "visitors get reviewed answers, not a live model", and "no free-text input"; the filing path, the
+  drawer and the evidence beside it stand)
 - Amends: D13 ("Quartz static site for humans; no custom UI to maintain")
 
 ## Context

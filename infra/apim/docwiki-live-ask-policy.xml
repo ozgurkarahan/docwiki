@@ -1,0 +1,76 @@
+<!--
+  DocWiki live ask: policy of the API Management API that fronts the Foundry project endpoint
+  (docs/live-ask.md). The portal calls it with its managed identity; visitors never reach it.
+
+  This is a template. Replace the three placeholders BEFORE applying it (API Management reads a
+  double-brace token as a named value, so an unreplaced placeholder fails or resolves wrongly):
+
+    {{TENANT_ID}}            Entra tenant ID of the portal's managed identity
+    {{PORTAL_CLIENT_ID}}     client ID of the portal's user-assigned managed identity
+    {{FOUNDRY_ACCOUNT_URL}}  base URL of the Foundry account, https://<account>.services.ai.azure.com
+
+  Never commit the substituted file. Limits (change them here, then re-apply):
+    per visitor   3 questions per 300 s (rate-limit-by-key renewal-period is at most 300 s on the v2
+                  tiers), 20,000 tokens per minute, 60,000 tokens per day
+    all visitors  1,500,000 tokens per day (the daily cost cut-off)
+  A call over a limit is answered with 429; the portal shows the filed answers instead.
+-->
+<policies>
+  <inbound>
+    <base />
+    <!-- Only the portal's identity, with a token for Foundry, gets through. -->
+    <validate-azure-ad-token tenant-id="{{TENANT_ID}}" header-name="Authorization" failed-validation-httpcode="401" failed-validation-error-message="Unauthorized.">
+      <audiences>
+        <audience>https://ai.azure.com</audience>
+      </audiences>
+      <client-application-ids>
+        <application-id>{{PORTAL_CLIENT_ID}}</application-id>
+      </client-application-ids>
+    </validate-azure-ad-token>
+    <!-- The portal sends the visitor's address; without it the caller's own address is the key. -->
+    <set-variable name="visitor" value='@{ var ip = context.Request.Headers.GetValueOrDefault("X-Visitor-IP", "").Trim(); return ip.Length > 0 ? ip : context.Request.IpAddress; }' />
+    <!-- Only questions (POST) cost tokens; reading the agent definition is not limited. -->
+    <choose>
+      <when condition='@(context.Request.Method == "POST")'>
+        <rate-limit-by-key calls="3" renewal-period="300" counter-key='@((string)context.Variables["visitor"])' />
+        <llm-token-limit counter-key='@((string)context.Variables["visitor"])' tokens-per-minute="20000" token-quota="60000" token-quota-period="Daily" estimate-prompt-tokens="false" />
+        <llm-token-limit counter-key="docwiki-global" token-quota="1500000" token-quota-period="Daily" estimate-prompt-tokens="false" />
+        <!-- Tokens per call, by API; no visitor dimension (cardinality, personal data). -->
+        <llm-emit-token-metric namespace="docwiki-live-ask">
+          <dimension name="API ID" />
+        </llm-emit-token-metric>
+      </when>
+    </choose>
+    <!-- The visitor's address stays here; Foundry gets the gateway's identity. -->
+    <set-header name="X-Visitor-IP" exists-action="delete" />
+    <authentication-managed-identity resource="https://ai.azure.com" output-token-variable-name="foundry-token" ignore-error="false" />
+    <set-header name="Authorization" exists-action="override">
+      <value>@("Bearer " + (string)context.Variables["foundry-token"])</value>
+    </set-header>
+    <set-backend-service base-url="{{FOUNDRY_ACCOUNT_URL}}" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+    <!-- A token quota that is used up is a 403 by default; the portal reads 429 as "limit reached". -->
+    <choose>
+      <when condition='@(context.LastError != null &amp;&amp; context.LastError.Source == "llm-token-limit")'>
+        <return-response>
+          <set-status code="429" reason="Too Many Requests" />
+          <set-header name="Retry-After" exists-action="override">
+            <value>3600</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>{"error":{"code":"limit_reached","message":"The live agent has reached its limit."}}</set-body>
+        </return-response>
+      </when>
+    </choose>
+  </on-error>
+</policies>

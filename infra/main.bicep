@@ -98,6 +98,12 @@ param enablePortal bool = false
 @description('Portal access (DOCWIKI_PORTAL_ACCESS): entra = Entra sign-in; public = no sign-in, honoured only when the audience is public (any other audience keeps the portal without ingress).')
 param portalAccess string = 'entra'
 
+@description('Let visitors of the portal ask the Researcher agent from the wiki (DOCWIKI_ENABLE_LIVE_ASK, docs/live-ask.md). Needs liveAskEndpoint; the portal then calls it through a gateway that holds the limits.')
+param enableLiveAsk bool = false
+
+@description('Gateway URL that proxies the Foundry project endpoint for the live ask (DOCWIKI_LIVE_ASK_ENDPOINT), e.g. https://<gateway>/<path>/api/projects/<project>. Passed in, never created here; the live ask stays off while empty.')
+param liveAskEndpoint string = ''
+
 @description('Deploy the optional Studio: an owner-only web app to add documents, follow the pipeline and ask the agents (Entra sign-in, one allowed owner).')
 param enableStudio bool = false
 
@@ -726,6 +732,21 @@ module mcpApp 'modules/container-app.bicep' = {
   }
 }
 
+// The live ask needs the gateway endpoint; without it the portal serves the filed answers only.
+var liveAskEnabled = enablePortal && enableLiveAsk && !empty(liveAskEndpoint)
+var liveAskEnv = liveAskEnabled
+  ? [
+      {
+        name: 'DOCWIKI_LIVE_ASK'
+        value: '1'
+      }
+      {
+        name: 'DOCWIKI_FOUNDRY_PROJECT_ENDPOINT'
+        value: liveAskEndpoint
+      }
+    ]
+  : []
+
 // The portal app always exists so that `azd deploy` can publish its image; it gets ingress
 // only when enabled AND its Entra sign-in is configured (fail closed). Disabled, it is dormant
 // (zero replicas). Enabled but not yet public (first provision), it has no scale rule so the
@@ -745,16 +766,20 @@ module portalApp 'modules/container-app.bicep' = {
     identityResourceId: portalIdentity.outputs.resourceId
     registryServer: registry.outputs.loginServer
     image: !empty(resolvedPortalImage) ? resolvedPortalImage : placeholderAppImage
-    env: concat(sharedEnv, [
-      {
-        name: 'AZURE_CLIENT_ID'
-        value: portalIdentity.outputs.clientId
-      }
-      {
-        name: 'OTEL_SERVICE_NAME'
-        value: 'docwiki-portal'
-      }
-    ])
+    env: concat(
+      sharedEnv,
+      [
+        {
+          name: 'AZURE_CLIENT_ID'
+          value: portalIdentity.outputs.clientId
+        }
+        {
+          name: 'OTEL_SERVICE_NAME'
+          value: 'docwiki-portal'
+        }
+      ],
+      liveAskEnv
+    )
     cpu: '0.25'
     memory: '0.5Gi'
     minReplicas: 0

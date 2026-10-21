@@ -14,6 +14,9 @@ the exact page, sheet rows, slide or transcript cue it came from. One immutable 
 people (a static site), Microsoft Foundry agents (an MCP server) and your own coding agent (stdio
 MCP and Agent Skills).
 
+**Ask this wiki:** the Researcher agent answers in the page, with citations checked before display
+([docs/live-ask.md](docs/live-ask.md)).
+
 > **Status: demo / proof of concept.** DocWiki shows that the pattern works end to end on Azure;
 > it is not a production-ready product. The sample is a small fictional corpus (the paperwork of
 > one building job: 12 public documents in French). Scores and costs on this sample are pending
@@ -41,7 +44,7 @@ MCP and Agent Skills).
 | **Agent kit** | `AGENTS.md`, `llms.txt`, `catalog.json` (pages and typed edges), `search.db` (SQLite FTS5 over page sections **and** raw extracted blocks) and Agent Skills, projected identically for GitHub Copilot, Claude Code and Codex (`.github/skills`, `.claude/skills`, `.agents/skills`). |
 | **MCP server** | `docwiki-mcp`: 10 read tools (search, pages, indexes, links, glossary, evidence, read-only SQL over tables, skills, recent changes) and 9 operations tools, over stateless streamable HTTP or stdio. Roles are enforced by the server, not by tool visibility. |
 | **Two Foundry agents** | The **Researcher** answers with numbered citations and abstains when the wiki is silent; the **Librarian** runs and repairs ingests, with human approval for every change. |
-| **Ask this wiki** | A button on every page of the site opens a drawer of reviewed Researcher answers: each answer's numbered citations open the evidence beside it, with the agent's steps and a provenance line. Visitors spend no model tokens and the site needs no backend: the answers are wiki pages (`queries/`) that the owner files from the Studio or with `docwiki file-answer` ([ADR 0007](docs/adr/0007-answers-in-the-wiki.md)). |
+| **Ask this wiki** | A button on every page of the site opens a drawer. It lists reviewed Researcher answers (wiki pages in `queries/` that the owner files from the Studio or with `docwiki file-answer`, [ADR 0007](docs/adr/0007-answers-in-the-wiki.md)) and, where the portal enables it, lets a visitor ask the Researcher live: the answer is shown as verified only when each citation opens an evidence page of the wiki, behind per-visitor and global limits ([ADR 0008](docs/adr/0008-one-experience-live-agent-in-the-wiki.md), [docs/live-ask.md](docs/live-ask.md)). Numbered citations open the evidence beside the drawer. |
 | **DocWiki Studio** | A signed-in web app on Container Apps: drop documents into the pipeline, follow each run (stages, gates, cost), ask the Researcher with clickable citations, file a reviewed answer into the wiki, and approve or deny the Librarian's operations in the page. Owner only, fail closed ([docs/studio.md](docs/studio.md)). |
 | **Quality gates** | 15 gates (G01–G15): schemas, links and anchors, citations, quote verification, safe content, sidecars, audience, injection canaries, paths, supersession, skills… A failing blocking gate keeps the previous release online. |
 | **Immutable releases** | Each run publishes a complete, hashed release and swaps one pointer (`current.json`) with an ETag precondition. Readers never see a half-built wiki; rollback is a pointer change. |

@@ -88,3 +88,16 @@ retirement of GitHub Pages. Owner decisions of 2026-10-21 are recorded in `AGENT
 | Infra | infra-ops-security.md section 1: `deploymentSku` defaults to `GlobalStandard` (`DataZoneStandard` is the data-residency option); there are four images (job, mcp, portal, studio). | Matches `infra/main.bicep` and `docker/`. |
 | Extraction | evidence-contract.md section 6: the Content Understanding adapter handles PDF and images only; DOCX, PPTX, XLSX, CSV, EML, VTT and text are always parsed locally. | Matches v1.1 (Extraction). |
 | Docs | The ADR index links ADR 0003. | It was the only unlinked ADR. |
+
+## v1.5
+
+Live ask: the Researcher answers visitors in the wiki's drawer ([ADR 0008](../adr/0008-one-experience-live-agent-in-the-wiki.md),
+owner decision of 2026-10-21 in `AGENTS.md`).
+
+| Area | Change | Why |
+|---|---|---|
+| Security | The invariant "no public endpoint calls an LLM" (architecture.md section 8, D13) is dropped. It is replaced by: a gateway in front of the Foundry project (an existing, shared API Management instance, passed in as a parameter) with a per-visitor rate, per-visitor and global token budgets and a daily cut-off; portal guards (body, question length, content type, same origin, one running question per visitor, a few in total, a per-visitor window); a fallback to the filed answers. | One experience: the agent lives in the wiki page. |
+| Site | The drawer is always built and the client decides whether to show it; with the live ask it gets a question form (site.md section 7). ADR 0007's "no free-text input" and "visitors only see filed answers" are superseded. | Owner decision. |
+| Portal | New `/api/ask/status`, `/api/ask` and `/api/ask/{job_id}` (`docwiki.portal.live_ask`), on only with `DOCWIKI_LIVE_ASK=1` and `DOCWIKI_FOUNDRY_PROJECT_ENDPOINT`. A live answer is `verified` only when every `[n]` of its text is an evidence sidecar path whose page exists in the served site; otherwise `unverified`, shown without citations. | Documents and model output are untrusted; the gate is deterministic. |
+| Agents client | `AgentClient.ask(..., headers=...)` passes extra HTTP headers on every Responses API call of a question (the gateway reads `X-Visitor-IP`). | Per-visitor limits at the gateway. |
+| Infra | Optional Bicep parameters `enableLiveAsk` and `liveAskEndpoint` (`DOCWIKI_ENABLE_LIVE_ASK`, `DOCWIKI_LIVE_ASK_ENDPOINT`) give the portal `DOCWIKI_LIVE_ASK=1` and `DOCWIKI_FOUNDRY_PROJECT_ENDPOINT`; the policy template `infra/apim/docwiki-live-ask-policy.xml` and [docs/live-ask.md](../live-ask.md) describe the gateway. | The gateway is not created by DocWiki and never committed. |

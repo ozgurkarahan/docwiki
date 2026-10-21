@@ -26,6 +26,7 @@ from docwiki.contracts.layout import StorageKeys
 from docwiki.contracts.settings import SettingsKeys
 from docwiki.llm import settings as llm_settings
 from docwiki.orchestration import settings as orchestration_settings
+from docwiki.portal.live_ask import ENABLE_ENV
 from docwiki.site import build as site_build
 from docwiki.stages import agentkit
 
@@ -199,6 +200,7 @@ def test_container_settings_are_known_keys() -> None:
         for name, value in vars(studio_config).items()
         if name.endswith("_ENV") and isinstance(value, str)
     }
+    known.add(ENABLE_ENV)  # the portal's live ask (docwiki.portal.live_ask)
     assert names <= known, f"unknown settings: {sorted(names - known)}"
     for required in (
         "DOCWIKI_FOUNDRY_PROJECT_ENDPOINT",
@@ -1031,3 +1033,68 @@ def test_compiled_inbox_trigger_and_studio_work_role(compiled: dict[str, Any]) -
     assert role_allows(granted, "blobs/write", condition=condition, path=FILING, container="work")
     for action in ("blobs/delete", "blobs/move/action", "containers/delete", "containers/write"):
         assert not role_allows(granted, action, condition=condition, path=FILING, container="work")
+
+
+def test_live_ask_is_optional_and_only_the_portal_gets_its_settings() -> None:
+    """ADR 0008: the gateway URL is a parameter (never created or committed); off by default."""
+    main = main_text()
+    assert re.search(r"^param enableLiveAsk bool = false$", main, re.MULTILINE)
+    assert re.search(r"^param liveAskEndpoint string = ''$", main, re.MULTILINE)
+    assert "var liveAskEnabled = enablePortal && enableLiveAsk && !empty(liveAskEndpoint)" in main
+    env = main[main.index("var liveAskEnv") : main.index("module portalApp")]
+    assert "name: 'DOCWIKI_LIVE_ASK'" in env and "value: '1'" in env
+    assert "name: 'DOCWIKI_FOUNDRY_PROJECT_ENDPOINT'" in env and "value: liveAskEndpoint" in env
+    portal = main[main.index("module portalApp") : main.index("module mcpAuth")]
+    assert "liveAskEnv" in portal and "value: portalIdentity.outputs.clientId" in portal
+    assert main.count("liveAskEnv") == 2  # declared once, used by the portal only
+    parameters = json.loads((INFRA / "main.parameters.json").read_text(encoding="utf-8"))
+    assert parameters["parameters"]["enableLiveAsk"] == {"value": "${DOCWIKI_ENABLE_LIVE_ASK}"}
+    assert parameters["parameters"]["liveAskEndpoint"] == {"value": "${DOCWIKI_LIVE_ASK_ENDPOINT}"}
+
+
+def test_live_ask_policy_is_a_template_with_the_documented_limits() -> None:
+    import xml.etree.ElementTree as ET
+
+    text = (INFRA / "apim" / "docwiki-live-ask-policy.xml").read_text(encoding="utf-8")
+    root = ET.fromstring(text)
+    assert set(re.findall(r"\{\{(\w+)\}\}", text)) == {
+        "TENANT_ID",
+        "PORTAL_CLIENT_ID",
+        "FOUNDRY_ACCOUNT_URL",
+    }
+    inbound = root.find("inbound")
+    assert inbound is not None
+    token = inbound.find("validate-azure-ad-token")
+    assert token is not None and token.get("tenant-id") == "{{TENANT_ID}}"
+    assert [a.text for a in token.iter("audience")] == ["https://ai.azure.com"]
+    assert [a.text for a in token.iter("application-id")] == ["{{PORTAL_CLIENT_ID}}"]
+    questions = [
+        (item.tag, item.attrib)
+        for when in inbound.iter("when")
+        for item in when
+        if item.tag in ("rate-limit-by-key", "llm-token-limit")
+    ]
+    assert [tag for tag, _ in questions] == [
+        "rate-limit-by-key",
+        "llm-token-limit",
+        "llm-token-limit",
+    ]
+    rate, per_visitor, overall = (attrs for _, attrs in questions)
+    assert (rate["calls"], rate["renewal-period"]) == ("3", "300")  # v2 tiers: at most 300 s
+    assert (per_visitor["tokens-per-minute"], per_visitor["token-quota"]) == ("20000", "60000")
+    assert per_visitor["token-quota-period"] == "Daily"
+    assert (overall["counter-key"], overall["token-quota"]) == ("docwiki-global", "1500000")
+    assert overall["token-quota-period"] == "Daily"
+    assert all("POST" in (when.get("condition") or "") for when in inbound.iter("when"))
+    # Order: limits, visitor header removed, then the gateway's own identity and the backend.
+    tags = [child.tag for child in inbound]
+    assert (
+        tags.index("choose")
+        < tags.index("set-header")
+        < tags.index("authentication-managed-identity")
+    )
+    assert tags[-1] == "set-backend-service"
+    assert inbound.find("authentication-managed-identity").get("resource") == "https://ai.azure.com"  # type: ignore[union-attr]
+    assert inbound.find("set-backend-service").get("base-url") == "{{FOUNDRY_ACCOUNT_URL}}"  # type: ignore[union-attr]
+    assert root.find(".//llm-emit-token-metric") is not None
+    assert not GUID.search(text) and "azure-api.net" not in text

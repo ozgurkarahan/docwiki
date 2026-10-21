@@ -138,4 +138,10 @@ decided by the identity spike and recorded in `docs/adr/0003-mcp-agent-identity.
 - Bounded work: max pages per document (default 300), max map-reduce chunks, max tokens per run,
   max research tool calls per question (12).
 - Budget alert at 50 / 80 / 100 % of a configurable monthly amount, with an action group.
-- No public endpoint calls an LLM; the public demo is a static site.
+- A public endpoint may call an LLM (v1.5, [ADR 0008](../adr/0008-one-experience-live-agent-in-the-wiki.md);
+  the earlier invariant "no public endpoint calls an LLM" is dropped, D13). The portal's live ask
+  is off by default and reaches the Researcher only through a gateway (an existing, shared API
+  Management instance passed in as a parameter) that holds a per-visitor rate, per-visitor and
+  global token budgets and a daily cut-off; past a limit the drawer falls back to the filed
+  answers. A live answer is shown as verified only when each of its citations resolves to an
+  evidence page of the served site. Setup and limits: [docs/live-ask.md](../live-ask.md).

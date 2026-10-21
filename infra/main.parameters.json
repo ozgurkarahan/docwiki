@@ -18,6 +18,8 @@
     "mcpTokenValidation": { "value": "${DOCWIKI_MCP_TOKEN_VALIDATION}" },
     "enablePortal": { "value": "${DOCWIKI_ENABLE_PORTAL}" },
     "portalAccess": { "value": "${DOCWIKI_PORTAL_ACCESS}" },
+    "enableLiveAsk": { "value": "${DOCWIKI_ENABLE_LIVE_ASK}" },
+    "liveAskEndpoint": { "value": "${DOCWIKI_LIVE_ASK_ENDPOINT}" },
     "enableStudio": { "value": "${DOCWIKI_ENABLE_STUDIO}" },
     "studioMinReplicas": { "value": "${DOCWIKI_STUDIO_MIN_REPLICAS}" },
     "enableEventTrigger": { "value": "${DOCWIKI_ENABLE_EVENT_TRIGGER}" },
