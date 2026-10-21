@@ -24,6 +24,9 @@ param ingressMode string = 'external'
 
 param targetPort int = 8080
 
+@description('Custom domains of the external ingress ({ name, bindingType, certificateId }, as in ingress.customDomains); ignored without ingress.')
+param customDomains array = []
+
 @description('HTTP path probed for liveness/readiness; empty uses the platform default TCP probe.')
 param healthPath string = ''
 
@@ -134,6 +137,7 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
             targetPort: targetPort
             transport: 'auto'
             allowInsecure: false
+            customDomains: customDomains
             traffic: [
               {
                 latestRevision: true

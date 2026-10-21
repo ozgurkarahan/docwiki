@@ -1098,3 +1098,50 @@ def test_live_ask_policy_is_a_template_with_the_documented_limits() -> None:
     assert inbound.find("set-backend-service").get("base-url") == "{{FOUNDRY_ACCOUNT_URL}}"  # type: ignore[union-attr]
     assert root.find(".//llm-emit-token-metric") is not None
     assert not GUID.search(text) and "azure-api.net" not in text
+
+
+def test_portal_custom_domain_and_warm_replica_are_optional() -> None:
+    """A custom domain set by hand would be dropped by the next provision: Bicep declares it and
+    only references the managed certificate (issued once outside Bicep), so the binding stays."""
+    main = main_text()
+    assert re.search(r"^param portalCustomDomain string = ''$", main, re.MULTILINE)
+    assert re.search(r"^param portalCertificateName string = ''$", main, re.MULTILINE)
+    assert re.search(
+        r"@minValue\(0\)\s*@maxValue\(1\)\s*@description\([^\n]*\)\s*"
+        r"param portalMinReplicas int = 0",
+        main,
+    )
+    domains = main[main.index("var portalCustomDomains") : main.index("var studioPublic")]
+    assert "empty(portalCustomDomain)" in domains and "bindingType: 'Disabled'" in domains
+    assert "bindingType: 'SniEnabled'" in domains
+    assert "'Microsoft.App/managedEnvironments/managedCertificates'" in domains
+    assert "resource " not in domains, "the certificate is referenced, never created"
+    portal = main[main.index("module portalApp") : main.index("module mcpAuth")]
+    assert "customDomains: portalCustomDomains" in portal
+    assert "minReplicas: enablePortal ? portalMinReplicas : 0" in portal
+    assert main.count("customDomains:") == 1, "only the portal gets a custom domain"
+    module = (INFRA / "modules" / "container-app.bicep").read_text(encoding="utf-8")
+    assert "param customDomains array = []" in module
+    ingress = module[module.index("ingress: ingressMode == 'external'") : module.index(": null")]
+    assert "customDomains: customDomains" in ingress
+    mapped = json.loads((INFRA / "main.parameters.json").read_text(encoding="utf-8"))["parameters"]
+    assert mapped["portalCustomDomain"] == {"value": "${DOCWIKI_PORTAL_CUSTOM_DOMAIN}"}
+    assert mapped["portalCertificateName"] == {"value": "${DOCWIKI_PORTAL_CERTIFICATE_NAME}"}
+    assert mapped["portalMinReplicas"] == {"value": "${DOCWIKI_PORTAL_MIN_REPLICAS}"}
+
+
+def test_compiled_portal_custom_domain(compiled: dict[str, Any]) -> None:
+    expression = compiled["variables"]["portalCustomDomains"]
+    assert "parameters('portalCustomDomain')" in expression
+    assert "parameters('portalCertificateName')" in expression
+    assert "Microsoft.App/managedEnvironments/managedCertificates" in expression
+    modules = {
+        resource["name"]: resource
+        for resource in _values(compiled["resources"])
+        if resource["type"] == "Microsoft.Resources/deployments"
+    }
+    portal = modules["portalApp"]["properties"]["parameters"]
+    assert portal["customDomains"] == {"value": "[variables('portalCustomDomains')]"}
+    assert portal["maxReplicas"] == {"value": 1}
+    for name in ("mcpApp", "studioApp"):
+        assert "customDomains" not in modules[name]["properties"]["parameters"], name

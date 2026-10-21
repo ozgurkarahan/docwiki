@@ -98,6 +98,17 @@ param enablePortal bool = false
 @description('Portal access (DOCWIKI_PORTAL_ACCESS): entra = Entra sign-in; public = no sign-in, honoured only when the audience is public (any other audience keeps the portal without ingress).')
 param portalAccess string = 'entra'
 
+@minValue(0)
+@maxValue(1)
+@description('Minimum replicas of the portal (DOCWIKI_PORTAL_MIN_REPLICAS): 0 scales to zero when idle (the first visitor waits for a cold start); 1 keeps one replica warm for demos. The portal never runs more than one replica.')
+param portalMinReplicas int = 0
+
+@description('Custom domain of the portal (DOCWIKI_PORTAL_CUSTOM_DOMAIN): a host name whose CNAME points to the portal; empty adds none. Without portalCertificateName it is only added to the app (binding Disabled: no certificate yet), see docs/operations.md.')
+param portalCustomDomain string = ''
+
+@description('Name of the managed certificate of portalCustomDomain in the Container Apps environment (DOCWIKI_PORTAL_CERTIFICATE_NAME), issued once by `az containerapp hostname bind`. Bicep only references it, so every provision keeps the HTTPS (SNI) binding.')
+param portalCertificateName string = ''
+
 @description('Let visitors of the portal ask the Researcher agent from the wiki (DOCWIKI_ENABLE_LIVE_ASK, docs/live-ask.md). Needs liveAskEndpoint; the portal then calls it through a gateway that holds the limits.')
 param enableLiveAsk bool = false
 
@@ -259,6 +270,28 @@ var deployerPrincipalId = grantDeployerDataAccess ? principalId : ''
 // public-audience build (DOCWIKI_PORTAL_ACCESS=public); any other combination fails closed.
 var portalAnonymous = enablePortal && portalAccess == 'public' && audience == 'public'
 var portalPublic = portalAnonymous || (enablePortal && portalAccess == 'entra' && !empty(portalClientId))
+// The custom domain's certificate is issued outside Bicep (it needs the DNS records first) and
+// only referenced here, so a provision never drops the binding.
+var portalCustomDomains = empty(portalCustomDomain)
+  ? []
+  : [
+      empty(portalCertificateName)
+        ? {
+            name: portalCustomDomain
+            bindingType: 'Disabled'
+          }
+        : {
+            name: portalCustomDomain
+            bindingType: 'SniEnabled'
+            certificateId: resourceId(
+              subscription().subscriptionId,
+              names.resourceGroup,
+              'Microsoft.App/managedEnvironments/managedCertificates',
+              names.environment,
+              portalCertificateName
+            )
+          }
+    ]
 // Fail closed: the Studio gets external ingress only once its Entra sign-in (studioClientId) and
 // its owner (studioAllowedPrincipals) are declared here. On the first provision the
 // postprovision hook registers the app, sets both, applies and verifies the built-in auth and
@@ -782,9 +815,10 @@ module portalApp 'modules/container-app.bicep' = {
     )
     cpu: '0.25'
     memory: '0.5Gi'
-    minReplicas: 0
+    minReplicas: enablePortal ? portalMinReplicas : 0
     maxReplicas: 1
     ingressMode: portalPublic ? 'external' : 'none'
+    customDomains: portalCustomDomains
     dormant: !enablePortal
     targetPort: 8080
   }
