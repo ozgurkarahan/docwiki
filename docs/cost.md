@@ -12,7 +12,7 @@ sample corpus (pending re-evaluation on the new sample); estimates are labelled 
 |---|---|
 | Container Apps jobs `ingest` and `reconcile` | Billed only while an execution runs (Consumption profile) |
 | Container App `mcp` | Scales to zero after about 8.5 minutes without requests (measured in the identity spike); `DOCWIKI_MCP_MIN_REPLICAS=1` keeps one replica warm and billed |
-| Container App `portal` | Disabled by default |
+| Container App `portal` | Disabled by default; enabled, it scales to zero. `DOCWIKI_PORTAL_MIN_REPLICAS=1` keeps one 0.25 vCPU / 0.5 GiB replica always on (small fixed monthly cost) |
 | Container App `studio` | Disabled by default; enabled, one replica stays warm (0.5 vCPU, 1 GiB) so that questions and approval waits survive idle minutes. `DOCWIKI_STUDIO_MIN_REPLICAS=0` scales it to zero |
 | Foundry model deployments (Data Zone or Global Standard) | Pay-per-token: no calls, no charge |
 | Container registry (Basic) | Small fixed daily fee |

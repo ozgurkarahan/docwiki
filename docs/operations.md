@@ -317,6 +317,30 @@ keep delivering afterwards), or temporarily turn the perimeter off to re-create 
 subscriptions, uploads and filed answers are picked up by the reconcile schedule, a manual job
 start or an ingest message.
 
+## Custom domain for the portal (optional)
+
+A custom domain set only with `az` is dropped by the next `azd provision`. Declare it in the azd
+environment and every later provision keeps it. Set it up once:
+
+1. DNS: add a CNAME `<custom-domain>` pointing at the portal's default FQDN, and a TXT record
+   `asuid.<custom-domain>` holding the app's verification ID:
+   `az containerapp show -g <resource-group> -n <portal-app> --query properties.customDomainVerificationId -o tsv`.
+2. Add the host name and bind it, which issues a managed certificate:
+   `az containerapp hostname add -g <resource-group> -n <portal-app> --hostname <custom-domain>`, then
+   `az containerapp hostname bind -g <resource-group> -n <portal-app> --hostname <custom-domain> --environment <environment> --validation-method CNAME`.
+3. Find the certificate name:
+   `az containerapp env certificate list -g <resource-group> -n <environment> --managed-certificates-only --query "[].name"`.
+4. Keep both in the azd environment:
+   `azd env set DOCWIKI_PORTAL_CUSTOM_DOMAIN <custom-domain>` and
+   `azd env set DOCWIKI_PORTAL_CERTIFICATE_NAME <certificate-name>`.
+5. Check with `azd provision --preview`: the portal ingress must show no `customDomains` change.
+
+The template only references the certificate (an SNI binding); it never creates it. Without
+`DOCWIKI_PORTAL_CERTIFICATE_NAME` the domain is added with its binding disabled. The managed
+certificate renews itself while the CNAME stays in place. For a visitor-ready portal, also set
+`DOCWIKI_PORTAL_MIN_REPLICAS=1` so the first visit has no cold start (small fixed cost, see
+[docs/cost.md](cost.md)).
+
 ## Logs and queries
 
 Container logs reach Log Analytics through an Azure Monitor diagnostic setting (tables
