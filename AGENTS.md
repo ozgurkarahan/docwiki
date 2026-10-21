@@ -21,13 +21,16 @@ become a cited wiki that is served on Azure Container Apps, with Microsoft Found
    "File to wiki" in the same drawer. ADR 0007's split into a separate Studio is being superseded
    by ADR 0008; do not add new features to the standalone Studio or portal.
 2. **A public LLM endpoint is allowed.** The old invariant "no public endpoint calls an LLM"
-   (`docs/spec/architecture.md` §8, D13) is dropped. It is replaced by: per-IP rate limits, a token
-   budget and a daily cost cut-off that falls back to the filed answers. Limits run in an existing,
+   (`docs/spec/architecture.md` §8, D13) is dropped (ADR 0008, live since 2026-10-21). It is
+   replaced by: per-IP rate limits, a token budget and a daily cost cut-off that falls back to the
+   filed answers. Limits run in an existing,
    shared Azure API Management instance, passed in as a deployment parameter; never create a new
    one, and never commit its name or URL. Live answers go through the same quote verification and
    leak checks as filed answers before they are shown.
 3. **One public repository, no GitHub Pages.** This repository is the only one. The demo is served
-   from Azure; there is no Pages site or committed `samples/wiki`.
+   from Azure at https://docwiki.ozgurkarahan.com; there is no Pages site or committed
+   `samples/wiki`. Only push `main` or branches created from it: local branches or worktrees whose
+   history predates the public snapshot (the old private repository) must never be pushed here.
 4. **GlobalStandard model deployments are the default.** This PoC has no data-residency requirement.
 5. **Small, reviewable steps.** Prefer short slices and small pull requests over long runs.
 6. **Decisions live here.** When the owner makes a new decision, record it in this section (and in
