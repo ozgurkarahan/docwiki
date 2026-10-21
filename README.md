@@ -54,8 +54,9 @@ MCP and Agent Skills).
 
 ### 1. Browse the sample wiki
 
-Live demo: deployed on Azure Container Apps (link coming with the single-app release). The sample
-site has a graph view, full-text search, backlinks and the evidence microscope.
+Live demo: **[docwiki.ozgurkarahan.com](https://docwiki.ozgurkarahan.com/)**, served from Azure
+Container Apps. Open **Ask this wiki** on any page and ask the Researcher agent a question; the
+site also has a graph view, full-text search, backlinks and the evidence microscope.
 
 The sample stands in for *your* documents: the paperwork of one small building job, written in
 French and compiled into an English wiki. A general contractor (Lamna Bâtiment) builds a 30 m²
