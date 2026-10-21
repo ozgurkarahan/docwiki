@@ -359,7 +359,7 @@ async def test_the_gateway_limit_is_a_busy_status_without_exception_text(
     "error",
     [
         AgentInvocationError("HTTP 500 (server_error) at https://gateway.internal.example"),
-        AgentInvocationError("not allowed", status_code=403),
+        AgentInvocationError("not allowed", status_code=401),
         RuntimeError("boom with a private path"),
     ],
 )
@@ -477,7 +477,10 @@ def test_a_question_flows_through_the_routes(site: Path) -> None:
         accepted = client.post(
             "/api/ask",
             json={"question": QUESTION},
-            headers={"origin": "http://wiki.example", "x-forwarded-for": "203.0.113.5, 10.0.0.1"},
+            headers={
+                "origin": "http://wiki.example",
+                "x-forwarded-for": "198.51.100.9, 203.0.113.5",
+            },
         )
         assert accepted.status_code == 202
         assert accepted.headers["cache-control"] == "no-store"
@@ -485,6 +488,7 @@ def test_a_question_flows_through_the_routes(site: Path) -> None:
         result = poll(client, accepted.json()["job_id"])
     assert result["status"] == "done" and result["elapsed_s"] >= 0
     assert result["answer"]["citations"][0]["href"] == f"evidence/{SID_A}/para-0007"
+    # The edge appends the real address last; the forged first entry never keys the limits.
     assert asker.calls[0][2] == {"X-Visitor-IP": "203.0.113.5"}
     assert asker.closed  # closed with the app
 
@@ -575,3 +579,15 @@ def test_the_visitor_limits_answer_429_with_a_message(site: Path) -> None:
             "/api/ask", json={"question": QUESTION}, headers={"x-forwarded-for": "203.0.113.200"}
         )
         assert other.status_code == 202
+
+
+@pytest.mark.parametrize("status_code", [429, 403])
+def test_gateway_limits_and_spent_quotas_tell_the_visitor_to_wait(
+    site: Path, status_code: int
+) -> None:
+    error = AgentInvocationError(f"HTTP {status_code} from the gateway", status_code=status_code)
+    app = create_app(site_dir=site, live_ask=service(FakeAsker(error), site))
+    with TestClient(app, base_url=BASE_URL) as client:
+        job = client.post("/api/ask", json={"question": QUESTION}).json()["job_id"]
+        result = poll(client, job)
+    assert result["status"] == "busy"

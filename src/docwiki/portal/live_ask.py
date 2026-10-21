@@ -253,8 +253,12 @@ def live_answer(
 
 
 def visitor_ip(request: Request) -> str:
-    """First entry of ``X-Forwarded-For``, else the client address (``unknown`` without one)."""
-    forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    """Last entry of ``X-Forwarded-For``, else the client address (``unknown`` without one).
+
+    The Container Apps edge appends the address it sees to the end of the header; earlier entries
+    come from the visitor and can be forged, so they never key the per-visitor limits.
+    """
+    forwarded = request.headers.get("x-forwarded-for", "").split(",")[-1].strip()
     client = request.client.host if request.client else ""
     return (forwarded or client or "unknown")[:_MAX_IP_CHARS]
 
@@ -367,7 +371,8 @@ class LiveAsk:
             job.status, job.message = "error", TIMEOUT_MESSAGE
             log.warning("live_ask.timeout job=%s", job.id)
         except AgentInvocationError as exc:
-            if exc.status_code == 429:
+            # The gateway answers 429 for rate limits and 403 once a daily token quota is spent.
+            if exc.status_code in (429, 403):
                 job.status, job.message = "busy", BUSY_MESSAGE
             else:
                 job.status, job.message = "error", FAILED_MESSAGE
