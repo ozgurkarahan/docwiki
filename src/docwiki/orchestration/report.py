@@ -168,10 +168,17 @@ class StageClock:
     def __init__(self, now: Callable[[], datetime]) -> None:
         self._now = now
         self._records: dict[str, _StageRecord] = {}
+        self.on_change: Callable[[], None] | None = None
+        """Called when a stage starts or finishes (the run writes its progress report)."""
+
+    def _changed(self) -> None:
+        if self.on_change is not None:
+            self.on_change()
 
     def start(self, stage: str) -> None:
         if stage not in self._records:
             self._records[stage] = _StageRecord(started_at=self._now())
+            self._changed()
 
     def count(self, stage: str, *, items: int = 0, cache_hits: int = 0, failures: int = 0) -> None:
         self.start(stage)
@@ -192,6 +199,16 @@ class StageClock:
         record.finished_at = self._now()
         if status is not None:
             record.status = status
+        self._changed()
+
+    def current(self) -> str | None:
+        """The stage at work: the last one started and not finished, in pipeline order."""
+        open_stages = [
+            stage
+            for stage in STAGE_NAMES
+            if stage in self._records and self._records[stage].finished_at is None
+        ]
+        return open_stages[-1] if open_stages else None
 
     def status(self, stage: str) -> str | None:
         record = self._records.get(stage)
@@ -204,11 +221,13 @@ class StageClock:
                 record.finished_at = self._now()
                 record.status = "failed"
 
-    def reports(self) -> list[StageReport]:
+    def reports(self, *, finished_only: bool = False) -> list[StageReport]:
+        """One report per stage; ``finished_only`` leaves out the stages still at work (a
+        progress report must not call them done)."""
         reports: list[StageReport] = []
         for stage in STAGE_NAMES:
             record = self._records.get(stage)
-            if record is None:
+            if record is None or (finished_only and record.finished_at is None):
                 continue
             finished = record.finished_at or self._now()
             reports.append(

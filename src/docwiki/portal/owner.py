@@ -27,6 +27,7 @@ from docwiki.contracts.formats import SUPPORTED_EXTENSIONS
 from docwiki.contracts.storage import StorageError
 from docwiki.portal.process import (
     ProcessService,
+    RebuildError,
     UploadConflictError,
     UploadError,
     UploadQuotaError,
@@ -186,6 +187,11 @@ def process_routes(service: ProcessService | None, config: OwnerConfig) -> list[
                     if owner and service is not None
                     else None
                 ),
+                "rebuild": (
+                    {"left": service.rebuilds_left()}
+                    if owner and service is not None and service.can_rebuild
+                    else None
+                ),
             },
             headers=NO_STORE,
         )
@@ -230,8 +236,32 @@ def process_routes(service: ProcessService | None, config: OwnerConfig) -> list[
         result["uploads_left"] = service.uploads_left()
         return JSONResponse(result, status_code=201, headers=NO_STORE)
 
+    async def rebuild(request: Request) -> JSONResponse:
+        """``PUT /api/owner/runs/{key}``: enqueue a rebuild of the wiki (owner only)."""
+        if service is None or not service.can_rebuild:
+            return _error(503, "this portal cannot start runs")
+        if not config.is_owner(request):
+            if config.principal(request) is None:
+                return _error(401, "sign in as the owner to rebuild the wiki")
+            return _error(403, "this account may not rebuild the wiki")
+        refused = _cross_site(request)
+        if refused is not None:
+            return _error(403, refused)
+        try:
+            result = await asyncio.to_thread(service.rebuild, request.path_params["key"])
+        except RebuildError as exc:
+            return _error(400, str(exc))
+        except UploadQuotaError as exc:
+            return _error(429, str(exc))
+        except Exception:
+            log.exception("the rebuild could not be queued")
+            return _error(502, "the rebuild could not be queued; the portal logs have the details")
+        log.info("owner rebuild queued")
+        return JSONResponse(result, status_code=202, headers=NO_STORE)
+
     return [
         Route("/api/process", process, methods=["GET", "HEAD"]),
+        Route("/api/owner/runs/{key}", rebuild, methods=["PUT"]),
         Route("/api/status", status, methods=["GET", "HEAD"]),
         Route("/api/owner/me", me, methods=["GET", "HEAD"]),
         Route("/api/owner/documents/{path:path}", upload, methods=["PUT"]),

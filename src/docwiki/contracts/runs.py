@@ -9,17 +9,19 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
-from docwiki.contracts._base import ContractModel, NonEmptyStr, UtcDateTime
+from docwiki.contracts._base import ContractModel, NonEmptyStr, RelPath, UtcDateTime
 from docwiki.contracts.enums import QueueKind, RequestedBy, Sensitivity, StageName
 from docwiki.contracts.gates import GateResult
-from docwiki.contracts.ids import RELEASE_ID_RE, RUN_ID_RE
+from docwiki.contracts.ids import RELEASE_ID_RE, RUN_ID_RE, SOURCE_ID_RE
 
 __all__ = [
     "ContentUnderstandingUsage",
     "CostReceipt",
     "LlmUsage",
     "ModelVersion",
+    "PageChange",
     "RunCounts",
+    "RunDocument",
     "RunReport",
     "StageReport",
     "VersionInfo",
@@ -28,6 +30,7 @@ __all__ = [
 NonNegInt = Annotated[int, Field(ge=0)]
 NonNegFloat = Annotated[float, Field(ge=0.0)]
 RunId = Annotated[str, Field(pattern=RUN_ID_RE.pattern)]
+SourceId = Annotated[str, Field(pattern=SOURCE_ID_RE.pattern)]
 ReleaseId = Annotated[str, Field(pattern=RELEASE_ID_RE.pattern)]
 
 
@@ -107,6 +110,25 @@ class RunCounts(ContractModel):
     failed: NonNegInt = 0
 
 
+class RunDocument(ContractModel):
+    """A document this run processes (v1.7): new, changed, deleted, or recompiled on request."""
+
+    source_id: SourceId
+    path: RelPath
+    change: Literal["new", "changed", "deleted", "recompiled"]
+
+
+class PageChange(ContractModel):
+    """A wiki page the published release added, changed or removed (v1.7), compared with the
+    previous publish; a topic page carries its contradiction count before and after (``None``
+    when unknown)."""
+
+    path: RelPath
+    change: Literal["added", "changed", "removed"]
+    contradictions: NonNegInt | None = None
+    previous_contradictions: NonNegInt | None = None
+
+
 class RunReport(ContractModel):
     schema_version: Literal[1] = Field(1, alias="schema")
     run_id: RunId
@@ -121,6 +143,11 @@ class RunReport(ContractModel):
     messages: NonNegInt = 0
     counts: RunCounts = Field(default_factory=RunCounts)
     stages: list[StageReport] = []
+    current_stage: StageName | None = None
+    """While ``status`` is ``running``: the stage at work (v1.7)."""
+    documents: list[RunDocument] = []
+    page_changes: list[PageChange] = []
+    """Only for a run that published: the pages it added, changed or removed."""
     gates: list[GateResult] = []
     versions: VersionInfo
     cost: CostReceipt

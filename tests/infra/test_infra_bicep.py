@@ -513,7 +513,12 @@ def test_portal_storage_access_is_least_privilege() -> None:
     queue = queue[: queue.index("\n}\n")]
     assert "storageQueueDataReader" in queue
     portal = storage[storage.index("// Portal identity") : storage.index("// Deployer (operator)")]
-    assert "MessageSender" not in portal and "Owner" not in portal.replace("owner", "")
+    # Slice C: the owner's rebuild sends to the ingest queue, only with the owner's sign-in.
+    sender = storage[storage.index("resource portalIngestSender") :]
+    sender = sender[: sender.index("\n}\n")]
+    assert "= if (portalUploads)" in sender and "scope: ingestQueue" in sender
+    assert portal.count("MessageSender") == 2  # the sender's role id (in a multi-line call)
+    assert "Owner" not in portal.replace("owner", "")
     main = main_text()
     assert "portalUploads: portalOwnerSignIn" in main
     auth = main[main.index("module portalAuth") : main.index("module budget ")]

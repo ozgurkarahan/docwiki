@@ -363,6 +363,57 @@
       "title": "ModelVersion",
       "type": "object"
     },
+    "PageChange": {
+      "additionalProperties": false,
+      "description": "A wiki page the published release added, changed or removed (v1.7), compared with the\nprevious publish; a topic page carries its contradiction count before and after (``None``\nwhen unknown).",
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "change": {
+          "enum": [
+            "added",
+            "changed",
+            "removed"
+          ],
+          "title": "Change",
+          "type": "string"
+        },
+        "contradictions": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Contradictions"
+        },
+        "previous_contradictions": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Previous Contradictions"
+        }
+      },
+      "required": [
+        "path",
+        "change"
+      ],
+      "title": "PageChange",
+      "type": "object"
+    },
     "RunCounts": {
       "additionalProperties": false,
       "properties": {
@@ -410,6 +461,38 @@
         }
       },
       "title": "RunCounts",
+      "type": "object"
+    },
+    "RunDocument": {
+      "additionalProperties": false,
+      "description": "A document this run processes (v1.7): new, changed, deleted, or recompiled on request.",
+      "properties": {
+        "source_id": {
+          "pattern": "^src-[0-9a-f]{12}$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "change": {
+          "enum": [
+            "new",
+            "changed",
+            "deleted",
+            "recompiled"
+          ],
+          "title": "Change",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_id",
+        "path",
+        "change"
+      ],
+      "title": "RunDocument",
       "type": "object"
     },
     "StageReport": {
@@ -666,7 +749,8 @@
         "librarian",
         "event",
         "cli",
-        "schedule"
+        "schedule",
+        "owner"
       ],
       "title": "Requested By",
       "type": "string"
@@ -749,6 +833,49 @@
         "$ref": "#/$defs/StageReport"
       },
       "title": "Stages",
+      "type": "array"
+    },
+    "current_stage": {
+      "anyOf": [
+        {
+          "enum": [
+            "discover",
+            "extract",
+            "classify",
+            "compile",
+            "entities",
+            "topics",
+            "links",
+            "indexes",
+            "agentkit",
+            "evidence",
+            "verify",
+            "site",
+            "publish"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Current Stage"
+    },
+    "documents": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/RunDocument"
+      },
+      "title": "Documents",
+      "type": "array"
+    },
+    "page_changes": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/PageChange"
+      },
+      "title": "Page Changes",
       "type": "array"
     },
     "gates": {
