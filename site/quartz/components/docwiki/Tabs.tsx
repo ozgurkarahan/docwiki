@@ -40,13 +40,19 @@ export default (() => {
             ))}
           </ol>
         </nav>
-        <div class="docwiki-tabbar-tools">
-          <a class="docwiki-chip" href={link("pipeline")} hidden></a>
-          <a class="docwiki-sign-in" href={link("pipeline")} hidden>
+        <a class="docwiki-chip docwiki-status docwiki-status--idle" href={link("pipeline")}>
+          <span class="docwiki-status-shape" aria-hidden="true">
+            ●
+          </span>
+          <span class="docwiki-status-word">Idle</span>
+        </a>
+        {/* The pipeline page has the owner's box with its own sign-in. */}
+        {slug !== "pipeline" && (
+          <a class="docwiki-sign-in" href={link("pipeline")}>
             Sign in
           </a>
-          <span class="sr-only docwiki-chip-live" role="status" aria-live="polite"></span>
-        </div>
+        )}
+        <span class="sr-only docwiki-chip-live" role="status" aria-live="polite"></span>
       </div>
     )
   }

@@ -7,7 +7,7 @@
 // platform's sign-in refuses signed-in POSTs). Polling is fast while something is in the pipeline,
 // slow otherwise, pauses on a hidden tab and stops when Quartz navigates away (window.addCleanup).
 import { relativeHref } from "../../../plugins/transformers/docwiki-text"
-import { State, asState, stateWords, statusPill } from "./status"
+import { STATES, State, asState, stateWords, statusPill } from "./status"
 
 const SECTION = "section.docwiki-process"
 /** Same stages, same order as `STAGES` in src/docwiki/site/process_page.py. */
@@ -43,6 +43,7 @@ const SEGMENT_RE = /^[A-Za-z0-9][A-Za-z0-9 ._()+-]{0,99}$/
 const MAX_DEPTH = 4
 const MAX_PATH_CHARS = 200
 const UNAVAILABLE = "Status unavailable, retrying…"
+const STATE_ORDER: readonly State[] = STATES
 
 interface Me {
   signIn: boolean
@@ -371,6 +372,15 @@ function stateSentence(view: View): string {
   return "Idle — the wiki is up to date"
 }
 
+/** The shape of a stage's status, as in the status vocabulary (status.ts). */
+function stageShape(status: string): string {
+  if (status === "done") return "●"
+  if (status === "running" || status === "pending") return "◐"
+  if (status === "failed") return "✕"
+  if (status === "quarantined") return "⊘"
+  return "○"
+}
+
 /** The 13 stages of the latest run: done, skipped, failed, running or not run. */
 function stageStrip(view: View): HTMLElement {
   const block = element("div", "docwiki-process-pipeline")
@@ -400,7 +410,7 @@ function stageStrip(view: View): HTMLElement {
     const key = status.replace(/ /g, "-")
     item.dataset.status = /^[a-z-]+$/.test(key) ? key : "none"
     item.append(element("span", "docwiki-process-stage-name", name))
-    item.append(element("span", "docwiki-process-stage-status", status))
+    item.append(element("span", "docwiki-process-stage-status", `${stageShape(key)} ${status}`))
     if (report?.durationS !== null && report?.durationS !== undefined) {
       item.append(element("span", "docwiki-process-stage-time", duration(report.durationS)))
     }
@@ -466,6 +476,12 @@ function documentsTable(
 ): HTMLElement {
   const block = element("div", "docwiki-process-documents")
   block.append(heading(`Documents (${view.total})`))
+  const breakdown = STATE_ORDER.filter((state) => (view.states[state] ?? 0) > 0).map(
+    (state) => `${view.states[state]} ${stateWords(state).toLowerCase()}`,
+  )
+  if (breakdown.length > 0) {
+    block.append(element("p", "docwiki-process-caption", breakdown.join(" · ")))
+  }
   const docs = [...view.documents]
   const mine = uploaded ? docs.findIndex((doc) => doc.path === uploaded?.path) : -1
   if (mine > 0) docs.unshift(...docs.splice(mine, 1))
@@ -521,7 +537,7 @@ function runSources(counts: Record<string, number>): string | null {
 
 function runsList(view: View): HTMLElement {
   const block = element("div", "docwiki-process-runs")
-  block.append(heading("Runs that changed the wiki"))
+  block.append(heading("Runs that published a release"))
   if (view.checks.count > 0) {
     const checks = plural(view.checks.count, "scheduled check")
     const last = view.checks.last ? `, the last ${when(view.checks.last)}` : ""
@@ -545,6 +561,8 @@ function runsList(view: View): HTMLElement {
     if (run.cost !== null) facts.push(`${run.currency ?? ""} ${run.cost.toFixed(2)}`.trim())
     const sources = runSources(run.counts)
     if (sources) facts.push(sources)
+    const changed = ["new", "changed", "deleted"].some((key) => (run.counts[key] ?? 0) > 0)
+    if (run.kind === "rebuild" && !changed) facts.push("no document changed: the site was rebuilt")
     const gates = Object.entries(run.gates)
       .filter(([, count]) => count > 0)
       .map(([status, count]) => `${count} ${status}`)
@@ -566,14 +584,6 @@ function ownerBar(me: Me): HTMLElement | null {
   }
   if (me.signIn && me.signInUrl) {
     const bar = element("div", "docwiki-process-owner")
-    bar.append(
-      element(
-        "p",
-        "docwiki-owner-box-text",
-        "Only the owner adds documents. Everyone can follow each one through the pipeline below, " +
-          "then read it in the wiki.",
-      ),
-    )
     const signIn = anchor(me.signInUrl, "Sign in to add a document")
     signIn.className = "docwiki-process-submit docwiki-owner-box-sign-in"
     bar.append(signIn)
@@ -737,7 +747,9 @@ document.addEventListener("nav", () => {
   const placeholder = section.querySelector<HTMLElement>(".docwiki-process-placeholder")
   // The owner's box at the top of the page (OwnerBox.tsx), or the top of this section without it.
   const box = document.querySelector<HTMLElement>(".docwiki-owner-box")
-  const owner = element("div", "docwiki-process-owner-area")
+  const owner =
+    box?.querySelector<HTMLElement>(".docwiki-process-owner-area") ??
+    element("div", "docwiki-process-owner-area")
   const state = element("p", "docwiki-process-state")
   state.setAttribute("role", "status")
   state.setAttribute("aria-live", "polite")
@@ -745,9 +757,11 @@ document.addEventListener("nav", () => {
   const live = element("div", "docwiki-process-live")
   const note = element("p", "docwiki-process-note", UNAVAILABLE)
   note.hidden = true
-  if (box) box.append(owner)
-  else section.append(owner)
-  section.append(state, live, note)
+  if (!owner.isConnected) section.append(owner)
+  // The live view comes before the disclosure of the 13 technical steps (Process.tsx).
+  const steps = section.querySelector<HTMLElement>(".docwiki-process-steps")
+  if (steps) steps.before(state, live, note)
+  else section.append(state, live, note)
 
   let alive = true
   let timer = 0
@@ -818,7 +832,6 @@ document.addEventListener("nav", () => {
       const bar = ownerBar(me)
       if (bar) owner.append(bar)
       if (me.owner && me.upload) owner.append(uploadForm(me.upload, () => void poll(), !box))
-      if (box && bar) box.hidden = false
       render() // owners see the names and errors hidden from visitors
     })
     .catch(() => {

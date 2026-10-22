@@ -56,12 +56,12 @@ DOCUMENT_STATUSES = ("new", *SOURCE_STATUSES)
 """``new``: in ``raw/`` but not seen by the pipeline yet; then the pipeline's own statuses."""
 DOCUMENT_STATES = (
     "failed",
-    "held_back",
     "received",
     "queued",
     "processing",
     "in_wiki",
     "superseded",
+    "held_back",
     "removed",
 )
 """What the site shows (ADR 0010), in display order. ``in_wiki`` and ``superseded`` only for a

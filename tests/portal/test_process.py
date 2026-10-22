@@ -144,10 +144,10 @@ def test_process_merges_raw_files_with_pipeline_state(storage: FolderStorage) ->
     # The site's words (ADR 0010), in display order.
     assert [(row["state"], row["path"]) for row in view["documents"]] == [
         ("failed", BROKEN_PATH),
-        ("held_back", ODD_PATH),
         ("received", NEW_PATH),
         ("queued", PENDING_PATH),
         ("in_wiki", DONE_PATH),
+        ("held_back", ODD_PATH),
         ("removed", GONE_PATH),
     ]
     assert view["states"]["in_wiki"] == 1 and view["states"]["processing"] == 0

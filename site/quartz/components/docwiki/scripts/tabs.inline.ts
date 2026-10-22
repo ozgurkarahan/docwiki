@@ -92,7 +92,7 @@ function chipText(value: Status): { words: string; state: "processing" | "in_wik
     return { words, state: "processing" }
   }
   if (value.state === "published" && value.document) {
-    return { words: `In the wiki → ${value.document.title}`, state: "in_wiki" }
+    return { words: "In the wiki → new page", state: "in_wiki" }
   }
   return { words: "Idle", state: "idle" }
 }
@@ -106,18 +106,27 @@ function render(): void {
       const pill = statusPill(state === "idle" ? "in_wiki" : state, words)
       if (state === "idle") pill.classList.add("docwiki-status--idle")
       chip.replaceChildren(...Array.from(pill.childNodes))
-      chip.className = `docwiki-chip ${pill.className}`
-      const target =
-        status.state === "published" && status.document
-          ? fromRoot(status.document.pageUrl)
-          : fromRoot("/pipeline")
-      chip.setAttribute("href", target)
-      chip.title = state === "idle" ? "The pipeline is idle; open it" : words
-      chip.hidden = false
+      chip.className = `docwiki-chip is-ready ${pill.className}`
+      const published = status.state === "published" && status.document
+      chip.setAttribute(
+        "href",
+        published && status.document ? fromRoot(status.document.pageUrl) : fromRoot("/pipeline"),
+      )
+      chip.title =
+        published && status.document
+          ? `In the wiki: ${status.document.title}`
+          : state === "idle"
+            ? "The pipeline is idle; open it"
+            : words
+      if (published && status.document) {
+        chip.setAttribute("aria-label", `In the wiki: ${status.document.title}`)
+      } else {
+        chip.removeAttribute("aria-label")
+      }
       if (live && announced !== "" && announced !== words) live.textContent = `Pipeline: ${words}`
       announced = words
     } else {
-      chip.hidden = true
+      chip.classList.remove("is-ready")
     }
   }
   const signIn = document.querySelector<HTMLAnchorElement>(".docwiki-sign-in")
@@ -126,14 +135,14 @@ function render(): void {
       signIn.textContent = "Owner ✓"
       signIn.setAttribute("href", fromRoot("/pipeline"))
       signIn.title = "Signed in as the owner: add documents on the Pipeline page"
-      signIn.hidden = false
+      signIn.classList.add("is-ready")
     } else if (me?.signIn && me.signInUrl) {
       signIn.textContent = "Sign in"
       signIn.setAttribute("href", me.signInUrl)
       signIn.title = "Owner sign-in: only the owner adds documents"
-      signIn.hidden = false
+      signIn.classList.add("is-ready")
     } else {
-      signIn.hidden = true
+      signIn.classList.remove("is-ready")
     }
   }
 }
