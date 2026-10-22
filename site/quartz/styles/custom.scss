@@ -987,12 +987,75 @@ $askDrawerWidth: 440px;
   }
 }
 
+// ----- How it works: the owner's box at the top (OwnerBox.tsx) -----
+// Filled by scripts/process.inline.ts; shares the form styles of the live section below (the
+// element in the selector outweighs them).
+
+section.docwiki-owner-box {
+  box-sizing: border-box;
+  max-width: 40rem;
+  margin: 0.75rem 0 1.5rem;
+  padding: 0.9rem 1.1rem 1.1rem;
+  border: 1px solid var(--secondary);
+  border-left-width: 5px;
+  border-radius: 8px;
+  background: var(--highlight);
+
+  &[hidden] {
+    display: none;
+  }
+
+  .docwiki-owner-box-title {
+    margin: 0 0 0.5rem;
+    font-size: 1.15rem;
+    line-height: 1.3;
+  }
+
+  .docwiki-owner-box-text {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--darkgray);
+  }
+
+  .docwiki-process-owner {
+    margin: 0;
+    font-size: 0.95rem;
+  }
+
+  a.docwiki-owner-box-sign-in {
+    display: inline-block;
+    margin-top: 0.8rem;
+    min-height: 44px;
+    box-sizing: border-box;
+    padding: 0.6rem 1.3rem;
+    text-decoration: none;
+    font-size: 1rem;
+
+    &:focus-visible {
+      outline: 2px solid var(--dark);
+      outline-offset: 2px;
+    }
+  }
+
+  .docwiki-process-upload {
+    max-width: none;
+    margin: 0.8rem 0 0;
+    border-color: var(--secondary);
+    background: var(--light);
+  }
+}
+
 // ----- How it works: the process, live (Process.tsx) -----
 // Filled on the client from /api/process. Badge colours follow the provenance badges: green done,
 // blue in progress, amber quarantined, red failed, grey skipped or gone.
 
 .docwiki-process {
   margin: 0.5rem 0 1.5rem;
+}
+
+.docwiki-process,
+.docwiki-owner-box {
   min-width: 0;
 
   p {

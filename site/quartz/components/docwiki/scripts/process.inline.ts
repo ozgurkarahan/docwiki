@@ -541,8 +541,18 @@ function ownerBar(me: Me): HTMLElement | null {
     return bar
   }
   if (me.signIn && me.signInUrl) {
-    const bar = element("p", "docwiki-process-owner")
-    bar.append(anchor(me.signInUrl, "Sign in to add documents"))
+    const bar = element("div", "docwiki-process-owner")
+    bar.append(
+      element(
+        "p",
+        "docwiki-owner-box-text",
+        "Only the owner adds documents. Everyone can follow each one through the pipeline below, " +
+          "then read it in the wiki.",
+      ),
+    )
+    const signIn = anchor(me.signInUrl, "Sign in to add a document")
+    signIn.className = "docwiki-process-submit docwiki-owner-box-sign-in"
+    bar.append(signIn)
     return bar
   }
   return null
@@ -573,10 +583,14 @@ function errorText(payload: unknown, status: number): string {
   return message ? `${message} (HTTP ${status})` : `The upload failed (HTTP ${status}).`
 }
 
-function uploadForm(upload: NonNullable<Me["upload"]>, done: () => void): HTMLElement {
+function uploadForm(
+  upload: NonNullable<Me["upload"]>,
+  done: () => void,
+  titled: boolean,
+): HTMLElement {
   const form = element("form", "docwiki-process-upload")
   form.noValidate = true
-  form.append(element("h3", "docwiki-process-title", "Add a document"))
+  if (titled) form.append(element("h3", "docwiki-process-title", "Add a document"))
 
   const fileLabel = element("label", "docwiki-process-label", "Document")
   fileLabel.htmlFor = "docwiki-process-file"
@@ -593,6 +607,7 @@ function uploadForm(upload: NonNullable<Me["upload"]>, done: () => void): HTMLEl
   folder.autocomplete = "off"
   folder.spellcheck = false
   folder.maxLength = MAX_PATH_CHARS
+  folder.placeholder = "for example planning, devis or achats"
 
   const replaceLabel = element("label", "docwiki-process-check")
   const replace = element("input")
@@ -662,8 +677,8 @@ function uploadForm(upload: NonNullable<Me["upload"]>, done: () => void): HTMLEl
         sayHint()
         uploaded = { path, at: Date.now() }
         form.reset()
-        status.textContent =
-          `Uploaded ${path}. The pipeline starts within a minute; this page follows it.`
+        status.textContent = `Uploaded ${path}. The pipeline starts within a minute: `
+        status.append(anchor("#docwiki-live", "follow it live"), ".")
         done()
       })
       .catch((error: unknown) => {
@@ -696,6 +711,8 @@ document.addEventListener("nav", () => {
   const section = document.querySelector<HTMLElement>(SECTION)
   if (!section) return
   const placeholder = section.querySelector<HTMLElement>(".docwiki-process-placeholder")
+  // The owner's box at the top of the page (OwnerBox.tsx), or the top of this section without it.
+  const box = document.querySelector<HTMLElement>(".docwiki-owner-box")
   const owner = element("div", "docwiki-process-owner-area")
   const state = element("p", "docwiki-process-state")
   state.setAttribute("role", "status")
@@ -704,7 +721,9 @@ document.addEventListener("nav", () => {
   const live = element("div", "docwiki-process-live")
   const note = element("p", "docwiki-process-note", UNAVAILABLE)
   note.hidden = true
-  section.append(owner, state, live, note)
+  if (box) box.append(owner)
+  else section.append(owner)
+  section.append(state, live, note)
 
   let alive = true
   let timer = 0
@@ -774,7 +793,8 @@ document.addEventListener("nav", () => {
       isOwner = me.owner
       const bar = ownerBar(me)
       if (bar) owner.append(bar)
-      if (me.owner && me.upload) owner.append(uploadForm(me.upload, () => void poll()))
+      if (me.owner && me.upload) owner.append(uploadForm(me.upload, () => void poll(), !box))
+      if (box && bar) box.hidden = false
       render() // owners see the names and errors hidden from visitors
     })
     .catch(() => {
