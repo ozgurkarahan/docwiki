@@ -45,6 +45,8 @@ let loading: Promise<AskAnswer[]> | null = null
 let failed = false
 /** Filed answers of this build (`data-filed-answers`); a build without any has no answers.json. */
 let filedCount = 0
+/** Source id → [page slug, title] of this build (`data-source-pages`). */
+let sourcePages: Record<string, [string, string]> = {}
 /** Whether the portal answers live questions (`/api/ask/status`); `null` until it is known. */
 let liveEnabled: boolean | null = null
 let liveChecking: Promise<void> | null = null
@@ -423,6 +425,22 @@ function sourceItem(entry: AskCitation, slug: string): HTMLLIElement {
   return item
 }
 
+/**
+ * The wiki pages of the sources an answer cites (citation hrefs are `evidence/<source_id>/...`),
+ * once each and in citation order: the reader goes on from the answer into the wiki.
+ */
+function wikiPages(item: AskAnswer): [string, string][] {
+  const pages = new Map<string, string>()
+  for (const entry of item.citations) {
+    const [root, sourceId] = entry.href.split("/")
+    const found = root === "evidence" ? sourcePages[sourceId] : undefined
+    if (found && typeof found[0] === "string" && !pages.has(found[0])) {
+      pages.set(found[0], String(found[1]))
+    }
+  }
+  return Array.from(pages.entries())
+}
+
 function answerView(body: HTMLElement, item: AskAnswer, slug: string) {
   const back = button("docwiki-ask-back", "Back to questions", "back")
   back.dataset.askAction = "back"
@@ -457,6 +475,17 @@ function answerView(body: HTMLElement, item: AskAnswer, slug: string) {
     const sources = element("ul", "docwiki-ask-sources")
     for (const entry of item.citations) sources.append(sourceItem(entry, slug))
     article.append(sources)
+  }
+  const pages = wikiPages(item)
+  if (pages.length > 0) {
+    article.append(element("h4", "docwiki-ask-sources-title", "Pages in the wiki"))
+    const list = element("ul", "docwiki-ask-sources docwiki-ask-pages")
+    for (const [page, title] of pages) {
+      const entry = element("li")
+      entry.append(link(slug, page, title, `page:${page}`))
+      list.append(entry)
+    }
+    article.append(list)
   }
   if (item.steps.length > 0) {
     const details = element("details", "docwiki-ask-steps")
@@ -667,6 +696,13 @@ document.addEventListener("nav", () => {
   if (!found) return
   const { fab, panel } = found
   filedCount = Number(panel.dataset.filedAnswers) || 0
+  try {
+    const parsed: unknown = JSON.parse(panel.dataset.sourcePages || "{}")
+    sourcePages =
+      parsed && typeof parsed === "object" ? (parsed as Record<string, [string, string]>) : {}
+  } catch {
+    sourcePages = {}
+  }
   fab.addEventListener("click", onFabClick)
   panel.addEventListener("click", onPanelClick)
   panel.addEventListener("scroll", onPanelScroll, { capture: true, passive: true })

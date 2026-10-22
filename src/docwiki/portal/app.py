@@ -24,6 +24,8 @@ from starlette.responses import FileResponse, JSONResponse, PlainTextResponse, R
 from starlette.routing import Route
 
 from docwiki.portal.live_ask import LiveAsk, live_ask_routes
+from docwiki.portal.owner import OwnerConfig, process_routes
+from docwiki.portal.process import ProcessService
 from docwiki.portal.sync import SiteState, SiteSync, site_state_from_dir
 
 __all__ = [
@@ -244,10 +246,13 @@ def create_app(
     poll_seconds: float = 30.0,
     headers: dict[str, str] | None = None,
     live_ask: LiveAsk | None = None,
+    process: ProcessService | None = None,
+    owner: OwnerConfig | None = None,
 ) -> Starlette:
     """Portal ASGI app serving ``sync``'s current site (polled every ``poll_seconds``) or, for a
     local preview, an already built ``site_dir``. ``live_ask`` adds the visitors' questions to the
-    Researcher; ``/api/ask/status`` reports whether it is enabled."""
+    Researcher; ``/api/ask/status`` reports whether it is enabled. ``process`` serves the live
+    process view and, for the owners of ``owner``, the uploads (ADR 0009)."""
     if (sync is None) == (site_dir is None):
         raise ValueError("pass exactly one of sync or site_dir")
     static = site_state_from_dir(Path(site_dir)) if site_dir is not None else None
@@ -272,6 +277,7 @@ def create_app(
     app = Starlette(
         routes=[
             *live_ask_routes(live_ask),
+            *process_routes(process, owner or OwnerConfig()),
             Route("/healthz", portal.health, methods=["GET", "HEAD"]),
             Route("/livez", portal.live, methods=["GET", "HEAD"]),
             Route("/{path:path}", portal.page, methods=["GET", "HEAD"]),

@@ -11,6 +11,15 @@ import { settings } from "./settings"
 
 const PANEL_ID = "docwiki-ask"
 
+/** Source id → [source page slug, title]: the wiki pages an answer's citations come from. */
+const sourcePages = JSON.stringify(
+  Object.fromEntries(
+    Object.entries(settings.sources)
+      .filter(([, source]) => source.page)
+      .map(([id, source]) => [id, [source.page, source.title]]),
+  ),
+)
+
 export default (() => {
   const AskPanel: QuartzComponent = ({ fileData, displayClass }: QuartzComponentProps) => {
     // The 404 page is served at any path, where its relative links would not resolve.
@@ -37,6 +46,7 @@ export default (() => {
           aria-label="Ask this wiki"
           data-repo-url={settings.repoUrl}
           data-filed-answers={String(settings.answers)}
+          data-source-pages={sourcePages}
           hidden
         ></aside>
       </div>

@@ -8,7 +8,7 @@ idempotent: re-running a hook converges on the same objects.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -269,13 +269,16 @@ def ensure_portal_app(
     tag: str,
     known_app_id: str | None,
     redirect_uri: str,
+    extra_redirect_uris: Sequence[str] = (),
     owner_object_id: str = "",
     description: str = "DocWiki private portal sign-in.",
 ) -> AppRegistration:
-    """Sign-in app of a web app (portal, Studio): web redirect URI and ID tokens only (no client
-    secret). ``description`` is only used when the registration is created."""
+    """Sign-in app of a web app (portal, Studio): web redirect URIs (``extra_redirect_uris``, for
+    example a custom domain's) and ID tokens only (no client secret). ``description`` is only used
+    when the registration is created."""
+    wanted = unique([redirect_uri, *extra_redirect_uris])
     web = {
-        "redirectUris": [redirect_uri],
+        "redirectUris": wanted,
         "implicitGrantSettings": {
             "enableIdTokenIssuance": True,
             "enableAccessTokenIssuance": False,
@@ -292,11 +295,11 @@ def ensure_portal_app(
     redirects = list(current.get("redirectUris") or [])
     implicit = current.get("implicitGrantSettings") or {}
     if (
-        redirect_uri not in redirects
+        any(uri not in redirects for uri in wanted)
         or not implicit.get("enableIdTokenIssuance")
         or implicit.get("enableAccessTokenIssuance")
     ):
-        body = {"web": {**web, "redirectUris": unique([*redirects, redirect_uri])}}
+        body = {"web": {**web, "redirectUris": unique([*redirects, *wanted])}}
         info(f"updating app registration {display_name}: web")
         retry(
             lambda: tools.rest("PATCH", f"{GRAPH}/applications/{app['id']}", body=body),

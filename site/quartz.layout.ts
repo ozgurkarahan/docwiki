@@ -32,8 +32,9 @@ const toolbar = Component.Flex({
 export const sharedPageComponents: SharedLayout = {
   head: DocWiki.Head(),
   header: [DocWiki.Banner()],
+  // The how-it-works page only: documents, queue and runs, live from the portal, after the text.
   // "Ask this wiki": filed research answers in a drawer on every page (none without answers).
-  afterBody: [DocWiki.AskPanel()],
+  afterBody: [DocWiki.Process(), DocWiki.AskPanel()],
   footer: DocWiki.Footer(),
 }
 

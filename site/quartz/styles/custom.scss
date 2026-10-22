@@ -223,6 +223,7 @@ article blockquote.docwiki-notice {
   .breadcrumb-container,
   .tags,
   .docwiki-notice--fictional,
+  .docwiki-process,
   .docwiki-ask-root {
     display: none;
   }
@@ -983,6 +984,429 @@ $askDrawerWidth: 440px;
     .docwiki-ask-provenance + .docwiki-ask-open {
       margin-top: 0.4rem;
     }
+  }
+}
+
+// ----- How it works: the process, live (Process.tsx) -----
+// Filled on the client from /api/process. Badge colours follow the provenance badges: green done,
+// blue in progress, amber quarantined, red failed, grey skipped or gone.
+
+.docwiki-process {
+  margin: 0.5rem 0 1.5rem;
+  min-width: 0;
+
+  p {
+    margin: 0;
+  }
+
+  .docwiki-process-placeholder,
+  .docwiki-process-caption,
+  .docwiki-process-hint,
+  .docwiki-process-note {
+    font-size: 0.88rem;
+    line-height: 1.45;
+    color: var(--gray);
+  }
+
+  .docwiki-process-note {
+    margin-top: 0.75rem;
+  }
+
+  .docwiki-process-owner {
+    margin: 0 0 0.75rem;
+    font-size: 0.9rem;
+    color: var(--darkgray);
+    overflow-wrap: anywhere;
+  }
+
+  .docwiki-process-state {
+    margin: 0 0 0.4rem;
+    font-size: 1.05rem;
+    font-weight: $semiBoldWeight;
+    color: var(--dark);
+  }
+
+  .docwiki-process-facts {
+    font-size: 0.9rem;
+    color: var(--darkgray);
+    overflow-wrap: anywhere;
+  }
+
+  .docwiki-process-title {
+    margin: 1.4rem 0 0.55rem;
+    font-size: 0.78rem;
+    font-weight: $semiBoldWeight;
+    letter-spacing: 0.04em;
+    line-height: 1.3;
+    text-transform: uppercase;
+    color: var(--gray);
+  }
+
+  // The owner's upload form.
+  .docwiki-process-upload {
+    box-sizing: border-box;
+    max-width: 36rem;
+    margin: 0 0 1.25rem;
+    padding: 0.2rem 1rem 1rem;
+    border: 1px solid var(--lightgray);
+    border-radius: 8px;
+
+    .docwiki-process-title {
+      margin-top: 0.85rem;
+    }
+  }
+
+  .docwiki-process-label {
+    display: block;
+    margin: 0.75rem 0 0.3rem;
+    font-size: 0.88rem;
+    font-weight: $semiBoldWeight;
+    color: var(--dark);
+  }
+
+  .docwiki-process-file {
+    display: block;
+    max-width: 100%;
+    font: inherit;
+    font-size: 0.88rem;
+    color: var(--darkgray);
+  }
+
+  .docwiki-process-input {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0;
+    padding: 0.45rem 0.7rem;
+    border: 1px solid var(--lightgray);
+    border-radius: 8px;
+    background: var(--light);
+    color: var(--dark);
+    font: inherit;
+
+    &:focus-visible {
+      outline: 2px solid var(--secondary);
+      outline-offset: 1px;
+    }
+  }
+
+  .docwiki-process-check {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0.75rem 0 0;
+    font-size: 0.88rem;
+    color: var(--darkgray);
+
+    // Quartz pulls checkboxes into the margin for task lists.
+    input[type="checkbox"] {
+      flex: none;
+      margin: 0;
+      transform: none;
+    }
+  }
+
+  .docwiki-process-submit,
+  .docwiki-process-more {
+    display: block;
+    margin: 0.75rem 0 0;
+    padding: 0.4rem 1.1rem;
+    border: 1px solid var(--secondary);
+    border-radius: 6px;
+    background: var(--secondary);
+    color: var(--light);
+    font: inherit;
+    font-weight: $semiBoldWeight;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      border-color: var(--tertiary);
+      background: var(--tertiary);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: progress;
+    }
+  }
+
+  .docwiki-process-more {
+    border-color: var(--lightgray);
+    background: transparent;
+    color: var(--secondary);
+
+    &:hover:not(:disabled) {
+      border-color: var(--secondary);
+      background: var(--highlight);
+    }
+  }
+
+  .docwiki-process-upload-status {
+    margin-top: 0.55rem;
+    font-size: 0.88rem;
+    color: var(--darkgray);
+    overflow-wrap: anywhere;
+
+    &:empty {
+      display: none;
+    }
+  }
+
+  .docwiki-process-upload-error,
+  .docwiki-process-error {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--dw-superseded-border);
+    border-radius: 6px;
+    background: var(--dw-superseded-bg);
+    color: var(--dw-superseded-fg);
+    font-size: 0.85rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+
+  .docwiki-process-upload-error {
+    margin-top: 0.55rem;
+  }
+
+  .docwiki-process-hint {
+    margin-top: 0.55rem;
+    font-size: 0.8rem;
+  }
+
+  // Status badges of documents and runs.
+  .docwiki-process-badge {
+    --badge-bg: var(--dw-paraphrase-bg);
+    --badge-fg: var(--dw-paraphrase-fg);
+    --badge-border: var(--dw-paraphrase-border);
+    display: inline-block;
+    padding: 0 0.45rem;
+    border: 1px solid var(--badge-border);
+    border-radius: 999px;
+    background: var(--badge-bg);
+    color: var(--badge-fg);
+    font-size: 0.78rem;
+    font-weight: $semiBoldWeight;
+    line-height: 1.5;
+    white-space: nowrap;
+
+    &.docwiki-process-badge--done,
+    &.docwiki-process-badge--succeeded {
+      --badge-bg: var(--dw-verified-bg);
+      --badge-fg: var(--dw-verified-fg);
+      --badge-border: var(--dw-verified-border);
+    }
+
+    &.docwiki-process-badge--new,
+    &.docwiki-process-badge--pending,
+    &.docwiki-process-badge--running,
+    &.docwiki-process-badge--received {
+      --badge-bg: var(--dw-table-bg);
+      --badge-fg: var(--dw-table-fg);
+      --badge-border: var(--dw-table-border);
+    }
+
+    &.docwiki-process-badge--quarantined {
+      --badge-bg: var(--dw-ocr-bg);
+      --badge-fg: var(--dw-ocr-fg);
+      --badge-border: var(--dw-ocr-border);
+    }
+
+    &.docwiki-process-badge--failed {
+      --badge-bg: var(--dw-superseded-bg);
+      --badge-fg: var(--dw-superseded-fg);
+      --badge-border: var(--dw-superseded-border);
+    }
+
+    &.docwiki-process-badge--deleted {
+      border-style: dashed;
+    }
+  }
+
+  // The 13 stages of the latest run: a grid that wraps on narrow screens.
+  .docwiki-process-stages {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+    gap: 0.4rem;
+    margin: 0.6rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .docwiki-process-stage {
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+    min-width: 0;
+    margin: 0;
+    padding: 0.4rem 0.55rem;
+    border: 1px solid var(--lightgray);
+    border-left-width: 4px;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    line-height: 1.35;
+
+    &[data-status="done"] {
+      border-left-color: var(--dw-verified-border);
+    }
+
+    &[data-status="running"],
+    &[data-status="pending"] {
+      border-left-color: var(--secondary);
+      background: var(--highlight);
+    }
+
+    &[data-status="failed"] {
+      border-left-color: var(--dw-superseded-border);
+      background: var(--dw-superseded-bg);
+    }
+
+    &[data-status="quarantined"] {
+      border-left-color: var(--dw-ocr-border);
+    }
+
+    &[data-status="skipped"],
+    &[data-status="not-run"] {
+      border-left-style: dashed;
+    }
+  }
+
+  .docwiki-process-stage-name {
+    font-family: var(--codeFont);
+    font-weight: $semiBoldWeight;
+    color: var(--dark);
+    overflow-wrap: anywhere;
+  }
+
+  .docwiki-process-stage-status,
+  .docwiki-process-stage-time {
+    color: var(--gray);
+  }
+
+  // Documents: the table scrolls inside its own box, never the page.
+  .docwiki-process-scroll {
+    // Its width comes from the column, never from the table (no page-level sideways scroll).
+    contain: inline-size;
+    max-width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--lightgray);
+    border-radius: 6px;
+
+    &:focus-visible {
+      outline: 2px solid var(--secondary);
+      outline-offset: 2px;
+    }
+  }
+
+  .docwiki-process-table {
+    width: 100%;
+    margin: 0;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+
+    th,
+    td {
+      padding: 0.4rem 0.6rem;
+      border: none;
+      border-bottom: 1px solid var(--lightgray);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      font-weight: $semiBoldWeight;
+      color: var(--darkgray);
+      white-space: nowrap;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    td:first-child,
+    td:nth-child(3),
+    td:nth-child(4),
+    td:last-child {
+      white-space: nowrap;
+    }
+
+    tr.is-uploaded td {
+      background: var(--highlight);
+    }
+
+    tr.is-uploaded td:first-child {
+      box-shadow: inset 3px 0 0 var(--secondary);
+    }
+  }
+
+  .docwiki-process-name {
+    min-width: 12rem;
+    overflow-wrap: anywhere;
+
+    > span {
+      display: block;
+    }
+  }
+
+  .docwiki-process-hidden {
+    font-style: italic;
+    color: var(--gray);
+  }
+
+  .docwiki-process-mine,
+  .docwiki-process-stage-of {
+    font-size: 0.78rem;
+    color: var(--gray);
+  }
+
+  .docwiki-process-stage-of {
+    display: block;
+    margin-top: 0.15rem;
+    font-family: var(--codeFont);
+  }
+
+  .docwiki-process-name > .docwiki-process-error {
+    margin-top: 0.3rem;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.8rem;
+  }
+
+  .docwiki-process-num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  // Recent runs.
+  .docwiki-process-run-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .docwiki-process-run {
+    margin: 0;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--lightgray);
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  .docwiki-process-run-title {
+    font-size: 0.9rem;
+    color: var(--dark);
+  }
+
+  .docwiki-process-run-facts {
+    margin-top: 0.15rem;
+    font-size: 0.84rem;
+    color: var(--gray);
+    overflow-wrap: anywhere;
+  }
+
+  .docwiki-process-current {
+    font-size: 0.78rem;
+    font-weight: $semiBoldWeight;
+    color: var(--secondary);
   }
 }
 

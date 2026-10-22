@@ -37,6 +37,8 @@ export default (() => {
               <a href={link(settings.qualityPage)}>quality report</a>
             </>
           )}
+          {" · "}
+          <a href={link("how-it-works")}>how it works</a>
         </p>
         <details class="docwiki-about-more">
           <summary>About DocWiki</summary>

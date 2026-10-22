@@ -130,6 +130,8 @@ azd env set DOCWIKI_MCP_MIN_REPLICAS 0
 | `DOCWIKI_PORTAL_ACCESS` | `entra` | `public` serves the portal without sign-in; honoured only with `DOCWIKI_AUDIENCE=public`, otherwise the portal gets no ingress |
 | `DOCWIKI_PORTAL_CUSTOM_DOMAIN` | empty | Host name whose CNAME points at the portal app; empty means none ([docs/operations.md](docs/operations.md#custom-domain-for-the-portal-optional)) |
 | `DOCWIKI_PORTAL_CERTIFICATE_NAME` | empty | Name of the Container Apps managed certificate for that host in the environment; the template only references it, and without it the domain is added with its binding disabled |
+| `DOCWIKI_PORTAL_OWNERS` | written by the hook | Comma-separated Entra object IDs of the owners who sign in on the public portal to add documents (the hook writes the deployer's); empty means no sign-in and no uploads ([docs/operations.md](docs/operations.md#owner-sign-in-and-uploads-on-the-public-portal)) |
+| `DOCWIKI_PORTAL_OWNER_SIGN_IN` | `true` | `false` keeps the public portal without the owner's sign-in and uploads |
 | `DOCWIKI_PORTAL_MIN_REPLICAS` | `0` | `1` keeps one portal replica warm (no cold start for the first visitor, small fixed cost) |
 | `DOCWIKI_ENABLE_LIVE_ASK` / `DOCWIKI_LIVE_ASK_ENDPOINT` | `false` / empty | Visitors ask the Researcher from the wiki ([docs/live-ask.md](docs/live-ask.md)); the endpoint is the gateway URL in front of the Foundry project, and the live ask stays off while it is empty |
 | `DOCWIKI_ENABLE_STUDIO` | `false` | DocWiki Studio ([docs/studio.md](docs/studio.md)): owner-only web app to upload documents, follow runs and ask the agents; always behind Entra sign-in |

@@ -6,7 +6,9 @@ uses ``docwiki.storage.storage_from_settings()`` provided by the engine (Blob St
 managed identity). ``--site-dir`` serves an already built site without any storage.
 
 ``DOCWIKI_LIVE_ASK=1`` (with ``DOCWIKI_FOUNDRY_PROJECT_ENDPOINT``) turns on the visitors'
-questions to the Researcher agent (``docs/live-ask.md``).
+questions to the Researcher agent (``docs/live-ask.md``). With a storage the portal also serves
+the live process view, and ``DOCWIKI_PORTAL_OWNERS`` lets the signed-in owner upload documents
+(ADR 0009); ``--local-owner`` makes every caller the owner on the loopback interface.
 """
 
 from __future__ import annotations
@@ -26,7 +28,11 @@ from docwiki.logs import quiet_sdk_http_logs
 from docwiki.orchestration.telemetry import configure_exporter, instrument_asgi
 from docwiki.portal.app import create_app
 from docwiki.portal.live_ask import LiveAsk
+from docwiki.portal.owner import OwnerConfig, OwnerConfigError
+from docwiki.portal.process import ProcessService, azure_queue_depth, azure_raw_lister
 from docwiki.portal.sync import SiteSync
+
+LOOPBACK = ("127.0.0.1", "localhost", "::1")
 
 
 def storage_from_env(env: Mapping[str, str]) -> Storage:
@@ -46,6 +52,29 @@ def storage_from_env(env: Mapping[str, str]) -> Storage:
     raise SystemExit(f"unknown {SettingsKeys.MODE}: {mode!r} (expected local or azure)")
 
 
+def process_service(storage: Storage, owner: OwnerConfig, env: Mapping[str, str]) -> ProcessService:
+    """The process view over ``storage``; in azure mode ``raw/`` is listed with sizes and dates
+    and the ingest queue is peeked with the managed identity."""
+    list_raw = None
+    queue_depth = None
+    if env.get(SettingsKeys.MODE) == "azure":
+        from azure.identity import DefaultAzureCredential
+
+        from docwiki.orchestration.settings import EngineSettings
+
+        settings = EngineSettings.from_env(env)
+        credential = DefaultAzureCredential()
+        list_raw = azure_raw_lister(settings.blob_account_url, settings.raw_container, credential)
+        queue_depth = azure_queue_depth(settings.queue_account_url, settings.queue_name, credential)
+    return ProcessService(
+        storage,
+        max_upload_bytes=owner.max_upload_bytes,
+        daily_uploads=owner.daily_uploads,
+        list_raw=list_raw,
+        queue_depth=queue_depth,
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m docwiki.portal",
@@ -60,7 +89,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--poll-seconds", type=float, default=30.0)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument(
+        "--local-owner",
+        action="store_true",
+        help="every caller is the owner, no sign-in (loopback interface only)",
+    )
     args = parser.parse_args(argv)
+    if args.local_owner and args.host not in LOOPBACK:
+        parser.error("--local-owner only serves the loopback interface (--host 127.0.0.1)")
+    try:
+        owner = OwnerConfig.from_env(os.environ, local_owner=args.local_owner)
+    except OwnerConfigError as exc:
+        parser.error(str(exc))
 
     import uvicorn
 
@@ -73,7 +113,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if live_ask is not None:
         logging.getLogger("docwiki.portal").info("live ask is on (DOCWIKI_LIVE_ASK=1)")
     if args.site_dir is not None:
-        app = create_app(site_dir=args.site_dir, live_ask=live_ask)
+        app = create_app(site_dir=args.site_dir, live_ask=live_ask, owner=owner)
     else:
         storage = (
             FolderStorage(args.storage_root, fsync=False)
@@ -85,6 +125,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             SiteSync(storage, cache_dir, prefix=args.prefix),
             poll_seconds=args.poll_seconds,
             live_ask=live_ask,
+            process=process_service(storage, owner, os.environ),
+            owner=owner,
         )
     if exporting:
         app = instrument_asgi(app)
