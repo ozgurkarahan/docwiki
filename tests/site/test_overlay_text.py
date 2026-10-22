@@ -524,3 +524,68 @@ def test_live_flag_survives_the_answers_parser_only_when_true() -> None:
         """
     )
     assert result == [True, None, None]
+
+
+def test_citations_are_renumbered_in_order_of_first_appearance() -> None:
+    result = run_helpers(
+        """
+        const cite = (n, title) => ({n, title, label: "p. 1", href: `evidence/s/${n}`, badge: ""})
+        const item = {
+          id: "x", slug: "queries/x", question: "q", date: "", banners: [], steps: [],
+          provenance: "", pages: [],
+          paragraphs: [
+            [{text: "A"}, {cite: 3}, {cite: 1}, {text: " B"}, {cite: 3}],
+            [{text: "C"}, {cite: 7}],
+          ],
+          citations: [cite(1, "one"), cite(2, "two"), cite(3, "three")],
+        }
+        const out = m.renumberCitations(item)
+        console.log(JSON.stringify({
+          marks: out.paragraphs.map((p) => p.map((s) => s.cite ?? s.text)),
+          sources: out.citations.map((c) => [c.n, c.title]),
+          untouched: item.paragraphs[0][1].cite,
+          empty: m.renumberCitations({...item, paragraphs: [], citations: []}).citations,
+        }))
+        """
+    )
+    assert result == {
+        "marks": [["A", 1, 2, " B", 1], ["C", 4]],
+        "sources": [[1, "three"], [2, "one"], [3, "two"]],  # 4: cited but not listed
+        "untouched": 3,
+        "empty": [],
+    }
+
+
+def test_drawer_phone_state_examples_and_stored_live_answers() -> None:
+    result = run_helpers(
+        f"""
+        const open = {{open: true, answer: "a", scroll: 4, resume: false}}
+        const base = {json.dumps(LIVE_ANSWER)}
+        const filed = {{...base, id: "f", live: undefined,
+          question: "When are the windows of the extension delivered?"}}
+        const stored = JSON.stringify([base, {{id: 1}}, {{...base, id: "b", live: false}}])
+        console.log(JSON.stringify({{
+          phone: m.restoredState(open, true),
+          desktop: m.restoredState(open, false) === open,
+          liveNotice: m.isLiveNotice(base.banners[0]),
+          allExamples: m.exampleQuestions(null, true).length,
+          filedExamples: m.exampleQuestions([filed], false),
+          none: m.exampleQuestions(null, false),
+          match: m.filedAnswerFor([filed], " when ARE the windows of the extension delivered?")?.id,
+          stored: m.parseStoredLive(stored).map((item) => [item.id, item.live]),
+          bad: [
+            m.parseStoredLive("{{"), m.parseStoredLive('{{"a":1}}'), m.parseStoredLive(null),
+          ],
+        }}))
+        """
+    )
+    assert isinstance(result, dict)
+    assert result["phone"] == {"open": False, "answer": "a", "scroll": 4, "resume": False}
+    assert result["desktop"] is True
+    assert result["liveNotice"] is True
+    assert result["allExamples"] == 3
+    assert result["filedExamples"] == ["When are the windows of the extension delivered?"]
+    assert result["none"] == []
+    assert result["match"] == "f"
+    assert result["stored"] == [[LIVE_ANSWER["id"], True], ["b", True]]
+    assert result["bad"] == [[], [], []]

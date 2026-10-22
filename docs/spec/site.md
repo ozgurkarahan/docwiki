@@ -58,7 +58,8 @@ outside an allowlist (the repository URL and the site's own host), and the injec
 [ADR 0008](../adr/0008-one-experience-live-agent-in-the-wiki.md).)
 
 - A layout component on every page except `404` renders a floating button and a non-modal drawer
-  (a panel on wide screens, a full-screen sheet on phones). The button is hidden until the client
+  (a panel on wide screens; on phones, below 800 px, a bottom sheet: full width, about 90% of the
+  height, with a 44 px close button). The button is hidden until the client
   knows there is something in it: the build has filed answers (`docwiki-site.json` `answers`, the
   panel's `data-filed-answers`), or the portal reports a live agent (`GET /api/ask/status` returns
   `{"enabled": true}`). A build with no filed answers on a static host (no `/api`) shows nothing.
@@ -66,15 +67,25 @@ outside an allowlist (the repository URL and the site's own host), and the injec
   list (those about the current page first), the selected answer with numbered citations,
   provenance badges, "How the agent worked" and the provenance line. A citation opens the evidence
   beside the drawer on wide screens; below the desktop breakpoint the drawer collapses to "Back to
-  the answer". State in `sessionStorage`.
+  the answer". State in `sessionStorage`; on a phone the drawer is never restored open on a page
+  load (the selected answer is kept for the next opening).
+- **Answer view**: the sources are numbered 1..n in the order the answer first cites them and the
+  inline markers are renumbered to match (`renumberCitations`), shown as separate "[1] [3]". "Pages
+  in the wiki" (the wiki pages of the cited sources) comes above "Sources".
+- **Empty drawer**: three example questions the sample corpus answers (`EXAMPLE_QUESTIONS`) are
+  buttons. With live ask they fill the question box and ask it; otherwise only the examples with a
+  filed answer are offered and a click opens that answer.
 - **Live ask** (only when enabled): above the question list a labelled textarea (at most 500
   characters) and an "Ask" button. The client posts `{"question"}` to `/api/ask`, polls
   `/api/ask/{job_id}` every 2 s and shows "The Researcher is reading the wiki… n s" in a polite live
   region while the form is disabled. The result goes through the same answer view, marked live:
-  the banner "Live answer from the Researcher agent — not reviewed by the owner.", no "Open as a
+  the banner "Live answer from the Researcher agent — not reviewed by the owner." in neutral
+  colours (information, not an alarm), no "Open as a
   page", and for an `unverified` answer no citation links plus the portal's message. A limit (429),
   an error or a timeout shows the portal's message and keeps the filed list. Live answers of the
-  page load are listed under "Your live questions"; they are never persisted.
+  session are listed under "Your live questions" and kept in `sessionStorage` (parsed back with
+  the same validation as the live JSON), so the last answer survives page navigation; they are
+  never sent anywhere or written to the wiki.
 - Everything is rendered with DOM nodes and `textContent`; every request goes to the site's own
   origin (CSP `connect-src 'self'`). The parsing and checks of the live JSON are pure helpers in
   `docwiki-text.ts`, tested with Node.

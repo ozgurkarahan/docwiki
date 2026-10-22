@@ -539,6 +539,7 @@ $askDrawerWidth: 440px;
   @media all and ($mobile) {
     right: max(1rem, env(safe-area-inset-right));
     bottom: max(1rem, env(safe-area-inset-bottom));
+    min-height: 2.75rem;
 
     // Not over Quartz's full-screen explorer menu.
     html.mobile-no-scroll & {
@@ -548,6 +549,18 @@ $askDrawerWidth: 440px;
 }
 
 // Room for the floating button under the last line of the page.
+@keyframes docwiki-ask-sheet-in {
+  from {
+    transform: translateY(2rem);
+    opacity: 0;
+  }
+
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
 .page:has(.docwiki-ask-fab:not([hidden])) footer.docwiki-footer {
   margin-bottom: 5.5rem;
 }
@@ -588,11 +601,21 @@ $askDrawerWidth: 440px;
     display: none;
   }
 
+  // Phones: a bottom sheet (full width, about 90% of the height) over the page.
   @media all and ($mobile) {
+    top: auto;
     left: 0;
     width: auto;
+    height: 90vh;
+    height: 90dvh;
     border-left: 0;
-    box-shadow: none;
+    border-top: 1px solid var(--lightgray);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -18px 42px -26px var(--dw-shadow);
+  }
+
+  @media all and ($mobile) and (prefers-reduced-motion: no-preference) {
+    animation: docwiki-ask-sheet-in 0.2s ease-out;
   }
 
   // Quartz sets a rem line height on every paragraph and list item.
@@ -620,7 +643,7 @@ $askDrawerWidth: 440px;
     display: flex;
     align-items: flex-start;
     gap: 0.75rem;
-    padding: max(1rem, env(safe-area-inset-top)) 0.85rem 0.85rem 1.25rem;
+    padding: 1rem 0.85rem 0.85rem 1.25rem;
     border-bottom: 1px solid var(--lightgray);
   }
 
@@ -670,6 +693,13 @@ $askDrawerWidth: 440px;
     &:hover {
       border-color: var(--lightgray);
       background: var(--highlight);
+    }
+
+    @media all and ($mobile) {
+      width: 2.75rem;
+      height: 2.75rem;
+      margin: -0.5rem -0.2rem 0 0;
+      border-color: var(--lightgray);
     }
   }
 
@@ -759,6 +789,10 @@ $askDrawerWidth: 440px;
       border-color: var(--secondary);
       background: var(--highlight);
     }
+
+    @media all and ($mobile) {
+      min-height: 2.75rem;
+    }
   }
 
   // The live question: a labelled textarea, "Ask" and a status line above the question list.
@@ -802,6 +836,9 @@ $askDrawerWidth: 440px;
 
   .docwiki-ask-submit {
     margin: 0.55rem 0 0;
+    @media all and ($mobile) {
+      min-height: 2.75rem;
+    }
     padding: 0.4rem 1.1rem;
     border: 1px solid var(--secondary);
     border-radius: 6px;
@@ -871,6 +908,10 @@ $askDrawerWidth: 440px;
     font-weight: $semiBoldWeight;
     cursor: pointer;
 
+    @media all and ($mobile) {
+      min-height: 2.75rem;
+    }
+
     &:hover {
       background: var(--highlight);
     }
@@ -912,6 +953,13 @@ $askDrawerWidth: 440px;
     overflow-wrap: anywhere;
   }
 
+  // The live notice is information, not an alarm: neutral colours (AA contrast in both themes).
+  .docwiki-ask-banner--live {
+    border-color: var(--dw-paraphrase-border);
+    background: var(--dw-paraphrase-bg);
+    color: var(--dw-paraphrase-fg);
+  }
+
   .docwiki-ask-text p {
     margin: 0 0 0.75rem;
     color: var(--darkgray);
@@ -922,9 +970,13 @@ $askDrawerWidth: 440px;
     margin-left: 0.1em;
     font-size: 0.72em;
     line-height: 0;
+    white-space: nowrap;
 
     a {
-      padding: 0 0.2em;
+      display: inline-block;
+      min-width: 1.5em;
+      padding: 0.15em 0.25em;
+      text-align: center;
       border-radius: 3px;
       background: var(--highlight);
     }
