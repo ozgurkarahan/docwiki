@@ -95,7 +95,9 @@ For every cited locator the build writes `evidence/<source_id>/<locator_key>.md`
 
 ```
 evidence/<source_id>/
-  index.md                     # source evidence index: title, original link, locators used
+  index.md                     # the document page: title, wiki page and original links, page
+                               # images (only with a published original), full text with tables,
+                               # then the cited locators (v1.7, ADR 0010)
   original.<ext>               # public sample builds only: copy of the original file
   p0003.md                     # PDF page sidecar
   img/p0003.png                # rendered page image (150 dpi) with highlight boxes for cited bboxes

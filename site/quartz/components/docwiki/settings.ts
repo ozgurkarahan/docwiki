@@ -9,6 +9,17 @@ export interface DocwikiSource {
   original: string | null
   /** `current`, `superseded` or `withdrawn` (catalog page status). */
   status?: string | null
+  /** Content slug of the document page (`evidence/<source_id>/index`): pages, full text. */
+  document?: string | null
+  docType?: string | null
+  docNumber?: string | null
+  revision?: string | null
+  /** ISO date from the file name, when it has one. */
+  date?: string | null
+  /** File extension of the original (`pdf`, `docx`, …). */
+  format?: string | null
+  /** Title of the revision that replaces this one. */
+  supersededBy?: string | null
 }
 
 export interface DocwikiQuality {

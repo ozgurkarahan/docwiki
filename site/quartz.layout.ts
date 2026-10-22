@@ -59,6 +59,8 @@ export const defaultContentPageLayout: PageLayout = {
     // Home page only: how the release was built, then a collapsible "About DocWiki".
     DocWiki.About(),
     DocWiki.EvidenceHeader(),
+    // Source pages: type, n°, indice, date, current or replaced, the document and the original.
+    DocWiki.SourceHeader(),
     Component.TagList(),
   ],
   left: [Component.PageTitle(), Component.MobileOnly(Component.Spacer()), toolbar, explorer],

@@ -8,6 +8,7 @@ import Footer from "./Footer"
 import Head from "./Head"
 import OwnerBox from "./OwnerBox"
 import Process from "./Process"
+import SourceHeader from "./SourceHeader"
 import Tabs from "./Tabs"
 
 export {
@@ -21,5 +22,6 @@ export {
   Head,
   OwnerBox,
   Process,
+  SourceHeader,
   Tabs,
 }

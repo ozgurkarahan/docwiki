@@ -177,7 +177,16 @@ def test_site_settings_from_the_mock_release() -> None:
         "title": "Planning and purchase tracking, indice B",
         "original": None,
         "status": "current",
+        "document": "evidence/src-86eabe3d6d0d/index",
+        "docType": "schedule",
+        "docNumber": "PLN-2026-003",
+        "revision": "B",
+        "date": None,
+        "format": "xlsx",
+        "supersededBy": None,
     }
+    plan_a = next(item for item in settings["sources"].values() if item["revision"] == "A")
+    assert plan_a["supersededBy"] == "Planning and purchase tracking, indice B"
     assert len(settings["sources"]) == 3
     assert settings["answers"] == 1  # queries/2026-03-31-window-delivery-date.md
     custom = site_settings(
