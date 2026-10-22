@@ -51,6 +51,11 @@ export default (() => {
     )
   }
 
+  // Quartz's explorer scrolls its active entry into view on a first visit, which scrolled the
+  // whole page down past the tabs; a saved explorer position (here: the top) skips that.
+  Tabs.beforeDOMLoaded = `try {
+  if (!sessionStorage.getItem("explorerScrollTop")) sessionStorage.setItem("explorerScrollTop", "0")
+} catch (e) {}`
   Tabs.afterDOMLoaded = script
 
   return Tabs

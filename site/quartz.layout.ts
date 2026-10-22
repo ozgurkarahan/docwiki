@@ -14,8 +14,10 @@ const graph = Component.ConditionalRender({
 
 const explorer = Component.Explorer({
   title: "Browse",
-  // Evidence sidecars are reached from footnotes; tag pages from the tag list.
-  filterFn: (node) => node.slugSegment !== "tags" && node.slugSegment !== "evidence",
+  // Evidence sidecars are reached from footnotes; tag pages from the tag list; Documents and
+  // Pipeline from the tabs.
+  filterFn: (node) =>
+    !["tags", "evidence", "documents", "pipeline"].includes(node.slugSegment ?? ""),
   // Folders without an index page show their path segment: `_meta` → "Meta", `queries` → "Queries".
   mapFn: (node) => {
     if (node.isFolder && node.data === null) {
