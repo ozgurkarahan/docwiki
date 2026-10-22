@@ -561,30 +561,142 @@ def _sidecar(
     return EvidencePage(path=path, frontmatter=frontmatter, body=body), asset_paths, primary
 
 
-def _index(ctx: _Context, entries: Sequence[tuple[str, str, str]]) -> EvidencePage:
+MAX_RENDITION_PAGES = 30
+"""Page images shown on a document page; longer documents link to the original for the rest."""
+_HEADING_MARKS = {1: "###", 2: "####"}
+
+
+def _page_numbers(doc: ExtractedDoc) -> list[int]:
+    """Pages of a paged source (PDF, scan, image), from its metadata or its blocks."""
+    pages = {
+        block.locator.page for block in doc.blocks if isinstance(block.locator, PdfPageLocator)
+    }
+    if doc.metadata.page_count:
+        pages |= set(range(1, doc.metadata.page_count + 1))
+    if any(isinstance(block.locator, ImageRegionLocator) for block in doc.blocks):
+        pages.add(1)
+    return sorted(pages)
+
+
+def _page_images(ctx: _Context) -> tuple[list[str], list[tuple[str, bytes]]]:
+    """The pages of a paged document as images, only when its original is published: they show
+    nothing the original does not (a contained source shows its cited pages only)."""
+    if not ctx.original:
+        return [], []
+    lines: list[str] = []
+    assets: list[tuple[str, bytes]] = []
+    pages = _page_numbers(ctx.doc)
+    for page in pages[:MAX_RENDITION_PAGES]:
+        image = ctx.images.get(page)
+        if image is None:
+            continue
+        name = f"img/page-{page:04d}.png"
+        assets.append((name, image))
+        lines += [f"![Page {page} of {escape_text(ctx.title)}]({name})", ""]
+    if not assets:
+        return [], []
+    if len(pages) > MAX_RENDITION_PAGES:
+        lines += [f"Pages {MAX_RENDITION_PAGES + 1} and later: see the original file.", ""]
+    return ["## Pages", "", *lines], [
+        (f"{EVIDENCE_MOUNT}/{ctx.doc.source_id}/{name}", data) for name, data in assets
+    ]
+
+
+def _full_table(ctx: _Context, table: Table) -> list[str]:
+    guard = ctx.guard
+    lines = _md_table([guard(column) or " " for column in table.columns], None)
+    for row in table.rows[:MAX_SIDECAR_ROWS]:
+        lines.append("| " + " | ".join(table_cell(guard(cell)) for cell in row.cells) + " |")
+    if len(table.rows) > MAX_SIDECAR_ROWS:
+        lines += ["", f"{len(table.rows) - MAX_SIDECAR_ROWS} more rows are not shown."]
+    return [*lines, ""]
+
+
+def _rendition(ctx: _Context) -> list[str]:
+    """The whole document as text, in reading order: headings, paragraphs, e-mail headers, OCR
+    lines, figure descriptions (labelled as generated) and every table as a table. Rendered with
+    the same guard as the sidecars: sentences addressed to AI systems and canaries are replaced,
+    and blocks withheld by containment keep their placeholder."""
+    guard = ctx.guard
+    lines = ["## Full text", ""]
+    shown_tables: set[str] = set()
+    page: int | None = None
+    paged = len(_page_numbers(ctx.doc)) > 1
+    for block in ctx.doc.blocks:
+        locator = block.locator
+        if paged and isinstance(locator, PdfPageLocator) and locator.page != page:
+            page = locator.page
+            lines += [f"**Page {page}**", ""]
+        if block.kind == "table-ref":
+            table = _table_for(ctx.doc, locator)
+            if table is not None:
+                if table.id not in shown_tables:
+                    shown_tables.add(table.id)
+                    lines += _full_table(ctx, table)
+                continue
+        text = guard(block.text).strip()
+        if not text:
+            continue
+        if block.kind == "heading":
+            mark = _HEADING_MARKS.get(block.level or 1, "#####")
+            lines += [f"{mark} {escape_text(one_line(text))}", ""]
+        elif block.kind == "figure-ref":
+            lines += [f"*Figure (generated description, not verified):* {escape_text(text)}", ""]
+        else:
+            paragraph = [escape_text(line) for line in text.splitlines() if line.strip()]
+            if block.kind == "note":
+                paragraph.insert(0, "*Speaker notes:*")
+            lines += ["\\\n".join(paragraph), ""]
+    for table in ctx.doc.tables:  # tables without a row block of their own
+        if table.id not in shown_tables:
+            lines += _full_table(ctx, table)
+    if lines == ["## Full text", ""]:
+        lines.append("No text was extracted from this document.")
+        lines.append("")
+    return lines
+
+
+def _index(
+    ctx: _Context, entries: Sequence[tuple[str, str, str]]
+) -> tuple[EvidencePage, list[tuple[str, bytes]]]:
+    """The document page (slice B of ADR 0010's Documents tab): the original, its pages as
+    images, its full text, then the passages the wiki cites."""
     sid = ctx.doc.source_id
     path = evidence_index_path(sid)
     link = relative_link(path, ctx.source_page_path)
-    source = f"Source page: [{escape_text(ctx.title)}]({link})"
+    source = f"Wiki page: [{escape_text(ctx.title)}]({link})"
     if ctx.original:
         source += f" · Original file: [{ctx.original}]({ctx.original})"
-    title = f"Evidence for {ctx.title}"
-    lines = [f"# {escape_text(title)}", "", source, "", "## Locators", ""]
+    title = ctx.title
+    pages, assets = _page_images(ctx)
+    lines = [
+        f"# {escape_text(title)}",
+        "",
+        source,
+        "",
+        "The document as it was received, read by the pipeline: its pages, its full text, then "
+        "the passages the wiki cites.",
+        "",
+        *pages,
+        *_rendition(ctx),
+        "## Cited passages",
+        "",
+    ]
     if entries:
         lines += [
             f"- [{escape_text(label)}]({key}.md) · {badge_for(provenance)}"
             for key, label, provenance in entries
         ]
     else:
-        lines.append("No locator of this source is cited.")
+        lines.append("No passage of this document is cited.")
     body = sanitize_markdown("\n".join(lines) + "\n", allow_markers=False)[0]
     frontmatter = EvidenceIndexFrontmatter(
         id=f"evidence:{sid}",
-        title=plain_text(title) or f"Evidence for {sid}",
+        title=plain_text(title) or f"Document {sid}",
         source_id=sid,
         sensitivity=ctx.sensitivity,
     )
-    return EvidencePage(path=path, frontmatter=frontmatter, body=body)
+    return EvidencePage(path=path, frontmatter=frontmatter, body=body), assets
 
 
 def _original_name(source_path: str) -> str:
@@ -722,7 +834,10 @@ def build_evidence(
         frontmatter = page.frontmatter
         assert isinstance(frontmatter, EvidenceFrontmatter)
         entries.append((key, locator_label(frontmatter.locator), primary))
-    written.add(writer.write_evidence(_index(ctx, entries)))
+    index, page_assets = _index(ctx, entries)
+    for rel_path, data in page_assets:
+        written.add(writer.write_bytes(rel_path, data))
+    written.add(writer.write_evidence(index))
     if guard.neutralized or guard.redacted:
         logger.warning(
             "evidence %s: %d sentence(s) addressed to AI systems replaced, %d canary string(s) "

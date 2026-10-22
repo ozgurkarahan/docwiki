@@ -25,7 +25,7 @@ import subprocess
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Literal, Protocol
 
 from docwiki.contracts.catalog import Catalog
@@ -329,6 +329,7 @@ def site_settings(
             gates = manifest.gates if gates is None else gates
             run_id = manifest.run_id if run_id is None else run_id
     statuses = Counter(source.status for source in release.catalog.sources)
+    titles = {page.id: page.title for page in release.catalog.pages if page.type == "source"}
     sources: dict[str, dict[str, str | None]] = {}
     for page in release.catalog.pages:
         if page.type != "source":
@@ -338,11 +339,25 @@ def site_settings(
             for path in (release.evidence_dir / page.id).glob("original.*")
             if path.is_file()
         )
+        meta = _source_meta(release, page.path)
+        source_path = _text(meta.get("source_path"))
+        later =[titles[sid] for sid in meta.get("superseded_by") or [] if sid in titles]
+        has_document = (release.evidence_dir / page.id / "index.md").is_file()
         sources[page.id] = {
             "page": page.path.removesuffix(".md"),
             "title": page.title,
             "original": f"{EVIDENCE_MOUNT}/{page.id}/{originals[0]}" if originals else None,
             "status": page.status,
+            # The documents register (ADR 0010, slice B).
+            "document": f"{EVIDENCE_MOUNT}/{page.id}/index" if has_document else None,
+            "docType": _text(meta.get("doc_type")),
+            "docNumber": _text(meta.get("doc_number")),
+            "revision": _text(meta.get("revision")),
+            "date": _path_date(source_path),
+            "format": PurePosixPath(source_path).suffix.lstrip(".").lower() or None
+            if source_path
+            else None,
+            "supersededBy": later[0] if later else None,
         }
     return {
         "schema": 1,
@@ -366,6 +381,28 @@ def site_settings(
         "answers": len(build_answers(release)["answers"]) if answers is None else answers,
         "steps": [{"name": name, "text": text} for name, text in STAGES],
     }
+
+
+_PATH_DATE_RE = re.compile(r"(?<!\d)(20\d{2}-[01]\d-[0-3]\d)(?!\d)")
+
+
+def _text(value: Any) -> str | None:
+    return value.strip() or None if isinstance(value, str) else None
+
+
+def _path_date(source_path: str | None) -> str | None:
+    """The document's date when its file name carries one (``2026-03-24_compte-rendu…``)."""
+    found = _PATH_DATE_RE.search(source_path or "")
+    return found.group(1) if found else None
+
+
+def _source_meta(release: ReleaseView, page_path: str) -> dict[str, Any]:
+    """Frontmatter of a source page (empty when unreadable: the register just shows less)."""
+    try:
+        meta, _ = read_frontmatter((release.wiki_dir / page_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return meta if isinstance(meta, dict) else {}
 
 
 def _skip_hidden(_folder: str, names: list[str]) -> list[str]:

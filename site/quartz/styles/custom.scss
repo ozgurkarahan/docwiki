@@ -1850,11 +1850,35 @@ a.docwiki-sign-in {
   }
 }
 
-.docwiki-documents-title {
-  flex: 1 1 16rem;
+.docwiki-documents-main {
+  flex: 1 1 18rem;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.docwiki-documents-title {
   font-weight: $semiBoldWeight;
   overflow-wrap: anywhere;
+}
+
+.docwiki-documents-facts {
+  color: var(--gray);
+  font-size: 0.82rem;
+}
+
+.docwiki-documents-none {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  color: var(--gray);
+  font-size: 0.82rem;
+}
+
+.docwiki-documents-item > .docwiki-status {
+  white-space: normal;
+  max-width: 100%;
 }
 
 .docwiki-documents-links {
@@ -1881,6 +1905,51 @@ a.docwiki-sign-in {
 // The owner's sign-in button fills this after load (Sign in is 44 px plus its margin).
 .docwiki-owner-box .docwiki-process-owner-area:empty {
   min-height: 3.6rem;
+}
+
+// ----- Source page header card (SourceHeader.tsx) -----
+
+.docwiki-source-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.8rem;
+  margin: 0.6rem 0 1rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--lightgray);
+  border-radius: 6px;
+  background: var(--light);
+
+  > .docwiki-status {
+    white-space: normal;
+  }
+}
+
+.docwiki-source-facts {
+  color: var(--darkgray);
+  font-size: 0.88rem;
+}
+
+.docwiki-source-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-left: auto;
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 0 0.6rem;
+    border: 1px solid var(--lightgray);
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+}
+
+// The site banner already says the sample is fictional: the page-level stamp is not repeated.
+body:has(.docwiki-banner) article blockquote.docwiki-notice--fictional {
+  display: none;
 }
 
 // ----- Footer -----
