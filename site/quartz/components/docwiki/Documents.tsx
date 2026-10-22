@@ -6,7 +6,7 @@
 import { FullSlug, resolveRelative } from "../../util/path"
 import { classNames } from "../../util/lang"
 import { QuartzComponent, QuartzComponentConstructor, QuartzComponentProps } from "../types"
-import { DocwikiSource, settings } from "./settings"
+import { DocwikiSource, humanDate, revisionStatus, settings } from "./settings"
 
 /** Same slug as `DOCUMENTS_SLUG` in src/docwiki/site/process_page.py. */
 const DOCUMENTS_SLUG = "documents"
@@ -24,14 +24,6 @@ const FORMATS: Record<string, string> = {
   txt: "Text",
   md: "Text",
   vtt: "Transcript",
-}
-
-const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "UTC" })
-
-function humanDate(iso: string | null | undefined): string | null {
-  if (!iso) return null
-  const date = new Date(`${iso}T00:00:00Z`)
-  return Number.isNaN(date.getTime()) ? null : dateFormat.format(date)
 }
 
 function typeLabel(source: DocwikiSource): string | null {
@@ -55,49 +47,47 @@ export default (() => {
     if (fileData.slug !== DOCUMENTS_SLUG) return null
     const slug = fileData.slug as FullSlug
     const link = (target: string) => resolveRelative(slug, target as FullSlug)
-    const sources = Object.values(settings.sources).sort(
-      (a, b) =>
-        (a.date ?? "9999").localeCompare(b.date ?? "9999") || a.title.localeCompare(b.title, "fr"),
-    )
-    const current = sources.filter((source) => source.status !== "superseded").length
+    // By type, then n° and indice (so revisions sit together), then date.
+    const key = (source: DocwikiSource) =>
+      [source.docType ?? "~", source.docNumber ?? "~", source.revision ?? "", source.date ?? ""]
+    const sources = Object.values(settings.sources).sort((a, b) => {
+      const [x, y] = [key(a), key(b)]
+      for (let i = 0; i < x.length; i++) {
+        const order = x[i].localeCompare(y[i])
+        if (order !== 0) return order
+      }
+      return a.title.localeCompare(b.title, "fr")
+    })
+    const superseded = sources.filter((source) => source.status === "superseded").length
+    const asOf = humanDate(settings.releaseDate)
     return (
       <section class={classNames(displayClass, "docwiki-documents")} aria-label="Documents">
         <p class="docwiki-documents-count">
-          {sources.length} document{sources.length === 1 ? "" : "s"} in this release ·{" "}
-          {current} current
-          {sources.length > current ? ` · ${sources.length - current} superseded` : ""}
+          {sources.length} document{sources.length === 1 ? "" : "s"} in this release
+          {superseded > 0 ? ` · ${superseded} superseded by a later indice` : ""}
+          {asOf ? ` · as of ${asOf}` : ""}
         </p>
         <ol class="docwiki-documents-list">
           {sources.map((source) => {
-            const superseded = source.status === "superseded"
+            const status = revisionStatus(source)
             return (
               <li class="docwiki-documents-item">
                 <div class="docwiki-documents-main">
-                  {source.document ? (
-                    <a class="docwiki-documents-title" href={link(source.document)}>
-                      {source.title}
-                    </a>
-                  ) : (
-                    <span class="docwiki-documents-title">{source.title}</span>
-                  )}
+                  <span class="docwiki-documents-title">{source.title}</span>
                   <span class="docwiki-documents-facts">{facts(source).join(" · ")}</span>
                 </div>
-                <span
-                  class={`docwiki-status docwiki-status--${superseded ? "superseded" : "in_wiki"}`}
-                >
-                  <span class="docwiki-status-shape" aria-hidden="true">
-                    {superseded ? "◑" : "●"}
+                {status && (
+                  <span
+                    class={`docwiki-status docwiki-status--${status.state}`}
+                    title={status.title}
+                  >
+                    <span class="docwiki-status-shape" aria-hidden="true">
+                      {status.state === "superseded" ? "◑" : "●"}
+                    </span>
+                    <span class="docwiki-status-word">{status.words}</span>
                   </span>
-                  <span class="docwiki-status-word">
-                    {superseded
-                      ? source.supersededBy
-                        ? `Superseded by ${source.supersededBy}`
-                        : "Superseded"
-                      : "Current"}
-                  </span>
-                </span>
+                )}
                 <span class="docwiki-documents-links">
-                  {source.document && <a href={link(source.document)}>View</a>}
                   {source.original ? (
                     source.format === "eml" ? (
                       <a
@@ -120,8 +110,14 @@ export default (() => {
                       </a>
                     )
                   ) : (
-                    <span class="docwiki-documents-none">Original not published</span>
+                    <span
+                      class="docwiki-documents-none"
+                      title="Originals are published only for the public fictional sample, and never for a document the safety checks flagged (its full text is shown with the flagged passage withheld)."
+                    >
+                      Original not published
+                    </span>
                   )}
+                  {source.document && <a href={link(source.document)}>View document</a>}
                   {source.page && <a href={link(source.page)}>Wiki page</a>}
                 </span>
               </li>

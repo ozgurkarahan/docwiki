@@ -1907,6 +1907,16 @@ a.docwiki-sign-in {
   min-height: 3.6rem;
 }
 
+// A document page is an evidence folder's index: Quartz would list its passages again, as a folder.
+body[data-slug^="evidence/"] .page-listing {
+  display: none;
+}
+
+article .table-container[tabindex]:focus-visible {
+  outline: 2px solid var(--secondary);
+  outline-offset: 2px;
+}
+
 // ----- Source page header card (SourceHeader.tsx) -----
 
 .docwiki-source-header {
@@ -1928,6 +1938,11 @@ a.docwiki-sign-in {
 .docwiki-source-facts {
   color: var(--darkgray);
   font-size: 0.88rem;
+}
+
+.docwiki-source-added {
+  color: var(--gray);
+  font-size: 0.82rem;
 }
 
 .docwiki-source-links {

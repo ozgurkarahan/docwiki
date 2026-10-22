@@ -189,8 +189,22 @@ document.addEventListener("visibilitychange", () => {
   else void poll()
 })
 
+/** A table wider than the page scrolls in its own box: make that box reachable by keyboard. */
+function scrollableTables(): void {
+  for (const box of document.querySelectorAll<HTMLElement>("article .table-container")) {
+    if (box.scrollWidth <= box.clientWidth + 1) continue
+    box.tabIndex = 0
+    box.setAttribute("role", "region")
+    const heading = box.closest("article")
+      ? (box.previousElementSibling?.textContent ?? "").trim().slice(0, 60)
+      : ""
+    box.setAttribute("aria-label", heading ? `Table: ${heading}` : "Table")
+  }
+}
+
 document.addEventListener("nav", () => {
   render()
+  scrollableTables()
   if (!polling) {
     polling = true
     void poll()

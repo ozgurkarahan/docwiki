@@ -14,12 +14,13 @@ export interface DocwikiSource {
   docType?: string | null
   docNumber?: string | null
   revision?: string | null
-  /** ISO date from the file name, when it has one. */
+  /** The document's own date (its extraction, else its file name), ISO. */
   date?: string | null
   /** File extension of the original (`pdf`, `docx`, …). */
   format?: string | null
-  /** Title of the revision that replaces this one. */
+  /** Title and indice of the revision that replaces this one. */
   supersededBy?: string | null
+  supersededByRevision?: string | null
 }
 
 export interface DocwikiQuality {
@@ -60,3 +61,33 @@ export interface DocwikiSettings {
 }
 
 export const settings = raw as DocwikiSettings
+
+/**
+ * Current or replaced: only for documents that have revisions (a number or an indice); a photo, a
+ * delivery note or an e-mail is neither. `null` when there is nothing to say.
+ */
+export function revisionStatus(
+  source: DocwikiSource | undefined,
+): { state: "in_wiki" | "superseded"; words: string; title?: string } | null {
+  if (!source) return null
+  if (source.status === "superseded") {
+    const by = source.supersededByRevision
+      ? `indice ${source.supersededByRevision}`
+      : source.supersededBy
+    return by
+      ? { state: "superseded", words: `Superseded by ${by}`, title: source.supersededBy ?? undefined }
+      : { state: "superseded", words: "Superseded" }
+  }
+  if (source.docNumber || source.revision) return { state: "in_wiki", words: "Current" }
+  return null
+}
+
+const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "UTC" })
+
+/** "20 Jan 2026" from an ISO date. */
+export function humanDate(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const date = new Date(`${iso.slice(0, 10)}T00:00:00Z`)
+  return Number.isNaN(date.getTime()) ? null : dateFormat.format(date)
+}
+
