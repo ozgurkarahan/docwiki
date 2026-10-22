@@ -10,5 +10,6 @@
 | [0006](0006-immutable-releases.md) | Immutable releases and an atomic pointer |
 | [0007](0007-answers-in-the-wiki.md) | Answers in the wiki: filed Researcher answers and an "Ask this wiki" panel (superseded in part by 0008) |
 | [0008](0008-one-experience-live-agent-in-the-wiki.md) | One experience: the live agent in the wiki |
+| [0009](0009-one-site.md) | One site: the process, the uploads and the agent in the wiki |
 
 The full decision log with rationale is in [`docs/spec/README.md`](../spec/README.md#4-decision-log-v1).

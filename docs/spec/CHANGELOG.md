@@ -101,3 +101,15 @@ owner decision of 2026-10-21 in `AGENTS.md`).
 | Portal | New `/api/ask/status`, `/api/ask` and `/api/ask/{job_id}` (`docwiki.portal.live_ask`), on only with `DOCWIKI_LIVE_ASK=1` and `DOCWIKI_FOUNDRY_PROJECT_ENDPOINT`. A live answer is `verified` only when every `[n]` of its text is an evidence sidecar path whose page exists in the served site; otherwise `unverified`, shown without citations. | Documents and model output are untrusted; the gate is deterministic. |
 | Agents client | `AgentClient.ask(..., headers=...)` passes extra HTTP headers on every Responses API call of a question (the gateway reads `X-Visitor-IP`). | Per-visitor limits at the gateway. |
 | Infra | Optional Bicep parameters `enableLiveAsk` and `liveAskEndpoint` (`DOCWIKI_ENABLE_LIVE_ASK`, `DOCWIKI_LIVE_ASK_ENDPOINT`) give the portal `DOCWIKI_LIVE_ASK=1` and `DOCWIKI_FOUNDRY_PROJECT_ENDPOINT`; the policy template `infra/apim/docwiki-live-ask-policy.xml` and [docs/live-ask.md](../live-ask.md) describe the gateway. | The gateway is not created by DocWiki and never committed. |
+
+## v1.6
+
+One site: the process, the owner's uploads and the agent in the wiki ([ADR 0009](../adr/0009-one-site.md),
+owner decision of 2026-10-22 in `AGENTS.md`).
+
+| Area | Change | Why |
+|---|---|---|
+| Site | A generated `how-it-works` page explains the pipeline and shows, live, each document's status, the queue, the release and the last runs (`GET /api/process`); signed in, the owner adds documents there. | Show the process; one website. |
+| Portal | New `GET /api/process` (public, read-only), `GET /api/owner/me` and `PUT /api/owner/documents/{path}` (owner only: platform sign-in, `DOCWIKI_PORTAL_OWNERS` allow-list, `X-DocWiki-Owner` header, same origin, no POST). Live answers list the wiki pages of their cited sources. | Owner uploads in the same site; Container Apps built-in auth refuses browser POSTs that carry its session cookie. |
+| Infra | The portal's built-in authentication runs in `AllowAnonymous` mode with `/api/ask` excluded; the portal identity reads `raw/`, `work/` and peeks the ingest queue, and writes `raw/` (no delete) when owners are set. The Studio app, image, identity, roles and sign-in registration are removed. | One app. |
+| Answers | Asking never writes to the wiki in this version: no "File to wiki" in a browser. `docwiki file-answer` (CLI) still files a reviewed answer. | Owner decision. |
