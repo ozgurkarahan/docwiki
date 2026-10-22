@@ -32,8 +32,13 @@ become a cited wiki that is served on Azure Container Apps, with Microsoft Found
    `samples/wiki`. Only push `main` or branches created from it: local branches or worktrees whose
    history predates the public snapshot (the old private repository) must never be pushed here.
 4. **GlobalStandard model deployments are the default.** This PoC has no data-residency requirement.
-5. **Small, reviewable steps.** Prefer short slices and small pull requests over long runs.
-6. **Decisions live here.** When the owner makes a new decision, record it in this section (and in
+5. **The standalone Studio is retired (2026-10-22).** On Azure its built-in sign-in refuses every
+   browser POST, so asking, filing and uploading never worked there. Do not fix or extend it: the
+   owner's powers move into the wiki drawer (ADR 0009, to be written), and the Studio app, image
+   and docs are then removed in their own pull request. Before designing the owner sign-in, prove
+   that a signed-in POST reaches the portal app.
+6. **Small, reviewable steps.** Prefer short slices and small pull requests over long runs.
+7. **Decisions live here.** When the owner makes a new decision, record it in this section (and in
    an ADR when it changes the design), so every coding agent, including GitHub Copilot sessions,
    works from the same facts.
 
