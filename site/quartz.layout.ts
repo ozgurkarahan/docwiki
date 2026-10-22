@@ -45,19 +45,22 @@ export const sharedPageComponents: SharedLayout = {
   footer: DocWiki.Footer(),
 }
 
+// Dates and reading time mean nothing on the Documents and Pipeline tabs, and on a source or
+// document page the compile date would read as the document's own date (its card has that).
+const contentMeta = Component.ConditionalRender({
+  component: Component.ContentMeta(),
+  condition: ({ fileData }) =>
+    fileData.slug !== "documents" &&
+    fileData.slug !== "pipeline" &&
+    fileData.frontmatter?.type !== "source" &&
+    fileData.frontmatter?.type !== "evidence-index",
+})
+
 export const defaultContentPageLayout: PageLayout = {
   beforeBody: [
     DocWiki.Breadcrumbs({ rootName: "Wiki" }),
     Component.ArticleTitle(),
-    // Dates and reading time mean nothing on the Documents and Pipeline tabs.
-    Component.ConditionalRender({
-      component: Component.ContentMeta(),
-      condition: ({ fileData }) =>
-        fileData.slug !== "documents" &&
-        fileData.slug !== "pipeline" &&
-        fileData.frontmatter?.type !== "source" &&
-        fileData.frontmatter?.type !== "evidence-index",
-    }),
+    contentMeta,
     // The pipeline page only: the owner's sign-in and upload form, before the text.
     DocWiki.OwnerBox(),
     // Home page only: how the release was built, then a collapsible "About DocWiki".
@@ -75,7 +78,9 @@ export const defaultListPageLayout: PageLayout = {
   beforeBody: [
     DocWiki.Breadcrumbs({ rootName: "Wiki" }),
     Component.ArticleTitle(),
-    Component.ContentMeta(),
+    contentMeta,
+    // A document page (evidence/<source_id>/index) is a folder page for Quartz: same card.
+    DocWiki.SourceHeader(),
   ],
   left: [Component.PageTitle(), Component.MobileOnly(Component.Spacer()), toolbar, explorer],
   right: [],
