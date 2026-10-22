@@ -1394,7 +1394,18 @@ section.docwiki-owner-box {
 
   .docwiki-process-stage-status,
   .docwiki-process-stage-time {
-    color: var(--gray);
+    color: var(--darkgray);
+  }
+
+  .docwiki-process-stage[data-status="running"] .docwiki-process-stage-status,
+  .docwiki-process-stage[data-status="pending"] .docwiki-process-stage-status {
+    color: var(--dw-st-processing);
+    font-weight: $semiBoldWeight;
+  }
+
+  .docwiki-process-stage[data-status="failed"] .docwiki-process-stage-status {
+    color: var(--dw-st-failed);
+    font-weight: $semiBoldWeight;
   }
 
   // Documents: the table scrolls inside its own box, never the page.
@@ -1676,14 +1687,46 @@ header:has(.docwiki-tabbar) {
   margin: 1rem 0 0.5rem;
 }
 
+// One row on wide screens: tabs, chip, Sign in. On phones: tabs and Sign in, then the chip. The
+// chip and Sign in are in the page from the start and only made visible once the portal answers,
+// so nothing moves when they appear.
 .docwiki-tabbar {
   flex: 1 1 100%;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas: "tabs chip sign-in";
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem 1rem;
+  gap: 0.5rem 0.75rem;
   min-width: 0;
+
+  > .docwiki-tabs {
+    grid-area: tabs;
+  }
+
+  > .docwiki-chip {
+    grid-area: chip;
+  }
+
+  > .docwiki-sign-in {
+    grid-area: sign-in;
+  }
+
+  @media all and ($mobile) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "tabs sign-in"
+      "chip chip";
+    gap: 0.4rem 0.4rem;
+
+    > .docwiki-chip {
+      justify-self: start;
+    }
+  }
+}
+
+.docwiki-chip:not(.is-ready),
+.docwiki-sign-in:not(.is-ready) {
+  visibility: hidden;
 }
 
 .docwiki-tabs ol {
@@ -1729,8 +1772,8 @@ header:has(.docwiki-tabbar) {
   }
 
   @media all and ($mobile) {
-    padding: 0 0.5rem;
-    font-size: 0.92rem;
+    padding: 0 0.4rem;
+    font-size: 0.9rem;
   }
 }
 
@@ -1738,17 +1781,9 @@ header:has(.docwiki-tabbar) {
   font-weight: normal;
 }
 
-.docwiki-tabbar-tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-}
-
 a.docwiki-chip {
   min-height: 32px;
-  max-width: min(22rem, 100%);
+  max-width: min(18rem, 100%);
   text-decoration: none;
   background: none;
 
@@ -1785,10 +1820,6 @@ a.docwiki-sign-in {
   }
 }
 
-.docwiki-chip[hidden],
-.docwiki-sign-in[hidden] {
-  display: none;
-}
 
 // ----- ① Documents (Documents.tsx) -----
 
@@ -1839,6 +1870,17 @@ a.docwiki-sign-in {
     border-radius: 6px;
     white-space: nowrap;
   }
+}
+
+@media all and ($mobile) {
+  .center {
+    padding-bottom: 5rem;
+  }
+}
+
+// The owner's sign-in button fills this after load (Sign in is 44 px plus its margin).
+.docwiki-owner-box .docwiki-process-owner-area:empty {
+  min-height: 3.6rem;
 }
 
 // ----- Footer -----

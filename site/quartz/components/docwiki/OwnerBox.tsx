@@ -14,11 +14,16 @@ export default (() => {
       <section
         class={classNames(displayClass, "docwiki-owner-box")}
         aria-labelledby="docwiki-owner-box-title"
-        hidden
       >
         <h2 id="docwiki-owner-box-title" class="docwiki-owner-box-title">
           Add a document to the wiki
         </h2>
+        <p class="docwiki-owner-box-text">
+          Only the owner adds documents. Everyone can follow each one through the pipeline below,
+          then read it in the wiki.
+        </p>
+        {/* Filled from /api/owner/me; its height is reserved so the page does not move. */}
+        <div class="docwiki-process-owner-area"></div>
       </section>
     )
   }

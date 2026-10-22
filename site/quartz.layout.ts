@@ -47,9 +47,13 @@ export const sharedPageComponents: SharedLayout = {
 
 export const defaultContentPageLayout: PageLayout = {
   beforeBody: [
-    DocWiki.Breadcrumbs(),
+    DocWiki.Breadcrumbs({ rootName: "Wiki" }),
     Component.ArticleTitle(),
-    Component.ContentMeta(),
+    // Dates and reading time mean nothing on the Documents and Pipeline tabs.
+    Component.ConditionalRender({
+      component: Component.ContentMeta(),
+      condition: ({ fileData }) => fileData.slug !== "documents" && fileData.slug !== "pipeline",
+    }),
     // The pipeline page only: the owner's sign-in and upload form, before the text.
     DocWiki.OwnerBox(),
     // Home page only: how the release was built, then a collapsible "About DocWiki".
@@ -62,7 +66,11 @@ export const defaultContentPageLayout: PageLayout = {
 }
 
 export const defaultListPageLayout: PageLayout = {
-  beforeBody: [DocWiki.Breadcrumbs(), Component.ArticleTitle(), Component.ContentMeta()],
+  beforeBody: [
+    DocWiki.Breadcrumbs({ rootName: "Wiki" }),
+    Component.ArticleTitle(),
+    Component.ContentMeta(),
+  ],
   left: [Component.PageTitle(), Component.MobileOnly(Component.Spacer()), toolbar, explorer],
   right: [],
 }
