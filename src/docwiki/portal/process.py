@@ -19,6 +19,7 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from pathlib import PurePosixPath
 from typing import Any
 from urllib.parse import quote
 
@@ -27,6 +28,8 @@ from docwiki.contracts.enums import STAGE_NAMES, allowed_for_audience
 from docwiki.contracts.formats import SUPPORTED_EXTENSIONS, detect_format
 from docwiki.contracts.ids import source_id_for
 from docwiki.contracts.layout import ReleaseFiles, StorageKeys, release_prefix
+from docwiki.contracts.queue import QueueMessage
+from docwiki.contracts.runs import RunReport
 from docwiki.contracts.state import SourceState
 from docwiki.contracts.storage import KeyNotFoundError, PreconditionFailedError, Storage
 from docwiki.mcp.tools_ops import SOURCE_STATUSES, OpsTools, overall_status
@@ -38,14 +41,17 @@ __all__ = [
     "DOCUMENT_STATUSES",
     "MAX_DEPTH",
     "MAX_PATH_CHARS",
+    "PHASES",
     "PathError",
     "ProcessService",
     "RawBlob",
+    "RebuildError",
     "UploadConflictError",
     "UploadError",
     "UploadQuotaError",
     "UploadTooLargeError",
     "check_upload_path",
+    "document_phase",
     "document_state",
     "site_link",
 ]
@@ -67,6 +73,18 @@ DOCUMENT_STATES = (
 """What the site shows (ADR 0010), in display order. ``in_wiki`` and ``superseded`` only for a
 document of the published release: one whose stages are all done but that is not published yet is
 still ``processing``."""
+PHASES: dict[str, tuple[str, ...]] = {
+    "read": ("discover", "extract"),
+    "file": ("classify",),
+    "write": ("compile", "entities", "topics", "links", "indexes", "agentkit"),
+    "check": ("evidence", "verify", "site", "publish"),
+}
+"""The business view of the 13 stages (ADR 0010): Read, File, Write, Check and publish."""
+PER_SOURCE_STAGES = ("extract", "classify", "compile")
+MAX_PAGE_CHANGES = 200
+"""Pages listed per change kind in a run's view (the page shows fewer, with "and n more")."""
+DEFAULT_DAILY_REBUILDS = 5
+_REBUILD_KEY_RE = re.compile(r"^[A-Za-z0-9-]{8,64}$")
 RUN_LIMIT = 10
 RUN_SCAN = 200
 """Run reports read to find :data:`RUN_LIMIT` runs that did something; no-op checks are counted,
@@ -98,6 +116,10 @@ class UploadConflictError(UploadError):
 
 class UploadQuotaError(RuntimeError):
     """The daily upload allowance is used up (HTTP 429)."""
+
+
+class RebuildError(ValueError):
+    """A rebuild the portal refuses: a bad key (HTTP 400)."""
 
 
 def check_upload_path(path: str) -> str:
@@ -175,6 +197,11 @@ def document_state(
     return ("superseded" if superseded else "in_wiki"), None
 
 
+def document_phase(stage: str | None) -> str | None:
+    """The business phase of a stage (:data:`PHASES`), or ``None``."""
+    return next((phase for phase, stages in PHASES.items() if stage in stages), None)
+
+
 @dataclass(frozen=True)
 class RawBlob:
     path: str
@@ -218,6 +245,8 @@ class ProcessService:
         daily_uploads: int,
         list_raw: RawLister | None = None,
         queue_depth: QueueDepth | None = None,
+        enqueue: Callable[[QueueMessage], None] | None = None,
+        daily_rebuilds: int = DEFAULT_DAILY_REBUILDS,
         clock: Callable[[], float] = time.monotonic,
         today: Callable[[], date] = lambda: datetime.now(UTC).date(),
     ) -> None:
@@ -226,6 +255,9 @@ class ProcessService:
         self.daily_uploads = daily_uploads
         self._list_raw = list_raw or self._list_raw_from_storage
         self._queue_depth = queue_depth
+        self._enqueue = enqueue
+        self.daily_rebuilds = daily_rebuilds
+        self._rebuilds: dict[date, set[str]] = {}
         self._clock = clock
         self._today = today
         self._uploads: dict[date, int] = {}
@@ -292,10 +324,14 @@ class ProcessService:
         """Release, runs, queue and documents; ``owner`` adds the names and errors hidden from
         visitors."""
         view = self._cached("process", self._process)
-        documents = (
-            view["documents"] if owner else [self._public_row(row) for row in view["documents"]]
-        )
-        return {**view, "documents": documents}
+        if owner:
+            return view
+        runs = [
+            {**run, "documents": [item for item in run["documents"] if not item["hidden"]]}
+            for run in view["runs"]
+        ]
+        documents = [self._public_row(row) for row in view["documents"]]
+        return {**view, "documents": documents, "runs": runs}
 
     def _process(self) -> dict[str, Any]:
         pointer, catalog = self._current_catalog()
@@ -309,10 +345,14 @@ class ProcessService:
                 "sources": len(catalog.sources) if catalog else None,
                 "pages": len(catalog.pages) if catalog else None,
             }
-        documents = self._documents(catalog, audience)
+        reports, checks = self._reports()
+        running = reports[0] if reports and reports[0].status == "running" else None
+        documents = self._documents(catalog, audience, running)
         counts = Counter(row["status"] for row in documents)
         states = Counter(row["state"] for row in documents)
-        runs, checks = self._runs(release)
+        hidden = {row["source_id"] for row in documents if row["hidden"]}
+        runs = [self._run_view(report, release, catalog, hidden) for report in reports]
+        self._last_changes(documents, reports, catalog)
         return {
             "release": release,
             "runs": runs,
@@ -370,17 +410,22 @@ class ProcessService:
             log.warning("queue depth unavailable: %s", exc)
             return None
 
-    def _documents(self, catalog: Catalog | None, audience: str) -> list[dict[str, Any]]:
+    def _documents(
+        self, catalog: Catalog | None, audience: str, running: RunReport | None = None
+    ) -> list[dict[str, Any]]:
         blobs = self._list_raw()
         states, _broken = WorkStore(self.storage).source_states()
         by_path: dict[str, SourceState] = {state.raw_path: state for state in states}
         pages = catalog.page_by_id() if catalog else {}
         released = {item.source_id: item.status for item in catalog.sources} if catalog else {}
+        in_run = {document.path for document in running.documents} if running else set()
+        stage = running.current_stage if running else None
         rows: list[dict[str, Any]] = []
         listed: set[str] = set()
         for blob in blobs:
             listed.add(blob.path)
-            rows.append(self._row(blob, by_path.get(blob.path), pages, released, audience))
+            row = self._row(blob, by_path.get(blob.path), pages, released, audience)
+            rows.append(self._follow_run(row, stage, blob.path in in_run))
         for path, state in by_path.items():
             if path not in listed and state.deleted:
                 rows.append(self._row(RawBlob(path=path), state, pages, released, audience))
@@ -435,8 +480,47 @@ class ProcessService:
             "hidden": hidden,
             "in_release": in_release,
             "page_url": site_link(page.path) if page else None,
+            "document_url": f"/evidence/{source_id}/" if page and source_id else None,
+            "phase": document_phase(STAGE_NAMES[step - 1]) if step else None,
+            "last_change": None,
             "last_error": _clip(state.last_error) if state else None,
         }
+
+    @staticmethod
+    @staticmethod
+    def _follow_run(row: dict[str, Any], stage: str | None, in_run: bool) -> dict[str, Any]:
+        """A document of the run at work: before its own stages (extract, classify, compile,
+        recorded in its state) it waits at the run's stage or at extract; past them, it is where
+        the run is."""
+        if (
+            not in_run
+            or stage not in STAGE_NAMES
+            or row["state"]
+            not in (
+                "received",
+                "queued",
+                "processing",
+            )
+        ):
+            return row
+        at = STAGE_NAMES.index(stage) + 1
+        own = row["step"] if row["state"] == "processing" else None
+        if own is None:
+            # not started on its own stages yet: the run is discovering it, or it waits for extract
+            where = "extract" if stage in PER_SOURCE_STAGES else stage
+            row.update(state="processing", stage=where, step=STAGE_NAMES.index(where) + 1)
+        elif stage not in PER_SOURCE_STAGES and (at > own or own == len(STAGE_NAMES)):
+            row.update(stage=stage, step=at)
+        row["phase"] = document_phase(row["stage"])
+        return row
+        if row["state"] == "received" and stage == "discover":
+            row.update(state="processing", stage="discover", step=1, phase="read")
+        elif row["state"] == "processing" and stage not in PER_SOURCE_STAGES:
+            own = row["step"] or 0
+            at = STAGE_NAMES.index(stage) + 1
+            if at > own or own == len(STAGE_NAMES):
+                row.update(stage=stage, step=at, phase=document_phase(stage))
+        return row
 
     @staticmethod
     def _public_row(row: dict[str, Any]) -> dict[str, Any]:
@@ -447,11 +531,11 @@ class ProcessService:
             )
         return public
 
-    def _runs(self, release: dict[str, Any] | None) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    def _reports(self) -> tuple[list[RunReport], dict[str, Any]]:
         """The last :data:`RUN_LIMIT` runs that did something, newest first, and the no-op checks
         met on the way (``{"count", "last"}``: counted, not listed; ADR 0010)."""
         store = WorkStore(self.storage)
-        runs: list[dict[str, Any]] = []
+        runs: list[RunReport] = []
         checks = 0
         last_check: str | None = None
         for run_id in reversed(store.run_ids()[-RUN_SCAN:]):
@@ -463,16 +547,51 @@ class ProcessService:
                 continue
             if report is None:
                 continue
-            summary = OpsTools._run_summary(report)
-            if summary["status"] == "no-op":
+            if report.status == "no-op":
                 checks += 1
-                last_check = last_check or summary.get("finished_at") or summary["started_at"]
+                last_check = last_check or _iso(report.finished_at) or _iso(report.started_at)
                 continue
-            runs.append(self._run_view(summary, release))
+            runs.append(report)
         return runs, {"count": checks, "last": last_check}
 
+    def _last_changes(
+        self, rows: list[dict[str, Any]], reports: list[RunReport], catalog: Catalog | None
+    ) -> None:
+        """Each document's ``last_change``: what the last published run that processed it
+        changed in the wiki (the pages that cite it)."""
+        if catalog is None:
+            return
+        by_path = {page.path: page for page in catalog.pages}
+        wanted = {row["source_id"]: row for row in rows if row["source_id"]}
+        for report in reports:  # newest first
+            if report.release_id is None or not report.page_changes:
+                continue
+            for document in report.documents:
+                row = wanted.pop(document.source_id, None)
+                if row is None:
+                    continue
+                pages = [
+                    _page_item(change.path, change.change, by_path)
+                    for change in report.page_changes
+                    if change.change != "removed"
+                    and change.path in by_path
+                    and document.source_id in by_path[change.path].sources
+                ]
+                row["last_change"] = {
+                    "run_id": report.run_id,
+                    "finished_at": _iso(report.finished_at),
+                    "change": document.change,
+                    "pages": pages[:MAX_PAGE_CHANGES],
+                }
+
     @staticmethod
-    def _run_view(summary: dict[str, Any], release: dict[str, Any] | None) -> dict[str, Any]:
+    def _run_view(
+        report: RunReport,
+        release: dict[str, Any] | None,
+        catalog: Catalog | None = None,
+        hidden: set[str] | frozenset[str] = frozenset(),
+    ) -> dict[str, Any]:
+        summary = OpsTools._run_summary(report)
         cost = summary.get("cost") or {}
         gates = summary.get("gates") or {}
         return {
@@ -508,6 +627,17 @@ class ProcessService:
                 "total": cost.get("total_cost"),
                 "duration_s": cost.get("duration_s"),
             },
+            "current_stage": report.current_stage if report.status == "running" else None,
+            "documents": [
+                {
+                    "path": document.path,
+                    "title": _title(document.source_id, catalog),
+                    "change": document.change,
+                    "hidden": document.source_id in hidden,
+                }
+                for document in report.documents
+            ],
+            "changes": _changes(report, catalog) if report.release_id else None,
         }
 
     # -- the owner's upload ------------------------------------------------------------------
@@ -554,6 +684,43 @@ class ProcessService:
             "source_id": source_id_for(rel),
         }
 
+    # -- the owner's rebuild -----------------------------------------------------------------
+
+    @property
+    def can_rebuild(self) -> bool:
+        return self._enqueue is not None
+
+    def rebuilds_left(self) -> int:
+        return max(self.daily_rebuilds - len(self._rebuilds.get(self._today(), set())), 0)
+
+    def rebuild(self, key: str) -> dict[str, Any]:
+        """Enqueue a rebuild of the wiki and the site (every page from the cache: about $0 when
+        no document changed). ``key`` makes a retried request enqueue once."""
+        if self._enqueue is None:
+            raise RuntimeError("this portal cannot enqueue runs")
+        if not _REBUILD_KEY_RE.match(key or ""):
+            raise RebuildError("the key must be 8 to 64 letters, digits or dashes")
+        today = self._today()
+        done = self._rebuilds.get(today, set())
+        if key in done:
+            return {"queued": True, "kind": "rebuild", "rebuilds_left": self.rebuilds_left()}
+        if len(done) >= self.daily_rebuilds:
+            raise UploadQuotaError(
+                f"the daily allowance of {self.daily_rebuilds} rebuilds is used up"
+            )
+        self._enqueue(
+            QueueMessage(
+                kind="rebuild",
+                requested_by="owner",
+                idempotency_key=f"owner:rebuild:{key}",
+                created_at=datetime.now(UTC).replace(microsecond=0),
+            )
+        )
+        self._rebuilds = {today: {*done, key}}
+        self.invalidate()
+        log.info("owner rebuild queued (%s)", key)
+        return {"queued": True, "kind": "rebuild", "rebuilds_left": self.rebuilds_left()}
+
     # -- health ------------------------------------------------------------------------------
 
     def storage_ok(self) -> bool:
@@ -586,6 +753,48 @@ def azure_raw_lister(account_url: str, container: str, credential: Any) -> RawLi
     return list_raw
 
 
+def _title(source_id: str, catalog: Catalog | None) -> str | None:
+    if catalog is None:
+        return None
+    page = catalog.page_by_id().get(source_id)
+    return page.title if page else None
+
+
+def _page_item(path: str, change: str, by_path: dict[str, Any]) -> dict[str, Any]:
+    page = by_path.get(path)
+    title = page.title if page else PurePosixPath(path).stem.replace("-", " ")
+    return {
+        "title": title,
+        "url": site_link(path) if page else None,
+        "type": page.type if page else None,
+        "change": change,
+    }
+
+
+def _changes(report: RunReport, catalog: Catalog | None) -> dict[str, Any]:
+    """The pages a published run added, changed or removed, and the contradictions it opened or
+    closed (a topic page whose count went up from zero, or down to zero)."""
+    by_path = {page.path: page for page in catalog.pages} if catalog else {}
+    result: dict[str, Any] = {"added": [], "changed": [], "removed": []}
+    opened: list[dict[str, Any]] = []
+    closed: list[dict[str, Any]] = []
+    for change in report.page_changes:
+        item = _page_item(change.path, change.change, by_path)
+        if len(result[change.change]) < MAX_PAGE_CHANGES:
+            result[change.change].append(item)
+        now, before = change.contradictions, change.previous_contradictions
+        if now and not before and (before is not None or change.change == "added"):
+            opened.append(item)
+        elif before and now == 0:
+            closed.append(item)
+    result["counts"] = {
+        kind: sum(1 for change in report.page_changes if change.change == kind)
+        for kind in ("added", "changed", "removed")
+    }
+    result["contradictions"] = {"opened": opened, "closed": closed}
+    return result
+
+
 QUEUE_PEEK_LIMIT = 32
 """Storage queues peek at most 32 messages: the page shows "32+" beyond that."""
 
@@ -600,3 +809,18 @@ def azure_queue_depth(account_url: str, queue_name: str, credential: Any) -> Que
         return len(list(client.peek_messages(max_messages=QUEUE_PEEK_LIMIT)))
 
     return depth
+
+
+def azure_enqueue(
+    account_url: str, queue_name: str, credential: Any
+) -> Callable[[QueueMessage], None]:
+    """Send a message to the ingest queue (the portal identity needs Queue Data Message Sender on
+    it, which the infra gives only when owners are configured)."""
+    from azure.storage.queue import QueueClient
+
+    client = QueueClient(account_url, queue_name, credential=credential)
+
+    def send(message: QueueMessage) -> None:
+        client.send_message(message.to_body())
+
+    return send

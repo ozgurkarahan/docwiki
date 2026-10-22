@@ -85,7 +85,9 @@ from docwiki.contracts.pages import (
 from docwiki.contracts.runs import (
     ContentUnderstandingUsage,
     ModelVersion,
+    PageChange,
     RunCounts,
+    RunDocument,
     RunReport,
     VersionInfo,
 )
@@ -251,6 +253,21 @@ def hints_key(source_id: str) -> str:
     return f"{StorageKeys.WORK}/state/hints/{source_id}.json"
 
 
+_BOOKKEEPING = frozenset({"meta", "log"})
+"""Page types a run writes about itself: not content changes."""
+
+
+def _contradictions(page: Page) -> list[int]:
+    """``[count]`` for a topic page (its open contradictions), else ``[]``."""
+    count = getattr(page.frontmatter, "contradictions", None)
+    return [count] if page.frontmatter.type == "topic" and isinstance(count, int) else []
+
+
+def _check_path(path: str) -> bool:
+    """A page path from an older build state that still reads as one."""
+    return bool(path) and not path.startswith("/") and ".." not in path.split("/")
+
+
 def fingerprint(page: Page) -> str:
     """Hash of a page without its release stamp and ``updated`` date."""
     fm = page.frontmatter.model_copy(update={"docwiki": NEUTRAL_STAMP, "updated": NEUTRAL_DATE})
@@ -384,6 +401,9 @@ class Pipeline:
         self.artifacts = ArtifactStore(ctx.storage)
         self.proposals = ProposalStore(ctx.storage)
         self.clock = StageClock(ctx.now)
+        self.clock.on_change = self._progress
+        self.finished = False
+        self.page_changes: list[PageChange] = []
         self.cursor = LedgerCursor(ctx.llm)
         self.work: dict[str, SourceWork] = {}
         self.errors: list[str] = []
@@ -1400,6 +1420,7 @@ class Pipeline:
             )
         if published.published:
             # the pointer is swapped: record the build state first, then prune (best effort)
+            self.page_changes = self._page_changes(pages)
             self._save_build_state(published.staged.release_id, pages)
             self._consume_inbox(query_pages, dropped_queries)
             shutil.rmtree(published.staged.root, ignore_errors=True)
@@ -1608,11 +1629,53 @@ class Pipeline:
                 item.source_id: item.state.content_hash for item in self.plan.active_items()
             },
             "pages": {
-                page.path: [fingerprint(page), page.frontmatter.updated.isoformat()]
+                page.path: [
+                    fingerprint(page),
+                    page.frontmatter.updated.isoformat(),
+                    *_contradictions(page),
+                ]
                 for page in pages
             },
         }
         self.ctx.storage.write_bytes(build_state_key(self.audience), json_bytes(state))
+
+    def _page_changes(self, pages: Sequence[Page]) -> list[PageChange]:
+        """Pages added, changed or removed since the last publish (from the build state's page
+        fingerprints); topic pages carry their contradiction count before and after. The run's
+        own bookkeeping (run receipts, quality report, log) is left out."""
+        previous = (self._build_state() or {}).get("pages") or {}
+        changes: list[PageChange] = []
+        seen: set[str] = set()
+        for page in pages:
+            seen.add(page.path)
+            if page.frontmatter.type in _BOOKKEEPING:
+                continue
+            entry = previous.get(page.path)
+            now = _contradictions(page)
+            before = entry[2] if isinstance(entry, list) and len(entry) > 2 else None
+            if not entry:
+                change = "added"
+            elif entry[0] != fingerprint(page):
+                change = "changed"
+            else:
+                continue
+            changes.append(
+                PageChange(
+                    path=page.path,
+                    change=change,
+                    contradictions=now[0] if now else None,
+                    previous_contradictions=before if isinstance(before, int) else None,
+                )
+            )
+        changes += [
+            PageChange(path=path, change="removed")
+            for path in sorted(previous)
+            if path not in seen
+            and _check_path(path)
+            and not path.startswith("_meta/")
+            and path != "log.md"
+        ]
+        return sorted(changes, key=lambda change: (change.change, change.path))
 
     # -- reports ---------------------------------------------------------------------------
 
@@ -1667,7 +1730,10 @@ class Pipeline:
             previous_release_id=self.previous.release_id,
             messages=self.request.messages,
             counts=counts,
-            stages=self.clock.reports(),
+            stages=self.clock.reports(finished_only=status == "running"),
+            current_stage=self.clock.current() if status == "running" else None,  # type: ignore[arg-type]
+            documents=self._run_documents(),
+            page_changes=list(self.page_changes),
             gates=list(gates),
             versions=versions,
             cost=cost_receipt(
@@ -1676,6 +1742,33 @@ class Pipeline:
             errors=list(self.errors),
             warnings=[*self.warnings, *self.ctx.notices()],
         )
+
+    def _run_documents(self) -> list[RunDocument]:
+        """The documents this run processes (new, changed, deleted or recompiled on request)."""
+        plan = self.plan
+        if plan is None:
+            return []
+        documents: list[RunDocument] = []
+        for item in plan.items.values():
+            change = item.change if item.change != "unchanged" else None
+            if change is None and item.forced and item.active:
+                change = "recompiled"
+            if change is None:
+                continue
+            documents.append(
+                RunDocument(source_id=item.source_id, path=item.raw_path, change=change)
+            )
+        return sorted(documents, key=lambda document: document.path.lower())
+
+    def _progress(self) -> None:
+        """A stage started or finished: rewrite the running report (``/api/process`` follows
+        the run with it). Never fails the run."""
+        if self.finished:
+            return
+        try:
+            self._write_report("running")
+        except Exception as exc:  # the report must never break the run
+            logger.warning("progress report of %s not written: %s", self.run_id, exc)
 
     def _write_report(self, status: str, **kwargs: Any) -> RunReport:
         report = self._report(status, **kwargs)
@@ -1697,6 +1790,7 @@ class Pipeline:
         staged: Path | None = None,
         deterministic: bool = False,
     ) -> RunOutcome:
+        self.finished = True
         self.clock.abort()
         if deterministic:
             self.errors.append(DETERMINISTIC_NOTE)

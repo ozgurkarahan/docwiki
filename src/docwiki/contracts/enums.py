@@ -81,7 +81,7 @@ StageName = Literal[
 ]
 StageStatus = Literal["pending", "done", "failed", "quarantined", "skipped"]
 QueueKind = Literal["ingest", "recompile", "rebuild", "reconcile"]
-RequestedBy = Literal["librarian", "event", "cli", "schedule"]
+RequestedBy = Literal["librarian", "event", "cli", "schedule", "owner"]
 ExtractionAdapter = Literal["local", "content-understanding"]
 CitationStatus = Literal["verified", "unverified-paraphrase", "failed"]
 Badge = Literal["✓ quote verified", "paraphrase", "table", "OCR", "generated description"]

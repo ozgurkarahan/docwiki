@@ -324,6 +324,15 @@ An ingress CORS policy does not change it. That is why the owner's calls use GET
 why the public `POST /api/ask` is an excluded path. In Git Bash, set `MSYS_NO_PATHCONV=1` before
 `az containerapp auth update --excluded-paths`, or `/healthz` is rewritten to a Windows path.
 
+### Rebuild the wiki from the site
+
+Signed in, the owner also has **Rebuild the wiki** on the `pipeline` page: it enqueues a `rebuild`
+(`PUT /api/owner/runs/{key}`, the same owner checks as an upload, at most 5 a day). A rebuild
+recompiles every page and the site from the cache, so it costs about $0 when no document changed
+and is the way to publish a new site after a site-only deployment. The portal identity needs
+Storage Queue Data Message Sender on the `ingest` queue, which `azd provision` gives when the
+owner's sign-in is on. From a shell, the same is `docwiki run --force` in a job execution.
+
 ### Live upload demo (optional)
 
 The sample keeps one document out of the deployed corpus: a later revision of the planning, in

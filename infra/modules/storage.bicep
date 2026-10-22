@@ -324,8 +324,8 @@ resource mcpIngestSender 'Microsoft.Authorization/roleAssignments@2022-04-01' = 
 // ---------------------------------------------------------------------------
 // Portal identity: reads the published sites under releases/; for the live process view
 // (ADR 0009) lists raw/, reads the work/ state and run reports and peeks the ingest queue; with
-// portalUploads it also writes raw/ for the signed-in owner, never deleting a blob. No other
-// write, no queue send.
+// portalUploads it also writes raw/ for the signed-in owner, never deleting a blob, and sends to
+// the ingest queue for the owner's "Rebuild the wiki" (v2 plan, slice C). No other write.
 // ---------------------------------------------------------------------------
 
 resource portalReleasesReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -385,6 +385,21 @@ resource portalIngestReader 'Microsoft.Authorization/roleAssignments@2022-04-01'
     principalId: portalPrincipalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.storageQueueDataReader)
+  }
+}
+
+// The owner's "Rebuild the wiki" enqueues a rebuild (only with the owner's sign-in).
+resource portalIngestSender 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (portalUploads) {
+  scope: ingestQueue
+  name: guid(ingestQueue.id, portalPrincipalId, roleIds.storageQueueDataMessageSender)
+  properties: {
+    principalId: portalPrincipalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      roleIds.storageQueueDataMessageSender
+    )
+    description: 'DocWiki portal: the signed-in owner enqueues a rebuild'
   }
 }
 

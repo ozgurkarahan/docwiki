@@ -29,7 +29,12 @@ from docwiki.orchestration.telemetry import configure_exporter, instrument_asgi
 from docwiki.portal.app import create_app
 from docwiki.portal.live_ask import LiveAsk
 from docwiki.portal.owner import OwnerConfig, OwnerConfigError
-from docwiki.portal.process import ProcessService, azure_queue_depth, azure_raw_lister
+from docwiki.portal.process import (
+    ProcessService,
+    azure_enqueue,
+    azure_queue_depth,
+    azure_raw_lister,
+)
 from docwiki.portal.sync import SiteSync
 
 LOOPBACK = ("127.0.0.1", "localhost", "::1")
@@ -57,6 +62,7 @@ def process_service(storage: Storage, owner: OwnerConfig, env: Mapping[str, str]
     and the ingest queue is peeked with the managed identity."""
     list_raw = None
     queue_depth = None
+    enqueue = None
     if env.get(SettingsKeys.MODE) == "azure":
         from azure.identity import DefaultAzureCredential
 
@@ -66,12 +72,21 @@ def process_service(storage: Storage, owner: OwnerConfig, env: Mapping[str, str]
         credential = DefaultAzureCredential()
         list_raw = azure_raw_lister(settings.blob_account_url, settings.raw_container, credential)
         queue_depth = azure_queue_depth(settings.queue_account_url, settings.queue_name, credential)
+        if owner.sign_in:
+            # The owner's "Rebuild the wiki" (slice C): the portal identity may send to the
+            # ingest queue only when owners are configured (infra: portalIngestSender).
+            enqueue = azure_enqueue(settings.queue_account_url, settings.queue_name, credential)
+    elif owner.local_owner:
+        from docwiki.mcp.ingest_queue import FolderQueue
+
+        enqueue = FolderQueue(storage).send
     return ProcessService(
         storage,
         max_upload_bytes=owner.max_upload_bytes,
         daily_uploads=owner.daily_uploads,
         list_raw=list_raw,
         queue_depth=queue_depth,
+        enqueue=enqueue,
     )
 
 

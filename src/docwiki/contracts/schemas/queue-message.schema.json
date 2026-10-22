@@ -67,7 +67,8 @@
         "librarian",
         "event",
         "cli",
-        "schedule"
+        "schedule",
+        "owner"
       ],
       "title": "Requested By",
       "type": "string"
