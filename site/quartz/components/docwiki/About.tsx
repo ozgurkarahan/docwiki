@@ -38,7 +38,7 @@ export default (() => {
             </>
           )}
           {" · "}
-          <a href={link("how-it-works")}>how it works</a>
+          <a href={link("pipeline")}>the pipeline</a>
         </p>
         <details class="docwiki-about-more">
           <summary>About DocWiki</summary>

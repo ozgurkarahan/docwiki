@@ -3,9 +3,13 @@ import { PageLayout, SharedLayout } from "./quartz/cfg"
 import * as Component from "./quartz/components"
 import * as DocWiki from "./quartz/components/docwiki"
 
-const graph = Component.Graph({
-  localGraph: { showTags: false, depth: 1 },
-  globalGraph: { showTags: false },
+// No graph on the Documents and Pipeline tabs (ADR 0010): it has nothing to show there.
+const graph = Component.ConditionalRender({
+  component: Component.Graph({
+    localGraph: { showTags: false, depth: 1 },
+    globalGraph: { showTags: false },
+  }),
+  condition: ({ fileData }) => fileData.slug !== "documents" && fileData.slug !== "pipeline",
 })
 
 const explorer = Component.Explorer({
@@ -31,10 +35,11 @@ const toolbar = Component.Flex({
 
 export const sharedPageComponents: SharedLayout = {
   head: DocWiki.Head(),
-  header: [DocWiki.Banner()],
-  // The how-it-works page only: documents, queue and runs, live from the portal, after the text.
-  // "Ask this wiki": filed research answers in a drawer on every page (none without answers).
-  afterBody: [DocWiki.Process(), DocWiki.AskPanel()],
+  // ① Documents · ② Pipeline · ③ Wiki, the pipeline's status chip and Sign in (ADR 0010).
+  header: [DocWiki.Tabs(), DocWiki.Banner()],
+  // The documents page only: the release's documents. The pipeline page only: documents, queue
+  // and runs, live from the portal, after the text. "Ask this wiki": the drawer on every page.
+  afterBody: [DocWiki.Documents(), DocWiki.Process(), DocWiki.AskPanel()],
   footer: DocWiki.Footer(),
 }
 
@@ -43,7 +48,7 @@ export const defaultContentPageLayout: PageLayout = {
     DocWiki.Breadcrumbs(),
     Component.ArticleTitle(),
     Component.ContentMeta(),
-    // The how-it-works page only: the owner's sign-in and upload form, before the text.
+    // The pipeline page only: the owner's sign-in and upload form, before the text.
     DocWiki.OwnerBox(),
     // Home page only: how the release was built, then a collapsible "About DocWiki".
     DocWiki.About(),

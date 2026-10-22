@@ -1,4 +1,4 @@
-// Client of "The process, live" (Process.tsx, ADR 0009) on the how-it-works page.
+// Client of "The process, live" (Process.tsx, ADR 0009, 0010) on the pipeline page.
 //
 // The portal says who is reading (/api/owner/me) and where every document is in the pipeline
 // (/api/process). Both replies are data: paths, errors and names come from documents and
@@ -7,6 +7,7 @@
 // platform's sign-in refuses signed-in POSTs). Polling is fast while something is in the pipeline,
 // slow otherwise, pauses on a hidden tab and stops when Quartz navigates away (window.addCleanup).
 import { relativeHref } from "../../../plugins/transformers/docwiki-text"
+import { State, asState, stateWords, statusPill } from "./status"
 
 const SECTION = "section.docwiki-process"
 /** Same stages, same order as `STAGES` in src/docwiki/site/process_page.py. */
@@ -54,10 +55,14 @@ interface Me {
 
 interface Doc {
   path: string
+  title: string | null
   size: number | null
   modified: string | null
   status: string
   stage: string | null
+  state: State
+  step: number | null
+  steps: number | null
   hidden: boolean
   pageUrl: string | null
   lastError: string | null
@@ -96,6 +101,9 @@ interface View {
   queued: number | null
   documents: Doc[]
   counts: Record<string, number>
+  states: Record<string, number>
+  /** Scheduled checks that found nothing to do: counted, not listed (ADR 0010). */
+  checks: { count: number; last: string | null }
   total: number
 }
 
@@ -172,13 +180,18 @@ function parseDoc(value: unknown): Doc | null {
   const data = record(value)
   const path = text(data?.path)
   const status = text(data?.status)
-  if (!data || !path || !status) return null
+  const state = asState(data?.state)
+  if (!data || !path || !status || !state) return null
   return {
     path,
+    title: text(data.title),
     size: number(data.size),
     modified: text(data.modified),
     status,
     stage: text(data.stage),
+    state,
+    step: number(data.step),
+    steps: number(data.steps),
     hidden: data.hidden === true,
     pageUrl: pageUrl(data.page_url),
     lastError: text(data.last_error),
@@ -241,6 +254,11 @@ function parseView(payload: unknown): View | null {
     queued: number(data.queued),
     documents,
     counts: numbers(data.counts),
+    states: numbers(data.states),
+    checks: {
+      count: number(record(data.checks)?.count) ?? 0,
+      last: text(record(data.checks)?.last),
+    },
     total: number(data.total) ?? documents.length,
   }
 }
@@ -283,9 +301,9 @@ function runDuration(run: Run): number | null {
   return Number.isNaN(start) || Number.isNaN(end) ? null : (end - start) / 1000
 }
 
-/** Documents not in the release yet: new in `raw/` or pending in a stage. */
+/** Documents on their way to the release: received, queued or processing. */
 function inPipeline(view: View): number {
-  return (view.counts.new ?? 0) + (view.counts.pending ?? 0)
+  return (view.states.received ?? 0) + (view.states.queued ?? 0) + (view.states.processing ?? 0)
 }
 
 function busy(view: View | null): boolean {
@@ -396,47 +414,49 @@ function documentRow(doc: Doc, owner: boolean): HTMLTableRowElement {
   const row = element("tr")
   const mine = uploaded !== null && doc.path === uploaded.path
   if (mine) row.className = "is-uploaded"
-  const status = element("td")
-  status.append(badge(doc.status))
-  if (doc.stage && doc.status !== "done") {
-    status.append(element("span", "docwiki-process-stage-of", doc.stage))
-  }
+  const status = element("td", "docwiki-process-status")
+  // A document whose stages are all done but whose release is not out yet is at "publish".
+  const stage = doc.state === "processing" ? (doc.stage ?? "publish") : null
+  status.append(statusPill(doc.state, stateWords(doc.state, doc.step, doc.steps, stage)))
   const name = element("td", "docwiki-process-name")
-  name.append(element("span", doc.hidden ? "docwiki-process-hidden" : undefined, doc.path))
+  if (doc.hidden) {
+    name.append(element("span", "docwiki-process-hidden", doc.path))
+  } else if (doc.title && doc.pageUrl) {
+    const open = anchor(doc.pageUrl, doc.title)
+    open.className = "docwiki-process-doc"
+    open.lang = "fr"
+    open.dataset.focusKey = `page:${doc.path}`
+    name.append(open)
+    name.append(element("span", "docwiki-process-path", doc.path))
+  } else {
+    name.append(element("span", "docwiki-process-doc", doc.title ?? doc.path))
+    if (doc.title) name.append(element("span", "docwiki-process-path", doc.path))
+  }
   if (mine) name.append(element("span", "docwiki-process-mine", "your upload"))
   if (owner && doc.hidden) {
     name.append(element("span", "docwiki-process-mine", "not in this site's audience"))
   }
   if (owner && doc.lastError) {
     name.append(element("span", "docwiki-process-error", doc.lastError))
-  } else if (doc.failed && doc.status !== "failed" && doc.status !== "quarantined") {
+  } else if (doc.failed && doc.state !== "failed" && doc.state !== "held_back") {
     name.append(element("span", "docwiki-process-error", "an earlier attempt failed"))
   }
-  const page = element("td")
-  if (doc.pageUrl) {
-    const open = anchor(doc.pageUrl, "open in the wiki")
-    open.dataset.focusKey = `page:${doc.path}`
-    page.append(open)
-  }
-  row.append(
-    status,
-    name,
-    element("td", "docwiki-process-num", size(doc.size)),
-    element("td", undefined, when(doc.modified)),
-    page,
-  )
+  const facts = element("td", "docwiki-process-when")
+  facts.append(element("span", undefined, when(doc.modified)))
+  if (doc.size !== null) facts.append(element("span", "docwiki-process-size", size(doc.size)))
+  row.append(status, name, facts)
   return row
 }
 
 /** An upload the portal accepted that the document list does not show yet. */
 function receivedRow(path: string): HTMLTableRowElement {
   const row = element("tr", "is-uploaded")
-  const status = element("td")
-  status.append(badge("received"))
+  const status = element("td", "docwiki-process-status")
+  status.append(statusPill("received"))
   const name = element("td", "docwiki-process-name")
-  name.append(element("span", undefined, path))
+  name.append(element("span", "docwiki-process-doc", path))
   name.append(element("span", "docwiki-process-mine", "received — waiting for the pipeline"))
-  row.append(status, name, element("td"), element("td"), element("td"))
+  row.append(status, name, element("td"))
   return row
 }
 
@@ -463,7 +483,7 @@ function documentsTable(
   scroller.dataset.focusKey = "documents"
   const table = element("table", "docwiki-process-table")
   const head = element("tr")
-  for (const label of ["Status", "Document", "Size", "Modified", "Wiki"]) {
+  for (const label of ["Status", "Document", "Received"]) {
     const cell = element("th", undefined, label)
     cell.scope = "col"
     head.append(cell)
@@ -502,7 +522,12 @@ function runSources(counts: Record<string, number>): string | null {
 
 function runsList(view: View): HTMLElement {
   const block = element("div", "docwiki-process-runs")
-  block.append(heading("Recent runs"))
+  block.append(heading("Runs that changed the wiki"))
+  if (view.checks.count > 0) {
+    const checks = plural(view.checks.count, "scheduled check")
+    const last = view.checks.last ? `, the last ${when(view.checks.last)}` : ""
+    block.append(element("p", "docwiki-process-caption", `${checks} found nothing to do${last}.`))
+  }
   if (view.runs.length === 0) {
     block.append(element("p", "docwiki-process-caption", "No run recorded yet."))
     return block

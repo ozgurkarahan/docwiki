@@ -284,7 +284,7 @@ minute per capacity unit).
   groups. No client secret exists (ID-token sign-in).
 - Public portal (`DOCWIKI_PORTAL_ACCESS=public`, only with `DOCWIKI_AUDIENCE=public`): every page
   is anonymous; Bicep gives the portal its ingress, so anyone with the URL can read the public
-  build and follow the process on its `how-it-works` page. See
+  build and follow the process on its `pipeline` page. See
   [Owner sign-in and uploads](#owner-sign-in-and-uploads-on-the-public-portal) for the owner.
 - The hooks call Microsoft Graph with the Azure CLI sign-in. When continuous access evaluation
   revokes it, they stop with `the signed-in session needs a fresh sign-in`: run `az logout`,
@@ -296,7 +296,7 @@ minute per capacity unit).
 ## Owner sign-in and uploads on the public portal
 
 On a public portal the owner signs in on the same site and adds documents from the
-`how-it-works` page ([ADR 0009](adr/0009-one-site.md)); everyone else reads anonymously. The
+`pipeline` page ([ADR 0009](adr/0009-one-site.md), [ADR 0010](adr/0010-the-story-site.md)); everyone else reads anonymously. The
 postprovision hook sets it up (skip it with `DOCWIKI_PORTAL_OWNER_SIGN_IN=false`; the deployer
 must be a user):
 
@@ -328,7 +328,7 @@ why the public `POST /api/ask` is an excluded path. In Git Bash, set `MSYS_NO_PA
 
 The sample keeps one document out of the deployed corpus: a later revision of the planning, in
 `samples/corpus/held-back/planning/`, whose new delivery date for the windows matches the e-mail.
-To show a new revision taking effect, sign in as the owner on the `how-it-works` page, upload it
+To show a new revision taking effect, sign in as the owner on the `pipeline` page, upload it
 and follow its status and the run on the same page (an operator can instead upload it to `raw/`
 with `az storage blob upload --auth-mode login`). A run takes a while, so start it before the
 audience arrives. When the run is `done`, ask the Researcher about the windows' delivery date

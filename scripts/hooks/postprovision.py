@@ -581,7 +581,7 @@ def secure_portal_owner(ctx: Context, app_name: str, host: str) -> None:
     ensure_container_settings(
         tools, app_name, app, {PORTAL_OWNERS_SETTING: owners}, label="portal owners"
     )
-    info(f"owner sign-in ready at https://{custom_domain or host}/how-it-works")
+    info(f"owner sign-in ready at https://{custom_domain or host}/pipeline")
 
 
 # ---------------------------------------------------------------------------

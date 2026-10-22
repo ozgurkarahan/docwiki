@@ -15,9 +15,10 @@ DocWiki is a **public proof of concept**. Its job is to show one pattern clearly
 become a cited wiki that is served on Azure Container Apps, with Microsoft Foundry agents working
 *inside* that wiki. It must be easy to understand and easy to present.
 
-1. **One site, one app (ADR 0009).** The wiki, the process and the agents are one website served
-   by the portal. Everyone reads the wiki, asks the Researcher in the drawer and follows the
-   process on the `how-it-works` page (each document's status, the runs, the release). Only the
+1. **One site, one app (ADR 0009, 0010).** The wiki, the process and the agents are one website
+   served by the portal, told as three tabs: ① Documents · ② Pipeline · ③ Wiki. Everyone reads
+   the wiki, asks the Researcher in the drawer and follows the process on the `pipeline` page
+   (each document's status, the runs, the release). Only the
    owner, signed in on the same site, uploads documents. Asking never writes to the wiki in this
    version: answers show their citations and the wiki pages they used.
 2. **A public LLM endpoint is allowed.** The old invariant "no public endpoint calls an LLM"

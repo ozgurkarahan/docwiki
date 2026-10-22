@@ -39,7 +39,7 @@ flowchart LR
 The jobs read `raw/` and write `work/` and `releases/`. The MCP server reads releases and, for the
 operations tools, run reports, source states and proposals in `work/`; it writes nothing but
 proposals, health reports and the overlay. The portal serves the site of the current release and,
-for its live `how-it-works` page, lists `raw/`, reads source states and run reports and peeks the
+for its live `pipeline` page, lists `raw/`, reads source states and run reports and peeks the
 queue; on a public portal the signed-in owner uploads into `raw/` through it (it cannot delete,
 [ADR 0009](adr/0009-one-site.md)). The public demo is served from Azure Container Apps (the portal
 with a public-audience build).

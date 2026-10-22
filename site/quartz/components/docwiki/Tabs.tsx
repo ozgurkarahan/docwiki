@@ -1,0 +1,57 @@
+// The site's three tabs (ADR 0010): ① Documents · ② Pipeline · ③ Wiki, in the header of every
+// page, with the pipeline's status chip and the owner's Sign in. The chip and the sign-in come
+// from the portal (/api/status, /api/owner/me) and stay hidden on a static host
+// (scripts/tabs.inline.ts).
+import { FullSlug, resolveRelative } from "../../util/path"
+import { classNames } from "../../util/lang"
+import { QuartzComponent, QuartzComponentConstructor, QuartzComponentProps } from "../types"
+// @ts-ignore
+import script from "./scripts/tabs.inline"
+
+/** Same slugs as `DOCUMENTS_SLUG` and `PROCESS_SLUG` in src/docwiki/site/process_page.py. */
+const TABS = [
+  { slug: "documents", number: "①", label: "Documents" },
+  { slug: "pipeline", number: "②", label: "Pipeline" },
+  { slug: "index", number: "③", label: "Wiki" },
+] as const
+
+export default (() => {
+  const Tabs: QuartzComponent = ({ fileData, displayClass }: QuartzComponentProps) => {
+    const slug = (fileData.slug ?? "index") as FullSlug
+    const active = slug === "documents" || slug === "pipeline" ? slug : "index"
+    const link = (target: string) => resolveRelative(slug, target as FullSlug)
+    return (
+      <div class={classNames(displayClass, "docwiki-tabbar")}>
+        <nav class="docwiki-tabs" aria-label="DocWiki">
+          <ol>
+            {TABS.map((tab) => (
+              <li>
+                <a
+                  href={link(tab.slug)}
+                  class="docwiki-tab"
+                  aria-current={tab.slug === active ? "page" : undefined}
+                >
+                  <span class="docwiki-tab-number" aria-hidden="true">
+                    {tab.number}
+                  </span>{" "}
+                  {tab.label}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+        <div class="docwiki-tabbar-tools">
+          <a class="docwiki-chip" href={link("pipeline")} hidden></a>
+          <a class="docwiki-sign-in" href={link("pipeline")} hidden>
+            Sign in
+          </a>
+          <span class="sr-only docwiki-chip-live" role="status" aria-live="polite"></span>
+        </div>
+      </div>
+    )
+  }
+
+  Tabs.afterDOMLoaded = script
+
+  return Tabs
+}) satisfies QuartzComponentConstructor

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import date
+import json
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -21,8 +22,10 @@ from starlette.testclient import TestClient
 
 from docwiki.contracts.ids import source_id_for
 from docwiki.contracts.storage import FolderStorage
+from docwiki.mcp.workstore import WorkStore
 from docwiki.portal.owner import OwnerConfig, OwnerConfigError, process_routes
 from docwiki.portal.process import (
+    JUST_PUBLISHED_S,
     PathError,
     ProcessService,
     RawBlob,
@@ -31,6 +34,7 @@ from docwiki.portal.process import (
     UploadQuotaError,
     UploadTooLargeError,
     check_upload_path,
+    document_state,
     site_link,
 )
 
@@ -137,14 +141,18 @@ def test_process_merges_raw_files_with_pipeline_state(storage: FolderStorage) ->
         GONE_PATH: "deleted",
         DONE_PATH: "done",
     }
-    assert [row["status"] for row in view["documents"]] == [
-        "new",
-        "failed",
-        "quarantined",
-        "pending",
-        "deleted",
-        "done",
+    # The site's words (ADR 0010), in display order.
+    assert [(row["state"], row["path"]) for row in view["documents"]] == [
+        ("failed", BROKEN_PATH),
+        ("held_back", ODD_PATH),
+        ("received", NEW_PATH),
+        ("queued", PENDING_PATH),
+        ("in_wiki", DONE_PATH),
+        ("removed", GONE_PATH),
     ]
+    assert view["states"]["in_wiki"] == 1 and view["states"]["processing"] == 0
+    assert rows[DONE_PATH]["title"]
+    assert rows[NEW_PATH]["title"] is None
     assert view["counts"] == {
         "new": 1,
         "failed": 1,
@@ -187,6 +195,86 @@ def test_process_runs_come_from_the_work_reports(storage: FolderStorage) -> None
     assert newest["counts"]["quarantined"] == 1
     assert older["cost"] == {"currency": "USD", "total": 0.42, "duration_s": 540.0}
     assert set(newest) >= {"run_id", "kind", "requested_by", "gates", "release_id"}
+
+
+@pytest.mark.parametrize(
+    ("status", "stage", "in_release", "hidden", "superseded", "expected"),
+    [
+        ("new", None, False, False, False, ("received", None)),
+        ("pending", None, False, False, False, ("queued", None)),
+        ("pending", "compile", False, False, False, ("processing", 4)),
+        # Every stage done, but the release that carries it is not out yet.
+        ("done", None, False, False, False, ("processing", 13)),
+        ("done", None, True, False, False, ("in_wiki", None)),
+        ("done", None, True, False, True, ("superseded", None)),
+        ("done", None, True, True, False, ("held_back", None)),
+        ("quarantined", "compile", False, False, False, ("held_back", None)),
+        ("failed", "extract", False, False, False, ("failed", None)),
+        ("deleted", None, False, False, False, ("removed", None)),
+    ],
+)
+def test_document_state(
+    status: str,
+    stage: str | None,
+    in_release: bool,
+    hidden: bool,
+    superseded: bool,
+    expected: tuple[str, int | None],
+) -> None:
+    assert (
+        document_state(status, stage, in_release=in_release, hidden=hidden, superseded=superseded)
+        == expected
+    )
+
+
+def test_a_done_document_outside_the_release_is_still_processing(tmp_path: Path) -> None:
+    storage = seed_storage(tmp_path / "store", sensitivity="public")
+    # The served catalog does not have the document yet: a run finished its stages, not its publish.
+    service = _service(storage)
+    service._current_catalog = lambda: (None, None)  # type: ignore[method-assign]
+    row = _rows(service.process(owner=True))[DONE_PATH]
+    assert (row["state"], row["step"], row["steps"]) == ("processing", 13, 13)
+    assert row["page_url"] is None and row["title"] is None
+
+
+def test_no_op_checks_are_counted_not_listed(storage: FolderStorage) -> None:
+    before = _service(storage).process()["runs"]
+    newest = WorkStore(storage).run_ids()[-1]
+    report = json.loads(storage.read_bytes(f"work/runs/{newest}/report.json"))
+    for n in range(3):
+        # Later than every seeded run (run ids sort by their UTC timestamp).
+        run_id = f"run-29991231-23595{n}-0000000{n}"
+        report.update(run_id=run_id, status="no-op", release_id=None)
+        storage.write_bytes(f"work/runs/{run_id}/report.json", json.dumps(report).encode("utf-8"))
+    view = _service(storage).process()
+    assert [run["run_id"] for run in view["runs"]] == [run["run_id"] for run in before]
+    assert view["checks"]["count"] == 3
+    assert view["checks"]["last"]
+
+
+def test_status_idle_processing_and_published(storage: FolderStorage) -> None:
+    service = _service(storage)
+    # The seeded storage has documents on their way: received, queued.
+    status = service.status()
+    assert status["state"] == "processing" and status["processing"] == 2
+    assert status["release_id"] == RELEASE_ID
+
+    done_only = [RawBlob(path=DONE_PATH, size=1)]
+    quiet = _service(storage, list_raw=lambda: done_only)
+    stamp = quiet.process()["release"]["published_at"]
+    published = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    assert quiet.status(now=published + timedelta(seconds=JUST_PUBLISHED_S + 1))["state"] == "idle"
+
+    fresh = [RawBlob(path=DONE_PATH, size=1, modified=published - timedelta(minutes=3))]
+    recent = _service(storage, list_raw=lambda: fresh)
+    status = recent.status(now=published + timedelta(minutes=2))
+    assert status["state"] == "published"
+    assert status["document"] == {"title": status["document"]["title"], "page_url": DONE_PAGE}
+    assert status["document"]["title"]
+
+    old = [RawBlob(path=DONE_PATH, size=1, modified=published - timedelta(days=3))]
+    status = _service(storage, list_raw=lambda: old).status(now=published + timedelta(minutes=2))
+    assert status["state"] == "idle" and status["document"] is None
 
 
 def test_process_without_a_release_or_state(tmp_path: Path) -> None:
@@ -360,6 +448,18 @@ def test_process_is_public(client: TestClient) -> None:
     assert body["queued"] == 2
     assert body["total"] == 6
     assert _rows(body)[BROKEN_PATH]["last_error"] is None
+
+
+def test_status_is_public(client: TestClient) -> None:
+    response = client.get("/api/status")
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["state"] == "processing"
+
+
+def test_status_without_storage_is_unavailable() -> None:
+    app = Starlette(routes=process_routes(None, OwnerConfig()))
+    assert TestClient(app).get("/api/status").status_code == 503
 
 
 def test_process_hides_for_visitors_and_shows_for_the_owner(tmp_path: Path) -> None:

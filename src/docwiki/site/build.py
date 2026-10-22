@@ -39,7 +39,7 @@ from docwiki.release.reader import ReleaseNotFoundError, ReleaseReader
 from docwiki.site.answers import build_answers, write_answers
 from docwiki.site.errors import SiteBuildError
 from docwiki.site.linkcheck import check_links
-from docwiki.site.process_page import write_process_page
+from docwiki.site.process_page import STAGES, write_documents_page, write_process_page
 from docwiki.site.security import REPO_URL, default_allowed_hosts, scan_site
 
 __all__ = [
@@ -342,6 +342,7 @@ def site_settings(
             "page": page.path.removesuffix(".md"),
             "title": page.title,
             "original": f"{EVIDENCE_MOUNT}/{page.id}/{originals[0]}" if originals else None,
+            "status": page.status,
         }
     return {
         "schema": 1,
@@ -363,6 +364,7 @@ def site_settings(
         "quality": _quality_summary(gates or []),
         "sources": dict(sorted(sources.items())),
         "answers": len(build_answers(release)["answers"]) if answers is None else answers,
+        "steps": [{"name": name, "text": text} for name, text in STAGES],
     }
 
 
@@ -570,6 +572,7 @@ def build_site(
     write_answers(answers, checkout)
     files = assemble_content(release, checkout / "content")
     write_process_page(checkout / "content")
+    write_documents_page(checkout / "content")
     settings = site_settings(
         release,
         base_url=base,
