@@ -1444,13 +1444,28 @@ section.docwiki-owner-box {
       white-space: nowrap;
     }
 
-    tbody tr:last-child td {
+    // One tbody per document: its row, then its journey when open (one border under both).
+    tbody.is-open > tr:first-child > td,
+    tbody:last-child > tr:last-child > td,
+    tbody:last-child:not(.is-open) > tr:first-child > td {
       border-bottom: none;
     }
 
-    td.docwiki-process-status,
-    td.docwiki-process-when {
+    tr.docwiki-journey-row > td {
+      padding-top: 0;
+    }
+
+    tr[hidden] {
+      display: none;
+    }
+
+    // The status and its one-line phase bar never wrap; the date wraps so the table fits.
+    td.docwiki-process-status {
       white-space: nowrap;
+    }
+
+    td.docwiki-process-when {
+      min-width: 6.5rem;
     }
 
     tr.is-uploaded td {
@@ -1482,6 +1497,15 @@ section.docwiki-owner-box {
         border-bottom: 1px solid var(--lightgray);
       }
 
+      tbody.is-open > tr:first-child {
+        padding-bottom: 0;
+        border-bottom: none;
+      }
+
+      tbody:last-child > tr:last-child {
+        border-bottom: none;
+      }
+
       td {
         padding: 0.1rem 0;
         border: none;
@@ -1500,7 +1524,7 @@ section.docwiki-owner-box {
   }
 
   .docwiki-process-name {
-    min-width: 12rem;
+    min-width: 10rem;
     overflow-wrap: anywhere;
 
     > span,
@@ -1613,6 +1637,261 @@ section.docwiki-owner-box {
     font-size: 0.78rem;
     font-weight: $semiBoldWeight;
     color: var(--secondary);
+  }
+
+  // The polite region: the state sentence, then the last real change (slice C).
+  .docwiki-process-sentence,
+  .docwiki-process-change {
+    display: block;
+  }
+
+  .docwiki-process-change {
+    margin-top: 0.15rem;
+    font-size: 0.88rem;
+    font-weight: $normalWeight;
+    color: var(--darkgray);
+    overflow-wrap: anywhere;
+
+    &:empty {
+      display: none;
+    }
+  }
+
+  // A run at work, in the "now" block.
+  .docwiki-process-at-work {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem 0.5rem;
+    margin-top: 0.45rem;
+    font-size: 0.9rem;
+    color: var(--darkgray);
+    overflow-wrap: anywhere;
+
+    > .docwiki-status {
+      white-space: normal;
+    }
+  }
+
+  // The four phases of a document in one line: shape, word and colour (never colour alone).
+  .docwiki-phases {
+    display: block;
+    margin-top: 0.3rem;
+  }
+
+  .docwiki-phases-bar {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.15rem 0.3rem;
+    font-size: 0.75rem;
+    line-height: 1.45;
+  }
+
+  // One line at 390 px; on phones it wraps only when zoomed, rather than scrolling sideways.
+  @media all and ($mobile) {
+    .docwiki-phases-bar {
+      flex-wrap: wrap;
+    }
+  }
+
+  .docwiki-phase {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    color: var(--dw-st-grey);
+    white-space: nowrap;
+
+    // The thin line between two phases (decorative: the shapes and words carry the meaning).
+    & + .docwiki-phase::before {
+      content: "";
+      width: 0.45rem;
+      margin-right: 0.1rem;
+      border-top: 1px solid var(--dw-st-grey);
+    }
+
+    &.docwiki-phase--done {
+      color: var(--dw-st-wiki);
+    }
+
+    &.docwiki-phase--current {
+      color: var(--dw-st-processing);
+      font-weight: $semiBoldWeight;
+    }
+  }
+
+  .docwiki-phase-shape {
+    font-size: 0.85rem;
+    line-height: 1;
+  }
+
+  // "Follow this document": a disclosure button and the document's journey.
+  .docwiki-follow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 28px;
+    margin: 0.35rem 0 0;
+    padding: 0 0.55rem;
+    border: 1px solid var(--secondary);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--secondary);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: $semiBoldWeight;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--highlight);
+    }
+  }
+
+  .docwiki-follow-icon {
+    display: inline-block;
+  }
+
+  .docwiki-follow[aria-expanded="true"] .docwiki-follow-icon {
+    transform: rotate(90deg);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .docwiki-follow-icon {
+      transition: transform 0.15s ease;
+    }
+  }
+
+  .docwiki-journey {
+    max-width: 46rem;
+    margin: 0.1rem 0 0.2rem;
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  .docwiki-journey-steps {
+    margin: 0;
+    padding: 0 0 0 0.7rem;
+    border-left: 2px solid var(--dw-st-grey);
+    list-style: none;
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+
+  .docwiki-journey-step {
+    display: grid;
+    grid-template-columns: 7rem minmax(0, 1fr);
+    gap: 0.6rem;
+    margin: 0 0 0.3rem;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+
+    @media all and ($mobile) {
+      display: block;
+    }
+  }
+
+  .docwiki-journey-label {
+    font-weight: $semiBoldWeight;
+    color: var(--darkgray);
+
+    @media all and ($mobile) {
+      display: block;
+    }
+  }
+
+  .docwiki-journey-value {
+    min-width: 0;
+    color: var(--darkgray);
+    overflow-wrap: anywhere;
+  }
+
+  .docwiki-journey-pages,
+  .docwiki-release-pages {
+    margin: 0.2rem 0 0;
+    padding: 0;
+    list-style: none;
+
+    > li {
+      margin: 0.1rem 0;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .docwiki-journey-removed {
+    color: var(--gray);
+  }
+
+  .docwiki-change {
+    display: inline-block;
+    padding: 0 0.35rem;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: $semiBoldWeight;
+    line-height: 1.45;
+    color: var(--dw-st-grey);
+
+    &.docwiki-change--added {
+      color: var(--dw-st-wiki);
+    }
+
+    &.docwiki-change--changed {
+      color: var(--dw-st-processing);
+    }
+
+    &.docwiki-change--removed {
+      border-style: dashed;
+    }
+  }
+
+  .docwiki-process-and-more {
+    font-size: 0.8rem;
+    color: var(--gray);
+  }
+
+  // What changed in this release.
+  .docwiki-release-summary {
+    font-size: 0.92rem;
+    color: var(--dark);
+  }
+
+  .docwiki-release-groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(14rem, 100%), 1fr));
+    gap: 0.6rem 1.2rem;
+    margin-top: 0.5rem;
+  }
+
+  .docwiki-release-label {
+    font-size: 0.82rem;
+    font-weight: $semiBoldWeight;
+    color: var(--darkgray);
+  }
+
+  .docwiki-release-pages > li {
+    font-size: 0.86rem;
+  }
+
+  .docwiki-release-type {
+    font-size: 0.72rem;
+    color: var(--gray);
+  }
+
+  // The owner's "Rebuild the wiki" (44 px, the main action of its line).
+  .docwiki-process-rebuild {
+    margin-top: 0.9rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--lightgray);
+  }
+
+  .docwiki-process-submit.docwiki-process-rebuild-button {
+    min-height: 44px;
+    margin-top: 0;
+    padding: 0.5rem 1.2rem;
   }
 }
 
