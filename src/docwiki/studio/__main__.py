@@ -54,17 +54,20 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     quiet_sdk_http_logs(logging.INFO)
-    from docwiki.orchestration.telemetry import configure_exporter
+    from docwiki.orchestration.telemetry import configure_exporter, instrument_asgi
     from docwiki.studio.wiring import build_app
 
     # Uploads, questions and approval decisions are logged: with Application Insights configured
     # (the container's case) they become an audit trail next to the pipeline's spans.
-    configure_exporter()
+    exporting = configure_exporter()
     try:
         app = build_app(local=args.local)
     except (StudioConfigError, SettingsError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
+
+    if exporting:
+        app = instrument_asgi(app)
 
     import uvicorn
 

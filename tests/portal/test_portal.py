@@ -224,3 +224,20 @@ def test_storage_from_env(tmp_path: Path) -> None:
     assert isinstance(storage, FolderStorage)
     with pytest.raises(SystemExit, match="expected local or azure"):
         storage_from_env({"DOCWIKI_MODE": "cloud"})
+
+
+def test_portal_wraps_its_app_only_when_exporting(monkeypatch, tmp_path):
+    import uvicorn
+
+    from docwiki.portal import __main__ as portal_main
+
+    (tmp_path / "index.html").write_text("<p>wiki</p>", encoding="utf-8")
+    served: list[object] = []
+    monkeypatch.setattr(uvicorn, "run", lambda app, **_kwargs: served.append(app))
+    monkeypatch.setattr(portal_main.LiveAsk, "from_env", staticmethod(lambda _env: None))
+    monkeypatch.setattr(portal_main, "instrument_asgi", lambda app: ("traced", app))
+    for exporting in (False, True):
+        monkeypatch.setattr(portal_main, "configure_exporter", lambda e=exporting: e)
+        assert portal_main.main(["--site-dir", str(tmp_path)]) == 0
+    plain, traced = served
+    assert not isinstance(plain, tuple) and traced[0] == "traced"
