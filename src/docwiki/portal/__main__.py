@@ -23,6 +23,7 @@ from docwiki.contracts.layout import StorageKeys
 from docwiki.contracts.settings import SETTINGS_DEFAULTS, SettingsKeys
 from docwiki.contracts.storage import FolderStorage, Storage
 from docwiki.logs import quiet_sdk_http_logs
+from docwiki.orchestration.telemetry import configure_exporter, instrument_asgi
 from docwiki.portal.app import create_app
 from docwiki.portal.live_ask import LiveAsk
 from docwiki.portal.sync import SiteSync
@@ -65,6 +66,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     quiet_sdk_http_logs(logging.INFO)
+    # With Application Insights configured (the container's case) every page and /api/ask call
+    # becomes a request, and the live-ask logs and the agent calls are correlated with it.
+    exporting = configure_exporter()
     live_ask = LiveAsk.from_env(os.environ)
     if live_ask is not None:
         logging.getLogger("docwiki.portal").info("live ask is on (DOCWIKI_LIVE_ASK=1)")
@@ -82,6 +86,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             poll_seconds=args.poll_seconds,
             live_ask=live_ask,
         )
+    if exporting:
+        app = instrument_asgi(app)
     uvicorn.run(app, host=args.host, port=args.port, server_header=False, log_level="info")
     return 0
 

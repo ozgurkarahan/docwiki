@@ -239,6 +239,33 @@ def test_jobs_export_to_application_insights_when_configured(monkeypatch):
     assert calls == [{"logger_name": "docwiki"}]
 
 
+def test_starlette_requests_become_server_spans_except_health_probes():
+    """configure_azure_monitor does not instrument plain Starlette: the portal and the Studio
+    sent no requests to Application Insights."""
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+    from opentelemetry.trace import SpanKind
+    from starlette.applications import Starlette
+    from starlette.responses import PlainTextResponse
+    from starlette.routing import Route
+    from starlette.testclient import TestClient
+
+    from docwiki.orchestration import telemetry
+
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    ok = lambda _request: PlainTextResponse("ok")  # noqa: E731
+    app = Starlette(routes=[Route("/healthz", ok), Route("/{path:path}", ok)])
+    client = TestClient(telemetry.instrument_asgi(app, tracer_provider=provider))
+    assert client.get("/healthz").status_code == 200
+    assert client.get("/topics/pumps").status_code == 200
+    spans = exporter.get_finished_spans()
+    assert [span.kind for span in spans] == [SpanKind.SERVER]
+    assert spans[0].attributes["http.status_code"] == 200
+
+
 def test_worker_configures_console_logs_and_the_exporter(monkeypatch, tmp_path):
     from docwiki import cli
     from docwiki.orchestration import telemetry

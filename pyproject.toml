@@ -33,6 +33,7 @@ azure = [
   "azure-ai-projects>=2.0",
   "openai>=1.60",
   "azure-monitor-opentelemetry>=1.6",
+  "opentelemetry-instrumentation-asgi>=0.46b0",
   "opentelemetry-sdk>=1.25",
   "aiohttp>=3.9",
 ]

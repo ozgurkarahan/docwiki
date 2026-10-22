@@ -21,6 +21,7 @@ __all__ = [
     "console_logs",
     "engine_logger",
     "flush_exporter",
+    "instrument_asgi",
     "stage_span",
 ]
 
@@ -47,6 +48,27 @@ def configure_exporter() -> bool:
         return False
     configure_azure_monitor(logger_name="docwiki")
     return True
+
+
+def instrument_asgi(app: Any, *, tracer_provider: Any | None = None) -> Any:
+    """Wrap a Starlette app so each HTTP request becomes an Application Insights request.
+
+    ``configure_azure_monitor`` instruments FastAPI, Flask and Django but not plain Starlette:
+    the portal and the Studio sent no requests at all, only their outgoing calls. Health probes
+    are left out and so are the per-message receive/send spans. Call it after
+    :func:`configure_exporter` returned true; without OpenTelemetry the app is returned as is.
+    """
+    try:
+        from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
+    except ImportError:
+        engine_logger.warning("opentelemetry-instrumentation-asgi is missing: requests not traced")
+        return app
+    return OpenTelemetryMiddleware(
+        app,
+        excluded_urls="/healthz,/livez",
+        exclude_spans=["receive", "send"],
+        tracer_provider=tracer_provider,
+    )
 
 
 def console_logs() -> None:
