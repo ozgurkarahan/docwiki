@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -236,7 +237,7 @@ def test_only_the_owner_rebuilds(storage: FolderStorage) -> None:
     sent: list[QueueMessage] = []
     client = _client(_service(storage, enqueue=sent.append))
     assert client.put("/api/owner/runs/key-0001").status_code == 401
-    forged = {"x-ms-client-principal-id": "00000000-0000-0000-0000-000000000bad"}
+    forged = {"x-ms-client-principal-id": str(uuid.UUID(int=0xBAD))}
     assert (
         client.put(
             "/api/owner/runs/key-0001", headers={**forged, "x-docwiki-owner": "1"}

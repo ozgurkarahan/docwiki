@@ -148,7 +148,7 @@ def test_last_change_and_release_changes_are_checked() -> None:
             contradictions: {opened: [{title: "D", url: "/d"}]},
           }),
           docs: m.parseRunDocuments([{path: "planning/x.xlsx", title: null, change: "new"}, {}]),
-          urls: ["/a", "//b", "https://c", "/d\\\\e", 3].map(m.siteUrl),
+          urls: ["/a", "//b.example.org", "https://c.example.org", "/d\\\\e", 3].map(m.siteUrl),
         }"""
     )
     assert isinstance(result, dict)
