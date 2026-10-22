@@ -1883,6 +1883,7 @@ a.docwiki-sign-in {
 
 .docwiki-documents-links {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.4rem;
 
   a {
