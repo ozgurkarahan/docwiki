@@ -14,7 +14,11 @@ export default (() => {
   const Process: QuartzComponent = ({ fileData, displayClass }: QuartzComponentProps) => {
     if (fileData.slug !== PROCESS_SLUG) return null
     return (
-      <section class={classNames(displayClass, "docwiki-process")} aria-label="The process, live">
+      <section
+        id="docwiki-live"
+        class={classNames(displayClass, "docwiki-process")}
+        aria-label="The process, live"
+      >
         <p class="docwiki-process-placeholder">Live status appears here on the deployed site.</p>
       </section>
     )

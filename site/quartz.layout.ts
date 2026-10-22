@@ -43,6 +43,8 @@ export const defaultContentPageLayout: PageLayout = {
     DocWiki.Breadcrumbs(),
     Component.ArticleTitle(),
     Component.ContentMeta(),
+    // The how-it-works page only: the owner's sign-in and upload form, before the text.
+    DocWiki.OwnerBox(),
     // Home page only: how the release was built, then a collapsible "About DocWiki".
     DocWiki.About(),
     DocWiki.EvidenceHeader(),

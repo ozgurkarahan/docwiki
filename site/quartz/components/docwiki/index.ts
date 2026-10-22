@@ -5,6 +5,17 @@ import Breadcrumbs from "./Breadcrumbs"
 import EvidenceHeader from "./EvidenceHeader"
 import Footer from "./Footer"
 import Head from "./Head"
+import OwnerBox from "./OwnerBox"
 import Process from "./Process"
 
-export { About, AskPanel, Banner, Breadcrumbs, EvidenceHeader, Footer, Head, Process }
+export {
+  About,
+  AskPanel,
+  Banner,
+  Breadcrumbs,
+  EvidenceHeader,
+  Footer,
+  Head,
+  OwnerBox,
+  Process,
+}
