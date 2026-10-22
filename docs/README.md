@@ -9,7 +9,6 @@ Start with the [project README](../README.md) for the overview and the ways to t
 | [Architecture](architecture.md) | Understand the components, the 13 stages, run control, the release lifecycle and identities |
 | [Wiki format](wiki-format.md) | Learn what a generated wiki contains, with an example page and its evidence |
 | [Agents](agents.md) | See how the Researcher and the Librarian behave, their tools, approvals and routine |
-| [Studio](studio.md) | Use the web app: add documents, follow the pipeline, ask the agents; its access model and a demo script |
 | [Skills and agent kit](skills.md) | Use `AGENTS.md`, `llms.txt`, the catalog, the search index and the Agent Skills |
 | [Local agents](local-agents.md) | Connect GitHub Copilot (VS Code and CLI), Claude Code or Codex to a wiki |
 | [Domain packs](domain-packs.md) | Adapt DocWiki to your own industry |

@@ -38,12 +38,11 @@ also trigger work. This page describes the threat model and the controls. The no
 |---|---|
 | Jobs identity (`ingest`, `reconcile`) | Read `raw`; read and write `work` and `releases`; process the `ingest` queue; call Foundry models and Content Understanding; pull images |
 | MCP identity | Read `releases`; write in `work` only under `reports/`, `proposals/` and `state/overlay.yaml` (role-assignment condition); send to the `ingest` queue; pull images. Nothing on `raw`, nothing on Foundry |
-| Portal identity | Read `releases`; pull images |
-| Studio identity | Upload to `raw` (a role-assignment condition denies deletes); read `work` and write filed answers only under `work/inbox/queries/` (a custom role with blob read, write and create only, so no delete, move or container management, and a condition that denies every other write); read `releases`; peek the `ingest` queue; ask the Foundry agents; pull images |
+| Portal identity | Read `releases`, `raw` and `work` and peek the `ingest` queue (the live process view); with owners set, upload to `raw` (a role-assignment condition denies deletes); pull images |
 | Event Grid system topic | Send to the `ingest` queue |
 | Researcher agent identity | App role `Wiki.Read` on the MCP API |
 | Librarian agent identity | App roles `Wiki.Read` and `Wiki.Operate` on the MCP API |
-| People | Entra sign-in: the deployer (resource group owner and Entra application rights), operators (data roles on `raw` and the queues), portal readers (assigned to the portal application), the Studio owner (assigned to the Studio application and listed in its allow-list) |
+| People | Entra sign-in: the deployer (resource group owner and Entra application rights), operators (data roles on `raw` and the queues), portal readers (assigned to the portal application), the owner of a public portal (assigned to the portal application and listed in `DOCWIKI_PORTAL_OWNERS`) |
 
 Platform settings: Foundry `disableLocalAuth: true`; storage `allowSharedKeyAccess: false` and no
 public blob access; registry admin user disabled; MCP built-in authentication with
@@ -52,12 +51,6 @@ no token store and no client secret, external ingress only once it is verified, 
 validation in the server (`DOCWIKI_MCP_TOKEN_VALIDATION=required`). The full role list and how to
 verify it are in
 [BOOTSTRAP.md, step 7](../BOOTSTRAP.md#step-7--verify-resources-security-settings-and-rbac).
-
-A role-assignment condition filters data actions only, never control-plane actions such as
-deleting or rewriting a container. The Studio's role on `work` is therefore a custom role with
-no control-plane action at all (blob read, write and create only) rather than Storage Blob Data
-Contributor; the deployer creates it, which needs `Microsoft.Authorization/roleDefinitions/write`
-on the resource group (included in Owner and User Access Administrator).
 
 The MCP authorization chain has four independent layers: Entra refuses tokens to unassigned
 principals, built-in authentication accepts only the right audience from allow-listed clients,
@@ -75,13 +68,15 @@ or groups assigned to its enterprise application get in. A public-audience deplo
 without sign-in (`DOCWIKI_PORTAL_ACCESS=public`): it then exposes only the static site of a build
 that excludes internal and restricted sources; any other audience keeps the portal without ingress.
 
-The optional Studio ([studio.md](studio.md)) can upload documents and spend model tokens, so it
-fails closed at every layer: no ingress until its sign-in is declared and verified; Entra sign-in
-with ID tokens, no client secret and assignment required; an application allow-list of object IDs
-(written by the hook, empty means nobody); `X-DocWiki-Studio` header plus same-origin checks
-against cross-site request forgery; a Content Security Policy without inline script; model output
-rendered as text; daily limits on questions and uploads. Unlike the portal it never runs without
-sign-in.
+On a public portal only the owner uploads documents, signed in on the same site
+([ADR 0009](adr/0009-one-site.md)), and every layer fails closed: built-in authentication in
+`AllowAnonymous` mode (ID tokens, no client secret, assignment required), verified by the hook
+before the container gets its owners; an application allow-list of object IDs
+(`DOCWIKI_PORTAL_OWNERS`, written by the hook, empty means nobody); owner calls use GET and PUT
+only, with the `X-DocWiki-Owner` header and same-origin checks against cross-site request forgery;
+an upload never deletes or overwrites without `?replace=1`, is limited to the supported formats and
+50 MB, and to a daily allowance. Its write on `raw` carries a role-assignment condition that denies
+deletes ([operations](operations.md#owner-sign-in-and-uploads-on-the-public-portal)).
 
 ## Content safety in the pipeline
 

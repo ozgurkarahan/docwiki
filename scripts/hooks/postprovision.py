@@ -28,30 +28,21 @@ select them by name):
                        ``/livez`` excluded); then, in this order: verify it and only then give
                        the running container ``DOCWIKI_PORTAL_OWNERS``. The owner's upload
                        right on ``raw/`` follows on the next ``azd provision``.
-4. ``studio``          Only with ``DOCWIKI_ENABLE_STUDIO=true`` and a deployer who is a user (the
-                       Studio signs in its owner): sign-in app registration (ID tokens, no client
-                       secret, assignment required, the deployer assigned), the deployer's object
-                       ID as ``DOCWIKI_STUDIO_ALLOWED_PRINCIPALS`` unless already set, built-in
-                       auth on the ``studio`` app (``RedirectToLoginPage``, ``/healthz`` and
-                       ``/livez`` excluded); then, in this order: verify it with
-                       ``az containerapp auth show``, give the running container
-                       ``DOCWIKI_STUDIO_ALLOWED_PRINCIPALS`` (the app refuses everyone without
-                       it) and only then enable external ingress.
-5. ``mcp-connection``  Foundry project connection of the agents' MCP tool: ``RemoteTool``,
+4. ``mcp-connection``  Foundry project connection of the agents' MCP tool: ``RemoteTool``,
                        ``AgenticIdentityToken``, target ``DOCWIKI_MCP_URL``, audience
                        ``api://<appId>`` (ARM, same properties as
                        ``infra/modules/mcp-connection.bicep``).
-6. ``agents``          ``agents/deploy.py --json`` (``--routine enable`` when
+5. ``agents``          ``agents/deploy.py --json`` (``--routine enable`` when
                        ``DOCWIKI_ENABLE_ROUTINE=true``); records each agent's identity.
-7. ``agent-roles``     App roles for the agent identities: Researcher ``Wiki.Read``, Librarian
+6. ``agent-roles``     App roles for the agent identities: Researcher ``Wiki.Read``, Librarian
                        ``Wiki.Read`` + ``Wiki.Operate``.
-8. ``mcp-allowlist``   Built-in auth ``allowedApplications`` = the agents' client IDs (except
+7. ``mcp-allowlist``   Built-in auth ``allowedApplications`` = the agents' client IDs (except
                        ``DOCWIKI_MCP_BLOCKED_AGENTS``); an empty list means 403 for every agent.
                        Verified again, and the server's caller allowlist follows.
-9. ``content-understanding``  Only with ``DOCWIKI_CU_DEFAULTS=true``: Content Understanding
+8. ``content-understanding``  Only with ``DOCWIKI_CU_DEFAULTS=true``: Content Understanding
                        model defaults.
 
-``DOCWIKI_SKIP_AGENTS=true`` skips steps 5 and 6. Created Entra objects, agents and
+``DOCWIKI_SKIP_AGENTS=true`` skips steps 4 and 5. Created Entra objects, agents and
 assignments are recorded in ``.azure/<env>/docwiki-state.json`` (git-ignored), which
 ``scripts/teardown.py`` uses to delete them.
 
@@ -110,9 +101,6 @@ ADR_0003 = "docs/adr/0003-mcp-agent-identity.md"
 TOKEN_VALIDATION_MODES = ("required", "off")
 
 DEFAULT_MCP_CONNECTION = "docwiki-mcp"
-# Object IDs allowed into the Studio: read by the app (an empty list refuses everyone) and
-# written to the azd environment (-> Bicep parameter studioAllowedPrincipals) by the studio step.
-STUDIO_PRINCIPALS_SETTING = "DOCWIKI_STUDIO_ALLOWED_PRINCIPALS"
 # The owners of the public portal (ADR 0009): read by the app (it accepts an owner call only from
 # one of them) and written to the azd environment (-> Bicep parameter portalOwners).
 PORTAL_OWNERS_SETTING = "DOCWIKI_PORTAL_OWNERS"
@@ -596,76 +584,6 @@ def secure_portal_owner(ctx: Context, app_name: str, host: str) -> None:
     info(f"owner sign-in ready at https://{custom_domain or host}/how-it-works")
 
 
-def secure_studio_app(tools: Tools, app_name: str, spec: AuthSpec, allowed_principals: str) -> None:
-    """Expose the Studio only behind verified built-in auth, with its owner allowlist.
-
-    Same order as the MCP app (fail closed): verify built-in auth, make sure the running
-    container has the allowlist (on the first provision Bicep ran before the hook set it, and the
-    app refuses everyone without it), then enable external ingress.
-    """
-    verify_auth_enabled(tools, app_name, spec)
-    app = tools.rest("GET", container_app_url(tools, app_name)) or {}
-    ensure_container_settings(
-        tools,
-        app_name,
-        app,
-        {STUDIO_PRINCIPALS_SETTING: allowed_principals},
-        label="Studio owner allowlist",
-    )
-    ensure_external_ingress(tools, app_name, app=app)
-
-
-def step_studio(ctx: Context) -> None:
-    tools = ctx.tools
-    if not is_true(tools.get("DOCWIKI_ENABLE_STUDIO")):
-        info("studio disabled (DOCWIKI_ENABLE_STUDIO=false): skipped")
-        return
-    values = tools.require("DOCWIKI_STUDIO_APP_NAME", "DOCWIKI_CONTAINER_APPS_DEFAULT_DOMAIN")
-    app_name = values["DOCWIKI_STUDIO_APP_NAME"]
-    host = f"{app_name}.{values['DOCWIKI_CONTAINER_APPS_DEFAULT_DOMAIN']}"
-    owner, owner_type = ctx.principal()
-    if owner_type != "User":
-        warn(
-            f"the Studio signs in its owner and the deployer is a {owner_type}, not a user: "
-            "the Studio stays without ingress (run the hook signed in as the user who owns it)"
-        )
-        return
-    suffix, tag = ctx.names()
-    previous = ctx.state.get("studio_app") or {}
-    registration = entra.ensure_portal_app(
-        tools,
-        display_name=f"docwiki-studio-{suffix}",
-        tag=tag,
-        known_app_id=previous.get("app_id") or tools.get("DOCWIKI_STUDIO_CLIENT_ID") or None,
-        redirect_uri=f"https://{host}/.auth/login/aad/callback",
-        owner_object_id=owner,
-        description="DocWiki Studio sign-in (owner only).",
-    )
-    ctx.state["studio_app"] = registration.to_state(previous)
-    ctx.save()
-    tools.azd_env_set("DOCWIKI_STUDIO_CLIENT_ID", registration.app_id)
-    # Sign-in requires an assignment: grant the deployer; the Studio has no other user.
-    entra.ensure_app_role_assignment(
-        tools,
-        resource_sp_id=registration.service_principal_id,
-        principal_id=owner,
-        role_id=entra.DEFAULT_ACCESS_ROLE_ID,
-    )
-    allowed = tools.get(STUDIO_PRINCIPALS_SETTING)
-    if not allowed:
-        tools.azd_env_set(STUDIO_PRINCIPALS_SETTING, owner)
-        allowed = owner
-    spec = AuthSpec(
-        client_id=registration.app_id,
-        audiences=(registration.app_id,),
-        action="RedirectToLoginPage",
-        excluded_paths=("/healthz", "/livez"),
-    )
-    apply_auth(tools, app_name, spec, deployment_name="docwiki-studio-auth")
-    secure_studio_app(tools, app_name, spec, allowed)
-    info(f"studio ready at https://{host}/ (Entra sign-in, owner only)")
-
-
 # ---------------------------------------------------------------------------
 # Agents (ADR 0003: docs/adr/0003-mcp-agent-identity.md)
 # ---------------------------------------------------------------------------
@@ -1061,7 +979,6 @@ STEPS: tuple[tuple[str, Callable[[Context], None]], ...] = (
     ("mcp-api", step_mcp_api),
     ("mcp-auth", step_mcp_auth),
     ("portal", step_portal),
-    ("studio", step_studio),
     ("mcp-connection", step_mcp_connection),
     ("agents", step_agents),
     ("agent-roles", step_agent_roles),

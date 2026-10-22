@@ -109,7 +109,6 @@ class Settings:
     deployment_sku: str
     models: list[ModelChoice] = field(default_factory=list)
     budget_contacts: list[str] = field(default_factory=list)
-    studio_enabled: bool = False
 
     @classmethod
     def from_tools(cls, tools: Tools, defaults: dict[str, str]) -> Settings:
@@ -150,8 +149,6 @@ class Settings:
                 ),
             ],
             budget_contacts=[item for item in contacts if item],
-            studio_enabled=value("DOCWIKI_ENABLE_STUDIO", "enableStudio").strip().lower()
-            in {"1", "true", "yes"},
         )
 
 
@@ -340,28 +337,12 @@ def evaluate_quota(
     return checks
 
 
-def evaluate_roles(
-    assignments: Iterable[dict[str, Any]], subscription: str, *, custom_roles: bool = False
-) -> Check:
-    """Owner, or Contributor + an access administrator role.
-
-    ``custom_roles``: the deployment defines a custom role (the Studio's role on ``work``), which
-    needs ``Microsoft.Authorization/roleDefinitions/write``: User Access Administrator has it,
-    Role Based Access Control Administrator does not.
-    """
+def evaluate_roles(assignments: Iterable[dict[str, Any]], subscription: str) -> Check:
+    """Owner, or Contributor + an access administrator role."""
     names = {str(item.get("roleDefinitionName")) for item in assignments}
     if "Owner" in names:
         return Check("deployer-roles", OK, "Owner")
     admin = names & {"User Access Administrator", "Role Based Access Control Administrator"}
-    if custom_roles and admin == {"Role Based Access Control Administrator"}:
-        return Check(
-            "deployer-roles",
-            FAIL,
-            "Role Based Access Control Administrator cannot create the Studio's custom role "
-            "(Microsoft.Authorization/roleDefinitions/write)",
-            "Ask for Owner (or User Access Administrator) on subscription "
-            f"{subscription}, or set DOCWIKI_ENABLE_STUDIO=false.",
-        )
     if "Contributor" in names and admin:
         return Check("deployer-roles", OK, "Contributor + " + sorted(admin)[0])
     shown = ", ".join(sorted(names)) or "none"
@@ -689,7 +670,7 @@ class Preflight:
                 Check("deployer-roles", WARN, "could not list role assignments", SIGN_IN_AGAIN)
             )
             return
-        self.add(evaluate_roles(data, self.subscription, custom_roles=self.settings.studio_enabled))
+        self.add(evaluate_roles(data, self.subscription))
 
     def check_entra(self) -> None:
         if self.skipped("entra"):

@@ -8,7 +8,8 @@
   regions where Foundry models, agents and Content Understanding are available.
 - Container images built remotely in the registry (no local Docker required):
   `docker/job.Dockerfile` (Python + Node 22 + pinned Quartz for the site stage),
-  `docker/mcp.Dockerfile`, `docker/portal.Dockerfile`, `docker/studio.Dockerfile` (four images).
+  `docker/mcp.Dockerfile`, `docker/portal.Dockerfile` (three images; `docker/studio.Dockerfile`
+  was removed in v1.6 with the Studio, [ADR 0009](../adr/0009-one-site.md)).
 - Parameters (with defaults): `fastModel`/`fastModelVersion`/`fastCapacity`,
   `smartModel`/`smartModelVersion`/`smartCapacity`, `deploymentSku` (`GlobalStandard` by
   default; `DataZoneStandard` for data residency), `mcpMinReplicas` (0; set 1 for demos), `enablePortal` (false),

@@ -273,7 +273,7 @@ def ensure_portal_app(
     owner_object_id: str = "",
     description: str = "DocWiki private portal sign-in.",
 ) -> AppRegistration:
-    """Sign-in app of a web app (portal, Studio): web redirect URIs (``extra_redirect_uris``, for
+    """Sign-in app of a web app (the portal): web redirect URIs (``extra_redirect_uris``, for
     example a custom domain's) and ID tokens only (no client secret). ``description`` is only used
     when the registration is created."""
     wanted = unique([redirect_uri, *extra_redirect_uris])

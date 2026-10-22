@@ -189,6 +189,8 @@ def test_second_run_has_nothing_left_to_delete(
 
 
 def with_studio(state_file: Path, *, created_by_hook: bool = True) -> None:
+    """The sign-in registration of the standalone Studio (removed in v1.6, ADR 0009), as an
+    older postprovision hook recorded it: teardown still deletes it."""
     state = azdlib.load_state(state_file)
     state["studio_app"] = {
         "object_id": "obj-3",
