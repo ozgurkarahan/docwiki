@@ -18,8 +18,16 @@ select them by name):
                        ``DOCWIKI_MCP_TOKEN_VALIDATION``) and only then enable external ingress.
 3. ``portal``          Only with ``DOCWIKI_ENABLE_PORTAL=true``: sign-in app registration (ID
                        tokens, no client secret), built-in auth with ``RedirectToLoginPage``.
-                       With ``DOCWIKI_PORTAL_ACCESS=public`` (public-audience builds only) there
-                       is no sign-in and nothing to register: Bicep gives the portal its ingress.
+                       With ``DOCWIKI_PORTAL_ACCESS=public`` (public-audience builds only) Bicep
+                       gives the portal its ingress and every page stays anonymous; the owner's
+                       sign-in (ADR 0009, unless ``DOCWIKI_PORTAL_OWNER_SIGN_IN=false``, deployer
+                       must be a user): registration (assignment required, the deployer
+                       assigned, redirect URIs of the default host and the custom domain), the
+                       deployer's object ID as ``DOCWIKI_PORTAL_OWNERS`` unless already set,
+                       built-in auth with ``AllowAnonymous`` (``/api/ask``, ``/healthz`` and
+                       ``/livez`` excluded); then, in this order: verify it and only then give
+                       the running container ``DOCWIKI_PORTAL_OWNERS``. The owner's upload
+                       right on ``raw/`` follows on the next ``azd provision``.
 4. ``studio``          Only with ``DOCWIKI_ENABLE_STUDIO=true`` and a deployer who is a user (the
                        Studio signs in its owner): sign-in app registration (ID tokens, no client
                        secret, assignment required, the deployer assigned), the deployer's object
@@ -105,6 +113,12 @@ DEFAULT_MCP_CONNECTION = "docwiki-mcp"
 # Object IDs allowed into the Studio: read by the app (an empty list refuses everyone) and
 # written to the azd environment (-> Bicep parameter studioAllowedPrincipals) by the studio step.
 STUDIO_PRINCIPALS_SETTING = "DOCWIKI_STUDIO_ALLOWED_PRINCIPALS"
+# The owners of the public portal (ADR 0009): read by the app (it accepts an owner call only from
+# one of them) and written to the azd environment (-> Bicep parameter portalOwners).
+PORTAL_OWNERS_SETTING = "DOCWIKI_PORTAL_OWNERS"
+# Built-in auth refuses every browser POST that carries its session cookie: the public ask is
+# excluded, the owner's routes use GET and PUT only.
+PORTAL_OWNER_EXCLUDED_PATHS = ("/api/ask", "/healthz", "/livez")
 CONNECTION_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{2,32}$")
 # `auth.strategy` the agent definitions declare; agents/deploy.py checks the connection with it.
 AGENT_AUTH_STRATEGY = "per-agent-identity"
@@ -483,7 +497,8 @@ def step_portal(ctx: Context) -> None:
     if (tools.get("DOCWIKI_PORTAL_ACCESS") or "entra").strip().lower() == "public":
         # Bicep gives the portal its ingress itself, and only for a public-audience build.
         if is_true(tools.get("DOCWIKI_PORTAL_ANONYMOUS")):
-            info(f"portal ready at https://{host}/ (no sign-in: public-audience build)")
+            info(f"portal ready at https://{host}/ (public: every page without sign-in)")
+            secure_portal_owner(ctx, app_name, host)
         else:
             warn(
                 "DOCWIKI_PORTAL_ACCESS=public needs DOCWIKI_AUDIENCE=public: the portal stays "
@@ -520,6 +535,65 @@ def step_portal(ctx: Context) -> None:
     apply_auth(tools, app_name, spec, deployment_name="docwiki-portal-auth")
     ensure_external_ingress(tools, app_name)
     info(f"portal ready at https://{host}/ (Entra sign-in)")
+
+
+def secure_portal_owner(ctx: Context, app_name: str, host: str) -> None:
+    """The owner's sign-in on the public portal (ADR 0009), fail closed: the container gets its
+    owners only once built-in auth (AllowAnonymous) is verified in front of it, since without it
+    any client could send the principal header itself."""
+    tools = ctx.tools
+    if not is_true(tools.get("DOCWIKI_PORTAL_OWNER_SIGN_IN"), default=True):
+        info("owner sign-in on the portal disabled (DOCWIKI_PORTAL_OWNER_SIGN_IN=false): skipped")
+        return
+    owner, owner_type = ctx.principal()
+    if owner_type != "User":
+        warn(
+            f"the portal signs in its owner and the deployer is a {owner_type}, not a user: "
+            "no sign-in and no uploads (run the hook signed in as the user who owns it)"
+        )
+        return
+    suffix, tag = ctx.names()
+    previous = ctx.state.get("portal_app") or {}
+    custom_domain = (tools.get("DOCWIKI_PORTAL_CUSTOM_DOMAIN") or "").strip()
+    registration = entra.ensure_portal_app(
+        tools,
+        display_name=f"docwiki-portal-{suffix}",
+        tag=tag,
+        known_app_id=previous.get("app_id") or tools.get("DOCWIKI_PORTAL_CLIENT_ID") or None,
+        redirect_uri=f"https://{host}/.auth/login/aad/callback",
+        extra_redirect_uris=(
+            (f"https://{custom_domain}/.auth/login/aad/callback",) if custom_domain else ()
+        ),
+        owner_object_id=owner,
+        description="DocWiki portal: the owner's sign-in (uploads).",
+    )
+    ctx.state["portal_app"] = registration.to_state(previous)
+    ctx.save()
+    tools.azd_env_set("DOCWIKI_PORTAL_CLIENT_ID", registration.app_id)
+    # Sign-in requires an assignment: grant the deployer; nobody else signs in.
+    entra.ensure_app_role_assignment(
+        tools,
+        resource_sp_id=registration.service_principal_id,
+        principal_id=owner,
+        role_id=entra.DEFAULT_ACCESS_ROLE_ID,
+    )
+    owners = tools.get(PORTAL_OWNERS_SETTING)
+    if not owners:
+        tools.azd_env_set(PORTAL_OWNERS_SETTING, owner)
+        owners = owner
+    spec = AuthSpec(
+        client_id=registration.app_id,
+        audiences=(registration.app_id,),
+        action="AllowAnonymous",
+        excluded_paths=PORTAL_OWNER_EXCLUDED_PATHS,
+    )
+    apply_auth(tools, app_name, spec, deployment_name="docwiki-portal-auth")
+    verify_auth_enabled(tools, app_name, spec)
+    app = tools.rest("GET", container_app_url(tools, app_name)) or {}
+    ensure_container_settings(
+        tools, app_name, app, {PORTAL_OWNERS_SETTING: owners}, label="portal owners"
+    )
+    info(f"owner sign-in ready at https://{custom_domain or host}/how-it-works")
 
 
 def secure_studio_app(tools: Tools, app_name: str, spec: AuthSpec, allowed_principals: str) -> None:

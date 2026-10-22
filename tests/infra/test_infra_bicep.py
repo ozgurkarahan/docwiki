@@ -27,6 +27,7 @@ from docwiki.contracts.settings import SettingsKeys
 from docwiki.llm import settings as llm_settings
 from docwiki.orchestration import settings as orchestration_settings
 from docwiki.portal.live_ask import ENABLE_ENV
+from docwiki.portal.owner import OWNERS_ENV
 from docwiki.site import build as site_build
 from docwiki.stages import agentkit
 
@@ -201,6 +202,7 @@ def test_container_settings_are_known_keys() -> None:
         if name.endswith("_ENV") and isinstance(value, str)
     }
     known.add(ENABLE_ENV)  # the portal's live ask (docwiki.portal.live_ask)
+    known.add(OWNERS_ENV)  # the portal's owners (docwiki.portal.owner, ADR 0009)
     assert names <= known, f"unknown settings: {sorted(names - known)}"
     for required in (
         "DOCWIKI_FOUNDRY_PROJECT_ENDPOINT",
@@ -290,7 +292,12 @@ def test_portal_without_sign_in_only_for_public_audience_builds() -> None:
         "!empty(portalClientId))" in main
     )
     assert (
-        "module portalAuth 'modules/app-auth.bicep' = if (portalPublic && !portalAnonymous)" in main
+        "var portalOwnerSignIn = portalAnonymous && !empty(portalClientId) && "
+        "!empty(portalOwners)" in main
+    )
+    assert (
+        "module portalAuth 'modules/app-auth.bicep' = if ((portalPublic && !portalAnonymous) || "
+        "portalOwnerSignIn)" in main
     )
     portal = main[main.index("module portalApp") : main.index("module mcpAuth")]
     assert "ingressMode: portalPublic ? 'external' : 'none'" in portal
@@ -458,14 +465,14 @@ def test_studio_storage_access_is_least_privilege() -> None:
     ]
     for name, _, seed, role in assigned:
         assert seed == role, f"{name}: the role that seeds the name is the one assigned"
-    condition = bicep_multiline_var(storage, "studioRawCondition")
+    condition = bicep_multiline_var(storage, "noDeleteCondition")
     delete = (
         "!(ActionMatches{'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete'})"
     )
     assert delete in condition
     assert condition.count("ActionMatches") == 1, "only the delete is withheld from the role"
     raw = _resource(storage, "studioRawContributor")
-    assert "condition: studioRawCondition" in raw and "conditionVersion: '2.0'" in raw
+    assert "condition: noDeleteCondition" in raw and "conditionVersion: '2.0'" in raw
     assert "principalType: 'ServicePrincipal'" in raw
     work = _resource(storage, "studioWorkInboxWriter")
     assert "condition: studioWorkInboxCondition" in work and "conditionVersion: '2.0'" in work
@@ -595,7 +602,7 @@ def test_studio_work_condition_covers_every_data_action_of_the_role() -> None:
     assert re.findall(rf"{re.escape(path)} (\w+) '([^']*)'", condition) == [
         ("StringStartsWith", INBOX)
     ]
-    raw = bicep_multiline_var(storage, "studioRawCondition")
+    raw = bicep_multiline_var(storage, "noDeleteCondition")
     for action in ("read", "write", "add/action"):
         assert evaluate_condition(raw, f"blobs/{action}", path="uploads/a.pdf", container="raw")
     assert not evaluate_condition(raw, "blobs/delete", path="uploads/a.pdf", container="raw")
@@ -771,7 +778,39 @@ def test_mcp_storage_access_is_least_privilege() -> None:
     )
     assert sorted(mcp_scopes) == ["ingestQueue", "releasesContainer", "workContainer"]
     portal_scopes = re.findall(r"resource portal\w+ '[^']+' = \{\s*scope: (\w+)", storage)
-    assert portal_scopes == ["releasesContainer"]
+    assert portal_scopes == ["releasesContainer", "workContainer", "ingestQueue"]
+
+
+def test_portal_storage_access_is_least_privilege() -> None:
+    """ADR 0009: the portal reads releases/, raw/ and work/ and peeks the queue; only with the
+    owner's uploads may it write raw/, and never delete there."""
+    storage = (INFRA / "modules" / "storage.bicep").read_text(encoding="utf-8")
+    reader = storage[storage.index("resource portalRawReader") :]
+    reader = reader[: reader.index("\n}\n")]
+    assert "= if (!portalUploads)" in reader and "storageBlobDataReader" in reader
+    uploader = storage[storage.index("resource portalRawUploader") :]
+    uploader = uploader[: uploader.index("\n}\n")]
+    assert "= if (portalUploads)" in uploader
+    assert "condition: noDeleteCondition" in uploader and "conditionVersion: '2.0'" in uploader
+    work = storage[storage.index("resource portalWorkReader") :]
+    work = work[: work.index("\n}\n")]
+    assert "storageBlobDataReader" in work
+    queue = storage[storage.index("resource portalIngestReader") :]
+    queue = queue[: queue.index("\n}\n")]
+    assert "storageQueueDataReader" in queue
+    portal = storage[storage.index("// Portal identity") : storage.index("// Studio identity")]
+    assert "MessageSender" not in portal and "Owner" not in portal.replace("owner", "")
+    main = main_text()
+    assert "portalUploads: portalOwnerSignIn" in main
+    auth = main[main.index("module portalAuth") : main.index("// The Studio app always exists")]
+    assert "unauthenticatedClientAction: portalOwnerSignIn ? 'AllowAnonymous'" in auth
+    # Built-in auth refuses every browser POST that carries its session cookie: the public ask
+    # must be excluded, the owner's routes must not be.
+    assert "'/api/ask'" in auth and "/api/owner" not in auth
+    portal_app = main[main.index("module portalApp") : main.index("module mcpAuth")]
+    assert "name: 'DOCWIKI_PORTAL_OWNERS'" in portal_app
+    owners = portal_app[portal_app.index("portalOwnerSignIn\n") :]
+    assert owners.index("? [") < owners.index("DOCWIKI_PORTAL_OWNERS")
 
 
 def test_event_grid_sender_role_is_on_the_account() -> None:

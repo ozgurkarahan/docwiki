@@ -41,6 +41,7 @@
     "mcpAllowedClientIds": { "value": "${DOCWIKI_MCP_ALLOWED_CLIENT_IDS}" },
     "mcpConnectionName": { "value": "${DOCWIKI_MCP_CONNECTION}" },
     "portalClientId": { "value": "${DOCWIKI_PORTAL_CLIENT_ID}" },
+    "portalOwners": { "value": "${DOCWIKI_PORTAL_OWNERS}" },
     "studioClientId": { "value": "${DOCWIKI_STUDIO_CLIENT_ID}" },
     "studioAllowedPrincipals": { "value": "${DOCWIKI_STUDIO_ALLOWED_PRINCIPALS}" },
     "jobImage": { "value": "${SERVICE_JOB_IMAGE_NAME}" },

@@ -21,6 +21,9 @@ param mcpPrincipalId string
 @description('Principal ID of the portal app identity.')
 param portalPrincipalId string
 
+@description('The signed-in owner uploads documents through the portal (ADR 0009): its raw/ role can write (never delete) instead of only read.')
+param portalUploads bool = false
+
 @description('Principal ID of the Studio app identity; empty skips the Studio data-plane roles.')
 param studioPrincipalId string = ''
 
@@ -84,9 +87,10 @@ var mcpWorkWriteCondition = '''
 )
 '''
 
-// Attribute-based condition on the Studio's raw/ role: it uploads and replaces documents but
-// never deletes a blob (soft delete and versioning keep what a replacement overwrites).
-var studioRawCondition = '''
+// Attribute-based condition on the raw/ role of an uploader (the portal for its owner, the
+// Studio): it uploads and replaces documents but never deletes a blob (soft delete and
+// versioning keep what a replacement overwrites).
+var noDeleteCondition = '''
 (
  !(ActionMatches{'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete'})
 )
@@ -342,7 +346,10 @@ resource mcpIngestSender 'Microsoft.Authorization/roleAssignments@2022-04-01' = 
 }
 
 // ---------------------------------------------------------------------------
-// Portal identity: reads the published sites under releases/ only.
+// Portal identity: reads the published sites under releases/; for the live process view
+// (ADR 0009) lists raw/, reads the work/ state and run reports and peeks the ingest queue; with
+// portalUploads it also writes raw/ for the signed-in owner, never deleting a blob. No other
+// write, no queue send.
 // ---------------------------------------------------------------------------
 
 resource portalReleasesReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -352,6 +359,56 @@ resource portalReleasesReader 'Microsoft.Authorization/roleAssignments@2022-04-0
     principalId: portalPrincipalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.storageBlobDataReader)
+  }
+}
+
+resource portalWorkReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: workContainer
+  name: guid(workContainer.id, portalPrincipalId, roleIds.storageBlobDataReader)
+  properties: {
+    principalId: portalPrincipalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.storageBlobDataReader)
+    description: 'DocWiki portal: read the source states and run reports (process view)'
+  }
+}
+
+// Either a reader or, for the owner's uploads, a contributor that never deletes (one of the two).
+resource portalRawReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!portalUploads) {
+  scope: rawContainer
+  name: guid(rawContainer.id, portalPrincipalId, roleIds.storageBlobDataReader)
+  properties: {
+    principalId: portalPrincipalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.storageBlobDataReader)
+    description: 'DocWiki portal: list the documents in raw/ (process view)'
+  }
+}
+
+resource portalRawUploader 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (portalUploads) {
+  scope: rawContainer
+  name: guid(rawContainer.id, portalPrincipalId, roleIds.storageBlobDataContributor)
+  properties: {
+    principalId: portalPrincipalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      roleIds.storageBlobDataContributor
+    )
+    condition: noDeleteCondition
+    conditionVersion: '2.0'
+    description: 'DocWiki portal: the owner uploads documents to raw/, never deletes a blob'
+  }
+}
+
+// The process view shows the queue depth (Peek Messages needs queues/messages/read).
+resource portalIngestReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: ingestQueue
+  name: guid(ingestQueue.id, portalPrincipalId, roleIds.storageQueueDataReader)
+  properties: {
+    principalId: portalPrincipalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.storageQueueDataReader)
   }
 }
 
@@ -373,7 +430,7 @@ resource studioRawContributor 'Microsoft.Authorization/roleAssignments@2022-04-0
       'Microsoft.Authorization/roleDefinitions',
       roleIds.storageBlobDataContributor
     )
-    condition: studioRawCondition
+    condition: noDeleteCondition
     conditionVersion: '2.0'
     description: 'DocWiki Studio: read and upload documents in raw/, never delete a blob'
   }

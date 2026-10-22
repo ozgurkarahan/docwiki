@@ -194,6 +194,9 @@ param mcpConnectionName string = 'docwiki-mcp'
 @description('Client ID of the portal sign-in app registration (set by the postprovision hook).')
 param portalClientId string = ''
 
+@description('Comma-separated Entra object IDs of the owners who sign in on the public portal to add documents (DOCWIKI_PORTAL_OWNERS, written by the postprovision hook: the deployer; ADR 0009). Empty: no sign-in and no uploads.')
+param portalOwners string = ''
+
 @description('Client ID of the Studio sign-in app registration (set by the postprovision hook).')
 param studioClientId string = ''
 
@@ -270,6 +273,11 @@ var deployerPrincipalId = grantDeployerDataAccess ? principalId : ''
 // public-audience build (DOCWIKI_PORTAL_ACCESS=public); any other combination fails closed.
 var portalAnonymous = enablePortal && portalAccess == 'public' && audience == 'public'
 var portalPublic = portalAnonymous || (enablePortal && portalAccess == 'entra' && !empty(portalClientId))
+// The owner's sign-in on the public portal (ADR 0009): built-in auth in AllowAnonymous mode, so
+// every page stays public; the app accepts an owner call only from an object ID of portalOwners.
+// The hook applies and verifies the auth before it gives the app its owners (fail closed: without
+// built-in auth in front, a client could send the principal header itself).
+var portalOwnerSignIn = portalAnonymous && !empty(portalClientId) && !empty(portalOwners)
 // The custom domain's certificate is issued outside Bicep (it needs the DNS records first) and
 // only referenced here, so a provision never drops the binding.
 var portalCustomDomains = empty(portalCustomDomain)
@@ -432,6 +440,7 @@ module storage 'modules/storage.bicep' = {
     runtimePrincipalId: identity.outputs.principalId
     mcpPrincipalId: mcpIdentity.outputs.principalId
     portalPrincipalId: portalIdentity.outputs.principalId
+    portalUploads: portalOwnerSignIn
     studioPrincipalId: enableStudio ? studioIdentity.outputs.principalId : ''
     deployerPrincipalId: deployerPrincipalId
     deployerPrincipalType: principalType
@@ -811,7 +820,15 @@ module portalApp 'modules/container-app.bicep' = {
           value: 'docwiki-portal'
         }
       ],
-      liveAskEnv
+      liveAskEnv,
+      portalOwnerSignIn
+        ? [
+            {
+              name: 'DOCWIKI_PORTAL_OWNERS'
+              value: portalOwners
+            }
+          ]
+        : []
     )
     cpu: '0.25'
     memory: '0.5Gi'
@@ -856,7 +873,10 @@ module mcpConnection 'modules/mcp-connection.bicep' = if (!empty(mcpApiClientId)
   }
 }
 
-module portalAuth 'modules/app-auth.bicep' = if (portalPublic && !portalAnonymous) {
+// Entra sign-in for the whole portal (portalAccess=entra), or the owner's sign-in on the public
+// portal: AllowAnonymous, with the public POST /api/ask excluded because built-in auth refuses
+// every browser POST that carries its session cookie (ADR 0009).
+module portalAuth 'modules/app-auth.bicep' = if ((portalPublic && !portalAnonymous) || portalOwnerSignIn) {
   name: 'portalAuth'
   scope: rg
   params: {
@@ -865,7 +885,14 @@ module portalAuth 'modules/app-auth.bicep' = if (portalPublic && !portalAnonymou
     allowedAudiences: [
       portalClientId
     ]
-    unauthenticatedClientAction: 'RedirectToLoginPage'
+    unauthenticatedClientAction: portalOwnerSignIn ? 'AllowAnonymous' : 'RedirectToLoginPage'
+    excludedPaths: portalOwnerSignIn
+      ? [
+          '/api/ask'
+          '/healthz'
+          '/livez'
+        ]
+      : []
   }
 }
 

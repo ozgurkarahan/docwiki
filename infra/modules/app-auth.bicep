@@ -2,7 +2,8 @@
 // Used by main.bicep once the app registration exists, and deployed directly by the
 // postprovision hook (scripts/hooks/postprovision.py) on the first run and whenever the agent
 // allowlist changes. No client secret: the MCP API only validates bearer tokens (v2 issuer,
-// ADR 0003); the portal signs users in with ID tokens only.
+// ADR 0003); the portal signs users in with ID tokens only (AllowAnonymous: the public portal,
+// where only the owner signs in, ADR 0009).
 
 @description('Name of an existing container app in the target resource group.')
 param containerAppName string
@@ -16,6 +17,7 @@ param allowedAudiences array
 @allowed([
   'Return401'
   'RedirectToLoginPage'
+  'AllowAnonymous'
 ])
 param unauthenticatedClientAction string = 'Return401'
 

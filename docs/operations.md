@@ -233,7 +233,9 @@ minute per capacity unit).
   - MCP app (`DOCWIKI_MCP_IDENTITY_*`): reads `releases/` and `work/`, writes only
     `work/reports/`, `work/proposals/` and `work/state/overlay.yaml` (Blob Data Contributor
     with an attribute-based condition), enqueues on `ingest`; no `raw/`, no Foundry;
-  - portal (`DOCWIKI_PORTAL_IDENTITY_*`): reads `releases/`;
+  - portal (`DOCWIKI_PORTAL_IDENTITY_*`): reads `releases/`, `raw/` and `work/` and peeks the
+    ingest queue (the live process view); with owners set, writes `raw/` (Blob Data
+    Contributor with a condition that denies deletes) for the owner's uploads;
   - Studio (`DOCWIKI_STUDIO_IDENTITY_*`): uploads to `raw/` (Blob Data Contributor with a
     condition that denies deletes), reads `work/` and writes filed answers only under
     `work/inbox/queries/` (the custom role "DocWiki Studio inbox writer (<storage account>)":
@@ -289,10 +291,10 @@ minute per capacity unit).
   groups assigned to the portal enterprise application get in. The hook assigns the deployer;
   add readers under Enterprise applications → `docwiki-portal-<env>-<token>` → Users and
   groups. No client secret exists (ID-token sign-in).
-- Public portal (`DOCWIKI_PORTAL_ACCESS=public`, only with `DOCWIKI_AUDIENCE=public`): no sign-in
-  and no app registration; Bicep gives the portal its ingress, so anyone with the URL can read the
-  public build. A portal that already had Entra sign-in keeps it until you run
-  `az containerapp auth update --name <portal app> --resource-group <rg> --enabled false`.
+- Public portal (`DOCWIKI_PORTAL_ACCESS=public`, only with `DOCWIKI_AUDIENCE=public`): every page
+  is anonymous; Bicep gives the portal its ingress, so anyone with the URL can read the public
+  build and follow the process on its `how-it-works` page. See
+  [Owner sign-in and uploads](#owner-sign-in-and-uploads-on-the-public-portal) for the owner.
 - Studio (when `DOCWIKI_ENABLE_STUDIO=true`, [studio.md](studio.md)): Entra sign-in, then the
   application checks the object ID against `DOCWIKI_STUDIO_ALLOWED_PRINCIPALS` (the hook writes
   the deployer's). To let someone in, assign them under Enterprise applications →
@@ -305,6 +307,37 @@ minute per capacity unit).
   `DOCWIKI_GRAPH_TOKEN_SOURCE=azd` (in the shell or the azd environment) lets the hooks use the
   azd sign-in for Graph after checking that azd and az are signed in as the same account in the
   same tenant.
+
+## Owner sign-in and uploads on the public portal
+
+On a public portal the owner signs in on the same site and adds documents from the
+`how-it-works` page ([ADR 0009](adr/0009-one-site.md)); everyone else reads anonymously. The
+postprovision hook sets it up (skip it with `DOCWIKI_PORTAL_OWNER_SIGN_IN=false`; the deployer
+must be a user):
+
+1. It registers the sign-in app `docwiki-portal-<env>-<token>` (ID tokens, no secret, assignment
+   required, the deployer assigned) with the callback of the default host and of
+   `DOCWIKI_PORTAL_CUSTOM_DOMAIN`.
+2. It writes the deployer's object ID to `DOCWIKI_PORTAL_OWNERS` unless already set.
+3. It applies built-in authentication in `AllowAnonymous` mode, with `/api/ask`, `/healthz` and
+   `/livez` excluded, verifies it, and only then gives the running container
+   `DOCWIKI_PORTAL_OWNERS` (without built-in auth in front, a client could send the principal
+   header itself).
+4. The next `azd provision` declares the same in Bicep and gives the portal identity its upload
+   role on `raw/` (write, never delete). On a first set-up, run `azd provision` twice.
+
+The app accepts an owner call only when the platform's `x-ms-client-principal-id` is one of
+`DOCWIKI_PORTAL_OWNERS`; uploads also need the `X-DocWiki-Owner: 1` header and a same-origin
+request, are limited to 50 MB (`DOCWIKI_PORTAL_MAX_UPLOAD_MB`) and 10 per day
+(`DOCWIKI_PORTAL_DAILY_UPLOADS`). To add an owner, assign them to the enterprise application and
+append their object ID to `DOCWIKI_PORTAL_OWNERS`, then run `azd provision`.
+
+Built-in authentication answers **403 to every browser POST that carries its session cookie**
+(empty body, `x-ms-middleware-request-id` header), before the request reaches the container; GET,
+PUT and DELETE with the same cookie pass, and so do anonymous POSTs and POSTs to excluded paths.
+An ingress CORS policy does not change it. That is why the owner's calls use GET and PUT only and
+why the public `POST /api/ask` is an excluded path. In Git Bash, set `MSYS_NO_PATHCONV=1` before
+`az containerapp auth update --excluded-paths`, or `/healthz` is rewritten to a Windows path.
 
 ## Storage network perimeter (optional)
 

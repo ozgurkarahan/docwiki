@@ -1540,14 +1540,22 @@ def test_portal_flow_configures_sign_in_then_ingress(runner: FakeRunner, tmp_pat
     assert not runner.commands(r"credential reset|secret"), "no client secret is ever created"
 
 
-@pytest.mark.parametrize(("anonymous", "expected"), [("true", "no sign-in"), ("false", "stays")])
+@pytest.mark.parametrize(
+    ("anonymous", "sign_in", "expected"),
+    [
+        ("true", "false", "owner sign-in on the portal disabled"),
+        ("false", None, "stays"),
+    ],
+)
 def test_public_portal_registers_nothing(
     runner: FakeRunner,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
     anonymous: str,
+    sign_in: str | None,
     expected: str,
 ) -> None:
+    extra = {} if sign_in is None else {"DOCWIKI_PORTAL_OWNER_SIGN_IN": sign_in}
     code = postprovision.main(
         ["--only", "portal"],
         runner=runner,
@@ -1555,12 +1563,304 @@ def test_public_portal_registers_nothing(
             DOCWIKI_ENABLE_PORTAL="true",
             DOCWIKI_PORTAL_ACCESS="public",
             DOCWIKI_PORTAL_ANONYMOUS=anonymous,
+            **extra,
         ),
         root=tmp_path,
     )
     assert code == 0
     assert not runner.calls, "no Entra registration, auth config or ingress change"
     assert expected in capsys.readouterr().out
+
+
+PORTAL_APP = "ca-portal-tok123"
+PORTAL_HOST = "ca-portal-tok123.region.azurecontainerapps.example"
+PORTAL_ID = "portal-app"
+PORTAL_CALLBACK = f"https://{PORTAL_HOST}/.auth/login/aad/callback"
+PORTAL_CUSTOM_DOMAIN = "wiki.example.org"
+PORTAL_CUSTOM_CALLBACK = f"https://{PORTAL_CUSTOM_DOMAIN}/.auth/login/aad/callback"
+PORTAL_GET = rf"GET .*containerApps/{PORTAL_APP}\?"
+PORTAL_PATHS = ["/api/ask", "/healthz", "/livez"]
+PORTAL_PUBLIC_ENV = {
+    "DOCWIKI_ENABLE_PORTAL": "true",
+    "DOCWIKI_PORTAL_ACCESS": "public",
+    "DOCWIKI_PORTAL_ANONYMOUS": "true",
+}
+
+
+def portal_auth_properties(
+    *,
+    enabled: bool = True,
+    action: str = "AllowAnonymous",
+    excluded: tuple[str, ...] = tuple(PORTAL_PATHS),
+) -> dict[str, Any]:
+    """Built-in auth of the public portal as ``az containerapp auth show`` prints it."""
+    return {
+        "platform": {"enabled": enabled},
+        "globalValidation": {
+            "unauthenticatedClientAction": action,
+            "excludedPaths": list(excluded),
+        },
+        "identityProviders": {
+            "azureActiveDirectory": {
+                "enabled": True,
+                "registration": {"clientId": PORTAL_ID, "openIdIssuer": ISSUER},
+                "validation": {"allowedAudiences": [PORTAL_ID]},
+            }
+        },
+        "login": {"tokenStore": {"enabled": False}},
+    }
+
+
+def portal_app_view(env: dict[str, str] | None = None) -> dict[str, Any]:
+    """ARM view of the public portal container app (Bicep gave it its ingress)."""
+    container = {
+        "name": "portal",
+        "image": "mcr.microsoft.com/dotnet/samples:aspnetapp",
+        "env": [{"name": key, "value": value} for key, value in (env or {}).items()],
+    }
+    configuration = {"ingress": {"external": True, "fqdn": PORTAL_HOST}}
+    return {"properties": {"configuration": configuration, "template": {"containers": [container]}}}
+
+
+def portal_owner_azure(
+    runner: FakeRunner,
+    *,
+    shown: dict[str, Any] | None = None,
+    deployment: Result | None = None,
+) -> FakeRunner:
+    """Fake Azure for a first public-portal provision: no app registration, no built-in auth."""
+    runner.on(r"^az account show", {"id": SUB, "user": {"type": "user"}})
+    runner.on(r"^az account get-access-token", {"accessToken": fake_token({"oid": "user-oid"})})
+    runner.on(r"GET .*applications\?\$filter", {"value": []})
+    runner.on(r"POST .*/applications ", {"id": "portal-obj", "appId": PORTAL_ID, "web": {}})
+    runner.on(r"PATCH .*/applications/portal-obj", None)
+    runner.on(rf"GET .*servicePrincipals\(appId='{PORTAL_ID}'\)", not_found())
+    runner.on(r"POST .*/servicePrincipals ", {"id": "portal-sp", "appRoleAssignmentRequired": True})
+    runner.on(r"GET .*/servicePrincipals/portal-sp/owners", {"value": []})
+    runner.on(r"POST .*/owners/\$ref", None)
+    runner.on(r"GET .*appRoleAssignedTo", {"value": []})
+    runner.on(r"POST .*appRoleAssignedTo", {"id": "default-access"})
+    runner.on(r"^azd env set", None)
+    runner.queue(
+        r"GET .*authConfigs/current", not_found(), {"properties": portal_auth_properties()}
+    )
+    runner.on(r"^az deployment group create", deployment)
+    runner.on(r"^az containerapp auth show", portal_auth_properties() if shown is None else shown)
+    runner.on(PORTAL_GET, portal_app_view())
+    runner.on(r"^az containerapp update", None)
+    runner.on(r"^az containerapp ingress enable", {"external": True, "fqdn": PORTAL_HOST})
+    return runner
+
+
+def test_public_portal_owner_flow_registers_secures_then_sets_the_owners(
+    runner: FakeRunner, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code = postprovision.main(
+        ["--only", "portal"],
+        runner=portal_owner_azure(runner),
+        environ=base_env(**PORTAL_PUBLIC_ENV, DOCWIKI_PORTAL_CUSTOM_DOMAIN=PORTAL_CUSTOM_DOMAIN),
+        root=tmp_path,
+    )
+    assert code == 0
+    created = runner.body_for(r"POST .*/applications ")[0]
+    assert created["displayName"] == f"docwiki-portal-{ENV}-{TOKEN}"
+    assert created["description"] == "DocWiki portal: the owner's sign-in (uploads)."
+    assert created["web"]["redirectUris"] == [PORTAL_CALLBACK, PORTAL_CUSTOM_CALLBACK]
+    state = json.loads(azdlib.state_path(ENV, tmp_path).read_text(encoding="utf-8"))
+    assert state["portal_app"]["app_id"] == PORTAL_ID
+    assert "studio_app" not in state
+    assert runner.body_for(r"POST .*appRoleAssignedTo") == [
+        {
+            "principalId": "user-oid",
+            "resourceId": "portal-sp",
+            "appRoleId": entra.DEFAULT_ACCESS_ROLE_ID,
+        }
+    ]
+    sets = runner.commands(r"^azd env set")
+    assert any(f"DOCWIKI_PORTAL_CLIENT_ID {PORTAL_ID} --environment demo" in s for s in sets)
+    assert any("DOCWIKI_PORTAL_OWNERS user-oid --environment demo" in s for s in sets)
+    (parameters,) = auth_parameters(runner)
+    assert parameters["containerAppName"]["value"] == PORTAL_APP
+    assert parameters["clientId"]["value"] == PORTAL_ID
+    assert parameters["allowedAudiences"]["value"] == [PORTAL_ID]
+    assert parameters["unauthenticatedClientAction"]["value"] == "AllowAnonymous"
+    assert parameters["excludedPaths"]["value"] == PORTAL_PATHS
+    deployment = runner.commands(r"^az deployment group create")[0]
+    assert "--name docwiki-portal-auth" in deployment
+    # Fail closed: auth applied and verified, only then the owners reach the container.
+    assert exposure_order(runner) == ["auth-deploy", "auth-verify", "settings"]
+    (update,) = runner.commands(r"^az containerapp update")
+    assert f"--name {PORTAL_APP}" in update and "--container-name portal" in update
+    assert "--set-env-vars DOCWIKI_PORTAL_OWNERS=user-oid --output none" in update
+    assert not runner.commands(r"ingress enable"), "Bicep owns the public portal's ingress"
+    assert not runner.commands(r"credential reset|secret"), "no client secret is ever created"
+    output = capsys.readouterr().out
+    assert f"owner sign-in ready at https://{PORTAL_CUSTOM_DOMAIN}/how-it-works" in output
+
+
+def test_public_portal_owner_flow_without_a_custom_domain_uses_the_default_host(
+    runner: FakeRunner, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code = postprovision.main(
+        ["--only", "portal"],
+        runner=portal_owner_azure(runner),
+        environ=base_env(**PORTAL_PUBLIC_ENV),
+        root=tmp_path,
+    )
+    assert code == 0
+    created = runner.body_for(r"POST .*/applications ")[0]
+    assert created["web"]["redirectUris"] == [PORTAL_CALLBACK]
+    assert f"owner sign-in ready at https://{PORTAL_HOST}/how-it-works" in capsys.readouterr().out
+
+
+def test_public_portal_second_run_changes_nothing(runner: FakeRunner, tmp_path: Path) -> None:
+    azdlib.save_state(
+        azdlib.state_path(ENV, tmp_path),
+        {
+            "portal_app": {
+                "app_id": PORTAL_ID,
+                "object_id": "portal-obj",
+                "display_name": f"docwiki-portal-{ENV}-{TOKEN}",
+                "service_principal_id": "portal-sp",
+                "created_by_hook": True,
+            }
+        },
+    )
+    runner.on(r"^az account show", {"id": SUB, "user": {"type": "user"}})
+    runner.on(r"^az account get-access-token", {"accessToken": fake_token({"oid": "user-oid"})})
+    registered = {
+        "id": "portal-obj",
+        "appId": PORTAL_ID,
+        "web": {
+            "redirectUris": [PORTAL_CALLBACK, PORTAL_CUSTOM_CALLBACK],
+            "implicitGrantSettings": {
+                "enableIdTokenIssuance": True,
+                "enableAccessTokenIssuance": False,
+            },
+        },
+    }
+    runner.on(rf"GET .*applications\(appId='{PORTAL_ID}'\)", registered)
+    runner.on(
+        rf"GET .*servicePrincipals\(appId='{PORTAL_ID}'\)",
+        {"id": "portal-sp", "appRoleAssignmentRequired": True},
+    )
+    runner.on(r"GET .*/servicePrincipals/portal-sp/owners", {"value": [{"id": "user-oid"}]})
+    assigned = {"id": "as-1", "principalId": "user-oid", "appRoleId": entra.DEFAULT_ACCESS_ROLE_ID}
+    runner.on(r"GET .*appRoleAssignedTo", {"value": [assigned]})
+    runner.on(r"GET .*authConfigs/current", {"properties": portal_auth_properties()})
+    runner.on(r"^az containerapp auth show", portal_auth_properties())
+    runner.on(PORTAL_GET, portal_app_view({"DOCWIKI_PORTAL_OWNERS": "user-oid"}))
+    environ = base_env(
+        **PORTAL_PUBLIC_ENV,
+        DOCWIKI_PORTAL_CUSTOM_DOMAIN=PORTAL_CUSTOM_DOMAIN,
+        DOCWIKI_PORTAL_CLIENT_ID=PORTAL_ID,
+        DOCWIKI_PORTAL_OWNERS="user-oid",
+    )
+    code = postprovision.main(["--only", "portal"], runner=runner, environ=environ, root=tmp_path)
+    assert code == 0
+    assert not runner.commands(
+        r"--method (POST|PATCH|DELETE)|deployment group create|containerapp update|ingress enable"
+    )
+    assert not runner.commands(r"^azd env set DOCWIKI_PORTAL_OWNERS")
+    assert exposure_order(runner) == ["auth-verify"]
+
+
+def test_public_portal_keeps_the_owners_of_the_environment(
+    runner: FakeRunner, tmp_path: Path
+) -> None:
+    environ = base_env(**PORTAL_PUBLIC_ENV, DOCWIKI_PORTAL_OWNERS="owner-a,owner-b")
+    code = postprovision.main(
+        ["--only", "portal"], runner=portal_owner_azure(runner), environ=environ, root=tmp_path
+    )
+    assert code == 0
+    assert not runner.commands(r"^azd env set DOCWIKI_PORTAL_OWNERS")
+    (update,) = runner.commands(r"^az containerapp update")
+    assert "--set-env-vars DOCWIKI_PORTAL_OWNERS=owner-a,owner-b --output none" in update
+
+
+def test_public_portal_owner_needs_a_user(
+    runner: FakeRunner, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    runner.on(r"^az account show", {"id": SUB, "user": {"type": "servicePrincipal", "name": "sp"}})
+    runner.on(
+        r"^az account get-access-token",
+        {"accessToken": fake_token({"oid": "sp-oid", "idtyp": "app"})},
+    )
+    code = postprovision.main(
+        ["--only", "portal"], runner=runner, environ=base_env(**PORTAL_PUBLIC_ENV), root=tmp_path
+    )
+    assert code == 0
+    assert not runner.commands(r"graph\.microsoft\.com|deployment group|containerapp|^azd env set")
+    output = capsys.readouterr().out
+    assert "ServicePrincipal, not a user" in output and "no uploads" in output
+    assert "owner sign-in ready" not in output
+
+
+@pytest.mark.parametrize(
+    ("shown", "problem"),
+    [
+        (portal_auth_properties(enabled=False), "built-in auth is not enabled"),
+        ({}, "built-in auth is not enabled"),
+        (portal_auth_properties(action="RedirectToLoginPage"), "not answered with AllowAnonymous"),
+        (portal_auth_properties(excluded=("/healthz",)), "the excluded paths differ"),
+    ],
+)
+def test_public_portal_owners_wait_for_verified_auth(
+    runner: FakeRunner, tmp_path: Path, shown: dict[str, Any], problem: str
+) -> None:
+    """Auth that ``az containerapp auth show`` does not confirm never gets the owners."""
+    portal_owner_azure(runner, shown=shown)
+    ctx = context(runner, tmp_path, **PORTAL_PUBLIC_ENV)
+    with pytest.raises(HookError) as raised:
+        postprovision.step_portal(ctx)
+    assert problem in str(raised.value)
+    assert not runner.commands(r"containerapp update|ingress enable")
+    assert not runner.commands(rf"containerApps/{PORTAL_APP}\?"), "the app is not even read"
+
+
+def test_public_portal_failed_auth_deployment_never_sets_the_owners(
+    runner: FakeRunner, tmp_path: Path
+) -> None:
+    portal_owner_azure(runner, deployment=Result(1, "", "ERROR: deployment refused"))
+    with pytest.raises(HookError, match="deployment refused"):
+        postprovision.step_portal(context(runner, tmp_path, **PORTAL_PUBLIC_ENV))
+    assert not runner.commands(r"auth show|containerapp update|ingress enable")
+
+
+def test_sign_in_app_gains_the_missing_custom_domain_redirect(
+    runner: FakeRunner, tmp_path: Path
+) -> None:
+    previous = "https://old.example/.auth/login/aad/callback"
+    registered = {
+        "id": "portal-obj",
+        "appId": PORTAL_ID,
+        "web": {
+            "redirectUris": [PORTAL_CALLBACK, previous],
+            "implicitGrantSettings": {
+                "enableIdTokenIssuance": True,
+                "enableAccessTokenIssuance": False,
+            },
+        },
+    }
+    runner.on(rf"GET .*applications\(appId='{PORTAL_ID}'\)", registered)
+    runner.on(r"PATCH .*/applications/portal-obj", None)
+    runner.on(
+        rf"GET .*servicePrincipals\(appId='{PORTAL_ID}'\)",
+        {"id": "portal-sp", "appRoleAssignmentRequired": True},
+    )
+    runner.on(r"GET .*/servicePrincipals/portal-sp/owners", {"value": [{"id": "user-oid"}]})
+    entra.ensure_portal_app(
+        tools(runner, tmp_path),
+        display_name=f"docwiki-portal-{ENV}-{TOKEN}",
+        tag=f"docwiki-env:{ENV}-{TOKEN}",
+        known_app_id=PORTAL_ID,
+        redirect_uri=PORTAL_CALLBACK,
+        extra_redirect_uris=(PORTAL_CUSTOM_CALLBACK,),
+        owner_object_id="user-oid",
+    )
+    (patch,) = runner.body_for(r"PATCH .*/applications/portal-obj")
+    assert patch["web"]["redirectUris"] == [PORTAL_CALLBACK, previous, PORTAL_CUSTOM_CALLBACK]
+    assert not runner.commands(r"POST ")
 
 
 STUDIO_ID = "studio-app"

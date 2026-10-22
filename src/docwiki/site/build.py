@@ -39,6 +39,7 @@ from docwiki.release.reader import ReleaseNotFoundError, ReleaseReader
 from docwiki.site.answers import build_answers, write_answers
 from docwiki.site.errors import SiteBuildError
 from docwiki.site.linkcheck import check_links
+from docwiki.site.process_page import write_process_page
 from docwiki.site.security import REPO_URL, default_allowed_hosts, scan_site
 
 __all__ = [
@@ -568,6 +569,7 @@ def build_site(
     apply_overlay(overlay, checkout)
     write_answers(answers, checkout)
     files = assemble_content(release, checkout / "content")
+    write_process_page(checkout / "content")
     settings = site_settings(
         release,
         base_url=base,
