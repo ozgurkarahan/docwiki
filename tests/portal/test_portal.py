@@ -112,6 +112,12 @@ def test_portal_serves_the_current_site(storage: FolderStorage, tmp_path: Path) 
         assert redirect.headers["location"] == "/sources/?x=1"
         assert_security_headers(redirect)
 
+        # The process page was renamed (ADR 0010): old links keep working.
+        for old in ("/how-it-works", "/how-it-works/"):
+            moved = client.get(old + "?x=1", follow_redirects=False)
+            assert moved.status_code == 308
+            assert moved.headers["location"] == "/pipeline?x=1"
+
         script = client.get("/postscript.js")
         assert script.headers["content-type"] == "text/javascript; charset=utf-8"
         assert client.get("/static/docwiki/icon.svg").headers["content-type"] == "image/svg+xml"
@@ -144,9 +150,7 @@ def test_portal_serves_the_current_site(storage: FolderStorage, tmp_path: Path) 
         "/sources/..%5c..%5cindex.html",
     ],
 )
-def test_portal_not_found_and_traversal(
-    storage: FolderStorage, tmp_path: Path, path: str
-) -> None:
+def test_portal_not_found_and_traversal(storage: FolderStorage, tmp_path: Path, path: str) -> None:
     publish(storage, tmp_path / "s1")
     app = create_app(SiteSync(storage, tmp_path / "cache"), poll_seconds=0)
     with TestClient(app) as client:

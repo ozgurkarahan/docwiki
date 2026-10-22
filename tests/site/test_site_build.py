@@ -176,6 +176,7 @@ def test_site_settings_from_the_mock_release() -> None:
         "page": PLAN_B_PAGE,
         "title": "Planning and purchase tracking, indice B",
         "original": None,
+        "status": "current",
     }
     assert len(settings["sources"]) == 3
     assert settings["answers"] == 1  # queries/2026-03-31-window-delivery-date.md

@@ -1385,10 +1385,8 @@ section.docwiki-owner-box {
       border-bottom: none;
     }
 
-    td:first-child,
-    td:nth-child(3),
-    td:nth-child(4),
-    td:last-child {
+    td.docwiki-process-status,
+    td.docwiki-process-when {
       white-space: nowrap;
     }
 
@@ -1399,14 +1397,96 @@ section.docwiki-owner-box {
     tr.is-uploaded td:first-child {
       box-shadow: inset 3px 0 0 var(--secondary);
     }
+
+    // Phones: one card per document (status, then the document, then when), no sideways scroll.
+    @media all and ($mobile) {
+      thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+      }
+
+      tbody,
+      tr,
+      td {
+        display: block;
+      }
+
+      tr {
+        padding: 0.5rem 0.6rem;
+        border-bottom: 1px solid var(--lightgray);
+      }
+
+      td {
+        padding: 0.1rem 0;
+        border: none;
+      }
+
+      td.docwiki-process-when {
+        white-space: normal;
+        color: var(--gray);
+        font-size: 0.8rem;
+
+        > span + span::before {
+          content: " · ";
+        }
+      }
+    }
   }
 
   .docwiki-process-name {
     min-width: 12rem;
     overflow-wrap: anywhere;
 
-    > span {
+    > span,
+    > a {
       display: block;
+    }
+
+    @media all and ($mobile) {
+      min-width: 0;
+    }
+  }
+
+  .docwiki-process-doc {
+    font-weight: $semiBoldWeight;
+  }
+
+  .docwiki-process-path,
+  .docwiki-process-size {
+    font-size: 0.78rem;
+    color: var(--gray);
+  }
+
+  .docwiki-process-when > span {
+    display: block;
+
+    @media all and ($mobile) {
+      display: inline;
+    }
+  }
+
+  // The 13 technical steps, in a disclosure under the live view (ADR 0010).
+  .docwiki-process-steps {
+    margin: 1.5rem 0 0;
+
+    > summary {
+      min-height: 24px;
+      cursor: pointer;
+      font-weight: $semiBoldWeight;
+      color: var(--darkgray);
+    }
+  }
+
+  .docwiki-process-steps-table {
+    margin: 0.6rem 0 0;
+    font-size: 0.86rem;
+
+    td:first-child {
+      font-variant-numeric: tabular-nums;
+      color: var(--gray);
     }
   }
 
@@ -1470,6 +1550,242 @@ section.docwiki-owner-box {
     font-size: 0.78rem;
     font-weight: $semiBoldWeight;
     color: var(--secondary);
+  }
+}
+
+// ----- Status vocabulary (ADR 0010) -----
+// Always shape + word + colour: Okabe-Ito hues, darkened for text (at least 4.5:1) in the light
+// theme and lightened in the dark one; borders at least 3:1.
+
+:root {
+  --dw-st-grey: #55534c;
+  --dw-st-processing: #00609a;
+  --dw-st-wiki: #00684a;
+  --dw-st-held: #8a5a00;
+  --dw-st-failed: #b34700;
+}
+
+:root[saved-theme="dark"] {
+  --dw-st-grey: #c4c2b8;
+  --dw-st-processing: #7cc4ef;
+  --dw-st-wiki: #5fd3a8;
+  --dw-st-held: #f0b43c;
+  --dw-st-failed: #ff9a5c;
+}
+
+.docwiki-status {
+  --status: var(--dw-st-grey);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--status);
+  border-radius: 999px;
+  color: var(--status);
+  font-size: 0.8rem;
+  font-weight: $semiBoldWeight;
+  line-height: 1.6;
+  white-space: nowrap;
+
+  &.docwiki-status--processing {
+    --status: var(--dw-st-processing);
+  }
+
+  &.docwiki-status--in_wiki {
+    --status: var(--dw-st-wiki);
+  }
+
+  &.docwiki-status--held_back {
+    --status: var(--dw-st-held);
+  }
+
+  &.docwiki-status--failed {
+    --status: var(--dw-st-failed);
+  }
+
+  &.docwiki-status--idle,
+  &.docwiki-status--superseded,
+  &.docwiki-status--received,
+  &.docwiki-status--queued,
+  &.docwiki-status--removed {
+    --status: var(--dw-st-grey);
+  }
+
+  &.docwiki-status--removed {
+    border-style: dashed;
+  }
+}
+
+// ----- The three tabs, the status chip and Sign in (Tabs.tsx, ADR 0010) -----
+
+header:has(.docwiki-tabbar) {
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 1rem 0 0.5rem;
+}
+
+.docwiki-tabbar {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  min-width: 0;
+}
+
+.docwiki-tabs ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.docwiki-tabs li {
+  margin: 0;
+}
+
+.docwiki-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-height: 44px;
+  padding: 0 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--darkgray);
+  font-weight: $semiBoldWeight;
+  text-decoration: none;
+  background: none;
+
+  &:hover {
+    border-color: var(--gray);
+    color: var(--dark);
+  }
+
+  &[aria-current="page"] {
+    border-color: var(--secondary);
+    background: var(--highlight);
+    color: var(--dark);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--secondary);
+    outline-offset: 2px;
+  }
+
+  @media all and ($mobile) {
+    padding: 0 0.5rem;
+    font-size: 0.92rem;
+  }
+}
+
+.docwiki-tab-number {
+  font-weight: normal;
+}
+
+.docwiki-tabbar-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+a.docwiki-chip {
+  min-height: 32px;
+  max-width: min(22rem, 100%);
+  text-decoration: none;
+  background: none;
+
+  .docwiki-status-word {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--secondary);
+    outline-offset: 2px;
+  }
+}
+
+a.docwiki-sign-in {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 0.9rem;
+  border: 1px solid var(--secondary);
+  border-radius: 8px;
+  color: var(--secondary);
+  font-weight: $semiBoldWeight;
+  text-decoration: none;
+  background: none;
+
+  &:hover {
+    background: var(--highlight);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--secondary);
+    outline-offset: 2px;
+  }
+}
+
+.docwiki-chip[hidden],
+.docwiki-sign-in[hidden] {
+  display: none;
+}
+
+// ----- ① Documents (Documents.tsx) -----
+
+.docwiki-documents-count {
+  color: var(--gray);
+  font-size: 0.9rem;
+}
+
+.docwiki-documents-list {
+  margin: 0.5rem 0 1.5rem;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--lightgray);
+  border-radius: 6px;
+}
+
+.docwiki-documents-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.8rem;
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid var(--lightgray);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.docwiki-documents-title {
+  flex: 1 1 16rem;
+  min-width: 0;
+  font-weight: $semiBoldWeight;
+  overflow-wrap: anywhere;
+}
+
+.docwiki-documents-links {
+  display: flex;
+  gap: 0.4rem;
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 0 0.6rem;
+    border: 1px solid var(--lightgray);
+    border-radius: 6px;
+    white-space: nowrap;
   }
 }
 

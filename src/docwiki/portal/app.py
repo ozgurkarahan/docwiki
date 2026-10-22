@@ -93,6 +93,9 @@ CONTENT_TYPES: dict[str, str] = {
 
 CACHE_CONTROL = "private, no-cache"
 
+PAGE_ALIASES: dict[str, str] = {"/how-it-works": "/pipeline"}
+"""Old page URLs that redirect permanently (ADR 0010 renamed the process page)."""
+
 Scope = MutableMapping[str, Any]
 Message = MutableMapping[str, Any]
 Receive = Callable[[], Awaitable[Message]]
@@ -274,8 +277,20 @@ def create_app(
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
 
+    async def alias(request: Request) -> Response:
+        target = PAGE_ALIASES[request.scope["path"].rstrip("/")]
+        query = request.url.query
+        return Response(
+            status_code=308, headers={"location": target + (f"?{query}" if query else "")}
+        )
+
     app = Starlette(
         routes=[
+            *(
+                Route(path, alias, methods=["GET", "HEAD"])
+                for old in PAGE_ALIASES
+                for path in (old, old + "/")
+            ),
             *live_ask_routes(live_ask),
             *process_routes(process, owner or OwnerConfig()),
             Route("/healthz", portal.health, methods=["GET", "HEAD"]),

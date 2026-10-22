@@ -1,5 +1,5 @@
-"""The process behind the wiki, live (ADR 0009): what ``/api/process`` shows on the
-``how-it-works`` page, and the owner's uploads into ``raw/``.
+"""The process behind the wiki, live (ADR 0009, 0010): what ``/api/process`` shows on the
+``pipeline`` page, the header chip's ``/api/status``, and the owner's uploads into ``raw/``.
 
 Everyone sees each document's pipeline status, the ingest queue, the current release and the last
 runs, read-only. A document whose sensitivity is above the site's audience is listed without its
@@ -23,7 +23,7 @@ from typing import Any
 from urllib.parse import quote
 
 from docwiki.contracts.catalog import Catalog
-from docwiki.contracts.enums import allowed_for_audience
+from docwiki.contracts.enums import STAGE_NAMES, allowed_for_audience
 from docwiki.contracts.formats import SUPPORTED_EXTENSIONS, detect_format
 from docwiki.contracts.ids import source_id_for
 from docwiki.contracts.layout import ReleaseFiles, StorageKeys, release_prefix
@@ -34,6 +34,7 @@ from docwiki.mcp.workstore import WorkStore
 from docwiki.release.publish import read_current_pointer
 
 __all__ = [
+    "DOCUMENT_STATES",
     "DOCUMENT_STATUSES",
     "MAX_DEPTH",
     "MAX_PATH_CHARS",
@@ -45,6 +46,7 @@ __all__ = [
     "UploadQuotaError",
     "UploadTooLargeError",
     "check_upload_path",
+    "document_state",
     "site_link",
 ]
 
@@ -52,7 +54,25 @@ log = logging.getLogger("docwiki.portal.process")
 
 DOCUMENT_STATUSES = ("new", *SOURCE_STATUSES)
 """``new``: in ``raw/`` but not seen by the pipeline yet; then the pipeline's own statuses."""
+DOCUMENT_STATES = (
+    "failed",
+    "held_back",
+    "received",
+    "queued",
+    "processing",
+    "in_wiki",
+    "superseded",
+    "removed",
+)
+"""What the site shows (ADR 0010), in display order. ``in_wiki`` and ``superseded`` only for a
+document of the published release: one whose stages are all done but that is not published yet is
+still ``processing``."""
 RUN_LIMIT = 10
+RUN_SCAN = 200
+"""Run reports read to find :data:`RUN_LIMIT` runs that did something; no-op checks are counted,
+not listed."""
+JUST_PUBLISHED_S = 15 * 60
+"""The header chip says "In the wiki → <document>" this long after the release that added it."""
 CACHE_TTL_S = 4.0
 MAX_PATH_CHARS = 200
 MAX_DEPTH = 4
@@ -127,6 +147,34 @@ def site_link(path: str | None) -> str | None:
     return "/" + quote(page, safe="/-_.")
 
 
+def document_state(
+    status: str,
+    stage: str | None,
+    *,
+    in_release: bool,
+    hidden: bool,
+    superseded: bool = False,
+) -> tuple[str, int | None]:
+    """``(state, step)``: the status the site shows and, while processing, the 1-based number of
+    the stage at work out of the 13 (ADR 0010)."""
+    if hidden or status == "quarantined":
+        return "held_back", None
+    if status == "failed":
+        return "failed", None
+    if status == "deleted":
+        return "removed", None
+    if status == "new":
+        return "received", None
+    if status == "pending":
+        if stage in STAGE_NAMES:
+            return "processing", STAGE_NAMES.index(stage) + 1
+        return "queued", None
+    if not in_release:
+        # Every stage of the document is done; the release that carries it is not out yet.
+        return "processing", len(STAGE_NAMES)
+    return ("superseded" if superseded else "in_wiki"), None
+
+
 @dataclass(frozen=True)
 class RawBlob:
     path: str
@@ -141,6 +189,16 @@ QueueDepth = Callable[[], int | None]
 
 def _iso(value: datetime | None) -> str | None:
     return value.isoformat().replace("+00:00", "Z") if value else None
+
+
+def _parse_time(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
 def _clip(value: str | None, limit: int = 300) -> str | None:
@@ -253,14 +311,55 @@ class ProcessService:
             }
         documents = self._documents(catalog, audience)
         counts = Counter(row["status"] for row in documents)
+        states = Counter(row["state"] for row in documents)
+        runs, checks = self._runs(release)
         return {
             "release": release,
-            "runs": self._runs(release),
+            "runs": runs,
+            "checks": checks,
             "queued": self._queued(),
             "documents": documents,
             "counts": {status: counts.get(status, 0) for status in DOCUMENT_STATUSES},
+            "states": {state: states.get(state, 0) for state in DOCUMENT_STATES},
             "total": len(documents),
         }
+
+    def status(self, *, now: datetime | None = None) -> dict[str, Any]:
+        """The header chip (ADR 0010): ``idle``, ``processing`` (with how many documents) or
+        ``published`` (a document reached the wiki in the last minutes, with its page)."""
+        view = self.process()
+        release = view["release"]
+        working = sum(
+            1 for row in view["documents"] if row["state"] in ("received", "queued", "processing")
+        )
+        latest = view["runs"][0] if view["runs"] else None
+        result: dict[str, Any] = {
+            "state": "idle",
+            "processing": working,
+            "release_id": release["release_id"] if release else None,
+            "document": None,
+        }
+        if working or (latest and not latest["finished_at"]) or (view["queued"] or 0) > 0:
+            result["state"] = "processing"
+            return result
+        published = _parse_time(release["published_at"]) if release else None
+        moment = now or datetime.now(UTC)
+        if published is None or (moment - published).total_seconds() > JUST_PUBLISHED_S:
+            return result
+        # The newest document of the release, when it arrived shortly before the release.
+        fresh = [
+            row
+            for row in view["documents"]
+            if row["state"] in ("in_wiki", "superseded")
+            and row["page_url"]
+            and (arrived := _parse_time(row["modified"])) is not None
+            and (published - arrived).total_seconds() <= JUST_PUBLISHED_S
+        ]
+        if fresh:
+            row = max(fresh, key=lambda item: _parse_time(item["modified"]) or published)
+            result["state"] = "published"
+            result["document"] = {"title": row["title"], "page_url": row["page_url"]}
+        return result
 
     def _queued(self) -> int | None:
         if self._queue_depth is None:
@@ -276,16 +375,21 @@ class ProcessService:
         states, _broken = WorkStore(self.storage).source_states()
         by_path: dict[str, SourceState] = {state.raw_path: state for state in states}
         pages = catalog.page_by_id() if catalog else {}
-        in_release = {source.source_id for source in catalog.sources} if catalog else set()
+        released = {item.source_id: item.status for item in catalog.sources} if catalog else {}
         rows: list[dict[str, Any]] = []
         listed: set[str] = set()
         for blob in blobs:
             listed.add(blob.path)
-            rows.append(self._row(blob, by_path.get(blob.path), pages, in_release, audience))
+            rows.append(self._row(blob, by_path.get(blob.path), pages, released, audience))
         for path, state in by_path.items():
             if path not in listed and state.deleted:
-                rows.append(self._row(RawBlob(path=path), state, pages, in_release, audience))
-        rows.sort(key=lambda row: (DOCUMENT_STATUSES.index(row["status"]), row["path"].lower()))
+                rows.append(self._row(RawBlob(path=path), state, pages, released, audience))
+        rows.sort(
+            key=lambda row: (
+                DOCUMENT_STATES.index(row["state"]),
+                (row["title"] or row["path"]).lower(),
+            )
+        )
         return rows
 
     @staticmethod
@@ -293,7 +397,7 @@ class ProcessService:
         blob: RawBlob,
         state: SourceState | None,
         pages: dict[str, Any],
-        in_release: set[str],
+        released: dict[str, str],
         audience: str,
     ) -> dict[str, Any]:
         if state is None:
@@ -305,18 +409,31 @@ class ProcessService:
         else:
             status, stage = overall_status(state)
             source_id = state.source_id
-        page = pages.get(source_id) if source_id else None
         sensitivity = state.sensitivity if state else None
+        hidden = bool(sensitivity and not allowed_for_audience(sensitivity, audience))
+        in_release = bool(source_id and source_id in released)
+        page = pages.get(source_id) if source_id and in_release else None
+        shown, step = document_state(
+            status,
+            stage,
+            in_release=in_release,
+            hidden=hidden,
+            superseded=bool(source_id and released.get(source_id) == "superseded"),
+        )
         return {
             "path": blob.path,
+            "title": page.title if page else None,
             "size": blob.size if blob.size is not None else (state.size if state else None),
             "modified": _iso(blob.modified) or (_iso(state.updated_at) if state else None),
             "status": status,
             "stage": stage,
+            "state": shown,
+            "step": step,
+            "steps": len(STAGE_NAMES),
             "source_id": source_id,
             "sensitivity": sensitivity,
-            "hidden": bool(sensitivity and not allowed_for_audience(sensitivity, audience)),
-            "in_release": bool(source_id and source_id in in_release),
+            "hidden": hidden,
+            "in_release": in_release,
             "page_url": site_link(page.path) if page else None,
             "last_error": _clip(state.last_error) if state else None,
         }
@@ -325,21 +442,34 @@ class ProcessService:
     def _public_row(row: dict[str, Any]) -> dict[str, Any]:
         public = {**row, "last_error": None, "failed": bool(row["last_error"])}
         if row["hidden"]:
-            public.update(path="(not in this site's audience)", source_id=None, page_url=None)
+            public.update(
+                path="(not in this site's audience)", title=None, source_id=None, page_url=None
+            )
         return public
 
-    def _runs(self, release: dict[str, Any] | None) -> list[dict[str, Any]]:
+    def _runs(self, release: dict[str, Any] | None) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """The last :data:`RUN_LIMIT` runs that did something, newest first, and the no-op checks
+        met on the way (``{"count", "last"}``: counted, not listed; ADR 0010)."""
         store = WorkStore(self.storage)
         runs: list[dict[str, Any]] = []
-        for run_id in reversed(store.run_ids()[-RUN_LIMIT:]):
+        checks = 0
+        last_check: str | None = None
+        for run_id in reversed(store.run_ids()[-RUN_SCAN:]):
+            if len(runs) >= RUN_LIMIT:
+                break
             try:
                 report = store.run_report(run_id)
             except ValueError:
                 continue
             if report is None:
                 continue
-            runs.append(self._run_view(OpsTools._run_summary(report), release))
-        return runs
+            summary = OpsTools._run_summary(report)
+            if summary["status"] == "no-op":
+                checks += 1
+                last_check = last_check or summary.get("finished_at") or summary["started_at"]
+                continue
+            runs.append(self._run_view(summary, release))
+        return runs, {"count": checks, "last": last_check}
 
     @staticmethod
     def _run_view(summary: dict[str, Any], release: dict[str, Any] | None) -> dict[str, Any]:

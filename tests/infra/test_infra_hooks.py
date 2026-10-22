@@ -1690,7 +1690,7 @@ def test_public_portal_owner_flow_registers_secures_then_sets_the_owners(
     assert not runner.commands(r"ingress enable"), "Bicep owns the public portal's ingress"
     assert not runner.commands(r"credential reset|secret"), "no client secret is ever created"
     output = capsys.readouterr().out
-    assert f"owner sign-in ready at https://{PORTAL_CUSTOM_DOMAIN}/how-it-works" in output
+    assert f"owner sign-in ready at https://{PORTAL_CUSTOM_DOMAIN}/pipeline" in output
 
 
 def test_public_portal_owner_flow_without_a_custom_domain_uses_the_default_host(
@@ -1705,7 +1705,7 @@ def test_public_portal_owner_flow_without_a_custom_domain_uses_the_default_host(
     assert code == 0
     created = runner.body_for(r"POST .*/applications ")[0]
     assert created["web"]["redirectUris"] == [PORTAL_CALLBACK]
-    assert f"owner sign-in ready at https://{PORTAL_HOST}/how-it-works" in capsys.readouterr().out
+    assert f"owner sign-in ready at https://{PORTAL_HOST}/pipeline" in capsys.readouterr().out
 
 
 def test_public_portal_second_run_changes_nothing(runner: FakeRunner, tmp_path: Path) -> None:

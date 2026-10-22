@@ -51,7 +51,7 @@ DEFAULT_DAILY_UPLOADS = 10
 PRINCIPAL_ID = "x-ms-client-principal-id"
 PRINCIPAL_NAME = "x-ms-client-principal-name"
 OWNER_HEADER = "x-docwiki-owner"
-RETURN_PAGE = "/how-it-works"
+RETURN_PAGE = "/pipeline"
 SIGN_IN_URL = f"/.auth/login/aad?post_login_redirect_uri={RETURN_PAGE}"
 SIGN_OUT_URL = f"/.auth/logout?post_logout_redirect_uri={RETURN_PAGE}"
 NO_STORE = {"cache-control": "no-store"}
@@ -156,6 +156,16 @@ def process_routes(service: ProcessService | None, config: OwnerConfig) -> list[
             return _error(502, "the pipeline state is unavailable right now")
         return JSONResponse(view, headers=NO_STORE)
 
+    async def status(_request: Request) -> JSONResponse:
+        if service is None:
+            return _error(503, "the status needs the release storage (not a static preview)")
+        try:
+            summary = await asyncio.to_thread(service.status)
+        except StorageError:
+            log.exception("status failed")
+            return _error(502, "the pipeline state is unavailable right now")
+        return JSONResponse(summary, headers=NO_STORE)
+
     def me(request: Request) -> JSONResponse:
         owner = config.is_owner(request) and service is not None
         principal = config.principal(request)
@@ -222,6 +232,7 @@ def process_routes(service: ProcessService | None, config: OwnerConfig) -> list[
 
     return [
         Route("/api/process", process, methods=["GET", "HEAD"]),
+        Route("/api/status", status, methods=["GET", "HEAD"]),
         Route("/api/owner/me", me, methods=["GET", "HEAD"]),
         Route("/api/owner/documents/{path:path}", upload, methods=["PUT"]),
     ]

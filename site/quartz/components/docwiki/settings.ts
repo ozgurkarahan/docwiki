@@ -7,6 +7,8 @@ export interface DocwikiSource {
   title: string
   /** Content path of the published original (`evidence/<source_id>/original.<ext>`). */
   original: string | null
+  /** `current`, `superseded` or `withdrawn` (catalog page status). */
+  status?: string | null
 }
 
 export interface DocwikiQuality {
@@ -42,6 +44,8 @@ export interface DocwikiSettings {
    * wiki" drawer is rendered only when there is at least one.
    */
   answers: number
+  /** The 13 pipeline stages and what each does (`STAGES` in src/docwiki/site/process_page.py). */
+  steps?: { name: string; text: string }[]
 }
 
 export const settings = raw as DocwikiSettings

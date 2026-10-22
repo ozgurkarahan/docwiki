@@ -113,3 +113,13 @@ owner decision of 2026-10-22 in `AGENTS.md`).
 | Portal | New `GET /api/process` (public, read-only), `GET /api/owner/me` and `PUT /api/owner/documents/{path}` (owner only: platform sign-in, `DOCWIKI_PORTAL_OWNERS` allow-list, `X-DocWiki-Owner` header, same origin, no POST). Live answers list the wiki pages of their cited sources. | Owner uploads in the same site; Container Apps built-in auth refuses browser POSTs that carry its session cookie. |
 | Infra | The portal's built-in authentication runs in `AllowAnonymous` mode with `/api/ask` excluded; the portal identity reads `raw/`, `work/` and peeks the ingest queue, and writes `raw/` (no delete) when owners are set. The Studio app, image, identity, roles and sign-in registration are removed. | One app. |
 | Answers | Asking never writes to the wiki in this version: no "File to wiki" in a browser. `docwiki file-answer` (CLI) still files a reviewed answer. | Owner decision. |
+
+## v1.7
+
+The story site: documents → pipeline → wiki ([ADR 0010](../adr/0010-the-story-site.md)), from the
+UX and building-trade reviews of 2026-10-22.
+
+| Area | Change | Why |
+|---|---|---|
+| Site | Three numbered tabs in the header of every page, ① Documents · ② Pipeline · ③ Wiki, with the pipeline's status chip and the owner's Sign in. `how-it-works` is renamed `pipeline` (the portal redirects the old URL); a generated `documents` page lists the release's documents with their original and wiki page. The 13 steps are in a disclosure; no graph view on these two pages. | The three-part story one click away from every page; "Pipeline" means something to a builder. |
+| Portal | `/api/process` rows carry `title`, `state` (`received`, `queued`, `processing`, `in_wiki`, `superseded`, `held_back`, `failed`, `removed`), `step` and `steps`; "in the wiki" only for a document of the published release. No-op runs are counted in `checks`, not listed. New public `GET /api/status` for the header chip (`idle`, `processing`, `published` with the document's page). Sign-in returns to `/pipeline`. | A status must say what is true. |

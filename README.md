@@ -45,7 +45,7 @@ MCP and Agent Skills).
 | **MCP server** | `docwiki-mcp`: 10 read tools (search, pages, indexes, links, glossary, evidence, read-only SQL over tables, skills, recent changes) and 9 operations tools, over stateless streamable HTTP or stdio. Roles are enforced by the server, not by tool visibility. |
 | **Two Foundry agents** | The **Researcher** answers with numbered citations and abstains when the wiki is silent; the **Librarian** runs and repairs ingests, with human approval for every change. |
 | **Ask this wiki** | A button on every page of the site opens a drawer. It lists reviewed Researcher answers (wiki pages in `queries/` that the owner files with `docwiki file-answer`, [ADR 0007](docs/adr/0007-answers-in-the-wiki.md)) and, where the portal enables it, lets a visitor ask the Researcher live: the answer is shown as verified only when each citation opens an evidence page of the wiki, behind per-visitor and global limits ([ADR 0008](docs/adr/0008-one-experience-live-agent-in-the-wiki.md), [docs/live-ask.md](docs/live-ask.md)). Numbered citations open the evidence beside the drawer. |
-| **How it works** | A page of the site that explains the pipeline and shows it live, read-only: each document's status, the ingest queue, the current release and the last runs (stages, timings, gates, cost). The owner signs in on the same site and uploads documents there; Event Grid and the ingest job do the rest ([ADR 0009](docs/adr/0009-one-site.md), [docs/operations.md](docs/operations.md#owner-sign-in-and-uploads-on-the-public-portal)). |
+| **Pipeline** | A page of the site (tab ② of ① Documents · ② Pipeline · ③ Wiki, [ADR 0010](docs/adr/0010-the-story-site.md)) that explains the pipeline and shows it live, read-only: each document's status, the ingest queue, the current release and the last runs (stages, timings, gates, cost). The owner signs in on the same site and uploads documents there; Event Grid and the ingest job do the rest ([ADR 0009](docs/adr/0009-one-site.md), [docs/operations.md](docs/operations.md#owner-sign-in-and-uploads-on-the-public-portal)). |
 | **Quality gates** | 15 gates (G01–G15): schemas, links and anchors, citations, quote verification, safe content, sidecars, audience, injection canaries, paths, supersession, skills… A failing blocking gate keeps the previous release online. |
 | **Immutable releases** | Each run publishes a complete, hashed release and swaps one pointer (`current.json`) with an ETag precondition. Readers never see a half-built wiki; rollback is a pointer change. |
 | **Domain packs** | Taxonomy, entity registry, topics, glossary, sensitivity, supersession and contradiction rules as YAML. Ships with one sample pack, `batiment` (the paperwork of a small French building contractor); small test packs exercise the engine with other domains. |
@@ -79,7 +79,7 @@ situations that make real document sets hard; the wiki handles each one visibly:
 | An e-mail tells AI assistants to confirm an early payment | The instruction is dropped, filed as an injection proposal and replaced by a visible placeholder |
 | An internal price study with margins | Restricted: absent from the public build |
 | A question no document answers (who is the architect?) | "Not found in the wiki." |
-| A later planning revision, held back | The owner uploads it on the `how-it-works` page ([demo](docs/operations.md#live-upload-demo-optional)): it supersedes the first planning and the contradiction resolves |
+| A later planning revision, held back | The owner uploads it on the `pipeline` page ([demo](docs/operations.md#live-upload-demo-optional)): it supersedes the first planning and the contradiction resolves |
 
 | Home | Topic synthesis |
 |---|---|
@@ -197,7 +197,7 @@ flowchart LR
 | Models | Microsoft Foundry deployments `fast` and `smart`; Content Understanding for PDFs and images | Classification fallback, figure descriptions and entity summaries (`fast`); compilation and topic synthesis (`smart`) |
 | MCP server | Container App `mcp` behind built-in authentication | Serves the current release; enforces `Wiki.Read` and `Wiki.Operate` per tool |
 | Agents | Foundry prompt agents `docwiki-researcher` and `docwiki-librarian` | Cited answers; operations with approvals |
-| Site | Quartz served by the optional `portal` Container App (Entra sign-in, or no sign-in for a public-audience build with the owner's sign-in for uploads) | Human view, evidence microscope, the live `how-it-works` page and the owner's uploads |
+| Site | Quartz served by the optional `portal` Container App (Entra sign-in, or no sign-in for a public-audience build with the owner's sign-in for uploads) | Human view, evidence microscope, the live `pipeline` page and the owner's uploads |
 | Operations | Log Analytics, Application Insights, Foundry tracing, budget alerts | Spans per stage, model call and tool call; a cost receipt per run |
 
 Run control, release lifecycle and identities: [docs/architecture.md](docs/architecture.md).

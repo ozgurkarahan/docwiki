@@ -1,18 +1,30 @@
-"""The ``how-it-works`` page (ADR 0009): how a document becomes cited wiki pages.
+"""The ``pipeline`` and ``documents`` pages (ADR 0009, 0010): the first two of the site's three
+tabs, ① Documents · ② Pipeline · ③ Wiki.
 
-The site build writes it next to the release's content, so it carries the wiki's navigation,
-search and drawer. Its text is static; the live part (each document's status, the queue, the
-runs and, for the signed-in owner, the upload form) is filled on the client from the portal's
-``/api/process`` by the ``Process`` component, and says so on a static host.
+The site build writes them next to the release's content, so they carry the wiki's navigation,
+search and drawer. Their text is static. On ``pipeline`` the live part (the owner's box, each
+document's status, the queue and the runs) is filled on the client from the portal's
+``/api/process`` by the ``Process`` and ``OwnerBox`` components, which also show the 13 technical
+steps of :data:`STAGES` in a disclosure. On ``documents`` the ``Documents`` component lists the
+release's documents.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-__all__ = ["PROCESS_SLUG", "STAGES", "process_markdown", "write_process_page"]
+__all__ = [
+    "DOCUMENTS_SLUG",
+    "PROCESS_SLUG",
+    "STAGES",
+    "documents_markdown",
+    "process_markdown",
+    "write_documents_page",
+    "write_process_page",
+]
 
-PROCESS_SLUG = "how-it-works"
+PROCESS_SLUG = "pipeline"
+DOCUMENTS_SLUG = "documents"
 
 STAGES: tuple[tuple[str, str], ...] = (
     ("discover", "Lists the documents, spots what is new, changed or deleted, groups revisions."),
@@ -32,40 +44,45 @@ STAGES: tuple[tuple[str, str], ...] = (
 
 
 def process_markdown() -> str:
-    rows = "\n".join(
-        f"| {number} | `{stage}` | {text} |" for number, (stage, text) in enumerate(STAGES, 1)
-    )
-    return f"""---
-title: How it works
+    return """---
+title: Pipeline
 ---
 
-This wiki was not written by hand. A folder of ordinary documents (PDF, Word, Excel, CSV,
-PowerPoint, e-mail, scans) is compiled into the pages you read, and every fact keeps a footnote
-that opens the exact passage it came from. When a document is added, the pipeline runs again and
-a new release of the whole wiki replaces the old one.
+This wiki was not written by hand. Ordinary documents (PDF, Word, Excel, e-mail, scans) are
+compiled into the pages you read, and every fact keeps a footnote that opens the exact passage it
+came from. When a document is added, the pipeline runs again and a new release of the whole wiki
+replaces the old one.
 
-Below, live: every document and where it is in the pipeline, and the last runs with their stages,
-timings and cost. The owner, signed in, adds documents here and follows them until their pages
-appear.
-
-## The pipeline
-
-| # | Stage | What it does |
-|---|---|---|
-{rows}
-
-Models are used only where judgement is needed (classifying an unusual document, writing source
-and topic pages); everything derivable from structure is computed by code. A run reuses what did
-not change, so adding one document costs well under a dollar and takes a few minutes.
+Below, live: every document and where it is in the pipeline, and the runs that changed the wiki,
+with their timings and cost. Models are used only where judgement is needed; everything derivable
+from structure is computed by code, and a run reuses what did not change.
 
 ## Live
 """
 
 
-def write_process_page(content_dir: Path) -> bool:
-    """Write ``how-it-works.md`` into the Quartz content unless the release has its own."""
-    target = content_dir / f"{PROCESS_SLUG}.md"
+def documents_markdown() -> str:
+    return """---
+title: Documents
+---
+
+The raw documents this wiki is compiled from, as they were received: quotes, contracts, plans,
+invoices, e-mails, photos and scans. Open the original, or the wiki page compiled from it.
+"""
+
+
+def _write_once(target: Path, text: str) -> bool:
     if target.exists():
         return False
-    target.write_text(process_markdown(), encoding="utf-8", newline="\n")
+    target.write_text(text, encoding="utf-8", newline="\n")
     return True
+
+
+def write_process_page(content_dir: Path) -> bool:
+    """Write ``pipeline.md`` into the Quartz content unless the release has its own."""
+    return _write_once(content_dir / f"{PROCESS_SLUG}.md", process_markdown())
+
+
+def write_documents_page(content_dir: Path) -> bool:
+    """Write ``documents.md`` into the Quartz content unless the release has its own."""
+    return _write_once(content_dir / f"{DOCUMENTS_SLUG}.md", documents_markdown())
