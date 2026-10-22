@@ -374,6 +374,17 @@ export const ASK_STATE_KEY = "docwiki-ask"
  */
 export const NARROW_QUERY = "(max-width: 1200px)"
 
+/** Quartz's phone layout (its `mobile` breakpoint): the drawer is a bottom sheet (custom.scss). */
+export const PHONE_QUERY = "(max-width: 800px)"
+
+/**
+ * The state to restore on a page load. On a phone the drawer never comes back open (a sheet over
+ * the page that was just opened would hide it); the answer stays selected for the next opening.
+ */
+export function restoredState(state: AskState, phone: boolean): AskState {
+  return phone && state.open ? { ...state, open: false } : state
+}
+
 /**
  * State after following a link of an answer (a citation, a source, the answer's page). On a narrow
  * screen the drawer collapses so that the page shows, keeping the answer to come back to; on wide
@@ -506,4 +517,102 @@ export function parseLivePoll(payload: unknown): LivePoll {
 /** "The Researcher is reading the wiki… 12 s" */
 export function waitingLabel(elapsedSeconds: number): string {
   return `The Researcher is reading the wiki… ${Math.max(Math.floor(elapsedSeconds), 0)} s`
+}
+
+// ----- Drawer details: numbering, examples, the last live answers -----
+
+/**
+ * The answer with its sources numbered 1..n in the order the answer first cites them, and the
+ * inline markers renumbered to match. A marker citing a source the answer does not list is
+ * numbered too (it stays unlinked); listed sources the text never cites follow, in their order.
+ * Pure: the input is not changed.
+ */
+export function renumberCitations(item: AskAnswer): AskAnswer {
+  const order = new Map<number, number>()
+  const assign = (old: number) => {
+    if (!order.has(old)) order.set(old, order.size + 1)
+    return order.get(old) as number
+  }
+  const seen = new Set<number>()
+  const listed = item.citations.filter((entry) => {
+    if (seen.has(entry.n)) return false
+    seen.add(entry.n)
+    return true
+  })
+  // Listed sources first (cited ones in order of appearance), so the list has no gaps.
+  for (const paragraph of item.paragraphs) {
+    for (const segment of paragraph) {
+      if (segment.cite !== undefined && seen.has(segment.cite)) assign(segment.cite)
+    }
+  }
+  for (const entry of listed) assign(entry.n)
+  const paragraphs = item.paragraphs.map((paragraph) =>
+    paragraph.map((segment) =>
+      segment.cite !== undefined ? { cite: assign(segment.cite) } : { ...segment },
+    ),
+  )
+  const citations = listed
+    .map((entry) => ({ ...entry, n: order.get(entry.n) as number }))
+    .sort((a, b) => a.n - b.n)
+  return { ...item, paragraphs, citations }
+}
+
+/** Opening of the notice every live answer carries (the portal's `LIVE_BANNER`). */
+export function isLiveNotice(banner: string): boolean {
+  return banner.startsWith("Live answer from the Researcher agent")
+}
+
+/** Questions the sample corpus answers, offered when the drawer has no answer to show. */
+export const EXAMPLE_QUESTIONS: readonly string[] = [
+  "When are the windows of the extension delivered?",
+  "Which architect designed the extension of the Moreau house?",
+  "What is the current total contract price of the works, excluding and including VAT?",
+]
+
+function sameQuestion(a: string, b: string): boolean {
+  const clean = (text: string) => text.trim().replace(/\s+/g, " ").toLowerCase()
+  return clean(a) === clean(b)
+}
+
+/** The filed answer to exactly this question, if the build has one. */
+export function filedAnswerFor(
+  answers: readonly AskAnswer[],
+  question: string,
+): AskAnswer | undefined {
+  return answers.find((item) => !item.live && sameQuestion(item.question, question))
+}
+
+/**
+ * The examples to offer: all of them when the portal answers live questions, else those that have
+ * a filed answer in this build.
+ */
+export function exampleQuestions(
+  answers: readonly AskAnswer[] | null,
+  live: boolean,
+): string[] {
+  if (live) return [...EXAMPLE_QUESTIONS]
+  return EXAMPLE_QUESTIONS.filter((question) => filedAnswerFor(answers ?? [], question))
+}
+
+/** sessionStorage key of the live answers of the session (they survive page navigation). */
+export const LIVE_STORE_KEY = "docwiki-ask-live"
+
+/**
+ * Live answers read back from sessionStorage: the same validation as the live JSON, always marked
+ * live, at most `LIVE_KEEP` of them, oldest first. Anything of the wrong shape is dropped.
+ */
+export function parseStoredLive(raw: string | null | undefined): AskAnswer[] {
+  if (!raw) return []
+  let value: unknown
+  try {
+    value = JSON.parse(raw)
+  } catch {
+    return []
+  }
+  if (!Array.isArray(value)) return []
+  const kept = value
+    .map(answer)
+    .filter((item): item is AskAnswer => item !== undefined)
+    .map((item) => ({ ...item, live: true }))
+  return kept.slice(-LIVE_KEEP)
 }

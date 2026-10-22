@@ -13,21 +13,29 @@ import {
   LIVE_POLL_MS,
   LIVE_QUESTION_MAX,
   LIVE_STATUS_PATH,
+  LIVE_STORE_KEY,
   NARROW_QUERY,
+  PHONE_QUERY,
   badgeForText,
   citationText,
+  exampleQuestions,
   fabLabel,
+  filedAnswerFor,
   followLink,
   groupAnswers,
+  isLiveNotice,
   liveQuestion,
   parseAnswers,
   parseAskState,
   parseJobId,
   parseLivePoll,
   parseLiveStatus,
+  parseStoredLive,
   provenanceLine,
   refusalMessage,
   relativeHref,
+  renumberCitations,
+  restoredState,
   stepsLabel,
   waitingLabel,
 } from "../../../plugins/transformers/docwiki-text"
@@ -66,8 +74,24 @@ let liveRun: LiveRun | null = null
 /** Why the last live question did not produce an answer, or what is wrong with the text. */
 let liveMessage: string | null = null
 let liveDraft = ""
-/** Live answers of this page load, oldest first: listed in the drawer, never persisted. */
-const liveAnswers = new Map<string, AskAnswer>()
+/** Live answers of this session, oldest first: kept in sessionStorage across page navigation. */
+const liveAnswers = new Map<string, AskAnswer>(
+  (() => {
+    try {
+      return parseStoredLive(sessionStorage.getItem(LIVE_STORE_KEY))
+    } catch {
+      return []
+    }
+  })().map((item): [string, AskAnswer] => [item.id, item]),
+)
+
+function storeLive() {
+  try {
+    sessionStorage.setItem(LIVE_STORE_KEY, JSON.stringify(Array.from(liveAnswers.values())))
+  } catch {
+    // Storage disabled or full: the answers last until the next full page load.
+  }
+}
 let memoryState: AskState = parseAskState(null)
 /** Focus to restore in the rebuilt drawer after a page navigation started from inside it. */
 let pendingFocus: string | null = null
@@ -216,7 +240,26 @@ function footer(repoUrl: string | undefined): HTMLElement {
   return foot
 }
 
+/** Example questions of the sample corpus, shown while no live answer of the session exists. */
+function examples(body: HTMLElement, list: readonly AskAnswer[]) {
+  if (liveAnswers.size > 0) return
+  const questions = exampleQuestions(list, liveEnabled === true)
+  if (questions.length === 0) return
+  const section = element("section", "docwiki-ask-group docwiki-ask-examples")
+  const items = element("ul", "docwiki-ask-questions")
+  questions.forEach((question, index) => {
+    const choice = button("docwiki-ask-question", question, `example:${index}`)
+    choice.dataset.askExample = question
+    const entry = element("li")
+    entry.append(choice)
+    items.append(entry)
+  })
+  section.append(element("h3", "docwiki-ask-group-title", "Try one of these"), items)
+  body.append(section)
+}
+
 function questionList(body: HTMLElement, list: readonly AskAnswer[], slug: string) {
+  examples(body, list)
   const groups = groupAnswers(list, slug)
   const live = Array.from(liveAnswers.values()).reverse()
   if (live.length > 0) groups.unshift({ title: "Your live questions", answers: live })
@@ -294,6 +337,17 @@ function liveForm(body: HTMLElement) {
   body.append(form)
 }
 
+/** An example question: asked live when the agent is enabled, else its filed answer is opened. */
+function useExample(question: string) {
+  if (liveEnabled) {
+    liveDraft = question
+    void startLive()
+    return
+  }
+  const filed = answers ? filedAnswerFor(answers, question) : undefined
+  if (filed) select(filed.id)
+}
+
 function waiting() {
   const status = document.querySelector<HTMLElement>(`#${PANEL_ID} .docwiki-ask-live-status`)
   if (status && liveRun) status.textContent = waitingLabel((Date.now() - liveRun.started) / 1000)
@@ -314,6 +368,7 @@ function endLive(run: LiveRun, outcome: LiveOutcome) {
       if (oldest.done) break
       liveAnswers.delete(oldest.value)
     }
+    storeLive()
     liveDraft = ""
     liveMessage = null
     const state = readState()
@@ -398,10 +453,10 @@ function citeMark(
 ): HTMLElement {
   const mark = element("sup", "docwiki-ask-cite")
   if (!entry) {
-    mark.textContent = String(n)
+    mark.textContent = `[${n}]`
     return mark
   }
-  const anchor = link(slug, entry.href, String(n), focusKey)
+  const anchor = link(slug, entry.href, `[${n}]`, focusKey)
   const label = `Source ${n}: ${entry.title} — ${entry.label}`
   anchor.setAttribute("aria-label", label)
   anchor.title = label
@@ -441,7 +496,9 @@ function wikiPages(item: AskAnswer): [string, string][] {
   return Array.from(pages.entries())
 }
 
-function answerView(body: HTMLElement, item: AskAnswer, slug: string) {
+function answerView(body: HTMLElement, answer: AskAnswer, slug: string) {
+  // Sources are numbered in the order the answer first cites them.
+  const item = renumberCitations(answer)
   const back = button("docwiki-ask-back", "Back to questions", "back")
   back.dataset.askAction = "back"
   const article = element("article", "docwiki-ask-answer")
@@ -450,7 +507,13 @@ function answerView(body: HTMLElement, item: AskAnswer, slug: string) {
   question.dataset.focusKey = "answer"
   article.append(question)
   for (const banner of item.banners) {
-    const note = element("p", "docwiki-ask-banner", banner)
+    const note = element(
+      "p",
+      item.live && isLiveNotice(banner)
+        ? "docwiki-ask-banner docwiki-ask-banner--live"
+        : "docwiki-ask-banner",
+      banner,
+    )
     note.setAttribute("role", "note")
     article.append(note)
   }
@@ -459,10 +522,15 @@ function answerView(body: HTMLElement, item: AskAnswer, slug: string) {
   let marks = 0
   for (const paragraph of item.paragraphs) {
     const block = element("p")
+    let previousCite = false
     for (const segment of paragraph) {
       if (segment.text !== undefined) {
         block.append(segment.text)
+        previousCite = false
       } else if (segment.cite !== undefined) {
+        // Neighbouring markers read as "[1] [3]", never "13".
+        if (previousCite) block.append(" ")
+        previousCite = true
         const entry = byNumber.get(segment.cite)
         block.append(citeMark(segment.cite, entry, slug, `cite:${marks++}`))
       }
@@ -470,12 +538,6 @@ function answerView(body: HTMLElement, item: AskAnswer, slug: string) {
     text.append(block)
   }
   article.append(text)
-  if (item.citations.length > 0) {
-    article.append(element("h4", "docwiki-ask-sources-title", "Sources"))
-    const sources = element("ul", "docwiki-ask-sources")
-    for (const entry of item.citations) sources.append(sourceItem(entry, slug))
-    article.append(sources)
-  }
   const pages = wikiPages(item)
   if (pages.length > 0) {
     article.append(element("h4", "docwiki-ask-sources-title", "Pages in the wiki"))
@@ -486,6 +548,12 @@ function answerView(body: HTMLElement, item: AskAnswer, slug: string) {
       list.append(entry)
     }
     article.append(list)
+  }
+  if (item.citations.length > 0) {
+    article.append(element("h4", "docwiki-ask-sources-title", "Sources"))
+    const sources = element("ul", "docwiki-ask-sources")
+    for (const entry of item.citations) sources.append(sourceItem(entry, slug))
+    article.append(sources)
   }
   if (item.steps.length > 0) {
     const details = element("details", "docwiki-ask-steps")
@@ -638,7 +706,9 @@ function onPanelClick(event: MouseEvent) {
     onLinkFollowed(followed, event)
     return
   }
-  const control = target.closest<HTMLElement>("[data-ask-action], [data-ask-answer]")
+  const control = target.closest<HTMLElement>(
+    "[data-ask-action], [data-ask-answer], [data-ask-example]",
+  )
   if (!control) return
   const action = control.dataset.askAction
   if (action === "close") {
@@ -648,6 +718,8 @@ function onPanelClick(event: MouseEvent) {
   } else if (action === "retry") {
     failed = false
     paint("title")
+  } else if (control.dataset.askExample) {
+    useExample(control.dataset.askExample)
   } else if (control.dataset.askAnswer) {
     select(control.dataset.askAnswer)
   }
@@ -722,8 +794,12 @@ document.addEventListener("nav", () => {
     fab.hidden = filedCount === 0 && liveEnabled !== true
     syncFab(fab, readState())
   }
+  // The drawer is a bottom sheet on phones: a page never starts with it open.
+  const stored = readState()
+  const restored = restoredState(stored, window.matchMedia(PHONE_QUERY).matches)
+  if (restored !== stored) writeState(restored)
   apply()
-  if (readState().open && !fab.hidden) paint(focusKey)
+  if (restored.open && !fab.hidden) paint(focusKey)
   if (!known) {
     void checkLive(currentSlug()).then(() => {
       if (!fab.isConnected) return // another page replaced this one meanwhile
