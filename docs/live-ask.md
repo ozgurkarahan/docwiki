@@ -118,8 +118,8 @@ limit for now. The answers below were reviewed and filed." The filed answers kee
 - An **unverified** answer (a citation is missing from the source list, is not an evidence path, or
   has no page in this site): the text with its citations removed and "This answer could not be
   checked against the sources, so it is not shown as verified."
-- No "Open as a page" link: live answers are not filed. The owner can ask the same question in the
-  Studio, review it and file it.
+- No "Open as a page" link: live answers are not filed. The owner can ask the same question with
+  `docwiki file-answer`, review it and file it ([agents](agents.md#filing-an-answer-into-the-wiki)).
 
 ## Turn it off
 

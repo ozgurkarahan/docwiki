@@ -187,12 +187,6 @@ def test_role_rules() -> None:
         == OK
     )
     assert preflight.evaluate_roles([], SUBSCRIPTION).status == FAIL
-    # The Studio's custom role on work/ needs roleDefinitions/write: RBAC Administrator lacks it.
-    rbac_admin = roles("Contributor", "Role Based Access Control Administrator")
-    blocked = preflight.evaluate_roles(rbac_admin, SUBSCRIPTION, custom_roles=True)
-    assert blocked.status == FAIL and "DOCWIKI_ENABLE_STUDIO=false" in (blocked.remediation or "")
-    for allowed in (roles("Owner"), roles("Contributor", "User Access Administrator")):
-        assert preflight.evaluate_roles(allowed, SUBSCRIPTION, custom_roles=True).status == OK
 
 
 def test_budget_contacts_are_never_echoed() -> None:

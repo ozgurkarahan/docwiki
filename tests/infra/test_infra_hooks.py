@@ -5,7 +5,6 @@ from __future__ import annotations
 import base64
 import io
 import json
-import re
 import threading
 import urllib.error
 import urllib.request
@@ -32,8 +31,6 @@ MCP_APP = "ca-mcp-tok123"
 MCP_FQDN = "ca-mcp-tok123.region.azurecontainerapps.example"
 APP = "app-1"
 APP_URI = f"api://{APP}"
-STUDIO_APP = "ca-studio-tok123"
-STUDIO_FQDN = "ca-studio-tok123.region.azurecontainerapps.example"
 
 
 def base_env(**extra: str) -> dict[str, str]:
@@ -46,7 +43,6 @@ def base_env(**extra: str) -> dict[str, str]:
         "DOCWIKI_MCP_APP_NAME": MCP_APP,
         "DOCWIKI_MCP_FQDN": MCP_FQDN,
         "DOCWIKI_PORTAL_APP_NAME": "ca-portal-tok123",
-        "DOCWIKI_STUDIO_APP_NAME": STUDIO_APP,
         "DOCWIKI_CONTAINER_APPS_DEFAULT_DOMAIN": "region.azurecontainerapps.example",
         "DOCWIKI_FOUNDRY_ACCOUNT_ENDPOINT": "https://aif-tok123.services.ai.azure.com/",
         "DOCWIKI_INGEST_JOB_NAME": "caj-ingest-tok123",
@@ -725,8 +721,8 @@ def test_duplicate_tagged_registrations_are_refused(runner: FakeRunner, tmp_path
     [
         ({}, "DocWiki private portal sign-in."),
         (
-            {"description": "DocWiki Studio sign-in (owner only)."},
-            "DocWiki Studio sign-in (owner only).",
+            {"description": "DocWiki portal: the owner's sign-in (uploads)."},
+            "DocWiki portal: the owner's sign-in (uploads).",
         ),
     ],
 )
@@ -1668,7 +1664,6 @@ def test_public_portal_owner_flow_registers_secures_then_sets_the_owners(
     assert created["web"]["redirectUris"] == [PORTAL_CALLBACK, PORTAL_CUSTOM_CALLBACK]
     state = json.loads(azdlib.state_path(ENV, tmp_path).read_text(encoding="utf-8"))
     assert state["portal_app"]["app_id"] == PORTAL_ID
-    assert "studio_app" not in state
     assert runner.body_for(r"POST .*appRoleAssignedTo") == [
         {
             "principalId": "user-oid",
@@ -1861,331 +1856,6 @@ def test_sign_in_app_gains_the_missing_custom_domain_redirect(
     (patch,) = runner.body_for(r"PATCH .*/applications/portal-obj")
     assert patch["web"]["redirectUris"] == [PORTAL_CALLBACK, previous, PORTAL_CUSTOM_CALLBACK]
     assert not runner.commands(r"POST ")
-
-
-STUDIO_ID = "studio-app"
-STUDIO_CALLBACK = f"https://{STUDIO_FQDN}/.auth/login/aad/callback"
-STUDIO_GET = rf"GET .*containerApps/{STUDIO_APP}\?"
-STUDIO_ENV = {"DOCWIKI_ENABLE_STUDIO": "true"}
-
-
-def studio_auth_properties(
-    *,
-    enabled: bool = True,
-    action: str = "RedirectToLoginPage",
-    excluded: tuple[str, ...] = ("/healthz", "/livez"),
-    allowed: tuple[str, ...] = (),
-) -> dict[str, Any]:
-    """Built-in auth of the Studio app as ``az containerapp auth show`` prints it."""
-    validation: dict[str, Any] = {"allowedAudiences": [STUDIO_ID]}
-    if allowed:
-        validation["defaultAuthorizationPolicy"] = {"allowedApplications": list(allowed)}
-    return {
-        "platform": {"enabled": enabled},
-        "globalValidation": {
-            "unauthenticatedClientAction": action,
-            "excludedPaths": list(excluded),
-        },
-        "identityProviders": {
-            "azureActiveDirectory": {
-                "enabled": True,
-                "registration": {"clientId": STUDIO_ID, "openIdIssuer": ISSUER},
-                "validation": validation,
-            }
-        },
-        "login": {"tokenStore": {"enabled": False}},
-    }
-
-
-def studio_app_view(env: dict[str, str] | None = None, *, external: bool = False) -> dict[str, Any]:
-    """ARM view of the Studio container app."""
-    container = {
-        "name": "studio",
-        "image": "mcr.microsoft.com/dotnet/samples:aspnetapp",
-        "env": [{"name": key, "value": value} for key, value in (env or {}).items()],
-    }
-    configuration = {"ingress": {"external": True, "fqdn": STUDIO_FQDN}} if external else {}
-    return {"properties": {"configuration": configuration, "template": {"containers": [container]}}}
-
-
-def studio_azure(
-    runner: FakeRunner,
-    *,
-    shown: dict[str, Any] | None = None,
-    deployment: Result | None = None,
-) -> FakeRunner:
-    """Fake Azure for a first Studio provision: no app registration, no built-in auth yet."""
-    runner.on(r"^az account show", {"id": SUB, "user": {"type": "user"}})
-    runner.on(r"^az account get-access-token", {"accessToken": fake_token({"oid": "user-oid"})})
-    runner.on(r"GET .*applications\?\$filter", {"value": []})
-    runner.on(r"POST .*/applications ", {"id": "studio-obj", "appId": STUDIO_ID, "web": {}})
-    runner.on(r"PATCH .*/applications/studio-obj", None)
-    runner.on(rf"GET .*servicePrincipals\(appId='{STUDIO_ID}'\)", not_found())
-    runner.on(r"POST .*/servicePrincipals ", {"id": "studio-sp", "appRoleAssignmentRequired": True})
-    runner.on(r"GET .*/servicePrincipals/studio-sp/owners", {"value": []})
-    runner.on(r"POST .*/owners/\$ref", None)
-    runner.on(r"GET .*appRoleAssignedTo", {"value": []})
-    runner.on(r"POST .*appRoleAssignedTo", {"id": "default-access"})
-    runner.on(r"^azd env set", None)
-    runner.queue(
-        r"GET .*authConfigs/current", not_found(), {"properties": studio_auth_properties()}
-    )
-    runner.on(r"^az deployment group create", deployment)
-    runner.on(r"^az containerapp auth show", studio_auth_properties() if shown is None else shown)
-    runner.on(STUDIO_GET, studio_app_view())
-    runner.on(r"^az containerapp update", None)
-    runner.on(r"^az containerapp ingress enable", {"external": True, "fqdn": STUDIO_FQDN})
-    return runner
-
-
-def test_studio_flow_registers_its_owner_secures_then_exposes(
-    runner: FakeRunner, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    code = postprovision.main(
-        ["--only", "studio"],
-        runner=studio_azure(runner),
-        environ=base_env(**STUDIO_ENV),
-        root=tmp_path,
-    )
-    assert code == 0
-    created = runner.body_for(r"POST .*/applications ")[0]
-    assert created["displayName"] == f"docwiki-studio-{ENV}-{TOKEN}"
-    assert created["description"] == "DocWiki Studio sign-in (owner only)."
-    assert created["signInAudience"] == "AzureADMyOrg"
-    assert created["web"] == {
-        "redirectUris": [STUDIO_CALLBACK],
-        "implicitGrantSettings": {
-            "enableIdTokenIssuance": True,
-            "enableAccessTokenIssuance": False,
-        },
-    }
-    assert runner.body_for(r"POST .*/servicePrincipals ")[0]["appRoleAssignmentRequired"] is True
-    state = json.loads(azdlib.state_path(ENV, tmp_path).read_text(encoding="utf-8"))
-    assert state["studio_app"]["app_id"] == STUDIO_ID
-    assert state["studio_app"]["created_by_hook"] is True
-    assert state["studio_app"]["service_principal_id"] == "studio-sp"
-    assert "portal_app" not in state
-    sets = runner.commands(r"^azd env set")
-    assert any(f"DOCWIKI_STUDIO_CLIENT_ID {STUDIO_ID} --environment demo" in s for s in sets)
-    assert any("DOCWIKI_STUDIO_ALLOWED_PRINCIPALS user-oid --environment demo" in s for s in sets)
-    # Sign-in requires an assignment: the deployer is the only user assigned.
-    assert runner.body_for(r"POST .*appRoleAssignedTo") == [
-        {
-            "principalId": "user-oid",
-            "resourceId": "studio-sp",
-            "appRoleId": entra.DEFAULT_ACCESS_ROLE_ID,
-        }
-    ]
-    (parameters,) = auth_parameters(runner)
-    assert parameters["containerAppName"]["value"] == STUDIO_APP
-    assert parameters["clientId"]["value"] == STUDIO_ID
-    assert parameters["allowedAudiences"]["value"] == [STUDIO_ID]
-    assert parameters["unauthenticatedClientAction"]["value"] == "RedirectToLoginPage"
-    assert parameters["excludedPaths"]["value"] == ["/healthz", "/livez"]
-    assert parameters["allowedApplications"]["value"] == []
-    deployment = runner.commands(r"^az deployment group create")[0]
-    assert "--name docwiki-studio-auth" in deployment and "app-auth.bicep" in deployment
-    # Fail closed: auth applied and verified, then the owner allowlist, then ingress.
-    assert exposure_order(runner) == ["auth-deploy", "auth-verify", "settings", "ingress"]
-    update = runner.commands(r"^az containerapp update")[0]
-    assert f"--name {STUDIO_APP}" in update and "--container-name studio" in update
-    assert "--set-env-vars DOCWIKI_STUDIO_ALLOWED_PRINCIPALS=user-oid --output none" in update
-    (ingress,) = runner.commands(r"ingress enable")
-    assert f"--name {STUDIO_APP}" in ingress and "--type external" in ingress
-    assert "--target-port 8080" in ingress
-    assert not runner.commands(r"credential reset|secret"), "no client secret is ever created"
-    assert not list((tmp_path / ".azure" / ENV / "hook-tmp").glob("*.json")), "bodies cleaned up"
-    output = capsys.readouterr().out
-    assert f"studio ready at https://{STUDIO_FQDN}/ (Entra sign-in, owner only)" in output
-    assert "owner allowlist" not in output, "set now, not 'already up to date'"
-
-
-def test_studio_auth_declared_by_the_hook_is_what_bicep_declares(
-    runner: FakeRunner, tmp_path: Path
-) -> None:
-    postprovision.main(
-        ["--only", "studio"],
-        runner=studio_azure(runner),
-        environ=base_env(**STUDIO_ENV),
-        root=tmp_path,
-    )
-    (parameters,) = auth_parameters(runner)
-    bicep = (REPO_ROOT / "infra" / "main.bicep").read_text(encoding="utf-8")
-    block = bicep[bicep.index("module studioAuth") : bicep.index("module budget")]
-    action = parameters["unauthenticatedClientAction"]["value"]
-    assert f"unauthenticatedClientAction: '{action}'" in block
-    assert re.findall(r"'(/[a-z]+)'", block) == parameters["excludedPaths"]["value"]
-    assert re.search(r"allowedAudiences: \[\s*studioClientId\s*\]", block)
-    assert "allowedApplications" not in block and parameters["allowedApplications"]["value"] == []
-    # The values the hook writes to the azd environment are the ones Bicep reads.
-    mapped = json.loads((REPO_ROOT / "infra" / "main.parameters.json").read_text("utf-8"))
-    assert mapped["parameters"]["studioClientId"]["value"] == "${DOCWIKI_STUDIO_CLIENT_ID}"
-    assert mapped["parameters"]["studioAllowedPrincipals"]["value"] == (
-        "${" + postprovision.STUDIO_PRINCIPALS_SETTING + "}"
-    )
-    assert runner.commands(rf"^azd env set {postprovision.STUDIO_PRINCIPALS_SETTING} ")
-
-
-def test_studio_step_follows_the_portal_step() -> None:
-    names = [name for name, _ in postprovision.STEPS]
-    assert names.index("studio") == names.index("portal") + 1
-    assert "``studio``" in (postprovision.__doc__ or "")
-
-
-def test_studio_second_run_changes_nothing(runner: FakeRunner, tmp_path: Path) -> None:
-    azdlib.save_state(
-        azdlib.state_path(ENV, tmp_path),
-        {
-            "studio_app": {
-                "app_id": STUDIO_ID,
-                "object_id": "studio-obj",
-                "display_name": f"docwiki-studio-{ENV}-{TOKEN}",
-                "service_principal_id": "studio-sp",
-                "created_by_hook": True,
-            }
-        },
-    )
-    runner.on(r"^az account show", {"id": SUB, "user": {"type": "user"}})
-    runner.on(r"^az account get-access-token", {"accessToken": fake_token({"oid": "user-oid"})})
-    registered = {
-        "id": "studio-obj",
-        "appId": STUDIO_ID,
-        "web": {
-            "redirectUris": [STUDIO_CALLBACK],
-            "implicitGrantSettings": {
-                "enableIdTokenIssuance": True,
-                "enableAccessTokenIssuance": False,
-            },
-        },
-    }
-    runner.on(rf"GET .*applications\(appId='{STUDIO_ID}'\)", registered)
-    runner.on(
-        rf"GET .*servicePrincipals\(appId='{STUDIO_ID}'\)",
-        {"id": "studio-sp", "appRoleAssignmentRequired": True},
-    )
-    runner.on(r"GET .*/servicePrincipals/studio-sp/owners", {"value": [{"id": "user-oid"}]})
-    assigned = {"id": "as-1", "principalId": "user-oid", "appRoleId": entra.DEFAULT_ACCESS_ROLE_ID}
-    runner.on(r"GET .*appRoleAssignedTo", {"value": [assigned]})
-    runner.on(r"GET .*authConfigs/current", {"properties": studio_auth_properties()})
-    runner.on(r"^az containerapp auth show", studio_auth_properties())
-    settled = {"DOCWIKI_STUDIO_ALLOWED_PRINCIPALS": "user-oid"}
-    runner.on(STUDIO_GET, studio_app_view(settled, external=True))
-    environ = base_env(
-        **STUDIO_ENV,
-        DOCWIKI_STUDIO_CLIENT_ID=STUDIO_ID,
-        DOCWIKI_STUDIO_ALLOWED_PRINCIPALS="user-oid",
-    )
-    code = postprovision.main(["--only", "studio"], runner=runner, environ=environ, root=tmp_path)
-    assert code == 0
-    assert not runner.commands(
-        r"--method (POST|PATCH|DELETE)|deployment group create|^azd env set|"
-        r"containerapp update|ingress enable"
-    )
-    assert exposure_order(runner) == ["auth-verify"]
-
-
-def test_studio_keeps_the_allowed_principals_of_the_environment(
-    runner: FakeRunner, tmp_path: Path
-) -> None:
-    environ = base_env(**STUDIO_ENV, DOCWIKI_STUDIO_ALLOWED_PRINCIPALS="owner-a,owner-b")
-    code = postprovision.main(
-        ["--only", "studio"], runner=studio_azure(runner), environ=environ, root=tmp_path
-    )
-    assert code == 0
-    assert not runner.commands(r"^azd env set DOCWIKI_STUDIO_ALLOWED_PRINCIPALS")
-    update = runner.commands(r"^az containerapp update")[0]
-    assert (
-        "--set-env-vars DOCWIKI_STUDIO_ALLOWED_PRINCIPALS=owner-a,owner-b --output none" in update
-    )
-
-
-def test_studio_updates_a_stale_allowlist_on_the_running_container(
-    runner: FakeRunner, tmp_path: Path
-) -> None:
-    """On the first provision Bicep ran before the hook set it; later provisions carry it."""
-    studio_azure(runner)
-    runner.rules = [rule for rule in runner.rules if rule[0].pattern != STUDIO_GET]
-    stale = {"DOCWIKI_STUDIO_ALLOWED_PRINCIPALS": "previous-owner"}
-    runner.on(STUDIO_GET, studio_app_view(stale))
-    ctx = context(runner, tmp_path, **STUDIO_ENV, DOCWIKI_STUDIO_ALLOWED_PRINCIPALS="owner-a")
-    postprovision.step_studio(ctx)
-    update = runner.commands(r"^az containerapp update")[0]
-    assert "--set-env-vars DOCWIKI_STUDIO_ALLOWED_PRINCIPALS=owner-a --output none" in update
-
-
-@pytest.mark.parametrize("value", [None, "false", "FALSE"])
-def test_studio_disabled_registers_nothing(
-    runner: FakeRunner, tmp_path: Path, capsys: pytest.CaptureFixture[str], value: str | None
-) -> None:
-    environ = base_env() if value is None else base_env(DOCWIKI_ENABLE_STUDIO=value)
-    code = postprovision.main(["--only", "studio"], runner=runner, environ=environ, root=tmp_path)
-    assert code == 0
-    assert not runner.calls, "no Entra registration, auth config or ingress change"
-    assert "studio disabled" in capsys.readouterr().out
-
-
-def test_studio_needs_a_user_as_its_owner(
-    runner: FakeRunner, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    runner.on(r"^az account show", {"id": SUB, "user": {"type": "servicePrincipal", "name": "sp"}})
-    runner.on(
-        r"^az account get-access-token",
-        {"accessToken": fake_token({"oid": "sp-oid", "idtyp": "app"})},
-    )
-    code = postprovision.main(
-        ["--only", "studio"], runner=runner, environ=base_env(**STUDIO_ENV), root=tmp_path
-    )
-    assert code == 0
-    assert not runner.commands(r"graph\.microsoft\.com|deployment group|containerapp|^azd env set")
-    output = capsys.readouterr().out
-    assert "ServicePrincipal, not a user" in output and "without ingress" in output
-    assert "studio ready" not in output
-
-
-@pytest.mark.parametrize(
-    ("shown", "problem"),
-    [
-        (studio_auth_properties(enabled=False), "built-in auth is not enabled"),
-        ({}, "built-in auth is not enabled"),
-        (studio_auth_properties(action="Return401"), "not answered with RedirectToLoginPage"),
-        (studio_auth_properties(excluded=("/healthz",)), "the excluded paths differ"),
-        (studio_auth_properties(allowed=("someone-else",)), "the allowed applications differ"),
-    ],
-)
-def test_studio_ingress_waits_for_verified_auth(
-    runner: FakeRunner, tmp_path: Path, shown: dict[str, Any], problem: str
-) -> None:
-    """Auth that ``az containerapp auth show`` does not confirm keeps the Studio private."""
-    studio_azure(runner, shown=shown)
-    ctx = context(runner, tmp_path, **STUDIO_ENV)
-    with pytest.raises(HookError) as raised:
-        postprovision.step_studio(ctx)
-    assert problem in str(raised.value)
-    assert "external ingress stays disabled" in str(raised.value)
-    assert "az containerapp auth show" in (raised.value.remediation or "")
-    assert not runner.commands(r"containerapp update|ingress enable")
-    assert not runner.commands(rf"containerApps/{STUDIO_APP}\?"), "the app is not even read"
-
-
-def test_studio_failed_auth_deployment_never_enables_ingress(
-    runner: FakeRunner, tmp_path: Path
-) -> None:
-    studio_azure(runner, deployment=Result(1, "", "ERROR: deployment refused"))
-    with pytest.raises(HookError, match="deployment refused"):
-        postprovision.step_studio(context(runner, tmp_path, **STUDIO_ENV))
-    assert not runner.commands(r"auth show|containerapp update|ingress enable")
-
-
-def test_studio_unverifiable_registration_stops_before_any_exposure(
-    runner: FakeRunner, tmp_path: Path
-) -> None:
-    """Graph refusing the registration (no Application Developer role) leaves the app private."""
-    runner.on(r"^az account show", {"id": SUB, "user": {"type": "user"}})
-    runner.on(r"^az account get-access-token", {"accessToken": fake_token({"oid": "user-oid"})})
-    runner.on(r"GET .*applications\?\$filter", Result(1, "", "ERROR: Forbidden (403)"))
-    with pytest.raises(azdlib.CommandError):
-        postprovision.step_studio(context(runner, tmp_path, **STUDIO_ENV))
-    assert not runner.commands(r"deployment group|containerapp|^azd env set")
 
 
 # ---------------------------------------------------------------------------

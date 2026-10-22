@@ -1,10 +1,10 @@
 """The inbox of filed research answers: ``work/inbox/queries/<yyyy-mm-dd>-<slug>.md``.
 
-Owner-only writers (the CLI with the deployer's data role, the Studio with a role limited to this
-prefix) put one contract query page per answer here; the next run merges the inbox into
-``queries/``, deletes what it published and moves what it could not use to
-``work/inbox/rejected/`` with the reason. Both only touch the version the run read (its ETag): an
-answer filed again under the same name meanwhile stays in the inbox for the next run.
+The owner's ``docwiki file-answer`` (the CLI with the deployer's data role) puts one contract
+query page per answer here; the next run merges the inbox into ``queries/``, deletes what it
+published and moves what it could not use to ``work/inbox/rejected/`` with the reason. Both only
+touch the version the run read (its ETag): an answer filed again under the same name meanwhile
+stays in the inbox for the next run.
 """
 
 from __future__ import annotations

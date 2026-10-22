@@ -32,11 +32,11 @@ What gets deployed (`infra/main.bicep`):
 | Container registry | `cr<token>` | Basic, admin user disabled; images built remotely by azd |
 | Container Apps environment | `cae-<token>` | Consumption profile; logs to Log Analytics through Azure Monitor |
 | Jobs | `caj-ingest-<token>`, `caj-reconcile-<token>` | Queue-triggered (KEDA, one execution) and scheduled reconcile |
-| Apps | `ca-mcp-<token>`, `ca-portal-<token>`, `ca-studio-<token>` | MCP server behind built-in auth (`/healthz` excluded; external ingress only once that auth is verified; the server validates the forwarded bearer token too); portal and Studio private unless enabled |
-| Managed identities | `id-docwiki-<token>`, `id-docwiki-mcp-<token>`, `id-docwiki-portal-<token>`, `id-docwiki-studio-<token>` | One per workload: pipeline jobs, MCP app, portal, Studio (least privilege) |
+| Apps | `ca-mcp-<token>`, `ca-portal-<token>` | MCP server behind built-in auth (`/healthz` excluded; external ingress only once that auth is verified; the server validates the forwarded bearer token too); portal private unless enabled |
+| Managed identities | `id-docwiki-<token>`, `id-docwiki-mcp-<token>`, `id-docwiki-portal-<token>` | One per workload: pipeline jobs, MCP app, portal (least privilege) |
 | Log Analytics + Application Insights | `log-<token>`, `appi-<token>` | 30-day retention |
 | Budget + action group | `budget-docwiki-<token>` | 50/80/100 % alerts (when contacts are set) |
-| Entra app registrations (hooks) | `docwiki-mcp-api-<env>-<token>` (+ `docwiki-portal-…`, `docwiki-studio-…`) | MCP API audience and app roles `Wiki.Read`, `Wiki.Operate`; sign-in of the portal and the Studio |
+| Entra app registrations (hooks) | `docwiki-mcp-api-<env>-<token>` (+ `docwiki-portal-…`) | MCP API audience and app roles `Wiki.Read`, `Wiki.Operate`; sign-in of the portal (its readers, or the owner of a public portal) |
 | Foundry project connection | `docwiki-mcp` | MCP tool of the agents: `RemoteTool` / `AgenticIdentityToken`, target `DOCWIKI_MCP_URL`, audience = MCP API identifier URI |
 | Foundry agents (hooks) | `docwiki-researcher`, `docwiki-librarian` | Each with its own Entra agent identity (ADR 0003); app roles and MCP allowlist set by the hooks |
 
@@ -134,8 +134,6 @@ azd env set DOCWIKI_MCP_MIN_REPLICAS 0
 | `DOCWIKI_PORTAL_OWNER_SIGN_IN` | `true` | `false` keeps the public portal without the owner's sign-in and uploads |
 | `DOCWIKI_PORTAL_MIN_REPLICAS` | `0` | `1` keeps one portal replica warm (no cold start for the first visitor, small fixed cost) |
 | `DOCWIKI_ENABLE_LIVE_ASK` / `DOCWIKI_LIVE_ASK_ENDPOINT` | `false` / empty | Visitors ask the Researcher from the wiki ([docs/live-ask.md](docs/live-ask.md)); the endpoint is the gateway URL in front of the Foundry project, and the live ask stays off while it is empty |
-| `DOCWIKI_ENABLE_STUDIO` | `false` | DocWiki Studio ([docs/studio.md](docs/studio.md)): owner-only web app to upload documents, follow runs and ask the agents; always behind Entra sign-in |
-| `DOCWIKI_STUDIO_MIN_REPLICAS` | `1` | `0` lets the Studio scale to zero (questions in flight are then lost when it does) |
 | `DOCWIKI_ENABLE_EVENT_TRIGGER` | `true` | `false` makes the ingest job manual |
 | `DOCWIKI_RECONCILE_CRON` | `0 */6 * * *` | Reconcile schedule (UTC) |
 | `DOCWIKI_AUDIENCE` | `internal` | Build audience (`public`, `internal`, `restricted`) |
@@ -179,8 +177,7 @@ python scripts/preflight.py
 VERIFY: The last line reads `preflight: 0 failed`. Checks: tool versions, az/azd sign-in,
 subscription state, allowed region, resource providers, both models offered in the region
 with the chosen deployment type and GA lifecycle, model quota, deployer roles (Owner, or
-Contributor + User Access Administrator; both include
-`Microsoft.Authorization/roleDefinitions/write`, which the Studio's custom role on `work` needs),
+Contributor + User Access Administrator or Role Based Access Control Administrator),
 permission to register Entra applications, budget contacts, no soft-deleted Foundry account
 blocking the name.
 
@@ -337,7 +334,7 @@ internal price study. Every document is fictional, and the two site photos are A
 study too: its sensitivity rule keeps it out of any build below the `restricted` audience
 (gate G07), so a `public` or `internal` deployment never serves it. Do not upload
 `samples/corpus/held-back/`: it is the document of the live upload demo
-([`docs/studio.md`](docs/studio.md#time-travel-optional)). With azcopy: `azcopy login` then
+([`docs/operations.md`](docs/operations.md#live-upload-demo-optional)). With azcopy: `azcopy login` then
 `azcopy copy "samples/corpus/full/*" "https://<account>.blob.core.windows.net/raw/" --recursive`.
 
 VERIFY:
@@ -617,7 +614,7 @@ the explicit approval of the environment's owner**, and never skip the backup (R
 Preconditions: you are signed in and pointed at the right azd environment (Steps 2 and 3); the
 deployer holds Storage Blob Data Contributor on `raw`, `work` and `releases` and Storage Queue
 Data Contributor on `ingest` and `ingest-poison` (Bicep grants them when
-`grantDeployerDataAccess` is on); nobody is uploading through the Studio. `<backup>` is a new, empty
+`grantDeployerDataAccess` is on); nobody is uploading on the portal. `<backup>` is a new, empty
 folder outside the repository, written without a trailing slash (never commit it). Delete
 **blobs, never containers**: the role assignments, the Event Grid subscription and the queue
 scaler are tied to them.

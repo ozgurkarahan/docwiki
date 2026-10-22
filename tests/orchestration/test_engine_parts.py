@@ -240,8 +240,8 @@ def test_jobs_export_to_application_insights_when_configured(monkeypatch):
 
 
 def test_starlette_requests_become_server_spans_except_health_probes():
-    """configure_azure_monitor does not instrument plain Starlette: the portal and the Studio
-    sent no requests to Application Insights."""
+    """configure_azure_monitor does not instrument plain Starlette: the portal sent no requests
+    to Application Insights."""
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import SimpleSpanProcessor
     from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter

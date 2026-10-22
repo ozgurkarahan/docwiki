@@ -59,6 +59,8 @@ from azdlib import (
     warn,
 )
 
+# "studio_app": the sign-in registration of the standalone Studio, removed in v1.6 (ADR 0009).
+# Nothing creates it any more; an older docwiki-state.json may still record it.
 ENTRA_KEYS = ("mcp_api", "portal_app", "studio_app")
 # Foundry data plane (project endpoint): token audience and API version of the agents API.
 FOUNDRY_DATA_PLANE = "https://ai.azure.com"

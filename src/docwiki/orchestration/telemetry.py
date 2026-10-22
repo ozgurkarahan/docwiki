@@ -54,7 +54,7 @@ def instrument_asgi(app: Any, *, tracer_provider: Any | None = None) -> Any:
     """Wrap a Starlette app so each HTTP request becomes an Application Insights request.
 
     ``configure_azure_monitor`` instruments FastAPI, Flask and Django but not plain Starlette:
-    the portal and the Studio sent no requests at all, only their outgoing calls. Health probes
+    the portal sent no requests at all, only its outgoing calls. Health probes
     are left out and so are the per-message receive/send spans. Call it after
     :func:`configure_exporter` returned true; without OpenTelemetry the app is returned as is.
     """

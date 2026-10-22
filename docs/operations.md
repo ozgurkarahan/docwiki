@@ -20,7 +20,6 @@ written down. Never paste the values (IDs, addresses, tokens) into issues or com
 | Foundry account / project endpoint | `DOCWIKI_FOUNDRY_ACCOUNT_NAME` / `DOCWIKI_FOUNDRY_PROJECT_ENDPOINT` |
 | Log Analytics workspace (for queries) | `DOCWIKI_LOG_ANALYTICS_WORKSPACE_ID` |
 | Managed identities: jobs / MCP app / portal | `DOCWIKI_RUNTIME_IDENTITY_NAME` / `DOCWIKI_MCP_IDENTITY_NAME` / `DOCWIKI_PORTAL_IDENTITY_NAME` |
-| Studio app / URL / identity (when `DOCWIKI_ENABLE_STUDIO=true`) | `DOCWIKI_STUDIO_APP_NAME` / `DOCWIKI_STUDIO_URL` / `DOCWIKI_STUDIO_IDENTITY_NAME` |
 
 The hooks keep a local record of the Entra objects they created in
 `.azure/<env>/docwiki-state.json` (git-ignored); `scripts/teardown.py` relies on it.
@@ -201,7 +200,7 @@ minute per capacity unit).
 ## Images and updates
 
 - `azd deploy` rebuilds and deploys all images remotely in the registry; `azd deploy job`,
-  `azd deploy mcp`, `azd deploy portal` or `azd deploy studio` deploy one service. The `postdeploy` hook copies the
+  `azd deploy mcp` or `azd deploy portal` deploy one service. The `postdeploy` hook copies the
   job image to the reconcile job and smoke-tests the MCP endpoint: built-in auth enabled
   (`Return401`), and 401 without a token, to a forged principal header and to a token for
   another audience (`python scripts/hooks/postdeploy.py --smoke-only` repeats the test).
@@ -235,15 +234,7 @@ minute per capacity unit).
     with an attribute-based condition), enqueues on `ingest`; no `raw/`, no Foundry;
   - portal (`DOCWIKI_PORTAL_IDENTITY_*`): reads `releases/`, `raw/` and `work/` and peeks the
     ingest queue (the live process view); with owners set, writes `raw/` (Blob Data
-    Contributor with a condition that denies deletes) for the owner's uploads;
-  - Studio (`DOCWIKI_STUDIO_IDENTITY_*`): uploads to `raw/` (Blob Data Contributor with a
-    condition that denies deletes), reads `work/` and writes filed answers only under
-    `work/inbox/queries/` (the custom role "DocWiki Studio inbox writer (<storage account>)":
-    blob read, write and create only, no delete, move or container management, with a
-    condition that allows no other write), reads `releases/`, peeks the `ingest` queue, asks
-    the Foundry agents (Azure AI User). An environment provisioned before this change keeps its
-    former Blob Data Reader assignment on `work`: harmless (read only), delete it by hand if
-    you wish.
+    Contributor with a condition that denies deletes) for the owner's uploads.
 
   List them with
   `az role assignment list --assignee $(azd env get-value DOCWIKI_MCP_IDENTITY_PRINCIPAL_ID) --all --output table`
@@ -295,12 +286,6 @@ minute per capacity unit).
   is anonymous; Bicep gives the portal its ingress, so anyone with the URL can read the public
   build and follow the process on its `how-it-works` page. See
   [Owner sign-in and uploads](#owner-sign-in-and-uploads-on-the-public-portal) for the owner.
-- Studio (when `DOCWIKI_ENABLE_STUDIO=true`, [studio.md](studio.md)): Entra sign-in, then the
-  application checks the object ID against `DOCWIKI_STUDIO_ALLOWED_PRINCIPALS` (the hook writes
-  the deployer's). To let someone in, assign them under Enterprise applications →
-  `docwiki-studio-<env>-<token>` → Users and groups **and** append their object ID to
-  `DOCWIKI_STUDIO_ALLOWED_PRINCIPALS`, then run `azd provision`. Container logs and the
-  `docwiki-studio` logs in Application Insights record uploads, questions and approval decisions.
 - The hooks call Microsoft Graph with the Azure CLI sign-in. When continuous access evaluation
   revokes it, they stop with `the signed-in session needs a fresh sign-in`: run `az logout`,
   `az login` and `azd auth login`, then re-run the hook. Alternatively,
@@ -338,6 +323,28 @@ PUT and DELETE with the same cookie pass, and so do anonymous POSTs and POSTs to
 An ingress CORS policy does not change it. That is why the owner's calls use GET and PUT only and
 why the public `POST /api/ask` is an excluded path. In Git Bash, set `MSYS_NO_PATHCONV=1` before
 `az containerapp auth update --excluded-paths`, or `/healthz` is rewritten to a Windows path.
+
+### Live upload demo (optional)
+
+The sample keeps one document out of the deployed corpus: a later revision of the planning, in
+`samples/corpus/held-back/planning/`, whose new delivery date for the windows matches the e-mail.
+To show a new revision taking effect, sign in as the owner on the `how-it-works` page, upload it
+and follow its status and the run on the same page (an operator can instead upload it to `raw/`
+with `az storage blob upload --auth-mode login`). A run takes a while, so start it before the
+audience arrives. When the run is `done`, ask the Researcher about the windows' delivery date
+again: the first planning is now `superseded` and the contradiction is gone.
+
+### An environment that ran the Studio
+
+The standalone Studio was removed in v1.6 ([ADR 0009](adr/0009-one-site.md)); `azd provision`
+no longer declares it, but an incremental deployment does not delete what an earlier template
+created. In an environment provisioned with an older version, delete by hand, once: the Container
+App `ca-studio-<token>`, the managed identity `id-docwiki-studio-<token>` (its role assignments go
+with it; list any left with `az role assignment list --all` and delete the ones whose principal
+no longer exists), the custom role "DocWiki Studio inbox writer (<storage account>)" (after its
+assignment), and the sign-in app registration `docwiki-studio-<env>-<token>` (`scripts/teardown.py
+--entra-only` deletes it if the hooks created it), plus the `DOCWIKI_STUDIO_*` and
+`SERVICE_STUDIO_*` values of the azd environment (`azd env set <name> ""`).
 
 ## Storage network perimeter (optional)
 

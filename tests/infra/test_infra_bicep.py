@@ -12,11 +12,8 @@ from typing import Any
 
 import pytest
 from infra_testkit import (
-    BLOB_ACTION,
     REPO_ROOT,
     STORAGE_BLOB_DATA_CONTRIBUTOR,
-    STORAGE_BLOB_DATA_READER,
-    RolePermissions,
     bicep_multiline_var,
     evaluate_condition,
     role_allows,
@@ -73,8 +70,6 @@ def test_spec_parameters_and_defaults() -> None:
         "mcpTokenValidation": "'required'",
         "enablePortal": "false",
         "portalAccess": "'entra'",
-        "enableStudio": "false",
-        "studioMinReplicas": "1",
         "enableEventTrigger": "true",
         "reconcileCron": "'0 */6 * * *'",
         "audience": "'internal'",
@@ -194,13 +189,6 @@ def test_container_settings_are_known_keys() -> None:
     }
     names = set(re.findall(r"name: '(DOCWIKI_[A-Z0-9_]+)'", main_text()))
     assert names, "no DOCWIKI_* container settings found"
-    # The Studio reads its own settings (docwiki.studio.config), not the engine's.
-    studio_config = pytest.importorskip("docwiki.studio.config")
-    known |= {
-        value
-        for name, value in vars(studio_config).items()
-        if name.endswith("_ENV") and isinstance(value, str)
-    }
     known.add(ENABLE_ENV)  # the portal's live ask (docwiki.portal.live_ask)
     known.add(OWNERS_ENV)  # the portal's owners (docwiki.portal.owner, ADR 0009)
     assert names <= known, f"unknown settings: {sorted(names - known)}"
@@ -306,109 +294,18 @@ def test_portal_without_sign_in_only_for_public_audience_builds() -> None:
     assert parameters["parameters"]["portalAccess"] == {"value": "${DOCWIKI_PORTAL_ACCESS}"}
 
 
-def test_studio_parameters_outputs_and_mapping() -> None:
+def test_the_standalone_studio_is_gone() -> None:
+    """ADR 0009: the portal is the only web app; no Studio parameter, identity, role, app or
+    output is left (teardown still deletes the sign-in registration of an older state)."""
     main = main_text()
-    for declaration in (
-        r"^param enableStudio bool = false$",
-        r"^param studioClientId string = ''$",
-        r"^param studioAllowedPrincipals string = ''$",
-        r"^param studioMinReplicas int = 1$",
-        r"^param studioImage string = ''$",
-        r"^param studioExists bool = false$",
-    ):
-        assert re.search(declaration, main, re.MULTILINE), declaration
-    assert re.search(
-        r"@minValue\(0\)\s*@maxValue\(1\)\s*@description\([^\n]*\)\s*param studioMinReplicas int",
-        main,
-    ), "one replica at most: questions in flight live in memory"
-    assert "studioIdentity: 'id-docwiki-studio-${resourceToken}'" in main
-    assert "studioApp: 'ca-studio-${resourceToken}'" in main
+    assert "studio" not in main.lower()
+    for module in ("storage.bicep", "foundry.bicep"):
+        text = (INFRA / "modules" / module).read_text(encoding="utf-8")
+        assert "studio" not in text.lower(), module
     mapped = json.loads((INFRA / "main.parameters.json").read_text(encoding="utf-8"))["parameters"]
-    assert {name: entry["value"] for name, entry in mapped.items() if "studio" in name.lower()} == {
-        "enableStudio": "${DOCWIKI_ENABLE_STUDIO}",
-        "studioMinReplicas": "${DOCWIKI_STUDIO_MIN_REPLICAS}",
-        "studioClientId": "${DOCWIKI_STUDIO_CLIENT_ID}",
-        "studioAllowedPrincipals": "${DOCWIKI_STUDIO_ALLOWED_PRINCIPALS}",
-        "studioImage": "${SERVICE_STUDIO_IMAGE_NAME}",
-        "studioExists": "${SERVICE_STUDIO_RESOURCE_EXISTS}",
-    }
+    assert not [name for name, entry in mapped.items() if "studio" in f"{name} {entry}".lower()]
     outputs = re.findall(r"^output (\w+) ", main, re.MULTILINE)
-    for name in (
-        "DOCWIKI_STUDIO_IDENTITY_NAME",
-        "DOCWIKI_STUDIO_IDENTITY_CLIENT_ID",
-        "DOCWIKI_STUDIO_IDENTITY_PRINCIPAL_ID",
-        "DOCWIKI_STUDIO_APP_NAME",
-        "DOCWIKI_ENABLE_STUDIO",
-        "DOCWIKI_STUDIO_URL",
-    ):
-        assert name in outputs, name
-    assert "output DOCWIKI_ENABLE_STUDIO bool = enableStudio" in main
-    assert (
-        "var studioUrl = 'https://${names.studioApp}.${containerAppsEnvironment.outputs.defaultDomain}'"
-        in main
-    )
-    assert "output DOCWIKI_STUDIO_URL string = enableStudio ? studioUrl : ''" in main
     assert len(outputs) <= 64, "ARM caps a template at 64 outputs (Bicep rule max-outputs)"
-
-
-def test_studio_ingress_waits_for_sign_in_and_an_allowed_owner() -> None:
-    """Fail closed (portal pattern): external ingress only where the Entra sign-in and an allowed
-    owner are declared; on the first provision the postprovision hook declares both, verifies the
-    built-in auth and only then enables ingress."""
-    main = main_text()
-    assert re.search(
-        r"^var studioPublic = enableStudio && !empty\(studioClientId\) && "
-        r"!empty\(studioAllowedPrincipals\)$",
-        main,
-        re.MULTILINE,
-    )
-    assert "module studioAuth 'modules/app-auth.bicep' = if (studioPublic)" in main
-    block = main[main.index("module studioApp") : main.index("module studioAuth")]
-    assert "ingressMode: studioPublic ? 'external' : 'none'" in block
-    assert "ingressMode: 'external'" not in block
-    auth = main[main.index("module studioAuth") : main.index("module budget")]
-    assert "clientId: studioClientId" in auth
-    assert re.search(r"allowedAudiences: \[\s*studioClientId\s*\]", auth)
-    assert "unauthenticatedClientAction: 'RedirectToLoginPage'" in auth
-    assert re.search(r"excludedPaths: \[\s*'/healthz'\s*'/livez'\s*\]", auth)
-    assert "allowedApplications" not in auth
-    # The new modules come after the portal's and before the budget: the other tests slice
-    # main.bicep between module names.
-    order = [main.index(f"module {name} ") for name in ("portalAuth", "studioApp", "studioAuth")]
-    assert order == sorted(order) and order[-1] < main.index("module budget ")
-
-
-def test_studio_app_settings_and_scale() -> None:
-    main = main_text()
-    block = main[main.index("module studioApp") : main.index("module studioAuth")]
-    assert "'azd-service-name': 'studio'" in block and "containerName: 'studio'" in block
-    assert "image: !empty(resolvedStudioImage) ? resolvedStudioImage : placeholderAppImage" in block
-    assert "module studioCurrentImage 'modules/current-image.bicep'" in main
-    assert (
-        "var resolvedStudioImage = !empty(studioImage) ? studioImage : "
-        "studioCurrentImage.outputs.image" in main
-    )
-    # The names are the app's own (test_container_settings_are_known_keys checks they exist).
-    expected = {
-        "AZURE_CLIENT_ID": "studioIdentity.outputs.clientId",
-        "DOCWIKI_FOUNDRY_PROJECT_ENDPOINT": "foundry.outputs.projectEndpoint",
-        "DOCWIKI_STUDIO_REQUIRE_SIGN_IN": "'true'",
-        "DOCWIKI_STUDIO_ALLOWED_PRINCIPALS": "studioAllowedPrincipals",
-        "DOCWIKI_STUDIO_WIKI_URL": "portalUrl",
-        "OTEL_SERVICE_NAME": "'docwiki-studio'",
-    }
-    for name, value in expected.items():
-        assert re.search(rf"name: '{name}'\s*value: {re.escape(value)}", block), name
-    assert re.search(r"concat\(\s*sharedEnv,", block), "the shared storage settings"
-    # Unset until known: the app refuses everyone without an allowed owner.
-    assert re.search(r"empty\(studioAllowedPrincipals\)\s*\?\s*\[\]", block)
-    # The wiki link only exists with a portal.
-    assert re.search(r"enablePortal\s*\?\s*\[\s*\{\s*name: 'DOCWIKI_STUDIO_WIKI_URL'", block)
-    assert "cpu: '0.5'" in block and "memory: '1Gi'" in block
-    assert "minReplicas: enableStudio ? studioMinReplicas : 0" in block
-    assert "maxReplicas: 1" in block, "questions and approvals in flight live in one replica"
-    assert "dormant: !enableStudio" in block
-    assert "targetPort: 8080" in block and "tcpProbes: true" in block
 
 
 def _resource(text: str, name: str) -> str:
@@ -416,214 +313,33 @@ def _resource(text: str, name: str) -> str:
     return text[text.index(f"resource {name} ") :].split("\n}\n", 1)[0]
 
 
-def _studio_assignments(storage: str) -> list[tuple[str, str, str, str]]:
-    """Every role assignment of the Studio identity in storage.bicep: its name, its scope, the
-    role that seeds its name and the role of its ``roleDefinitionId``."""
-    found: list[tuple[str, str, str, str]] = []
-    for name in re.findall(
-        r"^resource (\w+) 'Microsoft\.Authorization/roleAssignments@", storage, re.MULTILINE
-    ):
-        block = _resource(storage, name)
-        if "principalId: studioPrincipalId" not in block:
-            continue
-        match = re.match(
-            rf"resource {name} '[^']+' = if \(grantStudio\) \{{\s*scope: (\w+)\s*"
-            r"name: guid\(\w+\.id, studioPrincipalId, ([\w.]+)\)",
-            block,
-        )
-        assert match, f"{name}: only with a Studio identity, named after its scope and role"
-        role = re.search(
-            r"roleDefinitionId: subscriptionResourceId\(\s*"
-            r"'Microsoft\.Authorization/roleDefinitions',\s*([\w.]+)\s*\)",
-            block,
-        )
-        assert role, f"{name}: roleDefinitionId"
-        found.append((name, match.group(1), match.group(2), role.group(1)))
-    return found
-
-
-def test_studio_storage_access_is_least_privilege() -> None:
+def test_the_owner_upload_role_never_deletes() -> None:
+    """The portal's raw/ role for the owner's uploads (ADR 0009) withholds the delete only: soft
+    delete and versioning keep what a replacement overwrites."""
     storage = (INFRA / "modules" / "storage.bicep").read_text(encoding="utf-8")
-    assert re.search(r"^param studioPrincipalId string = ''$", storage, re.MULTILINE)
-    assert "var grantStudio = !empty(studioPrincipalId)" in storage
-    assert re.findall(r"^resource (studio\w+) ", storage, re.MULTILINE) == [
-        "studioRawContributor",
-        "studioInboxWriterRole",
-        "studioWorkInboxWriter",
-        "studioReleasesReader",
-        "studioIngestReader",
-    ]
-    assigned = _studio_assignments(storage)
-    # Uploads to raw/; reads work/ (source states, run reports) and files answers into its
-    # inbox with its own role; reads releases/ (pointer, catalog, evidence); peeks the ingest
-    # queue: nothing else, and nothing without a Studio identity.
-    assert [(name, scope, role) for name, scope, _, role in assigned] == [
-        ("studioRawContributor", "rawContainer", "roleIds.storageBlobDataContributor"),
-        ("studioWorkInboxWriter", "workContainer", "studioInboxWriterRole.name"),
-        ("studioReleasesReader", "releasesContainer", "roleIds.storageBlobDataReader"),
-        ("studioIngestReader", "ingestQueue", "roleIds.storageQueueDataReader"),
-    ]
-    for name, _, seed, role in assigned:
-        assert seed == role, f"{name}: the role that seeds the name is the one assigned"
     condition = bicep_multiline_var(storage, "noDeleteCondition")
     delete = (
         "!(ActionMatches{'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete'})"
     )
     assert delete in condition
     assert condition.count("ActionMatches") == 1, "only the delete is withheld from the role"
-    raw = _resource(storage, "studioRawContributor")
-    assert "condition: noDeleteCondition" in raw and "conditionVersion: '2.0'" in raw
-    assert "principalType: 'ServicePrincipal'" in raw
-    work = _resource(storage, "studioWorkInboxWriter")
-    assert "condition: studioWorkInboxCondition" in work and "conditionVersion: '2.0'" in work
-    assert "principalType: 'ServicePrincipal'" in work
-    for name in ("studioReleasesReader", "studioIngestReader"):
-        assert "condition:" not in _resource(storage, name), name
+    upload = {"path": "uploads/a.pdf", "container": "raw"}
+    for action in ("blobs/read", "blobs/write", "blobs/add/action"):
+        assert evaluate_condition(condition, action, **upload), action
+        assert role_allows(STORAGE_BLOB_DATA_CONTRIBUTOR, action, condition=condition, **upload)
+    assert not evaluate_condition(condition, "blobs/delete", **upload)
+    assert not role_allows(
+        STORAGE_BLOB_DATA_CONTRIBUTOR, "blobs/delete", condition=condition, **upload
+    )
+    assert "principalType: 'ServicePrincipal'" in _resource(storage, "portalRawUploader")
     roles = (INFRA / "modules" / "roles.bicep").read_text(encoding="utf-8")
     assert "storageQueueDataReader: '19e7f393-937e-4f77-808e-94535e297925'" in roles
-    assert "Studio" in storage[: storage.index("import {")], "the header lists the identities"
-
-
-def test_no_blob_data_contributor_for_the_studio_on_work() -> None:
-    """Storage Blob Data Contributor grants containers/write and containers/delete, which no
-    role assignment condition restricts: the Studio's only role on work/ is its custom role."""
-    storage = (INFRA / "modules" / "storage.bicep").read_text(encoding="utf-8")
-    on_work = [
-        (name, role)
-        for name, scope, _, role in _studio_assignments(storage)
-        if scope == "workContainer"
-    ]
-    assert on_work == [("studioWorkInboxWriter", "studioInboxWriterRole.name")]
-    assert "storageBlobDataContributor" not in _resource(storage, "studioWorkInboxWriter")
-
-
-def test_studio_work_role_is_custom_without_container_management() -> None:
-    """The Studio's role on work/ grants blob read, write and add only: no control-plane action
-    (data access needs none), no blob delete or move, no tags or immutability."""
-    storage = (INFRA / "modules" / "storage.bicep").read_text(encoding="utf-8")
-    role = _resource(storage, "studioInboxWriterRole")
-    header = re.match(
-        r"resource studioInboxWriterRole 'Microsoft\.Authorization/roleDefinitions@"
-        r"(\d{4}-\d{2}-\d{2})' = if \(grantStudio\) \{",
-        role,
-    )
-    assert header and header.group(1) >= "2022-04-01", "a current, non-preview API version"
-    # Deterministic, unique in the tenant (its display name too), assignable in this resource
-    # group only (the deployer needs roleDefinitions/write there).
-    assert "name: guid(resourceGroup().id, 'docwiki-studio-inbox-writer')" in role
-    assert "roleName: 'DocWiki Studio inbox writer (${storageAccountName})'" in role
-    assert "type: 'CustomRole'" in role
-    assert re.search(r"assignableScopes: \[\s*resourceGroup\(\)\.id\s*\]", role)
-    for key in ("actions", "notActions", "dataActions", "notDataActions"):
-        assert re.search(rf"^\s*{key}: \[", role, re.MULTILINE), f"{key} is explicit"
-    assert RolePermissions.from_bicep(role) == RolePermissions(
-        data_actions=(BLOB_ACTION + "read", BLOB_ACTION + "write", BLOB_ACTION + "add/action")
-    )
+    header = storage[: storage.index("import {")]
+    assert "the portal" in header and "Studio" not in header, "the header lists the identities"
 
 
 INBOX = StorageKeys.INBOX_QUERIES.removeprefix(StorageKeys.WORK + "/") + "/"
 """The answers inbox as a blob path of the ``work`` container (``inbox/queries/``)."""
-
-FILING = INBOX + "2026-03-02-window-delivery.md"
-"""A filed answer in the inbox, as a blob path of the ``work`` container."""
-
-
-@pytest.mark.parametrize(
-    ("action", "path", "allowed"),
-    [
-        ("blobs/read", "state/sources/src-165f1d3a109c.json", True),
-        ("blobs/read", "runs/run-1/report.json", True),
-        ("blobs/read", FILING, True),
-        ("blobs/write", FILING, True),
-        ("blobs/add/action", FILING, True),
-        ("blobs/write", "inbox/rejected/2026-03-02-window-delivery.md", False),
-        ("blobs/write", "inbox/queries", False),
-        ("blobs/write", "inbox/queries-old/a.md", False),
-        ("blobs/add/action", "x/" + INBOX + "a.md", False),
-        ("blobs/write", "state/overlay.yaml", False),
-        ("blobs/add/action", "state/sources/src-165f1d3a109c.json", False),
-        ("blobs/write", "reports/health-2026-03-02.md", False),
-        ("blobs/delete", FILING, False),
-        ("blobs/delete", "state/lease", False),
-        ("blobs/move/action", FILING, False),
-        ("blobs/move/action", "runs/run-1/report.json", False),
-        ("blobs/tags/write", FILING, False),
-        ("blobs/immutableStorage/runAsSuperUser/action", FILING, False),
-        ("blobs/permanentDelete/action", FILING, False),
-        ("containers/delete", "", False),
-        ("containers/write", "", False),
-        ("containers/read", "", False),
-        ("containers/setAcl/action", "", False),
-        ("generateUserDelegationKey/action", "", False),
-    ],
-)
-def test_studio_work_role_reads_all_and_writes_only_the_inbox(
-    action: str, path: str, allowed: bool
-) -> None:
-    """The role and its condition together: reads anywhere, writes and creations only in the
-    inbox, never a blob delete or move, nothing on the container itself."""
-    storage = (INFRA / "modules" / "storage.bicep").read_text(encoding="utf-8")
-    role = RolePermissions.from_bicep(_resource(storage, "studioInboxWriterRole"))
-    condition = bicep_multiline_var(storage, "studioWorkInboxCondition")
-    assert role_allows(role, action, condition=condition, path=path, container="work") is allowed
-
-
-def test_a_condition_never_restricts_container_management() -> None:
-    """Why the Studio's work/ role is custom: with Storage Blob Data Contributor, the same
-    condition would still let it delete or rewrite the whole container (source states, cache,
-    run lease, inbox), through ARM or the blob endpoint. Reads stay as open as with the Storage
-    Blob Data Reader assignment that the role replaces."""
-    storage = (INFRA / "modules" / "storage.bicep").read_text(encoding="utf-8")
-    role = RolePermissions.from_bicep(_resource(storage, "studioInboxWriterRole"))
-    condition = bicep_multiline_var(storage, "studioWorkInboxCondition")
-    for action in ("containers/delete", "containers/write"):
-        assert role_allows(STORAGE_BLOB_DATA_CONTRIBUTOR, action, condition=condition)
-        assert not role_allows(role, action, condition=condition)
-    for path in ("state/sources/src-165f1d3a109c.json", FILING):
-        assert role_allows(STORAGE_BLOB_DATA_READER, "blobs/read", path=path)
-        assert role_allows(role, "blobs/read", condition=condition, path=path)
-
-
-def test_studio_work_condition_covers_every_data_action_of_the_role() -> None:
-    """Each data action of the Studio's work/ role that changes a blob (write, add) is named in
-    the condition: one left out would create blobs anywhere. Reads are never restricted; the
-    inbox prefix is the one the code writes to (docwiki.answers.inbox)."""
-    from docwiki.answers.inbox import INBOX_PREFIX
-
-    storage = (INFRA / "modules" / "storage.bicep").read_text(encoding="utf-8")
-    condition = bicep_multiline_var(storage, "studioWorkInboxCondition")
-    role = RolePermissions.from_bicep(_resource(storage, "studioInboxWriterRole"))
-    named = set(re.findall(r"ActionMatches\{'([^']+)'\}", condition))
-    assert named == set(role.data_actions) - {BLOB_ACTION + "read"}
-    assert named == {BLOB_ACTION + "write", BLOB_ACTION + "add/action"}
-    assert "blobs/read" not in condition
-    assert f"{StorageKeys.WORK}/{INBOX}" == INBOX_PREFIX
-    path = "@Resource[Microsoft.Storage/storageAccounts/blobServices/containers/blobs:path]"
-    assert re.findall(rf"{re.escape(path)} (\w+) '([^']*)'", condition) == [
-        ("StringStartsWith", INBOX)
-    ]
-    raw = bicep_multiline_var(storage, "noDeleteCondition")
-    for action in ("read", "write", "add/action"):
-        assert evaluate_condition(raw, f"blobs/{action}", path="uploads/a.pdf", container="raw")
-    assert not evaluate_condition(raw, "blobs/delete", path="uploads/a.pdf", container="raw")
-
-
-def test_studio_foundry_access_is_azure_ai_user_only() -> None:
-    foundry = (INFRA / "modules" / "foundry.bicep").read_text(encoding="utf-8")
-    assert re.search(r"^param studioPrincipalId string = ''$", foundry, re.MULTILINE)
-    assert "var grantStudio = !empty(studioPrincipalId)" in foundry
-    assert re.findall(
-        r"^resource (studio\w+) '[^']+' = if \(grantStudio\) \{\s*scope: (\w+)\s*"
-        r"name: guid\(\w+\.id, studioPrincipalId, roleIds\.(\w+)\)",
-        foundry,
-        re.MULTILINE,
-    ) == [("studioAzureAiUser", "account", "azureAiUser")]
-    assert len(re.findall(r"^resource studio\w+ ", foundry, re.MULTILINE)) == 1
-    # While the Studio is disabled its identity holds no data-plane role.
-    main = main_text()
-    for module, following in (("storage", "foundry"), ("foundry", "containerAppsEnvironment")):
-        block = main[main.index(f"module {module} ") : main.index(f"module {following} ")]
-        assert "studioPrincipalId: enableStudio ? studioIdentity.outputs.principalId : ''" in block
 
 
 def test_mcp_server_validates_the_forwarded_token() -> None:
@@ -670,7 +386,7 @@ def test_mcp_connection_uses_the_agents_own_identities() -> None:
 
 def test_each_workload_runs_as_its_own_identity() -> None:
     main = main_text()
-    for module in ("identity", "mcpIdentity", "portalIdentity", "studioIdentity"):
+    for module in ("identity", "mcpIdentity", "portalIdentity"):
         assert (
             f"module {module} 'br/public:avm/res/managed-identity/user-assigned-identity:" in main
         )
@@ -679,19 +395,17 @@ def test_each_workload_runs_as_its_own_identity() -> None:
         "reconcile": main[main.index("module reconcileJob") : main.index("module mcpApp")],
         "mcp": main[main.index("module mcpApp") : main.index("module portalApp")],
         "portal": main[main.index("module portalApp") : main.index("module mcpAuth")],
-        "studio": main[main.index("module studioApp") : main.index("module studioAuth")],
     }
     expected = {
         "ingest": "identity",
         "reconcile": "identity",
         "mcp": "mcpIdentity",
         "portal": "portalIdentity",
-        "studio": "studioIdentity",
     }
     for workload, module in expected.items():
         block = blocks[workload]
         assert f"identityResourceId: {module}.outputs.resourceId" in block, workload
-    for workload in ("mcp", "portal", "studio"):
+    for workload in ("mcp", "portal"):
         module = expected[workload]
         assert re.search(
             rf"name: 'AZURE_CLIENT_ID'\s*value: {module}\.outputs\.clientId", blocks[workload]
@@ -798,11 +512,11 @@ def test_portal_storage_access_is_least_privilege() -> None:
     queue = storage[storage.index("resource portalIngestReader") :]
     queue = queue[: queue.index("\n}\n")]
     assert "storageQueueDataReader" in queue
-    portal = storage[storage.index("// Portal identity") : storage.index("// Studio identity")]
+    portal = storage[storage.index("// Portal identity") : storage.index("// Deployer (operator)")]
     assert "MessageSender" not in portal and "Owner" not in portal.replace("owner", "")
     main = main_text()
     assert "portalUploads: portalOwnerSignIn" in main
-    auth = main[main.index("module portalAuth") : main.index("// The Studio app always exists")]
+    auth = main[main.index("module portalAuth") : main.index("module budget ")]
     assert "unauthenticatedClientAction: portalOwnerSignIn ? 'AllowAnonymous'" in auth
     # Built-in auth refuses every browser POST that carries its session cookie: the public ask
     # must be excluded, the owner's routes must not be.
@@ -849,9 +563,6 @@ def test_dockerfiles_are_non_root_with_expected_entrypoints() -> None:
         "portal.Dockerfile": (
             'ENTRYPOINT ["python", "-m", "docwiki.portal", "--host", "0.0.0.0", "--port", "8080"]',
         ),
-        "studio.Dockerfile": (
-            'ENTRYPOINT ["python", "-m", "docwiki.studio", "--host", "0.0.0.0", "--port", "8080"]',
-        ),
     }
     for name, lines in expected.items():
         text = (REPO_ROOT / "docker" / name).read_text(encoding="utf-8")
@@ -868,7 +579,7 @@ def test_dockerfile_extras_exist() -> None:
     extras = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"][
         "optional-dependencies"
     ]
-    for name in ("job.Dockerfile", "mcp.Dockerfile", "studio.Dockerfile"):
+    for name in ("job.Dockerfile", "mcp.Dockerfile"):
         text = (REPO_ROOT / "docker" / name).read_text(encoding="utf-8")
         used = re.findall(r'"\.\[([a-z,]+)\]"', text)
         assert used, name
@@ -877,10 +588,6 @@ def test_dockerfile_extras_exist() -> None:
     portal = (REPO_ROOT / "docker" / "portal.Dockerfile").read_text(encoding="utf-8")
     assert '"azure,portal" if "portal" in extras else "azure,mcp"' in portal
     assert {"azure", "mcp"} <= set(extras), "portal web stack fallback"
-    # The Studio needs the web stack, the Azure SDKs and, because docwiki.studio imports
-    # docwiki.extract (whose package imports Pillow and the document readers), `extract`.
-    studio = (REPO_ROOT / "docker" / "studio.Dockerfile").read_text(encoding="utf-8")
-    assert re.findall(r'"\.\[([a-z,]+)\]"', studio) == ["azure,portal,extract"]
 
 
 def test_job_image_mirrors_a_checkout_for_the_site_stage() -> None:
@@ -982,10 +689,6 @@ def test_bicep_build_is_clean(compiled: dict[str, Any]) -> None:
         "DOCWIKI_RECONCILE_JOB_NAME",
         "DOCWIKI_MCP_IDENTITY_CLIENT_ID",
         "DOCWIKI_PORTAL_IDENTITY_CLIENT_ID",
-        "DOCWIKI_STUDIO_IDENTITY_CLIENT_ID",
-        "DOCWIKI_STUDIO_APP_NAME",
-        "DOCWIKI_ENABLE_STUDIO",
-        "DOCWIKI_STUDIO_URL",
         "DOCWIKI_MCP_CONNECTION",
         "APPLICATIONINSIGHTS_CONNECTION_STRING",
     ):
@@ -993,31 +696,11 @@ def test_bicep_build_is_clean(compiled: dict[str, Any]) -> None:
     assert len(outputs) <= 64, "ARM caps a template at 64 outputs"
 
 
-def test_compiled_studio_is_fail_closed(compiled: dict[str, Any]) -> None:
-    expression = compiled["variables"]["studioPublic"]
-    for name in ("enableStudio", "studioClientId", "studioAllowedPrincipals"):
-        assert f"parameters('{name}')" in expression, name
-    assert "or(" not in expression, "every condition must hold"
-    assert compiled["parameters"]["enableStudio"]["defaultValue"] is False
-    assert compiled["parameters"]["studioMinReplicas"]["maxValue"] == 1
-    resources = compiled["resources"]  # a list, or a dict by symbolic name in newer Bicep
-    modules = {
-        resource["name"]: resource
-        for resource in (resources.values() if isinstance(resources, dict) else resources)
-        if resource["type"] == "Microsoft.Resources/deployments"
-    }
-    assert modules["studioAuth"]["condition"] == "[variables('studioPublic')]"
-    app = modules["studioApp"]["properties"]["parameters"]
-    assert app["maxReplicas"] == {"value": 1}
-    assert app["dormant"] == {"value": "[not(parameters('enableStudio'))]"}
-    assert "variables('studioPublic')" in json.dumps(app["ingressMode"])
-
-
 def _values(resources: Any) -> list[dict[str, Any]]:
     return list(resources.values() if isinstance(resources, dict) else resources)
 
 
-def test_compiled_inbox_trigger_and_studio_work_role(compiled: dict[str, Any]) -> None:
+def test_compiled_inbox_trigger(compiled: dict[str, Any]) -> None:
     (storage,) = [
         resource
         for resource in _values(compiled["resources"])
@@ -1036,42 +719,10 @@ def test_compiled_inbox_trigger_and_studio_work_role(compiled: dict[str, Any]) -
     )
     for key in ("deliveryWithResourceIdentity", "retryPolicy", "eventDeliverySchema"):
         assert inbox["properties"][key] == raw["properties"][key], key
-    assignments = [
-        item for item in nested if item["type"] == "Microsoft.Authorization/roleAssignments"
-    ]
-    (role,) = [
-        item
-        for item in assignments
-        if item["properties"].get("condition") == "[variables('studioWorkInboxCondition')]"
-    ]
-    assert role["condition"] == "[variables('grantStudio')]"
-    assert role["properties"]["conditionVersion"] == "2.0"
-    # The Studio's only role on work/ is the custom role, created before it is assigned.
-    studio_on_work = [
-        item
-        for item in assignments
-        if item["properties"]["principalId"] == "[parameters('studioPrincipalId')]"
-        and "variables('workContainerName')" in item.get("scope", "")
-    ]
-    assert studio_on_work == [role]
-    (definition,) = [
+    # No custom role is left: the Studio's inbox writer went with the Studio (ADR 0009).
+    assert not [
         item for item in nested if item["type"] == "Microsoft.Authorization/roleDefinitions"
     ]
-    assert definition["condition"] == "[variables('grantStudio')]"
-    assert definition["properties"]["assignableScopes"] == ["[resourceGroup().id]"]
-    assert role["properties"]["roleDefinitionId"] == (
-        "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', "
-        f"{definition['name'][1:-1]})]"
-    )
-    assert any(
-        "studioInboxWriterRole" in item or "roleDefinitions" in item for item in role["dependsOn"]
-    )
-    (permission,) = definition["properties"]["permissions"]
-    granted = RolePermissions.from_json(permission)
-    condition = template["variables"]["studioWorkInboxCondition"]
-    assert role_allows(granted, "blobs/write", condition=condition, path=FILING, container="work")
-    for action in ("blobs/delete", "blobs/move/action", "containers/delete", "containers/write"):
-        assert not role_allows(granted, action, condition=condition, path=FILING, container="work")
 
 
 def test_live_ask_is_optional_and_only_the_portal_gets_its_settings() -> None:
@@ -1150,7 +801,7 @@ def test_portal_custom_domain_and_warm_replica_are_optional() -> None:
         r"param portalMinReplicas int = 0",
         main,
     )
-    domains = main[main.index("var portalCustomDomains") : main.index("var studioPublic")]
+    domains = main[main.index("var portalCustomDomains") : main.index("var mcpPublic")]
     assert "empty(portalCustomDomain)" in domains and "bindingType: 'Disabled'" in domains
     assert "bindingType: 'SniEnabled'" in domains
     assert "'Microsoft.App/managedEnvironments/managedCertificates'" in domains
@@ -1182,5 +833,4 @@ def test_compiled_portal_custom_domain(compiled: dict[str, Any]) -> None:
     portal = modules["portalApp"]["properties"]["parameters"]
     assert portal["customDomains"] == {"value": "[variables('portalCustomDomains')]"}
     assert portal["maxReplicas"] == {"value": 1}
-    for name in ("mcpApp", "studioApp"):
-        assert "customDomains" not in modules[name]["properties"]["parameters"], name
+    assert "customDomains" not in modules["mcpApp"]["properties"]["parameters"]

@@ -120,7 +120,8 @@ removed in v1.2 ([changelog](CHANGELOG.md#v12)).
 Properties of the sample documents that supersession, verification, containment and the
 evaluation rely on; tests under `tests/samples/` enforce them.
 
-1. **File names** are ASCII and every corpus path passes the Studio upload check (segments matching
+1. **File names** are ASCII and every corpus path passes the upload check (the Studio's until
+   v1.6, the portal's since [ADR 0009](../adr/0009-one-site.md); segments matching
    `^[A-Za-z0-9][A-Za-z0-9 ._()+-]{0,99}$`). Devis and planning files start with their document
    number and carry their indice (`_indice-A`, `_indice-B`), for example
    `DEV-2026-014_indice-B.pdf`; no other file name starts with `DEV-` or `PLN-`.

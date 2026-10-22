@@ -1,7 +1,7 @@
 """The document contract of the sample corpus (spec domain-and-corpus.md section 3.4).
 
 Supersession, citation verification, containment and the evaluation rely on these properties
-of the generated files: Studio-safe ASCII paths, document numbers and indices only in the quote
+of the generated files: upload-safe ASCII paths, document numbers and indices only in the quote
 and planning file names, amounts that parse as one number, the canary in a paragraph of its
 own, restricted-only values, and no architect anywhere.
 """
@@ -13,8 +13,8 @@ import unicodedata
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from docwiki.portal.process import check_upload_path
 from docwiki.stages.verify_citations import number_values, parse_number_spec
-from docwiki.studio.paths import check_upload_path
 
 SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._()+-]{0,99}$")
 REVISED_KINDS = {"devis": "DEV-", "planning": "PLN-"}
@@ -50,7 +50,7 @@ def _single_value(raw: str) -> str:
 # ------------------------------------------------------------------------------ rule 1: paths
 
 
-def test_paths_pass_the_studio_upload_check(documents: list[dict[str, Any]]) -> None:
+def test_paths_pass_the_portal_upload_check(documents: list[dict[str, Any]]) -> None:
     for entry in documents:
         path = entry["path"]
         assert path.isascii(), path

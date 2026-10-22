@@ -3,7 +3,7 @@
 The pack must classify, tier and group the generated files of ``samples/corpus`` as the document
 contract (§3.4) and the planted scenarios (§3.2) expect. Every check runs the engine's own code on
 the real files: the local extraction adapters, the classify stage (with a model client that fails
-on any call), discovery, the topic resolution rule, the Studio upload check and the agent-kit
+on any call), discovery, the topic resolution rule, the portal's upload check and the agent-kit
 renderer. No model and no network.
 """
 
@@ -41,6 +41,7 @@ from docwiki.engine_types import Classification, ExtractSettings
 from docwiki.extract import extract_source
 from docwiki.llm import FakeLlmClient
 from docwiki.orchestration.pipeline import _EXPLICIT_REFERENCE_CHARS
+from docwiki.portal.process import check_upload_path
 from docwiki.stages.agentkit import Safe, render_template
 from docwiki.stages.classify import classify_source
 from docwiki.stages.compile import detect_mentions
@@ -49,7 +50,6 @@ from docwiki.stages.models import SourceInfo
 from docwiki.stages.topics import resolution_statement
 from docwiki.stages.verify import load_canaries
 from docwiki.storage.routed import DirectorySource, RoutedStorage
-from docwiki.studio.paths import check_upload_path
 
 PACK = "batiment"
 NOW = datetime(2026, 3, 28, 9, 0, tzinfo=UTC)
@@ -340,7 +340,7 @@ def test_discovery_groups_only_the_quote_and_the_schedule(
         group = plan.items[sid[entry["id"]]].state.revision_group
         assert group == (entry["doc_number"] if entry["id"] in REVISED else None), entry["path"]
 
-    # The held-back schedule revision is uploaded through the Studio under its own name.
+    # The held-back schedule revision is uploaded by the owner on the portal under its own name.
     held_back = next(entry for entry in documents if entry["held_back"])
     upload = check_upload_path(_relative(held_back["path"]))
     target = raw.joinpath(*upload.split("/"))
@@ -389,7 +389,7 @@ def test_supersession_after_classification(
     ]
 
 
-def test_studio_uploads_keep_the_names_the_pack_relies_on(
+def test_owner_uploads_keep_the_names_the_pack_relies_on(
     documents: list[dict[str, Any]], pack: DomainPack
 ) -> None:
     for entry in documents:

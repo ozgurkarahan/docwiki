@@ -6,8 +6,8 @@ ADR 0008. The portal serves the wiki, so the drawer calls the same origin::
     POST /api/ask           {"question": "..."}  ->  202 {"job_id": "..."}
     GET  /api/ask/{job_id}  {"status", "elapsed_s", "answer"?, "message"?}
 
-A question runs :meth:`AgentClient.ask` in an asyncio task and the browser polls the job (the
-shape of ``docwiki.studio.jobs``, without its sign-in: the visitor is anonymous). The agent is
+A question runs :meth:`AgentClient.ask` in an asyncio task and the browser polls the job (no
+sign-in: the visitor is anonymous). The agent is
 reached through a gateway that holds the real limits (per-visitor rate, token budgets, a daily
 cut-off); the guards here only protect the portal and tell the visitor early:
 

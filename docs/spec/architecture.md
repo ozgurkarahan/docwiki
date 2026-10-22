@@ -36,8 +36,8 @@ replaces the queue with a direct CLI call, and runs the MCP server over stdio or
 | ACA Job `reconcile` (schedule trigger) | Safety net for lost wake-ups |
 | ACA app `mcp` (built-in auth, Return401) | MCP server for agents |
 | ACA app `portal` (optional, disabled by default) | Private site behind Entra sign-in |
-| Container registry (admin user disabled) | Images for job, mcp, portal, studio |
-| User-assigned managed identities (one per workload: jobs, mcp, portal, studio) | Runtime identity of each job or app |
+| Container registry (admin user disabled) | Images for job, mcp, portal (the Studio was removed in v1.6, [ADR 0009](../adr/0009-one-site.md)) |
+| User-assigned managed identities (one per workload: jobs, mcp, portal; the Studio was removed in v1.6, [ADR 0009](../adr/0009-one-site.md)) | Runtime identity of each job or app |
 | Application Insights | Telemetry for jobs, apps and Foundry tracing |
 | Budget + action group | Cost alerting |
 
@@ -113,7 +113,7 @@ replica timeout 3600 s, retry limit 1. The `reconcile` job runs the same algorit
 
 | Principal | Access |
 |---|---|
-| Runtime UAMIs, one per workload (jobs, mcp, portal, studio) | Least privilege per workload, within the limits of built-in roles. Jobs: Storage Blob Data Reader on `raw`; Storage Blob Data Contributor on `work`, `releases`; Storage Queue Data Contributor on `ingest` (the only built-in role that can renew message visibility); Cognitive Services User + Azure AI User (or equivalent) on the Foundry account; AcrPull. The other identities hold only what their app needs (see [CHANGELOG](CHANGELOG.md) v1.1, Identities, and v1.1, Studio) |
+| Runtime UAMIs, one per workload (jobs, mcp, portal; the Studio's was removed in v1.6, ADR 0009) | Least privilege per workload, within the limits of built-in roles. Jobs: Storage Blob Data Reader on `raw`; Storage Blob Data Contributor on `work`, `releases`; Storage Queue Data Contributor on `ingest` (the only built-in role that can renew message visibility); Cognitive Services User + Azure AI User (or equivalent) on the Foundry account; AcrPull. The other identities hold only what their app needs (see [CHANGELOG](CHANGELOG.md) v1.1, Identities, and v1.1, Studio) |
 | Event Grid system topic identity | Storage Queue Data Message Sender on `ingest` |
 | MCP app (built-in auth) | Accepts tokens for the MCP API app registration only; roles enforced in code |
 | Researcher agent principal | App role `Wiki.Read` on the MCP API |

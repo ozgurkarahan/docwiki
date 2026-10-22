@@ -1,4 +1,4 @@
-"""File to wiki (ADR 0007): a page written to the answers inbox wakes the ingest job.
+"""Filed answers (ADR 0007): a page written to the answers inbox wakes the ingest job.
 
 The Bicep subscription ``inbox-to-ingest`` sends Event Grid's BlobCreated events of
 ``work/inbox/queries/`` to the ``ingest`` queue, exactly like ``raw-to-ingest`` does for uploads;
@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 
 import pytest
-from infra_testkit import REPO_ROOT, RolePermissions, bicep_multiline_var, role_allows
+from infra_testkit import REPO_ROOT
 
 from docwiki.answers.inbox import INBOX_PREFIX
 from docwiki.contracts.layout import StorageKeys
@@ -69,25 +69,6 @@ def test_inbox_subscription_mirrors_the_upload_trigger() -> None:
     assert "queueName: ingestQueue.name" in inbox and "resourceId: storage.id" in inbox
     depends = _property(inbox, "dependsOn")
     assert "eventGridQueueSender" in depends and "rawToIngest" in depends
-
-
-def test_the_studio_files_only_where_the_trigger_listens() -> None:
-    """The Studio's work/ role writes and creates blobs only under the prefix that
-    ``inbox-to-ingest`` watches, so its filings wake the job; it never deletes or moves one, and
-    cannot delete or rewrite the container that holds the inbox and the job's state."""
-    storage = STORAGE.read_text(encoding="utf-8")
-    role = RolePermissions.from_bicep(_resource(storage, "studioInboxWriterRole"))
-    condition = bicep_multiline_var(storage, "studioWorkInboxCondition")
-    assert _property(_resource(storage, "inboxToIngest"), "subjectBeginsWith").endswith(
-        f"/blobs/{INBOX}'"
-    )
-    filing = f"{INBOX}2026-03-02-window-delivery.md"
-    rejected = "inbox/rejected/2026-03-02-window-delivery.md"
-    for action in ("blobs/write", "blobs/add/action"):
-        assert role_allows(role, action, condition=condition, path=filing, container="work")
-        assert not role_allows(role, action, condition=condition, path=rejected, container="work")
-    for action in ("blobs/delete", "blobs/move/action", "containers/delete", "containers/write"):
-        assert not role_allows(role, action, condition=condition, path=filing, container="work")
 
 
 @pytest.mark.parametrize("encoding", ["json", "base64"])
