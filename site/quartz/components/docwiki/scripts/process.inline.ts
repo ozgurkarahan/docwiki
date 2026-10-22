@@ -424,7 +424,6 @@ function documentRow(doc: Doc, owner: boolean): HTMLTableRowElement {
   } else if (doc.title && doc.pageUrl) {
     const open = anchor(doc.pageUrl, doc.title)
     open.className = "docwiki-process-doc"
-    open.lang = "fr"
     open.dataset.focusKey = `page:${doc.path}`
     name.append(open)
     name.append(element("span", "docwiki-process-path", doc.path))

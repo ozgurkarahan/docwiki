@@ -25,7 +25,7 @@ export default (() => {
         <ul class="docwiki-documents-list">
           {sources.map((source) => (
             <li class="docwiki-documents-item">
-              <span class="docwiki-documents-title" lang="fr">
+              <span class="docwiki-documents-title">
                 {source.title}
               </span>
               {source.status === "superseded" && (
