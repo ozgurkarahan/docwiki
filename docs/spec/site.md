@@ -91,3 +91,31 @@ outside an allowlist (the repository URL and the site's own host), and the injec
   `docwiki-text.ts`, tested with Node.
 - The portal side (guards, gate before display, gateway limits): `src/docwiki/portal/live_ask.py`
   and [docs/live-ask.md](../live-ask.md).
+
+## 8. Pipeline page
+
+([ADR 0010](../adr/0010-the-story-site.md); the business view of slice C.)
+
+- `/pipeline` is the second of the three header tabs (① Documents · ② Pipeline · ③ Wiki). It
+  leads with the owner's box, then the live view filled from `GET /api/process` (DOM nodes and
+  `textContent` only, site-absolute links only), then the 13 technical steps in a disclosure.
+- **Four phases.** Every document row shows one line of four phases, Read → File → Write → Check
+  and publish (discover, extract · classify · compile to agentkit · evidence to publish), each
+  with a shape, a word and a colour: ● done, ◐ in progress, ○ not started. A processing document
+  has the phases before its `phase` done; a document in the release has all four done; received
+  and queued have none started; held back, failed and removed have no bar. A visually hidden
+  text says it ("Phase 3 of 4: Write, step 4/13 compile").
+- **Follow this document.** A disclosure button per row (`aria-expanded`) opens the document's
+  journey under it: the original, its document page ("Pages and full text"), its status, the wiki
+  pages its last published run added, changed or removed (`last_change`), and its wiki page.
+- **What changed in this release.** After the documents: the pages added, changed and removed and
+  the contradictions opened and closed by the run of the current release (`runs[].changes`), or
+  "This release rebuilt the site; no page changed." Lists show at most 10 items, then "and n
+  more". While a run is unfinished, the live view names its stage and its documents.
+- **Owner rebuild.** When `/api/owner/me` returns `rebuild`, the owner sees a 44 px "Rebuild the
+  wiki" button (every page and the site from the cache; about $0 when no document changed; at most
+  5 a day), which sends `PUT /api/owner/runs/<random key>` and speeds up the polling.
+- **Live updates.** A poll updates the document rows by key (path): unchanged rows are left as
+  they are, so focus, open journeys and scroll stay. Only real changes (a new document, a new
+  state, a new phase) are announced, in the one polite region of the page, never on the first
+  render. The pure parts are in `scripts/pipeline.ts`, tested with Node.

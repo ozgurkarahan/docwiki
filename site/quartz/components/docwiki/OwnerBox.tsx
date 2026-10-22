@@ -1,6 +1,7 @@
 // "Add a document" (ADR 0009, 0010): the owner's sign-in and upload form at the top of the pipeline
 // page, before its text, so the owner finds them without scrolling. Hidden until the portal says
-// sign-in exists; scripts/process.inline.ts (Process.tsx) fills it from /api/owner/me.
+// sign-in exists; scripts/process.inline.ts (Process.tsx) fills it from /api/owner/me, with the
+// owner's "Rebuild the wiki" button when the portal offers it.
 import { classNames } from "../../util/lang"
 import { QuartzComponent, QuartzComponentConstructor, QuartzComponentProps } from "../types"
 

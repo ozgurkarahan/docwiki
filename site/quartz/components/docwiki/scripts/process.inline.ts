@@ -3,37 +3,62 @@
 // The portal says who is reading (/api/owner/me) and where every document is in the pipeline
 // (/api/process). Both replies are data: paths, errors and names come from documents and
 // storage, so they are rendered with DOM nodes and textContent only, and the only links are the
-// platform's sign-in pages and site-absolute wiki pages. The owner adds a document with a PUT (the
-// platform's sign-in refuses signed-in POSTs). Polling is fast while something is in the pipeline,
-// slow otherwise, pauses on a hidden tab and stops when Quartz navigates away (window.addCleanup).
+// platform's sign-in pages and site-absolute wiki pages. The owner adds a document or rebuilds the
+// wiki with a PUT (the platform's sign-in refuses signed-in POSTs). Polling is fast while
+// something is in the pipeline, slow otherwise, pauses on a hidden tab and stops when Quartz
+// navigates away (window.addCleanup).
+//
+// Each document row has its four-phase bar and a "Follow this document" disclosure (its journey).
+// A poll updates the document rows by key: unchanged rows stay as they are, so focus, open
+// disclosures and scroll are kept, and only real changes are announced, in the one polite region.
+// The pure parts (phases, change lists, the row plan, the sentences) are in ./pipeline.
 import { relativeHref } from "../../../plugins/transformers/docwiki-text"
+import {
+  DocFacts,
+  LastChange,
+  PHASES,
+  Page,
+  Phase,
+  ReleaseChanges,
+  RunDocument,
+  STAGES,
+  andMore,
+  announcements,
+  asPhase,
+  capped,
+  changeCount,
+  changeSummary,
+  list,
+  noChangeSentence,
+  number,
+  parseChanges,
+  parseLastChange,
+  parseRunDocuments,
+  phaseMarks,
+  phaseText,
+  planRows,
+  plural,
+  record,
+  rowKeys,
+  runAtWork,
+  runDocumentsText,
+  siteUrl,
+  text,
+} from "./pipeline"
 import { STATES, State, asState, stateWords, statusPill } from "./status"
 
 const SECTION = "section.docwiki-process"
-/** Same stages, same order as `STAGES` in src/docwiki/site/process_page.py. */
-const STAGES = [
-  "discover",
-  "extract",
-  "classify",
-  "compile",
-  "entities",
-  "topics",
-  "links",
-  "indexes",
-  "agentkit",
-  "evidence",
-  "verify",
-  "site",
-  "publish",
-] as const
 const ME_PATH = "api/owner/me"
 const PROCESS_PATH = "api/process"
 const UPLOAD_PATH = "api/owner/documents"
+const REBUILD_PATH = "api/owner/runs"
 const OWNER_HEADER = "X-DocWiki-Owner"
 const FAST_MS = 5_000
 const SLOW_MS = 30_000
-/** An upload keeps the fast polling this long, until its pages appear. */
-const UPLOAD_FOLLOW_MS = 10 * 60_000
+/** An upload or a rebuild keeps the fast polling this long, until its pages appear. */
+const FOLLOW_MS = 10 * 60_000
+/** Rebuilds a day (the portal's limit; it says how many are left). */
+const REBUILDS_A_DAY = 5
 const ROWS_COLLAPSED = 25
 const RUNS_SHOWN = 10
 /** Storage queues peek at most 32 messages (QUEUE_PEEK_LIMIT in docwiki.portal.process). */
@@ -52,6 +77,7 @@ interface Me {
   signInUrl: string | null
   signOutUrl: string | null
   upload: { maxMb: number; uploadsLeft: number; extensions: string[] } | null
+  rebuild: { left: number } | null
 }
 
 interface Doc {
@@ -62,10 +88,13 @@ interface Doc {
   status: string
   stage: string | null
   state: State
+  phase: Phase | null
   step: number | null
   steps: number | null
   hidden: boolean
   pageUrl: string | null
+  documentUrl: string | null
+  lastChange: LastChange | null
   lastError: string | null
   failed: boolean
 }
@@ -83,6 +112,9 @@ interface Run {
   startedAt: string | null
   finishedAt: string | null
   isCurrent: boolean
+  currentStage: string | null
+  documents: RunDocument[]
+  changes: ReleaseChanges | null
   counts: Record<string, number>
   stages: StageRun[]
   gates: Record<string, number>
@@ -110,27 +142,14 @@ interface View {
 
 /** The last upload of this page load (module state: it survives page navigations). */
 let uploaded: { path: string; at: number } | null = null
+/** Until when the polling stays fast after an upload or a rebuild. */
+let followUntil = 0
 let showAll = false
+/** The rows whose journey is open, by key (kept across polls and page navigations). */
+const expanded = new Set<string>()
+let journeys = 0
 
 // ----- Parsing: every field is checked, anything else is dropped -----
-
-function record(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null
-}
-
-function text(value: unknown): string | null {
-  return typeof value === "string" ? value : null
-}
-
-function number(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null
-}
-
-function list(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : []
-}
 
 function numbers(value: unknown): Record<string, number> {
   const result: Record<string, number> = {}
@@ -147,17 +166,12 @@ function authUrl(value: unknown): string | null {
   return url && url.startsWith("/.auth/") ? url : null
 }
 
-/** A site-absolute wiki page (`/sources/x`); hosts and schemes are not linked. */
-function pageUrl(value: unknown): string | null {
-  const url = text(value)
-  return url && url.startsWith("/") && !url.startsWith("//") && !url.includes("\\") ? url : null
-}
-
 function parseMe(payload: unknown): Me | null {
   const data = record(payload)
   if (!data) return null
   const upload = record(data.upload)
   const maxMb = number(upload?.max_mb)
+  const left = number(record(data.rebuild)?.left)
   return {
     signIn: data.sign_in === true,
     owner: data.owner === true,
@@ -174,6 +188,7 @@ function parseMe(payload: unknown): Me | null {
               .filter((item): item is string => item !== null && /^\.[a-z0-9]+$/.test(item)),
           }
         : null,
+    rebuild: left !== null ? { left: Math.max(0, left) } : null,
   }
 }
 
@@ -191,10 +206,13 @@ function parseDoc(value: unknown): Doc | null {
     status,
     stage: text(data.stage),
     state,
+    phase: asPhase(data.phase),
     step: number(data.step),
     steps: number(data.steps),
     hidden: data.hidden === true,
-    pageUrl: pageUrl(data.page_url),
+    pageUrl: siteUrl(data.page_url),
+    documentUrl: siteUrl(data.document_url),
+    lastChange: parseLastChange(data.last_change),
     lastError: text(data.last_error),
     failed: data.failed === true,
   }
@@ -222,6 +240,9 @@ function parseRun(value: unknown): Run | null {
     startedAt: text(data.started_at),
     finishedAt: text(data.finished_at),
     isCurrent: data.is_current === true,
+    currentStage: text(data.current_stage),
+    documents: parseRunDocuments(data.documents),
+    changes: parseChanges(data.changes),
     counts: numbers(data.counts),
     stages,
     gates: numbers(record(data.gates)?.summary),
@@ -264,6 +285,19 @@ function parseView(payload: unknown): View | null {
   }
 }
 
+function facts(doc: Doc): DocFacts {
+  return {
+    path: doc.path,
+    title: doc.title,
+    state: doc.state,
+    phase: doc.phase,
+    step: doc.step,
+    steps: doc.steps,
+    stage: doc.stage,
+    hidden: doc.hidden,
+  }
+}
+
 // ----- Formatting -----
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" })
@@ -290,10 +324,6 @@ function size(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function plural(count: number, word: string): string {
-  return `${count} ${word}${count === 1 ? "" : "s"}`
-}
-
 /** Elapsed time of a run: its receipt's duration, else from its start to its end (or now). */
 function runDuration(run: Run): number | null {
   if (run.durationS !== null) return run.durationS
@@ -308,10 +338,17 @@ function inPipeline(view: View): number {
 }
 
 function busy(view: View | null): boolean {
-  if (uploaded && Date.now() - uploaded.at < UPLOAD_FOLLOW_MS) return true
+  if (Date.now() < followUntil) return true
   if (!view) return false
   const latest = view.runs[0]
   return inPipeline(view) > 0 || (view.queued ?? 0) > 0 || (!!latest && !latest.finishedAt)
+}
+
+/** A random idempotency key for the portal (`[A-Za-z0-9-]{8,64}`). */
+function randomKey(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID()
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")
 }
 
 // ----- DOM -----
@@ -327,9 +364,10 @@ function element<K extends keyof HTMLElementTagNameMap>(
   return node
 }
 
-function anchor(href: string, content: string): HTMLAnchorElement {
+function anchor(href: string, content: string, focusKey?: string): HTMLAnchorElement {
   const node = element("a", undefined, content)
   node.setAttribute("href", href)
+  if (focusKey) node.dataset.focusKey = focusKey
   return node
 }
 
@@ -342,24 +380,48 @@ function heading(content: string): HTMLHeadingElement {
   return element("h3", "docwiki-process-title", content)
 }
 
+/** "and n more" after a capped list, or nothing. */
+function moreItem(more: number): HTMLLIElement[] {
+  return more > 0 ? [element("li", "docwiki-process-and-more", andMore(more))] : []
+}
+
+/** Replace a block's content only when it differs, so its focus and selection stay. */
+function swap(slot: HTMLElement, next: HTMLElement | null): void {
+  const current = slot.firstElementChild
+  if (!next) {
+    if (current) slot.replaceChildren()
+    return
+  }
+  if (current && slot.childElementCount === 1 && current.isEqualNode(next)) return
+  slot.replaceChildren(next)
+}
+
 function nowBlock(view: View): HTMLElement {
   const block = element("div", "docwiki-process-now")
-  const facts: string[] = []
+  const parts: string[] = []
   const release = view.release
   if (release) {
-    facts.push(`Release ${release.id}, published ${when(release.publishedAt)}`)
+    parts.push(`Release ${release.id}, published ${when(release.publishedAt)}`)
     const counts: string[] = []
     if (release.sources !== null) counts.push(plural(release.sources, "source"))
     if (release.pages !== null) counts.push(plural(release.pages, "page"))
-    if (counts.length > 0) facts.push(counts.join(", "))
+    if (counts.length > 0) parts.push(counts.join(", "))
   } else {
-    facts.push("No release published yet")
+    parts.push("No release published yet")
   }
   if (view.queued !== null) {
     const queued = view.queued >= QUEUE_PEEK_LIMIT ? `${QUEUE_PEEK_LIMIT}+` : String(view.queued)
-    facts.push(`queue: ${queued}`)
+    parts.push(`queue: ${queued}`)
   }
-  block.append(element("p", "docwiki-process-facts", facts.join(" · ")))
+  block.append(element("p", "docwiki-process-facts", parts.join(" · ")))
+  const latest = view.runs[0]
+  if (latest && !latest.finishedAt) {
+    const work = element("p", "docwiki-process-at-work")
+    work.append(statusPill("processing", runAtWork(latest.currentStage)))
+    const documents = runDocumentsText(latest.documents)
+    if (documents) work.append(element("span", "docwiki-process-at-work-docs", `— ${documents}`))
+    block.append(work)
+  }
   return block
 }
 
@@ -400,8 +462,11 @@ function stageStrip(view: View): HTMLElement {
     block.append(element("p", "docwiki-process-caption", "No run recorded yet."))
   }
   const byStage = new Map((latest?.stages ?? []).map((stage) => [stage.stage, stage]))
-  // While a run is unfinished, the first stage without a report is the one at work.
-  const current = running ? STAGES.find((name) => !byStage.has(name)) : undefined
+  // While a run is unfinished, the portal names the stage at work (else: the first without a
+  // report).
+  const current = running
+    ? (latest.currentStage ?? STAGES.find((name) => !byStage.has(name)))
+    : undefined
   const strip = element("ol", "docwiki-process-stages")
   for (const name of STAGES) {
     const report = byStage.get(name)
@@ -420,25 +485,124 @@ function stageStrip(view: View): HTMLElement {
   return block
 }
 
-function documentRow(doc: Doc, owner: boolean): HTMLTableRowElement {
+const PHASE_SHAPES = { done: "●", current: "◐", todo: "○" } as const
+
+/** The four phases of a document in one line: shape, word and colour, with a text equivalent. */
+function phaseBar(doc: Doc): HTMLElement | null {
+  const marks = phaseMarks(doc.state, doc.phase, doc.step, doc.stage)
+  if (!marks) return null
+  const bar = element("span", "docwiki-phases")
+  const visual = element("span", "docwiki-phases-bar")
+  visual.setAttribute("aria-hidden", "true")
+  PHASES.forEach((phase, index) => {
+    const mark = marks[index]
+    const item = element("span", `docwiki-phase docwiki-phase--${mark}`)
+    item.append(element("span", "docwiki-phase-shape", PHASE_SHAPES[mark]), phase.word)
+    visual.append(item)
+  })
+  const stage = doc.state === "processing" ? (doc.stage ?? "publish") : null
+  const words = phaseText(doc.state, doc.phase, doc.step, doc.steps, stage)
+  bar.append(visual, element("span", "sr-only", words))
+  return bar
+}
+
+/** One step of a document's journey: a label and what it is. */
+function journeyStep(label: string, ...content: (Node | string)[]): HTMLLIElement {
+  const item = element("li", "docwiki-journey-step")
+  item.append(element("span", "docwiki-journey-label", label))
+  const value = element("span", "docwiki-journey-value")
+  value.append(...content)
+  item.append(value)
+  return item
+}
+
+/** "Follow this document": the original, its document page, its status, the pages, its page. */
+function journey(doc: Doc, key: string, id: string): HTMLElement {
+  const block = element("div", "docwiki-journey")
+  block.id = id
+  const steps = element("ol", "docwiki-journey-steps")
+  const received = [doc.path]
+  if (doc.modified) received.push(`received ${when(doc.modified)}`)
+  if (doc.size !== null) received.push(size(doc.size))
+  steps.append(journeyStep("Original", received.join(" · ")))
+  steps.append(
+    journeyStep(
+      "Document page",
+      doc.documentUrl
+        ? anchor(doc.documentUrl, "Pages and full text", `journey-doc:${key}`)
+        : "not in the wiki yet",
+    ),
+  )
+  const stage = doc.state === "processing" ? (doc.stage ?? "publish") : null
+  const status = [stateWords(doc.state, doc.step, doc.steps, stage)]
+  const phase = phaseText(doc.state, doc.phase, doc.step, doc.steps, stage)
+  if (phase && doc.state === "processing") status.push(phase)
+  steps.append(journeyStep("Status", status.join(" — ")))
+  const change = doc.lastChange
+  if (change) {
+    const head = [plural(change.pages.length, "wiki page")]
+    if (change.change) head.push(`document ${change.change}`)
+    if (change.finishedAt) head.push(when(change.finishedAt))
+    const { shown, more } = capped(change.pages)
+    const pages = element("ul", "docwiki-journey-pages")
+    shown.forEach((page, index) => {
+      const item = element("li")
+      item.append(element("span", `docwiki-change docwiki-change--${page.change}`, page.change))
+      item.append(" ")
+      if (page.url) item.append(anchor(page.url, page.title, `journey-page:${key}:${index}`))
+      else item.append(element("span", "docwiki-journey-removed", page.title))
+      pages.append(item)
+    })
+    pages.append(...moreItem(more))
+    const value: (Node | string)[] = [head.join(" · ")]
+    if (shown.length > 0) value.push(pages)
+    steps.append(journeyStep("Its last run", ...value))
+  } else {
+    steps.append(journeyStep("Its last run", "no published run yet"))
+  }
+  steps.append(
+    journeyStep(
+      "Wiki page",
+      doc.pageUrl ? anchor(doc.pageUrl, doc.title ?? doc.path, `journey-wiki:${key}`) : "—",
+    ),
+  )
+  block.append(steps)
+  return block
+}
+
+/**
+ * One document: its row and, under it, its journey across the whole table (a row of its own,
+ * shown by the "Follow this document" disclosure). Each document is one `tbody`, the unit that
+ * the live updates keep, replace or move.
+ */
+function documentRow(
+  doc: Doc,
+  key: string,
+  owner: boolean,
+  mine: boolean,
+): HTMLTableSectionElement {
+  const group = element("tbody", "docwiki-process-group")
+  group.dataset.key = key
   const row = element("tr")
-  const mine = uploaded !== null && doc.path === uploaded.path
   if (mine) row.className = "is-uploaded"
+  group.append(row)
   const status = element("td", "docwiki-process-status")
   // A document whose stages are all done but whose release is not out yet is at "publish".
   const stage = doc.state === "processing" ? (doc.stage ?? "publish") : null
   status.append(statusPill(doc.state, stateWords(doc.state, doc.step, doc.steps, stage)))
+  const bar = phaseBar(doc)
+  if (bar) status.append(bar)
   const name = element("td", "docwiki-process-name")
+  const label = doc.title ?? doc.path
   if (doc.hidden) {
     name.append(element("span", "docwiki-process-hidden", doc.path))
   } else if (doc.title && doc.pageUrl) {
-    const open = anchor(doc.pageUrl, doc.title)
+    const open = anchor(doc.pageUrl, doc.title, `page:${key}`)
     open.className = "docwiki-process-doc"
-    open.dataset.focusKey = `page:${doc.path}`
     name.append(open)
     name.append(element("span", "docwiki-process-path", doc.path))
   } else {
-    name.append(element("span", "docwiki-process-doc", doc.title ?? doc.path))
+    name.append(element("span", "docwiki-process-doc", label))
     if (doc.title) name.append(element("span", "docwiki-process-path", doc.path))
   }
   if (mine) name.append(element("span", "docwiki-process-mine", "your upload"))
@@ -450,79 +614,165 @@ function documentRow(doc: Doc, owner: boolean): HTMLTableRowElement {
   } else if (doc.failed && doc.state !== "failed" && doc.state !== "held_back") {
     name.append(element("span", "docwiki-process-error", "an earlier attempt failed"))
   }
-  const facts = element("td", "docwiki-process-when")
-  facts.append(element("span", undefined, when(doc.modified)))
-  if (doc.size !== null) facts.append(element("span", "docwiki-process-size", size(doc.size)))
-  row.append(status, name, facts)
-  return row
+  // Documents kept out of the audience have no journey to show.
+  if (!doc.hidden) {
+    journeys += 1
+    const id = `docwiki-journey-${journeys}`
+    const open = expanded.has(key)
+    const follow = element("button", "docwiki-follow")
+    follow.type = "button"
+    follow.dataset.focusKey = `follow:${key}`
+    follow.setAttribute("aria-expanded", String(open))
+    follow.setAttribute("aria-controls", id)
+    follow.append(
+      element("span", "docwiki-follow-icon", "▸"),
+      "Follow this document",
+      element("span", "sr-only", `: ${label}`),
+    )
+    follow.firstElementChild?.setAttribute("aria-hidden", "true")
+    const path = element("tr", "docwiki-journey-row")
+    const cell = element("td")
+    cell.colSpan = 3
+    cell.append(journey(doc, key, id))
+    path.append(cell)
+    path.hidden = !open
+    group.classList.toggle("is-open", open)
+    follow.addEventListener("click", () => {
+      const now = follow.getAttribute("aria-expanded") !== "true"
+      follow.setAttribute("aria-expanded", String(now))
+      path.hidden = !now
+      group.classList.toggle("is-open", now)
+      if (now) expanded.add(key)
+      else expanded.delete(key)
+    })
+    name.append(follow)
+    group.append(path)
+  }
+  const received = element("td", "docwiki-process-when")
+  received.append(element("span", undefined, when(doc.modified)))
+  if (doc.size !== null) received.append(element("span", "docwiki-process-size", size(doc.size)))
+  row.append(status, name, received)
+  return group
 }
 
 /** An upload the portal accepted that the document list does not show yet. */
-function receivedRow(path: string): HTMLTableRowElement {
+function receivedRow(path: string, key: string): HTMLTableSectionElement {
+  const group = element("tbody", "docwiki-process-group")
+  group.dataset.key = key
   const row = element("tr", "is-uploaded")
+  group.append(row)
   const status = element("td", "docwiki-process-status")
   status.append(statusPill("received"))
   const name = element("td", "docwiki-process-name")
   name.append(element("span", "docwiki-process-doc", path))
   name.append(element("span", "docwiki-process-mine", "received — waiting for the pipeline"))
   row.append(status, name, element("td"))
-  return row
+  return group
 }
 
-function documentsTable(
-  view: View,
-  owner: boolean,
-  rerender: (focusKey: string) => void,
-): HTMLElement {
-  const block = element("div", "docwiki-process-documents")
-  block.append(heading(`Documents (${view.total})`))
-  const breakdown = STATE_ORDER.filter((state) => (view.states[state] ?? 0) > 0).map(
-    (state) => `${view.states[state]} ${stateWords(state).toLowerCase()}`,
-  )
-  if (breakdown.length > 0) {
-    block.append(element("p", "docwiki-process-caption", breakdown.join(" · ")))
+interface Row {
+  key: string
+  sig: string
+  node: HTMLTableSectionElement
+}
+
+/** The documents block: its rows are updated by key, never rebuilt as a whole. */
+class DocumentsBlock {
+  readonly root = element("div", "docwiki-process-documents")
+  private readonly title = heading("Documents")
+  private readonly caption = element("p", "docwiki-process-caption")
+  private readonly empty = element("p", "docwiki-process-caption", "No documents yet.")
+  private readonly scroller = element("div", "docwiki-process-scroll")
+  private readonly table = element("table", "docwiki-process-table")
+  private readonly more = element("div", "docwiki-process-more-slot")
+  private rows: Row[] = []
+  private readonly rerender: (focusKey: string) => void
+
+  constructor(rerender: (focusKey: string) => void) {
+    this.rerender = rerender
+    // Focusable, so that a keyboard scrolls a table wider than the screen.
+    this.scroller.tabIndex = 0
+    this.scroller.setAttribute("role", "region")
+    this.scroller.setAttribute("aria-label", "Documents")
+    this.scroller.dataset.focusKey = "documents"
+    const head = element("tr")
+    for (const label of ["Status", "Document", "Received"]) {
+      const cell = element("th", undefined, label)
+      cell.scope = "col"
+      head.append(cell)
+    }
+    const thead = element("thead")
+    thead.append(head)
+    this.table.append(thead)
+    this.scroller.append(this.table)
+    this.caption.hidden = true
+    this.root.append(this.title, this.caption, this.empty, this.scroller, this.more)
   }
-  const docs = [...view.documents]
-  const mine = uploaded ? docs.findIndex((doc) => doc.path === uploaded?.path) : -1
-  if (mine > 0) docs.unshift(...docs.splice(mine, 1))
-  const pseudo = uploaded !== null && mine < 0 ? uploaded.path : null
-  if (docs.length === 0 && !pseudo) {
-    block.append(element("p", "docwiki-process-caption", "No documents yet."))
-    return block
-  }
-  // Focusable, so that a keyboard scrolls a table wider than the screen.
-  const scroller = element("div", "docwiki-process-scroll")
-  scroller.tabIndex = 0
-  scroller.setAttribute("role", "region")
-  scroller.setAttribute("aria-label", "Documents")
-  scroller.dataset.focusKey = "documents"
-  const table = element("table", "docwiki-process-table")
-  const head = element("tr")
-  for (const label of ["Status", "Document", "Received"]) {
-    const cell = element("th", undefined, label)
-    cell.scope = "col"
-    head.append(cell)
-  }
-  const thead = element("thead")
-  thead.append(head)
-  const body = element("tbody")
-  if (pseudo) body.append(receivedRow(pseudo))
-  const shown = showAll ? docs : docs.slice(0, ROWS_COLLAPSED)
-  for (const doc of shown) body.append(documentRow(doc, owner))
-  table.append(thead, body)
-  scroller.append(table)
-  block.append(scroller)
-  if (shown.length < docs.length) {
-    const more = element("button", "docwiki-process-more", `Show all ${docs.length}`)
-    more.type = "button"
-    more.dataset.focusKey = "more"
-    more.addEventListener("click", () => {
-      showAll = true
-      rerender("documents")
+
+  update(view: View, owner: boolean): void {
+    const title = `Documents (${view.total})`
+    if (this.title.textContent !== title) this.title.textContent = title
+    const breakdown = STATE_ORDER.filter((state) => (view.states[state] ?? 0) > 0)
+      .map((state) => `${view.states[state]} ${stateWords(state).toLowerCase()}`)
+      .join(" · ")
+    if (this.caption.textContent !== breakdown) this.caption.textContent = breakdown
+    this.caption.hidden = breakdown === ""
+
+    const docs = [...view.documents]
+    const mineAt = uploaded ? docs.findIndex((doc) => doc.path === uploaded?.path) : -1
+    if (mineAt > 0) docs.unshift(...docs.splice(mineAt, 1))
+    const pseudo = uploaded !== null && mineAt < 0 ? uploaded.path : null
+    const shown = showAll ? docs : docs.slice(0, ROWS_COLLAPSED)
+    const keys = rowKeys(shown.map((doc) => doc.path))
+    const next: { key: string; sig: string; build: () => HTMLTableSectionElement }[] = []
+    if (pseudo) {
+      const key = `upload:${pseudo}`
+      next.push({ key, sig: "received", build: () => receivedRow(pseudo, key) })
+    }
+    shown.forEach((doc, index) => {
+      const key = keys[index]
+      const mine = uploaded !== null && doc.path === uploaded.path
+      next.push({
+        key,
+        sig: JSON.stringify([doc, owner, mine]),
+        build: () => documentRow(doc, key, owner, mine),
+      })
     })
-    block.append(more)
+
+    const plan = planRows(this.rows, next)
+    const nodes = new Map(this.rows.map((row) => [row.key, row.node]))
+    for (const key of plan.removed) nodes.get(key)?.remove()
+    const rows: Row[] = []
+    plan.items.forEach((item, index) => {
+      const spec = next[index]
+      let node = nodes.get(item.key)
+      if (item.action !== "keep" || !node) {
+        const built = spec.build()
+        if (node) node.replaceWith(built)
+        node = built
+      }
+      // Moved only when it is not already in its place (the table's first child is its head).
+      const at = this.table.children[index + 1]
+      if (at !== node) this.table.insertBefore(node, at ?? null)
+      rows.push({ key: item.key, sig: spec.sig, node })
+    })
+    this.rows = rows
+
+    const none = next.length === 0
+    this.empty.hidden = !none
+    this.scroller.hidden = none
+    let more: HTMLElement | null = null
+    if (shown.length < docs.length) {
+      more = element("button", "docwiki-process-more", `Show all ${docs.length}`)
+      more.setAttribute("type", "button")
+      more.dataset.focusKey = "more"
+      more.addEventListener("click", () => {
+        showAll = true
+        this.rerender("documents")
+      })
+    }
+    swap(this.more, more)
   }
-  return block
 }
 
 function runSources(counts: Record<string, number>): string | null {
@@ -535,6 +785,50 @@ function runSources(counts: Record<string, number>): string | null {
   return parts.length > 0 ? `${head}: ${parts.join(", ")}` : head
 }
 
+/** One kind of change of the release: its pages, linked, at most 10 then "and n more". */
+function changeGroup(kind: string, label: string, pages: Page[]): HTMLElement | null {
+  if (pages.length === 0) return null
+  const group = element("div", "docwiki-release-group")
+  group.append(element("p", "docwiki-release-label", `${label} (${pages.length})`))
+  const items = element("ul", "docwiki-release-pages")
+  const { shown, more } = capped(pages)
+  shown.forEach((page, index) => {
+    const item = element("li")
+    if (page.url) item.append(anchor(page.url, page.title, `release:${kind}:${index}`))
+    else item.append(element("span", "docwiki-journey-removed", page.title))
+    if (page.type) item.append(" ", element("span", "docwiki-release-type", page.type))
+    items.append(item)
+  })
+  items.append(...moreItem(more))
+  group.append(items)
+  return group
+}
+
+/** "What changed in this release", from the run that published the current release. */
+function releaseChanges(view: View): HTMLElement | null {
+  const run = view.runs.find((item) => item.isCurrent && item.changes !== null)
+  if (!run || !run.changes) return null
+  const changes = run.changes
+  const block = element("div", "docwiki-release")
+  block.append(heading("What changed in this release"))
+  if (changeCount(changes) === 0) {
+    block.append(element("p", "docwiki-process-caption", noChangeSentence(run.kind)))
+    return block
+  }
+  block.append(element("p", "docwiki-release-summary", changeSummary(changes)))
+  const groups = [
+    changeGroup("added", "Pages added", changes.added),
+    changeGroup("changed", "Pages changed", changes.changed),
+    changeGroup("removed", "Pages removed", changes.removed),
+    changeGroup("opened", "Contradictions opened", changes.opened),
+    changeGroup("closed", "Contradictions closed", changes.closed),
+  ].filter((group): group is HTMLElement => group !== null)
+  const grid = element("div", "docwiki-release-groups")
+  grid.append(...groups)
+  block.append(grid)
+  return block
+}
+
 function runsList(view: View): HTMLElement {
   const block = element("div", "docwiki-process-runs")
   block.append(heading("Runs that published a release"))
@@ -544,7 +838,8 @@ function runsList(view: View): HTMLElement {
     block.append(element("p", "docwiki-process-caption", `${checks} found nothing to do${last}.`))
   }
   if (view.runs.length === 0) {
-    block.append(element("p", "docwiki-process-caption", "No run recorded yet."))
+    const empty = "No run yet — the owner adds a document to start one."
+    block.append(element("p", "docwiki-process-caption", empty))
     return block
   }
   const items = element("ul", "docwiki-process-run-list")
@@ -557,24 +852,24 @@ function runsList(view: View): HTMLElement {
     if (run.isCurrent) {
       title.append(" ", element("span", "docwiki-process-current", "current release"))
     }
-    const facts = [`started ${when(run.startedAt)}`, duration(runDuration(run))]
-    if (run.cost !== null) facts.push(`${run.currency ?? ""} ${run.cost.toFixed(2)}`.trim())
+    const parts = [`started ${when(run.startedAt)}`, duration(runDuration(run))]
+    if (run.cost !== null) parts.push(`${run.currency ?? ""} ${run.cost.toFixed(2)}`.trim())
     const sources = runSources(run.counts)
-    if (sources) facts.push(sources)
+    if (sources) parts.push(sources)
     const changed = ["new", "changed", "deleted"].some((key) => (run.counts[key] ?? 0) > 0)
-    if (run.kind === "rebuild" && !changed) facts.push("no document changed: the site was rebuilt")
+    if (run.kind === "rebuild" && !changed) parts.push("no document changed: the site was rebuilt")
     const gates = Object.entries(run.gates)
       .filter(([, count]) => count > 0)
       .map(([status, count]) => `${count} ${status}`)
-    if (gates.length > 0) facts.push(`gates: ${gates.join(", ")}`)
-    item.append(title, element("p", "docwiki-process-run-facts", facts.join(" · ")))
+    if (gates.length > 0) parts.push(`gates: ${gates.join(", ")}`)
+    item.append(title, element("p", "docwiki-process-run-facts", parts.join(" · ")))
     items.append(item)
   }
   block.append(items)
   return block
 }
 
-// ----- The owner: sign-in bar and upload form -----
+// ----- The owner: sign-in bar, upload form and rebuild -----
 
 function ownerBar(me: Me): HTMLElement | null {
   if (me.owner) {
@@ -612,15 +907,24 @@ function uploadPath(folder: string, file: File): { path: string } | { error: str
   return { path }
 }
 
-function errorText(payload: unknown, status: number): string {
+function errorText(payload: unknown, status: number, what = "The upload"): string {
   const message = text(record(payload)?.error)
-  return message ? `${message} (HTTP ${status})` : `The upload failed (HTTP ${status}).`
+  return message ? `${message} (HTTP ${status})` : `${what} failed (HTTP ${status}).`
+}
+
+/** The owner's polite status line, shared by the upload and the rebuild. */
+function ownerStatus(): HTMLParagraphElement {
+  const status = element("p", "docwiki-process-upload-status")
+  status.setAttribute("role", "status")
+  status.setAttribute("aria-live", "polite")
+  return status
 }
 
 function uploadForm(
   upload: NonNullable<Me["upload"]>,
   done: () => void,
   titled: boolean,
+  status: HTMLElement,
 ): HTMLElement {
   const form = element("form", "docwiki-process-upload")
   form.noValidate = true
@@ -650,9 +954,6 @@ function uploadForm(
 
   const submit = element("button", "docwiki-process-submit", "Add to the wiki")
   submit.type = "submit"
-  const status = element("p", "docwiki-process-upload-status")
-  status.setAttribute("role", "status")
-  status.setAttribute("aria-live", "polite")
   const problem = element("p", "docwiki-process-upload-error")
   problem.setAttribute("role", "alert")
   problem.hidden = true
@@ -710,6 +1011,7 @@ function uploadForm(
         if (left !== null) upload.uploadsLeft = left
         sayHint()
         uploaded = { path, at: Date.now() }
+        followUntil = Date.now() + FOLLOW_MS
         form.reset()
         status.textContent = `Uploaded ${path}. The pipeline starts within a minute: `
         status.append(anchor("#docwiki-live", "follow it live"), ".")
@@ -724,6 +1026,57 @@ function uploadForm(
       })
   })
   return form
+}
+
+/** "Rebuild the wiki": a run that rebuilds every page and the site from the cache. */
+function rebuildControl(
+  rebuild: NonNullable<Me["rebuild"]>,
+  done: () => void,
+  status: HTMLElement,
+): HTMLElement {
+  const block = element("div", "docwiki-process-rebuild")
+  const button = element("button", "docwiki-process-submit docwiki-process-rebuild-button")
+  button.type = "button"
+  button.textContent = "Rebuild the wiki"
+  const hint = element("p", "docwiki-process-hint")
+  hint.id = "docwiki-process-rebuild-hint"
+  button.setAttribute("aria-describedby", hint.id)
+  const sayHint = () => {
+    hint.textContent =
+      "Rebuilds every page and the site from the cache; about $0 when no document changed; " +
+      `at most ${REBUILDS_A_DAY} a day, ${rebuild.left} left.`
+    button.disabled = rebuild.left <= 0
+  }
+  sayHint()
+  button.addEventListener("click", () => {
+    if (button.disabled) return
+    button.disabled = true
+    status.textContent = "Asking for a rebuild…"
+    const target = relativeHref(currentSlug(), `${REBUILD_PATH}/${randomKey()}`)
+    fetch(target, { method: "PUT", headers: { [OWNER_HEADER]: "1" }, credentials: "same-origin" })
+      .then(async (response) => {
+        const payload = await response.json().catch((): unknown => null)
+        const left = number(record(payload)?.rebuilds_left)
+        if (left !== null) rebuild.left = Math.max(0, left)
+        if (response.status !== 202) {
+          if (response.status === 429) rebuild.left = 0
+          status.textContent = errorText(payload, response.status, "The rebuild")
+          return
+        }
+        followUntil = Date.now() + FOLLOW_MS
+        status.textContent =
+          "Rebuild queued: it starts within a minute; follow it in the pipeline below."
+        done()
+      })
+      .catch((error: unknown) => {
+        console.error("DocWiki: the rebuild request failed", error)
+        status.textContent =
+          "The rebuild request did not reach the portal; check the connection and try again."
+      })
+      .finally(sayHint)
+  })
+  block.append(button, hint)
+  return block
 }
 
 // ----- Page life: fetch, render, poll -----
@@ -750,9 +1103,12 @@ document.addEventListener("nav", () => {
   const owner =
     box?.querySelector<HTMLElement>(".docwiki-process-owner-area") ??
     element("div", "docwiki-process-owner-area")
+  // The one polite region of the live view: the state sentence and the changes since the last
+  // poll. It becomes live after the first render, which is never announced.
   const state = element("p", "docwiki-process-state")
-  state.setAttribute("role", "status")
-  state.setAttribute("aria-live", "polite")
+  const sentence = element("span", "docwiki-process-sentence")
+  const latestChange = element("span", "docwiki-process-change")
+  state.append(sentence, latestChange)
   state.hidden = true
   const live = element("div", "docwiki-process-live")
   const note = element("p", "docwiki-process-note", UNAVAILABLE)
@@ -767,31 +1123,48 @@ document.addEventListener("nav", () => {
   let timer = 0
   let view: View | null = null
   let isOwner = false
+  let seen: DocFacts[] | null = null
 
-  // Every poll rebuilds the view: the focus and the table's sideways scroll are carried over.
+  const nowSlot = element("div", "docwiki-process-slot")
+  const stagesSlot = element("div", "docwiki-process-slot")
+  const changesSlot = element("div", "docwiki-process-slot")
+  const runsSlot = element("div", "docwiki-process-slot")
+  // A poll updates the blocks in place: the focus moves back if its element was replaced.
   const render = (focusKey?: string) => {
     if (!alive || !view) return
     if (placeholder) placeholder.hidden = true
-    const sentence = stateSentence(view)
-    if (state.textContent !== sentence) state.textContent = sentence
+    const said = stateSentence(view)
+    if (sentence.textContent !== said) sentence.textContent = said
     state.hidden = false
     const active = document.activeElement
     const key =
       focusKey ??
       (active instanceof HTMLElement && live.contains(active) ? active.dataset.focusKey : undefined)
-    const scrollLeft = live.querySelector(".docwiki-process-scroll")?.scrollLeft ?? 0
-    live.replaceChildren(
-      nowBlock(view),
-      stageStrip(view),
-      documentsTable(view, isOwner, render),
-      runsList(view),
-    )
-    const scroller = live.querySelector(".docwiki-process-scroll")
-    if (scroller) scroller.scrollLeft = scrollLeft
-    if (key) {
+    if (!live.hasChildNodes()) {
+      live.append(nowSlot, stagesSlot, documents.root, changesSlot, runsSlot)
+    }
+    swap(nowSlot, nowBlock(view))
+    swap(stagesSlot, stageStrip(view))
+    documents.update(view, isOwner)
+    swap(changesSlot, releaseChanges(view))
+    swap(runsSlot, runsList(view))
+    if (key && (focusKey || !document.activeElement || !live.contains(document.activeElement))) {
       const targets = Array.from(live.querySelectorAll<HTMLElement>("[data-focus-key]"))
       targets.find((node) => node.dataset.focusKey === key)?.focus({ preventScroll: true })
     }
+  }
+  const documents = new DocumentsBlock(render)
+
+  /** Say what changed since the last poll; the first render says nothing. */
+  const announce = (next: View) => {
+    const current = next.documents.map(facts)
+    const sentences = announcements(seen, current)
+    if (seen === null) {
+      state.setAttribute("role", "status")
+      state.setAttribute("aria-live", "polite")
+    }
+    seen = current
+    if (sentences.length > 0) latestChange.textContent = `${sentences.join("; ")}.`
   }
 
   const schedule = (ms: number) => {
@@ -808,9 +1181,16 @@ document.addEventListener("nav", () => {
       if (status === 404 && view === null) return
       const parsed = status === 200 ? parseView(payload) : null
       if (!parsed) throw new Error(`HTTP ${status}`)
+      const first = view === null
       view = parsed
       note.hidden = true
       render()
+      if (first) {
+        // Live only after the first render is on screen, so it is not read out.
+        window.requestAnimationFrame(() => announce(parsed))
+      } else {
+        announce(parsed)
+      }
     } catch (error) {
       if (!alive) return
       console.warn("DocWiki: the process status could not be read", error)
@@ -831,7 +1211,13 @@ document.addEventListener("nav", () => {
       isOwner = me.owner
       const bar = ownerBar(me)
       if (bar) owner.append(bar)
-      if (me.owner && me.upload) owner.append(uploadForm(me.upload, () => void poll(), !box))
+      const status = ownerStatus()
+      const done = () => void poll()
+      if (me.owner && me.upload) owner.append(uploadForm(me.upload, done, !box, status))
+      if (me.owner && me.rebuild) {
+        owner.append(rebuildControl(me.rebuild, done, status))
+        if (!me.upload) owner.append(status)
+      }
       render() // owners see the names and errors hidden from visitors
     })
     .catch(() => {
