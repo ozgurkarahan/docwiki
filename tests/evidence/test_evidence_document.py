@@ -28,6 +28,8 @@ async def test_a_pdf_document_page_shows_its_pages_and_full_text(
     page = built.page("index")
     assert page.frontmatter.type == "evidence-index"
     assert page.frontmatter.title == TITLES[rel]
+    # The document's own date, from its extraction (never the compile date).
+    assert page.frontmatter.document_date == built.doc.metadata.authored
     body = page.body
     assert body.index("## Pages") < body.index("## Full text") < body.index("## Cited passages")
     assert "![Page 1 of Quote DEV-2026-014 indice A](img/page-0001.png)" in body
@@ -35,7 +37,7 @@ async def test_a_pdf_document_page_shows_its_pages_and_full_text(
     assert "Nettoyer la dalle avant la pose." in body
     assert "*Figure (generated description, not verified):*" in body
     assert "- [p. 1](p0001.md)" in body
-    assert "Original file: [original.pdf](original.pdf)" in body
+    assert "[Original file (PDF)](original.pdf)" in body
     assert not find_violations(body, allow_markers=False)
 
 
@@ -79,3 +81,27 @@ async def test_canaries_are_never_rendered(corpus: Corpus, writer: ReleaseWriter
     text = guarded.text("index")
     assert word.lower() not in text.lower()
     EvidencePage.parse(text, f"evidence/{guarded.doc.source_id}/index.md")
+
+
+def test_a_merged_cell_heading_is_shown_once() -> None:
+    from types import SimpleNamespace
+
+    from docwiki.contracts.extracted import Table, TableRow
+    from docwiki.contracts.locators import XlsxRowsLocator
+    from docwiki.evidence.builder import _full_table
+    from docwiki.evidence.guard import TextGuard
+
+    table = Table(
+        id="t01",
+        locator=XlsxRowsLocator(sheet="Devis", row_start=1, row_end=3),
+        provenance="deterministic-table",
+        columns=["Poste", "Qté", "Prix"],
+        rows=[
+            TableRow(row_id="r0002", cells=["Lot 8 – Cuisine"] * 3),
+            TableRow(row_id="r0003", cells=["Dépose", "1", "350,00"]),
+        ],
+        artifact="tables/t01.parquet",
+    )
+    lines = _full_table(SimpleNamespace(guard=TextGuard(())), table)  # type: ignore[arg-type]
+    assert "| **Lot 8 – Cuisine** |  |  |" in lines
+    assert "| Dépose | 1 | 350,00 |" in lines

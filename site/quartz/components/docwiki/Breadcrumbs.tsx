@@ -32,10 +32,17 @@ export default ((userOpts?: Partial<Options>) => {
     const trie = (ctx.trie ??= trieFromAllFiles(allFiles))
     const nodes = trie.ancestryChain(slug.split("/"))
     if (!nodes || nodes.length < 2) return null
-    const crumbs = nodes.map((node, index) => ({
+    let crumbs = nodes.map((node, index) => ({
       name: index === 0 ? opts.rootName : folderName(node.displayName, node.data === null),
       href: resolveRelative(slug, simplifySlug(node.slug)),
     }))
+    // A document's pages: Documents / <document> / <passage> (ADR 0010).
+    if (slug.startsWith("evidence/")) {
+      crumbs = [
+        { name: "Documents", href: resolveRelative(slug, "documents" as FullSlug) },
+        ...crumbs.slice(2),
+      ]
+    }
     const current = crumbs.pop()!
 
     return (

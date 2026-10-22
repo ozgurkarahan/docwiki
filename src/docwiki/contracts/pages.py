@@ -338,6 +338,9 @@ class EvidenceIndexFrontmatter(ContractModel):
     title: NonEmptyStr
     source_id: SourceId
     sensitivity: Sensitivity
+    document_date: IsoDate | None = None
+    """The document's own date when its extraction found one (v1.7): the date it was written,
+    sent or created, never the date it was compiled."""
 
     @model_validator(mode="after")
     def _consistency(self) -> Self:

@@ -52,7 +52,11 @@ export const defaultContentPageLayout: PageLayout = {
     // Dates and reading time mean nothing on the Documents and Pipeline tabs.
     Component.ConditionalRender({
       component: Component.ContentMeta(),
-      condition: ({ fileData }) => fileData.slug !== "documents" && fileData.slug !== "pipeline",
+      condition: ({ fileData }) =>
+        fileData.slug !== "documents" &&
+        fileData.slug !== "pipeline" &&
+        fileData.frontmatter?.type !== "source" &&
+        fileData.frontmatter?.type !== "evidence-index",
     }),
     // The pipeline page only: the owner's sign-in and upload form, before the text.
     DocWiki.OwnerBox(),

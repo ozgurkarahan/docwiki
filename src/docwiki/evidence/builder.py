@@ -606,7 +606,13 @@ def _full_table(ctx: _Context, table: Table) -> list[str]:
     guard = ctx.guard
     lines = _md_table([guard(column) or " " for column in table.columns], None)
     for row in table.rows[:MAX_SIDECAR_ROWS]:
-        lines.append("| " + " | ".join(table_cell(guard(cell)) for cell in row.cells) + " |")
+        cells = [guard(cell) for cell in row.cells]
+        if len(cells) > 1 and cells[0].strip() and all(cell == cells[0] for cell in cells):
+            # A merged cell (a section heading of the table) repeats in every column: once.
+            heading = f"**{table_cell(cells[0])}**"
+            lines.append("| " + " | ".join([heading, *([""] * (len(cells) - 1))]) + " |")
+            continue
+        lines.append("| " + " | ".join(table_cell(cell) for cell in cells) + " |")
     if len(table.rows) > MAX_SIDECAR_ROWS:
         lines += ["", f"{len(table.rows) - MAX_SIDECAR_ROWS} more rows are not shown."]
     return [*lines, ""]
@@ -666,7 +672,8 @@ def _index(
     link = relative_link(path, ctx.source_page_path)
     source = f"Wiki page: [{escape_text(ctx.title)}]({link})"
     if ctx.original:
-        source += f" · Original file: [{ctx.original}]({ctx.original})"
+        kind = PurePosixPath(ctx.original).suffix.lstrip(".").upper()
+        source += f" · [Original file ({kind})]({ctx.original})"
     title = ctx.title
     pages, assets = _page_images(ctx)
     lines = [
@@ -695,6 +702,7 @@ def _index(
         title=plain_text(title) or f"Document {sid}",
         source_id=sid,
         sensitivity=ctx.sensitivity,
+        document_date=ctx.doc.metadata.authored,
     )
     return EvidencePage(path=path, frontmatter=frontmatter, body=body), assets
 

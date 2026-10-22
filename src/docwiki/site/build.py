@@ -330,6 +330,7 @@ def site_settings(
             run_id = manifest.run_id if run_id is None else run_id
     statuses = Counter(source.status for source in release.catalog.sources)
     titles = {page.id: page.title for page in release.catalog.pages if page.type == "source"}
+    revisions = {source.source_id: source.revision for source in release.catalog.sources}
     sources: dict[str, dict[str, str | None]] = {}
     for page in release.catalog.pages:
         if page.type != "source":
@@ -341,8 +342,10 @@ def site_settings(
         )
         meta = _source_meta(release, page.path)
         source_path = _text(meta.get("source_path"))
-        later =[titles[sid] for sid in meta.get("superseded_by") or [] if sid in titles]
-        has_document = (release.evidence_dir / page.id / "index.md").is_file()
+        later = [sid for sid in meta.get("superseded_by") or [] if sid in titles]
+        document = release.evidence_dir / page.id / "index.md"
+        has_document = document.is_file()
+        dated = _document_date(document) if has_document else None
         sources[page.id] = {
             "page": page.path.removesuffix(".md"),
             "title": page.title,
@@ -353,11 +356,12 @@ def site_settings(
             "docType": _text(meta.get("doc_type")),
             "docNumber": _text(meta.get("doc_number")),
             "revision": _text(meta.get("revision")),
-            "date": _path_date(source_path),
+            "date": dated or _path_date(source_path),
             "format": PurePosixPath(source_path).suffix.lstrip(".").lower() or None
             if source_path
             else None,
-            "supersededBy": later[0] if later else None,
+            "supersededBy": titles[later[0]] if later else None,
+            "supersededByRevision": revisions.get(later[0]) if later else None,
         }
     return {
         "schema": 1,
@@ -394,6 +398,16 @@ def _path_date(source_path: str | None) -> str | None:
     """The document's date when its file name carries one (``2026-03-24_compte-rendu…``)."""
     found = _PATH_DATE_RE.search(source_path or "")
     return found.group(1) if found else None
+
+
+def _document_date(index: Path) -> str | None:
+    """``document_date`` of a document page (the evidence index), when the extraction found one."""
+    try:
+        meta, _ = read_frontmatter(index.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    value = meta.get("document_date") if isinstance(meta, dict) else None
+    return str(value) if value else None
 
 
 def _source_meta(release: ReleaseView, page_path: str) -> dict[str, Any]:

@@ -18,7 +18,13 @@ const TABS = [
 export default (() => {
   const Tabs: QuartzComponent = ({ fileData, displayClass }: QuartzComponentProps) => {
     const slug = (fileData.slug ?? "index") as FullSlug
-    const active = slug === "documents" || slug === "pipeline" ? slug : "index"
+    // A document's own pages (evidence/<source_id>/…) belong to the Documents tab.
+    const active =
+      slug === "documents" || slug.startsWith("evidence/")
+        ? "documents"
+        : slug === "pipeline"
+          ? "pipeline"
+          : "index"
     const link = (target: string) => resolveRelative(slug, target as FullSlug)
     return (
       <div class={classNames(displayClass, "docwiki-tabbar")}>

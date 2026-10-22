@@ -33,6 +33,19 @@
       ],
       "title": "Sensitivity",
       "type": "string"
+    },
+    "document_date": {
+      "anyOf": [
+        {
+          "format": "date",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Document Date"
     }
   },
   "required": [

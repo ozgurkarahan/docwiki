@@ -184,9 +184,11 @@ def test_site_settings_from_the_mock_release() -> None:
         "date": None,
         "format": "xlsx",
         "supersededBy": None,
+        "supersededByRevision": None,
     }
     plan_a = next(item for item in settings["sources"].values() if item["revision"] == "A")
     assert plan_a["supersededBy"] == "Planning and purchase tracking, indice B"
+    assert plan_a["supersededByRevision"] == "B"
     assert len(settings["sources"]) == 3
     assert settings["answers"] == 1  # queries/2026-03-31-window-delivery-date.md
     custom = site_settings(
