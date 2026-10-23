@@ -123,3 +123,12 @@ def test_a_scope_named_index_is_refused():
     ).pages
     with pytest.raises(ValueError, match="scope value 'index'"):
         build_hubs(content, scoped, stamp=STAMP, updated=DAY)
+
+
+def test_a_title_that_shows_its_date_does_not_repeat_it():
+    from datetime import date
+
+    from docwiki.stages.hubs import _date_suffix
+
+    assert _date_suffix("Compte rendu n°3 (2026-03-24)", date(2026, 3, 24)) == ""
+    assert _date_suffix("Compte rendu n°3", date(2026, 3, 24)) == " (2026-03-24)"
