@@ -357,6 +357,15 @@ def test_resolution_rule_on_the_planted_contradictions(
             superseded_by=(),
         )
 
+    # The batiment wiki is French (v1.7, ADR 0012); the rule's statement in French:
+    assert resolution_statement(pack, info("planning-a"), info("mail-fournisseur")) == (
+        "Règle de résolution (autorité, puis date)\u00a0: mail-fournisseur l'emporte "
+        "(daté du 2026-03-18 contre 2026-03-17)."
+    )
+    # the logic below is checked on the English strings of the same pack
+    pack = pack.model_copy(
+        update={"info": pack.info.model_copy(update={"wiki_languages": ["en"]})}
+    )
     rule = "Resolution rule (authority, then recency): "
     # Window delivery: the schedule and the supplier's e-mail share an authority, the later wins.
     assert resolution_statement(pack, info("planning-a"), info("mail-fournisseur")) == (

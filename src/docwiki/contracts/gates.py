@@ -39,6 +39,7 @@ GateId = Literal[
     "G14",
     "G15",
     "G16",
+    "G17",
 ]
 
 
@@ -82,6 +83,12 @@ GATES: dict[str, GateSpec] = {
             True,
             "No wiki page renders a locked trade term with a banned English equivalent",
         ),
+        GateSpec(
+            "G17",
+            "translations",
+            False,
+            "Every canonical page has its mirror in each other wiki language, translated",
+        ),
     )
 }
 if tuple(GATES) != get_args(GateId):  # pragma: no cover - guards edits of the two lists
@@ -124,7 +131,7 @@ def gate_results(
     metrics: dict[str, tuple[float | None, float | None]] | None = None,
     max_details: int = 20,
 ) -> list[GateResult]:
-    """Fold violations into one result per gate (G01–G16).
+    """Fold violations into one result per gate (G01–G17).
 
     Errors fail blocking gates and warn non-blocking ones; warnings only ever warn. Gates listed
     in ``skipped`` (evaluated elsewhere or not applicable) are reported as ``skipped``.

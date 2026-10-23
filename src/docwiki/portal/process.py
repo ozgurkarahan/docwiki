@@ -77,9 +77,10 @@ PHASES: dict[str, tuple[str, ...]] = {
     "read": ("discover", "extract"),
     "file": ("classify",),
     "write": ("compile", "entities", "topics", "links", "indexes", "agentkit"),
-    "check": ("evidence", "verify", "site", "publish"),
+    "check": ("evidence", "translate", "verify", "site", "publish"),
 }
-"""The business view of the 13 stages (ADR 0010): Read, File, Write, Check and publish."""
+"""The business view of the stages (ADR 0010): Read, File, Write, Check and publish; ``translate``
+(v1.7, ADR 0012) runs only for a wiki with mirror languages."""
 PER_SOURCE_STAGES = ("extract", "classify", "compile")
 MAX_PAGE_CHANGES = 200
 """Pages listed per change kind in a run's view (the page shows fewer, with "and n more")."""
@@ -180,7 +181,7 @@ def document_state(
     superseded: bool = False,
 ) -> tuple[str, int | None]:
     """``(state, step)``: the status the site shows and, while processing, the 1-based number of
-    the stage at work out of the 13 (ADR 0010)."""
+    the stage at work out of all the stages (ADR 0010)."""
     if hidden or status == "quarantined":
         return "held_back", None
     if status == "failed":

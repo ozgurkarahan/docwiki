@@ -4,8 +4,12 @@ Schema = the frozen DDL of pipeline §6 plus two additive tables used for filter
 ``pages(page_id, type, path, title, scope)`` and ``page_refs(page_id, ref_kind, ref_id)`` where
 ``ref_kind`` is ``entity`` or ``topic``. Schema 2 (v1.7, ADR 0011) adds the nullable ``scope``
 column to ``docs`` and ``pages``: the scope value of a source page (and its blocks), a scoped
-topic or a hub, ``NULL`` for company pages. Schema 1 databases are still read (no page has a
-scope there).
+topic or a hub, ``NULL`` for company pages. Schema 3 (v1.7, ADR 0012) adds the ``tree`` column
+to ``docs`` and ``pages``: the wiki language tree of the row (the canonical language for the
+canonical wiki, the mirror language for ``<lang>/`` pages, ``NULL`` for source blocks, which are
+the documents' own words) and keys ``pages`` by ``(page_id, tree)``; ``meta.languages`` lists the
+wiki languages, canonical first. ``lang`` stays the language of the row's text. Schema 1 and 2
+databases are still read (one language, no scopes in schema 1).
 """
 
 from __future__ import annotations
@@ -47,8 +51,8 @@ __all__ = [
     "page_scope",
 ]
 
-SCHEMA_VERSION = "2"
-READABLE_SCHEMAS = frozenset({"1", SCHEMA_VERSION})
+SCHEMA_VERSION = "3"
+READABLE_SCHEMAS = frozenset({"1", "2", SCHEMA_VERSION})
 """Schemas :class:`SearchIndex` and the release validator accept."""
 TOKENIZER = "unicode61 remove_diacritics 2"
 COLUMN_WEIGHTS = (3.0, 2.0, 1.0)
@@ -57,11 +61,12 @@ COLUMN_WEIGHTS = (3.0, 2.0, 1.0)
 _DDL = """
 CREATE TABLE docs(rowid INTEGER PRIMARY KEY, kind TEXT, page_id TEXT, path TEXT, title TEXT,
                   section TEXT, anchor TEXT, source_id TEXT, locator_key TEXT, sensitivity TEXT,
-                  status TEXT, lang TEXT, text TEXT, scope TEXT);
+                  status TEXT, lang TEXT, text TEXT, scope TEXT, tree TEXT);
 CREATE TABLE synonyms(term TEXT, synonym TEXT, lang TEXT);
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT);
-CREATE TABLE pages(page_id TEXT PRIMARY KEY, type TEXT NOT NULL, path TEXT NOT NULL,
-                   title TEXT NOT NULL, scope TEXT);
+CREATE TABLE pages(page_id TEXT NOT NULL, tree TEXT NOT NULL, type TEXT NOT NULL,
+                   path TEXT NOT NULL, title TEXT NOT NULL, scope TEXT, lang TEXT,
+                   PRIMARY KEY(page_id, tree));
 CREATE TABLE page_refs(page_id TEXT NOT NULL, ref_kind TEXT NOT NULL, ref_id TEXT NOT NULL,
                        PRIMARY KEY(page_id, ref_kind, ref_id));
 """
@@ -99,6 +104,9 @@ class SearchHit(ContractModel):
     source_id: str | None = None
     locator_key: str | None = None
     score: float
+    lang: str | None = None
+    """The language of the row's text: the page's language for a page section, the document's
+    for a source block (v1.7)."""
 
 
 @dataclass(frozen=True)
@@ -160,7 +168,7 @@ def page_scope(page: Page) -> str | None:
     return scope if isinstance(scope, str) and scope else None
 
 
-def _page_rows(page: Page) -> list[tuple[object, ...]]:
+def _page_rows(page: Page, tree: str | None = None) -> list[tuple[object, ...]]:
     fm = page.frontmatter
     source_id = fm.source_id if isinstance(fm, SourceFrontmatter) else None
     status = fm.status if isinstance(fm, SourceFrontmatter) else None
@@ -186,6 +194,7 @@ def _page_rows(page: Page) -> list[tuple[object, ...]]:
                 fm.lang,
                 text,
                 scope,
+                tree,
             )
         )
     return rows
@@ -213,11 +222,15 @@ def build_search_db(
     release_id: str | None = None,
     audience: str | None = None,
     use_fts5: bool | None = None,
+    languages: Sequence[str] = ("en",),
 ) -> SearchDbInfo:
     """Create ``search.db`` at ``path`` (replaced if present). Deterministic for equal inputs.
 
     ``use_fts5=None`` auto-detects; ``False`` builds the plain tables only (BM25 fallback).
+    ``languages`` are the wiki languages, canonical first: a mirror page (``translation_of``)
+    belongs to the tree of its language, every other page to the canonical tree.
     """
+    wiki_languages = list(languages) or ["en"]
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.exists():
@@ -233,16 +246,20 @@ def build_search_db(
         rows: list[tuple[object, ...]] = []
         scopes: dict[str, str | None] = {}
         for page in page_list:
-            rows.extend(_page_rows(page))
+            tree = page.frontmatter.lang if page.is_mirror else wiki_languages[0]
+            rows.extend(_page_rows(page, tree))
             scopes[page.frontmatter.id] = page_scope(page)
             conn.execute(
-                "INSERT INTO pages(page_id, type, path, title, scope) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO pages(page_id, tree, type, path, title, scope, lang) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (
                     page.frontmatter.id,
+                    tree,
                     page.frontmatter.type,
                     page.path,
                     page.frontmatter.title,
                     scopes[page.frontmatter.id],
+                    page.frontmatter.lang,
                 ),
             )
             conn.executemany(
@@ -265,12 +282,13 @@ def build_search_db(
                     block.lang,
                     block.text,
                     scopes.get(block.page_id),
+                    None,
                 )
             )
         conn.executemany(
             "INSERT INTO docs(kind, page_id, path, title, section, anchor, source_id, locator_key, "
-            "sensitivity, status, lang, text, scope) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "sensitivity, status, lang, text, scope, tree) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             rows,
         )
         conn.executemany(
@@ -284,6 +302,7 @@ def build_search_db(
             "rows": str(len(rows)),
             "release_id": release_id or "",
             "audience": audience or "",
+            "languages": ",".join(wiki_languages),
         }
         conn.executemany("INSERT INTO meta(key, value) VALUES (?, ?)", sorted(meta.items()))
         if fts:
@@ -307,6 +326,7 @@ class _Row:
     source_id: str | None
     locator_key: str | None
     text: str
+    lang: str | None = None
 
 
 class SearchIndex:
@@ -320,6 +340,11 @@ class SearchIndex:
         columns = {row[1] for row in conn.execute("PRAGMA table_info(docs)")}
         self.has_scopes = "scope" in columns
         """False for a schema 1 database: no row has a scope, ``within`` matches nothing."""
+        self.has_trees = "tree" in columns
+        """False before schema 3: one language, ``lang`` filters nothing."""
+        languages = [code for code in (self.meta.get("languages") or "").split(",") if code]
+        self.languages: list[str] = languages or ["en"]
+        """The wiki languages, canonical first (``["en"]`` before schema 3)."""
         self._synonym_groups = self._load_synonyms()
         self._corpus: Bm25Corpus | None = None
         self._rows: dict[int, _Row] | None = None
@@ -395,9 +420,22 @@ class SearchIndex:
         entity: str | None,
         topic: str | None,
         within: str | None = None,
+        lang: str | None = None,
     ) -> tuple[str, list[object]]:
         clauses: list[str] = []
         params: list[object] = []
+        if self.has_trees:
+            tree = lang if lang in self.languages else self.languages[0]
+            if tree == self.languages[0]:
+                clauses.append("(d.tree IS NULL OR d.tree = ?)")
+                params.append(tree)
+            else:
+                # the mirror, completed by the canonical pages it does not translate
+                clauses.append(
+                    "(d.tree IS NULL OR d.tree = ? OR (d.tree = ? AND d.page_id NOT IN "
+                    "(SELECT page_id FROM pages WHERE tree = ?)))"
+                )
+                params.extend([tree, self.languages[0], tree])
         if kinds:
             clauses.append(f"d.kind IN ({','.join('?' * len(kinds))})")
             params.extend(kinds)
@@ -431,11 +469,14 @@ class SearchIndex:
         topic: str | None = None,
         limit: int = 10,
         within: str | None = None,
+        lang: str | None = None,
     ) -> list[SearchHit]:
         """Ranked hits: synonym-expanded phrases, OR semantics, BM25 (title 3, section 2, text 1).
 
         ``within`` keeps only rows of that scope value (pages carrying it and the blocks of its
-        source pages); company pages have no scope.
+        source pages); company pages have no scope. ``lang`` picks the wiki language tree (the
+        canonical one by default; a mirror language returns the mirror pages, the canonical pages
+        without a mirror and the source blocks).
 
         The FTS5 backend selects candidate rows with ``MATCH``; the BM25 backend matches in
         memory. Both rank with the same scorer, so results are identical.
@@ -445,7 +486,7 @@ class SearchIndex:
         phrases = self.expand(query)
         if not phrases:
             return []
-        where, params = self._filters(kinds, types, entity, topic, within)
+        where, params = self._filters(kinds, types, entity, topic, within, lang)
         with self._lock:
             corpus, rows = self._load_corpus()
             if self.backend == "fts5":
@@ -487,7 +528,7 @@ class SearchIndex:
             docs: list[Bm25Doc] = []
             for record in self._conn.execute(
                 "SELECT rowid, kind, page_id, path, title, section, anchor, source_id, "
-                "locator_key, text FROM docs ORDER BY rowid"
+                "locator_key, text, lang FROM docs ORDER BY rowid"
             ):
                 row = _Row(*record)
                 rows[row.rowid] = row
@@ -518,6 +559,7 @@ class SearchIndex:
             source_id=row.source_id,
             locator_key=row.locator_key,
             score=round(score, 6),
+            lang=row.lang,
         )
 
 

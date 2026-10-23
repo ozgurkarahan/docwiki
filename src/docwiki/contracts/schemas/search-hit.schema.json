@@ -78,6 +78,18 @@
     "score": {
       "title": "Score",
       "type": "number"
+    },
+    "lang": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Lang"
     }
   },
   "required": [

@@ -260,7 +260,7 @@ def test_no_rebuild_without_a_queue(storage: FolderStorage) -> None:
 
 @pytest.mark.parametrize(
     ("stage", "expected"),
-    [("compile", ("compile", 4, "write")), ("site", ("site", 12, "check"))],
+    [("compile", ("compile", 4, "write")), ("site", ("site", 13, "check"))],
 )
 def test_a_changed_document_in_the_wiki_follows_its_run(
     storage: FolderStorage, stage: str, expected: tuple[str, int, str]

@@ -144,7 +144,8 @@ def index(request: pytest.FixtureRequest, tmp_path: Path) -> SearchIndex:
 
 
 def test_meta_and_rows(index: SearchIndex) -> None:
-    assert index.meta["schema"] == "2"
+    assert index.meta["schema"] == "3"
+    assert index.meta["languages"] == "en" and index.languages == ["en"]
     assert index.meta["release_id"] == RELEASE
     assert index.meta["audience"] == "public"
     assert index.meta["tokenizer"] == "unicode61 remove_diacritics 2"

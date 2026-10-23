@@ -142,7 +142,8 @@ def test_the_pack_declares_four_views(build: ViewBuild) -> None:
         "views/doubles-affectations.md",
     ]
     for page in build.pages:
-        assert "computed by code, not by a language model" in page.body
+        # the batiment wiki is French (v1.7, ADR 0012)
+        assert "calculés par code, pas par un modèle de langage" in page.body
         assert "FICTIONAL SAMPLE" in page.body
 
 

@@ -37,6 +37,10 @@ STAGES: tuple[tuple[str, str], ...] = (
     ("indexes", "Writes the home page, indexes, glossary, change log and search index."),
     ("agentkit", "Writes the agent guide and skills from reviewed templates."),
     ("evidence", "Saves the exact passage behind every citation, with the original page image."),
+    (
+        "translate",
+        "Writes the wiki in its other languages; numbers, citations and trade terms are checked.",
+    ),
     ("verify", "Runs the quality gates: a blocking failure stops the release."),
     ("site", "Builds this website from the candidate release."),
     ("publish", "Publishes the release atomically: the site switches to it within a minute."),

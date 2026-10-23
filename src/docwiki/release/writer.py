@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import shutil
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -74,6 +74,7 @@ class ReleaseWriter:
         versions: VersionInfo,
         inputs: ReleaseInputs | None = None,
         run_id: str | None = None,
+        wiki_languages: Sequence[str] = ("en",),
     ) -> None:
         if created_at.tzinfo is None:
             raise ValueError("created_at must be timezone-aware")
@@ -82,6 +83,8 @@ class ReleaseWriter:
         self.versions = versions
         self.inputs = inputs or ReleaseInputs()
         self.run_id = run_id
+        self.wiki_languages = list(wiki_languages) or ["en"]
+        """The wiki languages, canonical first (v1.7, ADR 0012)."""
         self.release_id = ReleaseManifest.compute_release_id(
             created_at=self.created_at,
             audience=audience,
@@ -153,6 +156,8 @@ class ReleaseWriter:
         """``catalog.json`` at the release root and an identical copy in ``wiki/``."""
         if catalog.release_id != self.release_id or catalog.audience != self.audience:
             raise ValueError("catalog release_id/audience must match the release")
+        if catalog.wiki_languages != self.wiki_languages:
+            raise ValueError("catalog wiki_languages must match the release")
         text = catalog.to_json()
         self.write_text(ReleaseFiles.CATALOG, text)
         self.write_text(f"{ReleaseFiles.WIKI_DIR}/{ReleaseFiles.CATALOG}", text)
@@ -179,6 +184,7 @@ class ReleaseWriter:
             release_id=self.release_id,
             audience=self.audience,
             use_fts5=use_fts5,
+            languages=self.wiki_languages,
         )
 
     def finalize(
@@ -197,6 +203,7 @@ class ReleaseWriter:
             counts=dict(sorted((counts or {}).items())),
             gates=list(gates),
             files=hash_release_files(self.root),
+            wiki_languages=self.wiki_languages,
         )
         data = manifest.to_json().encode("utf-8")
         (self.root / ReleaseFiles.MANIFEST).write_bytes(data)

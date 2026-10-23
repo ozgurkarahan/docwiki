@@ -174,24 +174,34 @@ class ReleaseReader:
     def list_pages(self, page_type: str | None = None) -> list[CatalogPage]:
         return [page for page in self.catalog.pages if page_type is None or page.type == page_type]
 
-    def page_entry(self, page: str) -> CatalogPage:
-        """Catalog entry by page id or wiki path."""
-        entry = self.catalog.page_by_id().get(page) or self.catalog.page_by_path().get(page)
+    @property
+    def wiki_languages(self) -> list[str]:
+        """The wiki languages, canonical first (v1.7; ``["en"]`` for older releases)."""
+        return list(self.catalog.wiki_languages)
+
+    def page_entry(self, page: str, lang: str | None = None) -> CatalogPage:
+        """Catalog entry by page id or wiki path. ``lang`` picks the mirror page of that
+        language (v1.7) when there is one, else the canonical page; by default an id names the
+        canonical page and a path the page at that path."""
+        catalog = self.catalog
+        entry = catalog.page_by_id(lang).get(page) or catalog.page_by_path().get(page)
         if entry is None:
             raise KeyError(f"unknown page: {page!r}")
+        if lang is not None and entry.lang != lang and entry.translation_of is None:
+            entry = catalog.page_by_id(lang).get(entry.id, entry)
         return entry
 
-    def read_page_text(self, page: str) -> str:
-        return self.content_file(self.page_entry(page).path).read_text(encoding="utf-8")
+    def read_page_text(self, page: str, lang: str | None = None) -> str:
+        return self.content_file(self.page_entry(page, lang).path).read_text(encoding="utf-8")
 
-    def read_page(self, page: str) -> Page:
-        entry = self.page_entry(page)
-        return Page.parse(self.read_page_text(page), entry.path)
+    def read_page(self, page: str, lang: str | None = None) -> Page:
+        entry = self.page_entry(page, lang)
+        return Page.parse(self.content_file(entry.path).read_text(encoding="utf-8"), entry.path)
 
-    def read_section(self, page: str, section: str) -> str:
+    def read_section(self, page: str, section: str, lang: str | None = None) -> str:
         """Markdown of one section, matched by heading text (case-insensitive) or anchor."""
         wanted = section.strip().lstrip("#").strip()
-        for item in split_sections(self.read_page(page).body):
+        for item in split_sections(self.read_page(page, lang).body):
             if item.heading is None:
                 continue
             if item.anchor == wanted or item.heading.casefold() == wanted.casefold():

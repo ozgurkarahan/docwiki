@@ -3,7 +3,7 @@
 // the keyed row plan of the live updates and the sentences announced in the polite region.
 // No imports and no DOM: unit-tested directly with Node (tests/site/test_pipeline_text.py).
 
-/** The 13 stages, in order: same as `STAGES` in src/docwiki/site/process_page.py. */
+/** The 14 stages, in order: same as `STAGES` in src/docwiki/site/process_page.py. */
 export const STAGES = [
   "discover",
   "extract",
@@ -15,6 +15,7 @@ export const STAGES = [
   "indexes",
   "agentkit",
   "evidence",
+  "translate",
   "verify",
   "site",
   "publish",
@@ -22,7 +23,7 @@ export const STAGES = [
 
 export type Phase = "read" | "file" | "write" | "check"
 
-/** The business view of the 13 stages (the portal's `phase` of a document). */
+/** The business view of the 14 stages (the portal's `phase` of a document). */
 export const PHASES: readonly { key: Phase; word: string; stages: readonly string[] }[] = [
   { key: "read", word: "Read", stages: ["discover", "extract"] },
   { key: "file", word: "File", stages: ["classify"] },
@@ -31,7 +32,11 @@ export const PHASES: readonly { key: Phase; word: string; stages: readonly strin
     word: "Write",
     stages: ["compile", "entities", "topics", "links", "indexes", "agentkit"],
   },
-  { key: "check", word: "Check and publish", stages: ["evidence", "verify", "site", "publish"] },
+  {
+    key: "check",
+    word: "Check and publish",
+    stages: ["evidence", "translate", "verify", "site", "publish"],
+  },
 ]
 
 export type PhaseMark = "done" | "current" | "todo" | "failed"
@@ -69,7 +74,7 @@ export function asPhase(value: unknown): Phase | null {
   return PHASES.some((phase) => phase.key === value) ? (value as Phase) : null
 }
 
-/** The phase of a stage name, or of a 1-based step out of the 13. */
+/** The phase of a stage name, or of a 1-based step out of the 14. */
 export function phaseOfStage(stage: string | null, step: number | null = null): Phase | null {
   const name = stage ?? (step !== null && step >= 1 ? (STAGES[step - 1] ?? null) : null)
   if (!name) return null

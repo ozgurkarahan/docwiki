@@ -281,7 +281,7 @@ def test_source_state_shard() -> None:
         SourceState.model_validate({**state.model_dump(by_alias=True), "deleted": True})
     with pytest.raises(ValidationError):
         SourceState.model_validate(
-            {**state.model_dump(by_alias=True), "stages": {"translate": {"status": "done"}}}
+            {**state.model_dump(by_alias=True), "stages": {"teleport": {"status": "done"}}}
         )
 
 
@@ -385,7 +385,7 @@ def test_gate_results_fold_violations() -> None:
         Violation(gate="G05", code="bare-url", severity="warning", message="w"),
     ]
     results = {result.gate: result for result in gate_results(violations, skipped=["G04"])}
-    assert len(results) == len(GATES) == 16
+    assert len(results) == len(GATES) == 17
     assert results["G02"].status == "fail" and results["G02"].blocks_publish
     assert results["G13"].status == "warn" and not results["G13"].blocks_publish
     assert results["G15"].status == "warn"

@@ -135,7 +135,8 @@
             "G13",
             "G14",
             "G15",
-            "G16"
+            "G16",
+            "G17"
           ],
           "title": "Gate",
           "type": "string"
@@ -511,6 +512,7 @@
             "indexes",
             "agentkit",
             "evidence",
+            "translate",
             "verify",
             "site",
             "publish"
@@ -576,6 +578,37 @@
           },
           "title": "Errors",
           "type": "array"
+        },
+        "llm_calls": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Llm Calls",
+          "type": "integer"
+        },
+        "input_tokens": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Input Tokens",
+          "type": "integer"
+        },
+        "output_tokens": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Output Tokens",
+          "type": "integer"
+        },
+        "cost": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost"
         }
       },
       "required": [
@@ -665,7 +698,8 @@
             "G13",
             "G14",
             "G15",
-            "G16"
+            "G16",
+            "G17"
           ],
           "title": "Gate",
           "type": "string"
@@ -851,6 +885,7 @@
             "indexes",
             "agentkit",
             "evidence",
+            "translate",
             "verify",
             "site",
             "publish"

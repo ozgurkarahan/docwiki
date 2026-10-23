@@ -206,7 +206,7 @@ def test_process_runs_come_from_the_work_reports(storage: FolderStorage) -> None
         ("pending", None, False, False, False, ("queued", None)),
         ("pending", "compile", False, False, False, ("processing", 4)),
         # Every stage done, but the release that carries it is not out yet.
-        ("done", None, False, False, False, ("processing", 13)),
+        ("done", None, False, False, False, ("processing", 14)),
         ("done", None, True, False, False, ("in_wiki", None)),
         ("done", None, True, False, True, ("superseded", None)),
         ("done", None, True, True, False, ("held_back", None)),
@@ -235,7 +235,7 @@ def test_a_done_document_outside_the_release_is_still_processing(tmp_path: Path)
     service = _service(storage)
     service._current_catalog = lambda: (None, None)  # type: ignore[method-assign]
     row = _rows(service.process(owner=True))[DONE_PATH]
-    assert (row["state"], row["step"], row["steps"]) == ("processing", 13, 13)
+    assert (row["state"], row["step"], row["steps"]) == ("processing", 14, 14)
     assert row["page_url"] is None and row["title"] is None
 
 

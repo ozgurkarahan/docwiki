@@ -77,6 +77,7 @@ StageName = Literal[
     "indexes",
     "agentkit",
     "evidence",
+    "translate",
     "verify",
     "site",
     "publish",
