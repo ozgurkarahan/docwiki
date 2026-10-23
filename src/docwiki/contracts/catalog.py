@@ -26,6 +26,7 @@ from docwiki.contracts.pages import (
     QueryFrontmatter,
     SourceFrontmatter,
     TopicFrontmatter,
+    ViewFrontmatter,
 )
 
 __all__ = [
@@ -138,7 +139,8 @@ def catalog_page_for(frontmatter: Any, path: str) -> CatalogPage:
         topics = list(frontmatter.topics)
         status = frontmatter.status
     elif isinstance(
-        frontmatter, EntityFrontmatter | TopicFrontmatter | QueryFrontmatter | HubFrontmatter
+        frontmatter,
+        EntityFrontmatter | TopicFrontmatter | QueryFrontmatter | HubFrontmatter | ViewFrontmatter,
     ):
         sources = list(frontmatter.sources)
     scope = getattr(frontmatter, "scope", None)

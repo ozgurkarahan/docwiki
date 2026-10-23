@@ -44,7 +44,7 @@ __all__ = [
 ]
 
 PageType = Literal[
-    "source", "entity", "topic", "hub", "index", "query", "meta", "glossary", "log"
+    "source", "entity", "topic", "hub", "view", "index", "query", "meta", "glossary", "log"
 ]
 Sensitivity = Literal["public", "internal", "restricted"]
 SourceStatus = Literal["current", "superseded", "withdrawn"]

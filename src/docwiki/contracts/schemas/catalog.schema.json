@@ -82,6 +82,7 @@
             "entity",
             "topic",
             "hub",
+            "view",
             "index",
             "query",
             "meta",

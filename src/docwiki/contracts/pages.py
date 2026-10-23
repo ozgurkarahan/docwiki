@@ -39,6 +39,7 @@ from docwiki.contracts.ids import (
     SOURCE_ID_RE,
     format_entity_id,
     format_topic_id,
+    format_view_id,
     is_entity_id,
 )
 from docwiki.contracts.locators import Locator, locator_key
@@ -63,6 +64,7 @@ __all__ = [
     "SkillFrontmatter",
     "SourceFrontmatter",
     "TopicFrontmatter",
+    "ViewFrontmatter",
     "parse_frontmatter",
 ]
 
@@ -248,6 +250,29 @@ class HubFrontmatter(_BaseFrontmatter):
         return self
 
 
+class ViewFrontmatter(_BaseFrontmatter):
+    """A computed view (v1.7, ADR 0011): rows selected by the pack's read-only SQL over the
+    tables of the current documents of some types, computed by code and cited row by row;
+    ``view:<slug>`` at ``views/<slug>.md``. ``sources`` are the documents whose tables the view
+    reads, ``rows`` the number of result rows."""
+
+    type: Literal["view"] = "view"
+    view_slug: Kebab
+    sources: list[SourceId] = []
+    rows: Annotated[int, Field(ge=0)]
+
+    @field_validator("sources")
+    @classmethod
+    def _sources(cls, value: list[str]) -> list[str]:
+        return _sorted_unique(value, "sources")
+
+    @model_validator(mode="after")
+    def _consistency(self) -> Self:
+        if self.id != format_view_id(self.view_slug):
+            raise ValueError("view page id must be 'view:<view_slug>'")
+        return self
+
+
 class QueryFrontmatter(_BaseFrontmatter):
     type: Literal["query"] = "query"
     question: NonEmptyStr
@@ -308,6 +333,7 @@ Frontmatter = Annotated[
     | EntityFrontmatter
     | TopicFrontmatter
     | HubFrontmatter
+    | ViewFrontmatter
     | QueryFrontmatter
     | IndexFrontmatter
     | MetaFrontmatter

@@ -28,6 +28,7 @@ __all__ = [
     "format_query_id",
     "format_release_id",
     "format_topic_id",
+    "format_view_id",
     "hub_page_path",
     "index_page_path",
     "is_entity_id",
@@ -40,6 +41,7 @@ __all__ = [
     "parse_query_id",
     "parse_release_id",
     "parse_topic_id",
+    "parse_view_id",
     "proposal_id_for",
     "query_page_path",
     "release_id_for",
@@ -48,6 +50,7 @@ __all__ = [
     "source_page_path",
     "source_slug",
     "topic_page_path",
+    "view_page_path",
 ]
 
 KEBAB_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -73,6 +76,8 @@ RESERVED_ENTITY_TYPES = frozenset(
         "src",
         "topic",
         "topics",
+        "view",
+        "views",
     }
 )
 """Entity type keys that would clash with page-id namespaces or wiki folders."""
@@ -288,6 +293,20 @@ def parse_hub_id(hub_id: str) -> tuple[str, str]:
     return folder, key
 
 
+def format_view_id(slug: str) -> str:
+    """``view:<slug>``: a computed view of the pack's ``views.yaml`` (v1.7, ADR 0011)."""
+    if not is_kebab(slug):
+        raise ValueError(f"invalid view slug: {slug!r}")
+    return f"view:{slug}"
+
+
+def parse_view_id(view_id: str) -> str:
+    prefix, sep, slug = view_id.partition(":")
+    if prefix != "view" or not sep or not is_kebab(slug):
+        raise ValueError(f"view id must look like 'view:<slug>': {view_id!r}")
+    return slug
+
+
 def format_query_id(day: date, slug: str) -> str:
     if not is_kebab(slug):
         raise ValueError(f"invalid query slug: {slug!r}")
@@ -319,6 +338,10 @@ def topic_page_path(topic_id: str) -> str:
 def hub_page_path(hub_id: str) -> str:
     folder, key = parse_hub_id(hub_id)
     return f"{folder}/{key}.md"
+
+
+def view_page_path(view_id: str) -> str:
+    return f"views/{parse_view_id(view_id)}.md"
 
 
 def query_page_path(query_id: str) -> str:

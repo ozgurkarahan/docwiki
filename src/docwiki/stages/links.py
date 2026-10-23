@@ -47,6 +47,7 @@ from docwiki.contracts.pages import (
     QueryFrontmatter,
     SourceFrontmatter,
     TopicFrontmatter,
+    ViewFrontmatter,
 )
 from docwiki.contracts.safety import sanitize_markdown
 from docwiki.domain.models import DomainPack
@@ -505,13 +506,17 @@ def _page_links(page: Page, label: str, targets: Sequence[Page]) -> list[str]:
     return [f"- {plural(label, len(ordered))}: {links}"]
 
 
-def _related_lines(page: Page, by_id: Mapping[str, Page], pack: DomainPack) -> list[str]:
+def _related_lines(
+    page: Page, by_id: Mapping[str, Page], pack: DomainPack, views: Sequence[Page] = ()
+) -> list[str]:
     fm = page.frontmatter
     lines: list[str] = []
     if isinstance(fm, SourceFrontmatter):
         entities = [by_id[entity_id] for entity_id in fm.entities if entity_id in by_id]
         lines += _entity_lines(page, entities, pack)
         lines += _page_links(page, "Topic", [by_id[t] for t in fm.topics if t in by_id])
+        reading = [view for view in views if fm.id in getattr(view.frontmatter, "sources", [])]
+        lines += _page_links(page, "Computed view", reading)
         for label, ids in (("Supersedes", fm.supersedes), ("Superseded by", fm.superseded_by)):
             targets = sorted(
                 (by_id[source_id] for source_id in ids if source_id in by_id),
@@ -643,9 +648,11 @@ def apply_links(pages: Sequence[Page], pack: DomainPack, *, autolink: bool = Tru
             for page in content
         ]
     by_id = {page.frontmatter.id: page for page in content}
+    # computed views pass through unchanged; the source pages they read link to them
+    views = [page for page in pages if isinstance(page.frontmatter, ViewFrontmatter)]
     with_related: list[Page] = []
     for page in content:
-        lines = _related_lines(page, by_id, pack)
+        lines = _related_lines(page, by_id, pack, views)
         if lines and page.frontmatter.type != "query":
             block = "\n".join([f"## {RELATED_HEADING}", "", *lines])
             page = Page(
