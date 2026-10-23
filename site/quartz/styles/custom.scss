@@ -561,7 +561,8 @@ a.docwiki-story-card {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas:
-      "number value"
+      "number tab"
+      ". value"
       ". detail";
     column-gap: 0.5rem;
     align-content: center;
@@ -573,6 +574,11 @@ a.docwiki-story-card {
 
     .docwiki-story-value {
       grid-area: value;
+    }
+
+    .docwiki-story-tab {
+      grid-area: tab;
+      align-self: baseline;
     }
 
     .docwiki-story-detail {
