@@ -2708,6 +2708,12 @@ td > a.docwiki-target {
   justify-content: center;
 }
 
+// Every link that starts a table cell (a document title in the dashboard's cards) is a 24 px
+// target too, not only the counts.
+article td > a {
+  @include docwiki-target;
+}
+
 // ISO days in the data tables' cells (the transformer wraps them) never break at their hyphens.
 .docwiki-nowrap {
   white-space: nowrap;
