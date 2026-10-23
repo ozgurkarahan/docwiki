@@ -198,6 +198,17 @@
       "violations": 0,
       "details": [],
       "message": "<= 10 % sources quarantined"
+    },
+    {
+      "gate": "G16",
+      "name": "locked-vocabulary",
+      "blocking": true,
+      "status": "skipped",
+      "metric": null,
+      "threshold": null,
+      "violations": 0,
+      "details": [],
+      "message": "No wiki page renders a locked trade term with a banned English equivalent"
     }
   ],
   "files": {
@@ -242,7 +253,7 @@
       "size": 925
     },
     "search.db": {
-      "sha256": "0d17943566521602fcf9c2bacf11fa0c021d12b37f97afec5162f77eb59f6ba8",
+      "sha256": "fb8d0b23f21d4a5e94a67ff617dafd2d51ec02abbcbe0cf93ec6bc03f5563c9a",
       "size": 106496
     },
     "tables/src-86eabe3d6d0d/index.json": {
@@ -310,8 +321,8 @@
       "size": 2582
     },
     "wiki/_meta/quality.md": {
-      "sha256": "e940fced9e093884e06decf2bfce9a27f226c42b9f3930b744a44f05f1ee8f4f",
-      "size": 848
+      "sha256": "839eadc24cfee7de9113add0628949c829acfd038d46ae8d79be6dc165511011",
+      "size": 886
     },
     "wiki/catalog.json": {
       "sha256": "3a14143e20bf1de5f5db99bd9533e109332e73c46bc3e5a3810cd75228425b93",

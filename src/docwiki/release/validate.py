@@ -1,7 +1,8 @@
 """``validate_release``: structural checks of a release, reused by the quality gates.
 
 Violations carry the gate they belong to (pipeline §7). Gates that need pipeline state (G04
-quote verification, G15 extraction, G10 without pack knowledge) are left to the ``verify`` stage.
+quote verification, G15 extraction, G10 and G16 without pack knowledge) are left to the ``verify``
+stage.
 Structural/integrity problems of machine files (manifest, catalog, pointer, tables index, search
 database) are reported under G01 (schema validity).
 """
@@ -1125,6 +1126,78 @@ def _check_orphans(state: _State, inbound: dict[str, set[str]], threshold: float
         )
 
 
+_QUOTED_RE = re.compile(r'"[^"\n]*"|“[^”\n]*”|«[^»\n]*»')
+_BLOCKQUOTE_RE = re.compile(r"^\s*>")
+_TITLE_LINE_RE = re.compile(r"^title\s*:")
+
+
+def _rendering_pattern(rendering: str) -> re.Pattern[str] | None:
+    """Whole-word, case-insensitive pattern of a banned rendering (plural ``s``/``es`` allowed).
+
+    Words of a multi-word rendering may be separated by any whitespace; a hyphen is literal, so
+    ``hand-over`` matches only when it is listed itself.
+    """
+    words = rendering.split()
+    if not words:
+        return None
+    phrase = r"\s+".join(re.escape(word) for word in words)
+    return re.compile(rf"(?<!\w){phrase}(?:e?s)?(?!\w)", re.IGNORECASE)
+
+
+def _prose(line: str) -> str:
+    """The part of a line in the wiki's own words: blockquotes and quoted text removed."""
+    if _BLOCKQUOTE_RE.match(line):
+        return ""
+    return _QUOTED_RE.sub(" ", line)
+
+
+def _check_locked_vocabulary(state: _State, locked_terms: Mapping[str, Sequence[str]]) -> None:
+    """G16: no page title or body renders a locked trade term with a banned English equivalent.
+
+    Text quoted from the documents (blockquotes, text between double quotes) is not checked. The
+    quality report is not checked either: it lists the findings themselves.
+    """
+    patterns: list[tuple[str, str, re.Pattern[str]]] = []
+    for term, renderings in locked_terms.items():
+        for rendering in (renderings,) if isinstance(renderings, str) else renderings:
+            pattern = _rendering_pattern(rendering)
+            if pattern is not None:
+                patterns.append((term, rendering.strip(), pattern))
+    if not patterns:
+        return
+    files = dict(state.lay.wiki_files())
+    for rel, page in sorted(state.pages.items()):
+        if rel == WikiFiles.QUALITY:
+            continue
+        shown = state.wiki_display(rel)
+        title_line: int | None = None
+        file = files.get(rel)
+        if file is not None:
+            head = state.read(file).decode("utf-8", errors="ignore").split("\n")
+            for number, raw in enumerate(head[: state.offsets.get(rel, 0)], start=1):
+                if _TITLE_LINE_RE.match(raw):
+                    title_line = number
+                    break
+        lines: list[tuple[int | None, str]] = [(title_line, _prose(page.frontmatter.title))]
+        offset = state.offsets.get(rel, 0)
+        lines += [
+            (offset + number, _prose(raw))
+            for number, raw in enumerate(page.body.split("\n"), start=1)
+        ]
+        for line, text in lines:
+            if not text.strip():
+                continue
+            for term, rendering, pattern in patterns:
+                if pattern.search(text):
+                    state.add(
+                        "G16",
+                        "banned-rendering",
+                        f'"{rendering}" is a banned rendering of the locked term "{term}"',
+                        shown,
+                        line,
+                    )
+
+
 def validate_release(
     path: str | Path,
     *,
@@ -1133,13 +1206,15 @@ def validate_release(
     audience: str | None = None,
     orphan_threshold: float = 0.05,
     glossary_seeded: bool | None = None,
+    locked_terms: Mapping[str, Sequence[str]] | None = None,
 ) -> list[Violation]:
     """Validate a release folder, a portable wiki folder or a folder holding ``current.json``.
 
     Paths in violations are relative to the validated folder (``wiki/…`` in a release folder,
     plain wiki paths and ``.docwiki/…`` in a portable folder). ``require_manifest=False``
     validates a candidate release before ``finalize`` (then pass ``audience``). ``canaries``
-    enables G08. ``glossary_seeded=True`` enables G10.
+    enables G08. ``glossary_seeded=True`` enables G10. ``locked_terms`` (``{locked term:
+    [banned renderings]}``, from the domain pack) enables G16.
     """
     base = Path(path)
     state = _State(root=base)
@@ -1199,6 +1274,8 @@ def validate_release(
     _check_search_db(state)
     _check_tables(state, source_ids)
     _check_orphans(state, inbound, orphan_threshold)
+    if locked_terms:
+        _check_locked_vocabulary(state, locked_terms)
     if glossary_seeded and state.catalog is not None and not state.catalog.glossary:
         state.add(
             "G10",

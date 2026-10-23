@@ -114,6 +114,7 @@ Queries expand terms with glossary synonyms before matching.
 | G13 orphans | ≤ 5 % of pages without inbound links | warning |
 | G14 skills | Skill projections identical and valid (name, description, size limits) | yes |
 | G15 extraction | ≤ 10 % sources quarantined | warning |
+| G16 locked-vocabulary | No page title or body renders a locked trade term of the domain pack with one of its banned English renderings (whole words, case-insensitive; blockquotes and text in double quotes are not checked); skipped when the pack locks no term | yes |
 
 Gate results are written to `_meta/quality.md` and `manifest.json`. A failing blocking gate stops
 the publish; the previous release stays current.

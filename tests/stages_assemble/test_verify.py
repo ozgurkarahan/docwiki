@@ -1,4 +1,4 @@
-"""Stage ``verify``: pipeline gates (G04, G08, G10, G15), canaries and the quality page."""
+"""Stage ``verify``: pipeline gates (G04, G08, G10, G15, G16), canaries and the quality page."""
 
 from __future__ import annotations
 
@@ -84,6 +84,7 @@ def test_g04_thresholds_on_the_mock_release(citations, expected):
     gates = {gate.gate: gate for gate in result.gates}
     assert gates["G04"].status == expected
     assert gates["G08"].status == "skipped" and gates["G10"].status == "skipped"
+    assert gates["G16"].status == "skipped"
     assert result.passed is (expected != "fail")
 
 
