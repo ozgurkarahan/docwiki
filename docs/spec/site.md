@@ -99,15 +99,20 @@ outside an allowlist (the repository URL and the site's own host), and the injec
 - `/pipeline` is the second of the three header tabs (① Documents · ② Pipeline · ③ Wiki). It
   leads with the owner's box, then the live view filled from `GET /api/process` (DOM nodes and
   `textContent` only, site-absolute links only), then the 13 technical steps in a disclosure.
-- **Four phases.** Every document row shows one line of four phases, Read → File → Write → Check
-  and publish (discover, extract · classify · compile to agentkit · evidence to publish), each
-  with a shape, a word and a colour: ● done, ◐ in progress, ○ not started. A processing document
-  has the phases before its `phase` done; a document in the release has all four done; received
-  and queued have none started; held back, failed and removed have no bar. A visually hidden
-  text says it ("Phase 3 of 4: Write, step 4/13 compile").
+- **Four phases.** Under each document's title (the status column stays narrow) one line of four
+  phases, Read → File → Write → Check and publish (discover, extract · classify · compile to
+  agentkit · evidence to publish), each with a shape, a word and a colour: ● done, ◐ in progress,
+  ○ not started, ✕ failed. A processing document has the phases before its `phase` done; a
+  document in the release has all four done; received and queued have none started; a failed one
+  is failed at the phase of its stage (Read when unknown); held back and removed have no bar. A
+  visually hidden text says it ("Phase 3 of 4: Write, step 4/13 compile").
 - **Follow this document.** A disclosure button per row (`aria-expanded`) opens the document's
-  journey under it: the original, its document page ("Pages and full text"), its status, the wiki
-  pages its last published run added, changed or removed (`last_change`), and its wiki page.
+  journey under it: the original as in the register ("Original ↗" in a new tab, "Download .eml",
+  or "Original not published", from `original_url`) with its path, its document page ("Pages and
+  full text"), its status, the wiki pages its last recorded run added or removed (chips) or
+  changed (`last_change`; "No recorded run changed it" without one), and its wiki page. When that
+  run made the current release, "and n more" links to "What changed in this release"
+  (`#docwiki-what-changed`).
 - **What changed in this release.** After the documents: the pages added, changed and removed and
   the contradictions opened and closed by the run of the current release (`runs[].changes`), or
   "This release rebuilt the site; no page changed." Lists show at most 10 items, then "and n

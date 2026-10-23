@@ -77,11 +77,13 @@ def test_phase_marks() -> None:
           m.phaseMarks("received", null),
           m.phaseMarks("queued", null),
           m.phaseMarks("failed", null),
+          m.phaseMarks("failed", null, null, "compile"),
+          m.phaseMarks("failed", null, 12, null),
           m.phaseMarks("held_back", null),
           m.phaseMarks("removed", null),
         ]"""
     )
-    done, current, todo = "done", "current", "todo"
+    done, current, todo, failed = "done", "current", "todo", "failed"
     assert result == [
         [done, done, current, todo],
         [current, todo, todo, todo],
@@ -92,7 +94,10 @@ def test_phase_marks() -> None:
         [done] * 4,
         [todo] * 4,
         [todo] * 4,
-        None,
+        # A failed document stops at its stage's phase; Read when the stage is unknown.
+        [failed, todo, todo, todo],
+        [done, done, failed, todo],
+        [done, done, done, failed],
         None,
         None,
     ]
@@ -107,6 +112,8 @@ def test_phase_text_and_stage_lookup() -> None:
           m.phaseText("in_wiki", null),
           m.phaseText("queued", null),
           m.phaseText("failed", null),
+          m.phaseText("failed", null, null, 13, "compile"),
+          m.phaseText("held_back", null),
           m.phaseOfStage("agentkit"), m.phaseOfStage(null, 10), m.phaseOfStage("nope"),
           m.asPhase("write"), m.asPhase("publish"),
         ]"""
@@ -117,6 +124,8 @@ def test_phase_text_and_stage_lookup() -> None:
         "Phase 2 of 4: File",
         "All 4 phases done",
         "Not started: 4 phases to go",
+        "Failed at phase 1 of 4: Read",
+        "Failed at phase 3 of 4: Write",
         "",
         "write",
         "check",
@@ -135,7 +144,7 @@ def test_last_change_and_release_changes_are_checked() -> None:
               {title: "Planning PLN-2026-003", url: "/sources/pln-2026-003", change: "changed",
                type: "source"},
               {title: "Old page", url: "/topics/old", change: "removed", type: "topic"},
-              {title: "Evil", url: "https://example.invalid/x", change: "added", type: "entity"},
+              {title: "Evil", url: "https://docs.example.org/x", change: "added", type: "entity"},
               {title: "Odd", url: "/x", change: "renamed"},
               {url: "/no-title", change: "added"},
             ],
@@ -143,7 +152,10 @@ def test_last_change_and_release_changes_are_checked() -> None:
           oddChange: m.parseLastChange({change: "exploded", pages: "no"}),
           none: m.parseLastChange(null),
           changes: m.parseChanges({
-            added: [{title: "A", url: "/a", type: "entity"}, {title: "B", url: "//host/b"}],
+            added: [
+              {title: "A", url: "/a", type: "entity"},
+              {title: "B", url: "//docs.example.org/b"},
+            ],
             changed: [], removed: [{title: "C", url: "/c"}],
             contradictions: {opened: [{title: "D", url: "/d"}]},
           }),
@@ -153,6 +165,7 @@ def test_last_change_and_release_changes_are_checked() -> None:
     )
     assert isinstance(result, dict)
     assert result["last"] == {
+        "runId": "r1",
         "finishedAt": "2026-10-22T10:00:00Z",
         "change": "changed",
         "pages": [
@@ -166,7 +179,12 @@ def test_last_change_and_release_changes_are_checked() -> None:
             {"title": "Evil", "url": None, "type": "entity", "change": "added"},
         ],
     }
-    assert result["oddChange"] == {"finishedAt": None, "change": None, "pages": []}
+    assert result["oddChange"] == {
+        "runId": None,
+        "finishedAt": None,
+        "change": None,
+        "pages": [],
+    }
     assert result["none"] is None
     assert result["changes"] == {
         "added": [
@@ -303,4 +321,29 @@ def test_only_real_changes_are_announced() -> None:
             "x.pdf failed",
             "x.pdf was removed",
         ],
+    }
+
+
+def test_journey_original_chips_and_more_link() -> None:
+    result = run(
+        """{
+          originals: [
+            ["planning/a.xlsx", "/evidence/src-1/original.xlsx"],
+            ["mail/b.EML", "/evidence/src-2/original.eml"],
+            ["mail/c.eml", null],
+            ["devis/d.pdf", null],
+          ].map(([path, url]) => m.originalLink(path, url)),
+          chips: ["added", "changed", "removed"].map(m.changeChip),
+          more: [
+            m.moreGoesToRelease({runId: "r8", finishedAt: null, change: null, pages: []}, "r8"),
+            m.moreGoesToRelease({runId: "r7", finishedAt: null, change: null, pages: []}, "r8"),
+            m.moreGoesToRelease({runId: null, finishedAt: null, change: null, pages: []}, null),
+            m.moreGoesToRelease(null, "r8"),
+          ],
+        }"""
+    )
+    assert result == {
+        "originals": ["open", "download", "none", "none"],
+        "chips": [True, False, True],
+        "more": [True, False, False, False],
     }
