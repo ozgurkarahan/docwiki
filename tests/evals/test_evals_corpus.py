@@ -344,12 +344,6 @@ def test_release_catalog_loading(tmp_path: Path, repo_root: Path) -> None:
         ReleaseCatalog.load(tmp_path / "missing")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="samples/fixtures/mock-release keeps the flat raw paths of the corpus before slice F "
-    "(ADR 0011), which no longer exist in samples/corpus; rebuild the fixture (contracts lane) "
-    "with the chantiers/ layout and remove this mark",
-)
 def test_mock_release_sources_map_to_the_corpus(repo_root: Path) -> None:
     """The release fixture and the sample corpus agree on raw paths (no hash in the fixture)."""
     manifest = CorpusManifest.load(repo_root / "samples" / "corpus")
