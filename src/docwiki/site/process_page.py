@@ -4,7 +4,7 @@ tabs, ① Documents · ② Pipeline · ③ Wiki.
 The site build writes them next to the release's content, so they carry the wiki's navigation,
 search and drawer. Their text is static. On ``pipeline`` the live part (the owner's box, each
 document's status, the queue and the runs) is filled on the client from the portal's
-``/api/process`` by the ``Process`` and ``OwnerBox`` components, which also show the 13 technical
+``/api/process`` by the ``Process`` and ``OwnerBox`` components, which also show the 14 technical
 steps of :data:`STAGES` in a disclosure. On ``documents`` the ``Documents`` component lists the
 release's documents.
 

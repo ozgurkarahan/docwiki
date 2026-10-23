@@ -1214,7 +1214,7 @@ document.addEventListener("nav", () => {
   const note = element("p", "docwiki-process-note", T().pipeline.unavailable)
   note.hidden = true
   if (!owner.isConnected) section.append(owner)
-  // The live view comes before the disclosure of the 13 technical steps (Process.tsx).
+  // The live view comes before the disclosure of the 14 technical steps (Process.tsx).
   const steps = section.querySelector<HTMLElement>(".docwiki-process-steps")
   if (steps) steps.before(state, live, note)
   else section.append(state, live, note)

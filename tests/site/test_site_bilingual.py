@@ -165,8 +165,8 @@ def test_ui_strings_in_the_page_language(site: Path) -> None:
     assert "How this wiki is made" in en_home and "Compiled by" in en_home
     # The mirror's home reads like the home page: no listing of its folder.
     assert "page-listing" not in en_home and "page-listing" not in home
-    assert "Les 13 étapes techniques" in page(site, "pipeline")
-    assert "The 13 technical steps" in page(site, "en/pipeline")
+    assert "Les 14 étapes techniques" in page(site, "pipeline")
+    assert "The 14 technical steps" in page(site, "en/pipeline")
     assert "documents dans cette version" in page(site, "documents")
     assert "documents in this release" in page(site, "en/documents")
 

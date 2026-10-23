@@ -2,7 +2,7 @@
 // heading. The page's text is static (docwiki.site.process_page); this section is filled on the
 // client from the portal's /api/process and /api/owner/me, with DOM nodes and textContent only
 // (scripts/process.inline.ts). On a static host those APIs do not exist and the placeholder stays.
-// The 13 technical steps follow in a disclosure. Every language's pipeline page has it.
+// The 14 technical steps follow in a disclosure. Every language's pipeline page has it.
 import { classNames } from "../../util/lang"
 import { QuartzComponent, QuartzComponentConstructor, QuartzComponentProps } from "../types"
 import { pageBase, pageLang, pageStrings, settingsFor } from "./settings"
