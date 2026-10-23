@@ -349,13 +349,14 @@ class ProcessService:
                 "sources": len(catalog.sources) if catalog else None,
                 "pages": len(catalog.pages) if catalog else None,
             }
-        reports, checks, history = self._reports()
+        reports, checks, history, seen_at = self._reports()
         running = reports[0] if reports and reports[0].status == "running" else None
         documents = self._documents(
             catalog,
             audience,
             running,
             released_at=pointer.created_at if pointer is not None else None,
+            seen_at=seen_at,
             originals=self._published_originals(pointer.release_id) if pointer else {},
         )
         counts = Counter(row["status"] for row in documents)
@@ -427,6 +428,7 @@ class ProcessService:
         running: RunReport | None = None,
         *,
         released_at: datetime | None = None,
+        seen_at: datetime | None = None,
         originals: dict[str, str] | None = None,
     ) -> list[dict[str, Any]]:
         blobs = self._list_raw()
@@ -441,7 +443,7 @@ class ProcessService:
         for blob in blobs:
             listed.add(blob.path)
             row = self._row(blob, by_path.get(blob.path), pages, released, audience)
-            if _received_after(row, blob, released_at):
+            if _received_after(row, blob, released_at, seen_at):
                 # A new version of a document of the release: received, not yet in the wiki.
                 row.update(state="received", stage=None, step=None, phase=None)
             name = (originals or {}).get(row["source_id"] or "")
@@ -562,16 +564,20 @@ class ProcessService:
             )
         return public
 
-    def _reports(self) -> tuple[list[RunReport], dict[str, Any], list[RunReport]]:
+    def _reports(
+        self,
+    ) -> tuple[list[RunReport], dict[str, Any], list[RunReport], datetime | None]:
         """The last :data:`RUN_LIMIT` runs that did something, newest first, the no-op checks met
         on the way (``{"count", "last"}``: counted, not listed; ADR 0010), and every published
-        run of the last :data:`RUN_SCAN` (for each document's last change). Finished reports are
-        read once."""
+        run of the last :data:`RUN_SCAN` (for each document's last change), and when the newest
+        finished run (no-op checks included) started: files older than that were seen by the
+        pipeline. Finished reports are read once."""
         store = WorkStore(self.storage)
         runs: list[RunReport] = []
         history: list[RunReport] = []
         checks = 0
         last_check: str | None = None
+        seen_at: datetime | None = None
         for run_id in reversed(store.run_ids()[-RUN_SCAN:]):
             report = self._finished.get(run_id)
             if report is None:
@@ -583,6 +589,8 @@ class ProcessService:
                     continue
                 if report.status != "running":
                     self._finished[run_id] = report
+            if report.status != "running" and seen_at is None:
+                seen_at = report.started_at
             if report.status == "no-op":
                 if len(runs) < RUN_LIMIT:
                     checks += 1
@@ -592,7 +600,7 @@ class ProcessService:
                 runs.append(report)
             if report.release_id is not None and report.page_changes:
                 history.append(report)
-        return runs, {"count": checks, "last": last_check}, history
+        return runs, {"count": checks, "last": last_check}, history, seen_at
 
     def _published_originals(self, release_id: str) -> dict[str, str]:
         """``{source_id: original file name}`` of the originals the release publishes (listed
@@ -812,15 +820,25 @@ def azure_raw_lister(account_url: str, container: str, credential: Any) -> RawLi
     return list_raw
 
 
-def _received_after(row: dict[str, Any], blob: RawBlob, released_at: datetime | None) -> bool:
-    """A document of the release whose file changed after the release was published."""
+def _received_after(
+    row: dict[str, Any],
+    blob: RawBlob,
+    released_at: datetime | None,
+    seen_at: datetime | None,
+) -> bool:
+    """A document of the release whose file changed after the release was published and after
+    the last finished run started (an identical copy uploaded again ends in a no-op run: the
+    document is in the wiki again once that run has seen it)."""
     if not row["in_release"] or row["state"] not in ("in_wiki", "superseded"):
         return False
     if blob.modified is None or released_at is None:
         return False
-    modified = blob.modified if blob.modified.tzinfo else blob.modified.replace(tzinfo=UTC)
-    released = released_at if released_at.tzinfo else released_at.replace(tzinfo=UTC)
-    return modified > released
+
+    def utc(value: datetime) -> datetime:
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+    modified = utc(blob.modified)
+    return modified > utc(released_at) and (seen_at is None or modified > utc(seen_at))
 
 
 def _title(source_id: str, catalog: Catalog | None) -> str | None:
