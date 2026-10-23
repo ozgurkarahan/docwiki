@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import sys
 import uuid
@@ -41,6 +42,8 @@ __all__ = [
 OWNER = str(uuid.UUID(int=0xA11C))
 """Object ID of the signed-in owner in the tests."""
 NEW_PATH = "uploads/fresh-note.md"
+RECEIVED_AT = 1774828800.0
+"""2026-03-30T00:00:00Z: when the raw files of the seeded storage arrived."""
 
 RAW_FILES: dict[str, bytes] = {
     DONE_PATH: b"PK\x03\x04 docx",
@@ -73,4 +76,6 @@ def seed_storage(root: Path, *, sensitivity: str = "internal") -> FolderStorage:
         storage.write_bytes(key, json.dumps(state).encode("utf-8"))
     for path, data in RAW_FILES.items():
         storage.write_bytes(f"raw/{path}", data)
+        # Received before the mock release was published (a later file is a new version).
+        os.utime(storage.path_for(f"raw/{path}"), (RECEIVED_AT, RECEIVED_AT))
     return storage

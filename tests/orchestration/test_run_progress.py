@@ -46,7 +46,7 @@ async def test_a_run_reports_its_documents_and_the_pages_it_changed(harness, cor
     assert rebuilt.report.documents == [] or all(
         document.change == "recompiled" for document in rebuilt.report.documents
     )
-    assert [change for change in rebuilt.report.page_changes if change.change != "changed"] == []
+    assert rebuilt.report.page_changes == []  # the home page's recent changes do not count
 
     # the final report on storage is the finished one, with its changes
     stored = RunReport.from_json(storage.read_bytes(run_report_key(first.run_id)))

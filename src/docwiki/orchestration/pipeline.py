@@ -255,6 +255,8 @@ def hints_key(source_id: str) -> str:
 
 _BOOKKEEPING = frozenset({"meta", "log"})
 """Page types a run writes about itself: not content changes."""
+_BOOKKEEPING_PAGES = frozenset({"index.md", "log.md"})
+"""The home page lists the recent changes and the last run: it changes with every run."""
 
 
 def _contradictions(page: Page) -> list[int]:
@@ -1648,7 +1650,7 @@ class Pipeline:
         seen: set[str] = set()
         for page in pages:
             seen.add(page.path)
-            if page.frontmatter.type in _BOOKKEEPING:
+            if page.frontmatter.type in _BOOKKEEPING or page.path in _BOOKKEEPING_PAGES:
                 continue
             entry = previous.get(page.path)
             now = _contradictions(page)
@@ -1673,7 +1675,7 @@ class Pipeline:
             if path not in seen
             and _check_path(path)
             and not path.startswith("_meta/")
-            and path != "log.md"
+            and path not in _BOOKKEEPING_PAGES
         ]
         return sorted(changes, key=lambda change: (change.change, change.path))
 
