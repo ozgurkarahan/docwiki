@@ -83,7 +83,7 @@ __all__ = [
     "unrelocate_text",
 ]
 
-STAGE_VERSION = "2"
+STAGE_VERSION = "3"
 PROMPT_VERSION = load_prompt("translate").version
 SCHEMA_NAME = "translate_page"
 TRANSLATED_TYPES = frozenset({"source", "entity", "topic"})
@@ -172,6 +172,8 @@ def _mask_terms(
         return replace
 
     masked = _PROTECTED_RE.sub(replacer(None), text)
+    # amounts are written by code ("2 390,00 € HT", with no-break spaces): the model only moves them
+    masked = _AMOUNT_RE.sub(replacer(None), masked)
     for term, pattern in forms:
         masked = pattern.sub(replacer(term), masked)
     return masked, tuple(tokens), tuple(terms)
@@ -417,7 +419,10 @@ def check_translation(source: str, translated: str, vocabulary: Vocabulary) -> l
             problems.append(f"locked terms changed: {', '.join(changed)}")
     for term, rendering, pattern in vocabulary.banned:
         if len(pattern.findall(translated)) > len(pattern.findall(source)):
-            problems.append(f'"{rendering}" is a banned rendering of the locked term "{term}"')
+            problems.append(
+                f'"{rendering}" is a banned rendering of the locked term "{term}": rephrase '
+                f'without the words "{rendering}" (for example "person in charge")'
+            )
     for marker in ("<", ">", "://"):
         if translated.count(marker) > source.count(marker):
             problems.append(f"{marker!r} was added (HTML or a link)")

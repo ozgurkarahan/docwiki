@@ -131,8 +131,11 @@ def test_the_plan_keeps_structure_out_of_the_model(batiment: DomainPack) -> None
     # links, citations and code spans are masked; the summary is a segment
     # (and locked terms: "lot" becomes a placeholder, named in the segment's terms)
     first = next(segment for segment in plan.segments if "Le montant du" in segment.text)
-    assert "réception" not in first.text and first.tokens == ("[^c1]", "réception", "lot")
-    assert first.terms == (None, "réception", "lot")
+    # (amounts, written by code with no-break spaces, are masked as well)
+    amount = "2\u202f390,00\u00a0€\u00a0HT"
+    assert "réception" not in first.text and "€" not in first.text
+    assert first.tokens == ("[^c1]", amount, "réception", "lot")
+    assert first.terms == (None, None, "réception", "lot")
     assert any(segment.text == "Délais" for segment in plan.segments)
     assert plan.segments[-1].id == "summary"
     pose = next(segment for segment in plan.segments if "pose" in segment.text)
