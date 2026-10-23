@@ -28,6 +28,7 @@ from docwiki.stages.translate import (
     check_translation,
     plan_page,
     relocate_page,
+    repair_terms,
     translate_plan,
     translation_digest,
     unrelocate_text,
@@ -91,20 +92,27 @@ def french_page() -> Any:
     return replace_frontmatter(page, lang="fr", summary="Devis de la menuiserie, lot 5.")
 
 
-def echo(prefix: str = "EN: ", change: Any = None) -> Any:
+def sent(request: LlmRequest) -> list[dict[str, Any]]:
+    """The segments a request sent to the model."""
+    payload = request.text.split("BEGIN SEGMENTS ", 1)[1].split("\n", 1)[1]
+    payload = payload.rsplit("\nEND SEGMENTS ", 1)[0]
+    segments: list[dict[str, Any]] = json.loads(payload)["segments"]
+    return segments
+
+
+def echo(prefix: str = "EN: ", change: Any = None, reshape: Any = None) -> Any:
     calls: list[LlmRequest] = []
 
     def handler(request: LlmRequest) -> dict[str, Any]:
         calls.append(request)
-        payload = request.text.split("BEGIN SEGMENTS ", 1)[1].split("\n", 1)[1]
-        payload = payload.rsplit("\nEND SEGMENTS ", 1)[0]
-        segments = json.loads(payload)["segments"]
         out = []
-        for segment in segments:
+        for segment in sent(request):
             text = prefix + segment["text"]
             if change is not None:
                 text = change(len(calls), segment, text)
             out.append({"id": segment["id"], "text": text})
+        if reshape is not None:
+            out = reshape(len(calls), out)
         return {"segments": out}
 
     handler.calls = calls  # type: ignore[attr-defined]
@@ -210,7 +218,7 @@ async def test_translation_and_mirror_page(batiment: DomainPack) -> None:
     result = await translate_plan(llm, plan, batiment)
     assert result.status == "translated" and result.calls == 1 == len(handler.calls)
     request = handler.calls[0]
-    assert request.tier == "fast" and request.prompt_version == "translate-v2"
+    assert request.tier == "fast" and request.prompt_version == "translate-v3"
     assert "from French (fr) into English (en)" in request.text
     # locked terms are placeholders now: the request names them per segment and lists the bans
     assert '"terms"' in request.text and "Never write:" in request.text
@@ -220,7 +228,7 @@ async def test_translation_and_mirror_page(batiment: DomainPack) -> None:
     assert fm.lang == "en" and fm.translation_of == fm.id == page.frontmatter.id
     assert fm.title == page.frontmatter.title and fm.summary.startswith("EN: Devis")
     # "lot" is a locked term: kept, and glossed by code on its first use on the page
-    assert "- EN: Le montant du lot [" in mirror.body and "] 5" in mirror.body
+    assert "- EN: Le montant du lot 5 [" in mirror.body  # after its reference
     assert "[^c1]" in mirror.body
     assert "### EN: Délais" in mirror.body
     # a JSON round trip of the cached result rebuilds the same page
@@ -249,6 +257,122 @@ async def test_the_retry_can_fix_the_translation(batiment: DomainPack) -> None:
     plan = plan_page(french_page(), batiment, "en")
     result = await translate_plan(FakeLlmClient({SCHEMA_NAME: handler}), plan, batiment)
     assert result.status == "translated" and len(handler.calls) == 2
+
+
+# -- a locked term written as its word; partial retries ----------------------------------------
+
+
+def write_term(word: str, term: str = "lot") -> Any:
+    """A model that writes ``word`` where the placeholder of the locked ``term`` was."""
+
+    def change(call: int, segment: dict[str, Any], text: str) -> str:
+        for placeholder, original in (segment.get("terms") or {}).items():
+            if original.lower() == term:
+                text = text.replace(placeholder, word)
+        return text
+
+    return change
+
+
+def lot_segment(batiment: DomainPack) -> Segment:
+    plan = plan_page(french_page(), batiment, "en")
+    return next(segment for segment in plan.segments if "Le montant du" in segment.text)
+
+
+@pytest.mark.parametrize("word", ["lot", "Lot", "LOT"])
+def test_a_locked_term_written_as_its_word_is_put_back(batiment: DomainPack, word: str) -> None:
+    vocabulary = Vocabulary.of(batiment)
+    segment = lot_segment(batiment)
+    assert segment.terms[3] == "lot"
+    english = segment.text.replace("Le montant du ⟦4⟧", f"The amount of {word}")
+    assert check_translation(segment.text, english, vocabulary)  # rejected as written
+    repaired = repair_terms(segment, english, vocabulary)
+    assert repaired == segment.text.replace("Le montant du", "The amount of")
+    assert check_translation(segment.text, repaired, vocabulary) == []
+
+
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [
+        ("du ⟦4⟧", "of the work package"),  # the lot placeholder replaced by another word
+        ("la ⟦3⟧", "the lot"),  # the réception placeholder replaced by another term's word
+        ("du ⟦4⟧ 5", "du ⟦4⟧ 5, a lot of work,"),  # an English "a lot": no placeholder missing
+        ("du ⟦4⟧ 5", "of lot 5 (lot"),  # the word once more than the placeholder it stands for
+    ],
+)
+def test_a_placeholder_replaced_by_anything_else_is_still_rejected(
+    batiment: DomainPack, before: str, after: str
+) -> None:
+    vocabulary = Vocabulary.of(batiment)
+    segment = lot_segment(batiment)
+    assert before in segment.text
+    english = segment.text.replace(before, after)
+    problems = check_translation(
+        segment.text, repair_terms(segment, english, vocabulary), vocabulary
+    )
+    assert any("locked terms changed" in item or "placeholders" in item for item in problems)
+
+
+async def test_a_page_whose_lots_are_written_as_words_is_translated(batiment: DomainPack) -> None:
+    handler = echo(change=write_term("Lot"))
+    plan = plan_page(french_page(), batiment, "en")
+    result = await translate_plan(FakeLlmClient({SCHEMA_NAME: handler}), plan, batiment)
+    assert result.status == "translated" and len(handler.calls) == 1, result.problems
+    mirror = assemble_mirror(plan, result, batiment)
+    gloss = next(term.gloss for term in batiment.terms.terms if term.term == "lot")
+    # the placeholder is back: the canonical word, glossed by code once
+    assert f"Le montant du lot 5 [{gloss}]" in mirror.body
+    assert mirror.frontmatter.summary == "EN: Devis de la menuiserie, lot 5."
+
+
+async def test_only_the_rejected_segments_are_sent_again(batiment: DomainPack) -> None:
+    def change(call: int, segment: dict[str, Any], text: str) -> str:
+        return text.replace("5", "6") if call == 1 and segment["id"] != "summary" else text
+
+    handler = echo(change=change)
+    plan = plan_page(french_page(), batiment, "en")
+    result = await translate_plan(FakeLlmClient({SCHEMA_NAME: handler}), plan, batiment)
+    assert result.status == "translated" and len(handler.calls) == 2
+    first = lot_segment(batiment)
+    assert len(sent(handler.calls[0])) == len(plan.segments)
+    assert [segment["id"] for segment in sent(handler.calls[1])] == [first.id]
+    retry = handler.calls[1].text.split("# Your previous translation was rejected", 1)[1]
+    assert f"- {first.id}: numbers changed" in retry
+    # the segments accepted the first time are kept as they were
+    assert result.texts["summary"] == "EN: " + plan.segments[-1].text
+    assert result.texts[first.id] == "EN: " + first.text
+
+
+async def test_a_merged_batch_is_retried_one_segment_per_call(batiment: DomainPack) -> None:
+    def merge(call: int, out: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if call > 1:
+            return out
+        merged = {"id": out[0]["id"], "text": out[0]["text"] + " " + out[1]["text"]}
+        return [merged, *out[2:]]
+
+    handler = echo(reshape=merge)
+    plan = plan_page(french_page(), batiment, "en")
+    result = await translate_plan(FakeLlmClient({SCHEMA_NAME: handler}), plan, batiment)
+    assert result.status == "translated", result.problems
+    assert len(handler.calls) == 1 + len(plan.segments)
+    assert all(len(sent(request)) == 1 for request in handler.calls[1:])
+    assert "segments were merged" in handler.calls[1].text
+    assert result.texts == {segment.id: "EN: " + segment.text for segment in plan.segments}
+
+
+async def test_a_segment_rejected_twice_keeps_the_whole_page_untranslated(
+    batiment: DomainPack,
+) -> None:
+    def change(call: int, segment: dict[str, Any], text: str) -> str:
+        return text.replace("5", "6") if segment["id"] == "summary" else text
+
+    handler = echo(change=change)
+    plan = plan_page(french_page(), batiment, "en")
+    result = await translate_plan(FakeLlmClient({SCHEMA_NAME: handler}), plan, batiment)
+    assert result.status == "untranslated" and len(handler.calls) == 2
+    assert [segment["id"] for segment in sent(handler.calls[1])] == ["summary"]
+    assert result.problems and all(item.startswith("summary: ") for item in result.problems)
+    assert result.texts == {segment.id: segment.text for segment in plan.segments}
 
 
 # -- relocation --------------------------------------------------------------------------------
@@ -302,3 +426,71 @@ def test_locked_terms_are_masked_for_the_model_and_glossed_once_by_code() -> Non
     # a second segment of the same page gets no gloss again
     again = _unmask(masked, tokens, terms, glosses, glossed)
     assert "[" + gloss not in again
+
+
+# -- gloss placement and the case of locked terms ------------------------------------------------
+
+
+def test_a_gloss_follows_the_whole_reference() -> None:
+    from docwiki.stages.translate import _unmask
+
+    glosses = {"OS": "works order", "lot": "work package", "DPGF": "priced breakdown"}
+    tokens = ("OS", "lot", "DPGF")
+    text = "The ⟦1⟧ n°3 moves ⟦2⟧ 5.2, then ⟦3⟧ DEV-2026-031 indice B of 13/03/2026."
+    out = _unmask(text, tokens, tokens, glosses, set())
+    assert out == (
+        "The OS n°3 [works order] moves lot 5.2 [work package], then "
+        "DPGF DEV-2026-031 indice B [priced breakdown] of 13/03/2026."
+    )
+    # no reference: the gloss follows the term itself
+    assert _unmask("The ⟦1⟧ is late.", ("lot",), ("lot",), glosses, set()) == (
+        "The lot [work package] is late."
+    )
+
+
+def test_a_locked_common_noun_takes_the_case_of_its_place() -> None:
+    from docwiki.stages.translate import _unmask
+
+    tokens = ("lot", "Lot", "OS")
+    terms = ("lot", "lot", "OS")
+    text = "⟦1⟧ 5 is late. The ⟦2⟧ 6 and the ⟦3⟧ are not."
+    assert _unmask(text, tokens, terms, recase=True) == (
+        "Lot 5 is late. The lot 6 and the OS are not."
+    )
+    # the canonical text of an untranslated page is never recased
+    assert _unmask(text, tokens, terms) == "lot 5 is late. The Lot 6 and the OS are not."
+
+
+def test_plurals_of_one_word_terms_are_locked_too(batiment: DomainPack) -> None:
+    from docwiki.stages.translate import _mask_terms
+
+    forms = Vocabulary.of(batiment).forms
+    masked, tokens, terms = _mask_terms("Les lots 02 et 03 et les situations n°1 à n°3.", forms)
+    assert "lots" not in masked and "situations" not in masked
+    assert dict(zip(tokens, terms, strict=True)) == {"lots": "lot", "situations": "situation"}
+    # acronyms are matched as written only
+    assert _mask_terms("Les OSs.", forms)[1] == ()
+
+
+async def test_glosses_never_go_in_a_heading_and_follow_terms_in_link_labels(
+    batiment: DomainPack,
+) -> None:
+    page = french_page()
+    body = page.body.replace("### Délais", "### Délais et OS").replace(
+        "La pose commence",
+        "Voir la [DPGF DEV-2026-031](../sources/dpgf.md) indice B du 13/03/2026. La pose commence",
+    )
+    page = page.model_copy(update={"body": body})
+    plan = plan_page(page, batiment, "en")
+    result = await translate_plan(FakeLlmClient({SCHEMA_NAME: echo()}), plan, batiment)
+    mirror = assemble_mirror(plan, result, batiment)
+    glosses = {term.term: term.gloss for term in batiment.terms.terms}
+    assert "### EN: Délais et OS\n" in mirror.body  # no gloss in the heading
+    # the gloss of a term inside a link label goes after the link and its reference
+    assert (
+        f"[DPGF DEV-2026-031](../sources/dpgf.md) indice B [{glosses['DPGF']}] du 13/03/2026"
+        in mirror.body
+    )
+    # the first use in the text gets the gloss the heading did not
+    assert f"l'OS n°3 [{glosses['OS']}]" in mirror.body
+    assert mirror.body.count(f"[{glosses['OS']}]") == 1

@@ -14,8 +14,11 @@ canonical language, ``wiki/<path>``) and gets an English mirror under ``wiki/en/
   are translated; the title, names, aliases, ids, numbers and every other field are copied;
 * a deterministic check (:func:`check_translation`) compares each segment with its translation:
   placeholders, numbers, dates, document numbers, amounts and locked terms must be identical
-  and no banned rendering of a locked term may appear. A rejected translation is retried once
-  with the problems listed; when it fails again the page is kept untranslated, with the
+  and no banned rendering of a locked term may appear. A locked term the model wrote as its
+  own word where its placeholder was is put back as the placeholder first
+  (:func:`repair_terms`). The rejected segments only are asked again once, with their problems
+  listed (one segment per call when the model merged or dropped segments of a batch); when one
+  fails again the page is kept untranslated, with the
   :func:`~docwiki.contracts.i18n.untranslated_marker` line and a run warning (gate G17 warns);
 * the result is cached in the artifact store under
   ``cache_key("translate", [content hash, target language, locked-terms digest],
@@ -77,13 +80,14 @@ __all__ = [
     "language_name",
     "plan_page",
     "relocate_page",
+    "repair_terms",
     "rewrite_links",
     "translate_plan",
     "translation_digest",
     "unrelocate_text",
 ]
 
-STAGE_VERSION = "3"
+STAGE_VERSION = "4"
 PROMPT_VERSION = load_prompt("translate").version
 SCHEMA_NAME = "translate_page"
 TRANSLATED_TYPES = frozenset({"source", "entity", "topic"})
@@ -179,27 +183,87 @@ def _mask_terms(
     return masked, tuple(tokens), tuple(terms)
 
 
+_REFERENCE_RE = re.compile(
+    r"(?:[  ]+(?:n°[  ]?)?(?=[\w/-]*\d)[A-Za-z0-9](?:[\w/-]|[.,](?=\w))*)?"
+    r"(?:[  ]+indices?[  ]+[A-Z0-9]\b)?"
+)
+"""The reference that may follow a locked term (``lot 5``, ``OS n°3``, ``DPGF DEV-2026-031
+indice B``): its gloss goes after the reference, never between the term and its reference."""
+_LINK_LABEL_RE = re.compile(r"\[(?P<label>.*)\](?:\(|\[)", re.DOTALL)
+_SENTENCE_END = ".!?"
+_CLOSING = "\"'»”)"
+
+
+def _link_label(token: str) -> str:
+    """The label of a link token (``[DPGF DEV-2026-031](…)`` → ``DPGF DEV-2026-031``); empty
+    for an image, a footnote marker, code or an amount."""
+    match = _LINK_LABEL_RE.match(token)
+    return match.group("label") if match is not None else ""
+
+
+def _recased(original: str, term: str, sentence_start: bool) -> str:
+    """A locked common noun as the translated sentence places it: capitalised at the start of
+    a sentence, lower case inside one (an acronym or a name-like term is kept as written)."""
+    if not term[:1].islower() or not original[:1].isalpha():
+        return original
+    if sentence_start:
+        return original[:1].upper() + original[1:]
+    if original[1:] == original[1:].lower():
+        return original[:1].lower() + original[1:]
+    return original
+
+
 def _unmask(
     text: str,
     tokens: Sequence[str],
     terms: Sequence[str | None] = (),
     glosses: Mapping[str, str] | None = None,
     glossed: set[str] | None = None,
+    forms: Sequence[tuple[str, re.Pattern[str]]] = (),
+    recase: bool = False,
 ) -> str:
-    """``text`` with its placeholders restored. With ``glosses``, the first occurrence of each
-    locked term on the page (``glossed`` collects them) is followed by its gloss in brackets."""
+    """``text`` with its placeholders restored.
 
-    def restore(match: re.Match[str]) -> str:
+    With ``glosses``, the first occurrence of each locked term on the page (``glossed``
+    collects them) is followed by its gloss in brackets, after the reference that follows the
+    term (``lot 5 [gloss]``); a locked term in the label of a link (found with ``forms``) is
+    glossed after the link. With ``recase``, a locked common noun takes the case of its place
+    in the translated sentence.
+    """
+    out: list[str] = []
+    position = 0
+    for match in _PLACEHOLDER_RE.finditer(text):
+        out.append(text[position : match.start()])
+        position = match.end()
         index = int(match.group(1)) - 1
         original = tokens[index]
         term = terms[index] if index < len(terms) else None
-        if term is None or glosses is None or glossed is None or term in glossed:
-            return original
-        glossed.add(term)
-        gloss = glosses.get(term)
-        return f"{original} [{gloss}]" if gloss else original
-
-    return _PLACEHOLDER_RE.sub(restore, text)
+        if term is not None and recase:
+            before = "".join(out).rstrip().rstrip(_CLOSING)
+            start = not before or before[-1] in _SENTENCE_END
+            original = _recased(original, term, start)
+        out.append(original)
+        if glosses is None or glossed is None:
+            continue
+        if term is not None:
+            named = [term]
+        else:
+            named = [name for _, _, name in _locked_spans(_link_label(original), forms)]
+        owed: list[str] = []
+        for name in named:
+            if name in glossed:
+                continue
+            glossed.add(name)
+            if glosses.get(name):
+                owed.append(glosses[name])
+        if owed:
+            reference = _REFERENCE_RE.match(text, position)
+            if reference is not None:
+                out.append(reference.group(0))
+                position = reference.end()
+            out += [f" [{gloss}]" for gloss in owed]
+    out.append(text[position:])
+    return "".join(out)
 
 
 def _fixed_strings(source: Strings, target: Strings) -> tuple[dict[str, str], dict[str, str]]:
@@ -327,24 +391,38 @@ def plan_page(page: Page, pack: DomainPack, target_lang: str) -> PagePlan:
 # -- the preservation check -----------------------------------------------------------------
 
 
-def _locked_counts(text: str, forms: Sequence[tuple[str, re.Pattern[str]]]) -> Counter[str]:
-    """Occurrences of each locked term (any of its forms, longest first, no overlap)."""
-    counts: Counter[str] = Counter()
-    taken: list[tuple[int, int]] = []
+def _locked_spans(
+    text: str, forms: Sequence[tuple[str, re.Pattern[str]]]
+) -> list[tuple[int, int, str]]:
+    """``(start, end, term)`` of each locked term written in ``text`` (any of its forms, longest
+    first, no overlap), in text order."""
+    taken: list[tuple[int, int, str]] = []
     for term, pattern in forms:
         for match in pattern.finditer(text):
-            span = match.span()
-            if any(span[0] < end and start < span[1] for start, end in taken):
+            start, end = match.span()
+            if any(start < other_end and other_start < end for other_start, other_end, _ in taken):
                 continue
-            taken.append(span)
-            counts[term] += 1
-    return counts
+            taken.append((start, end, term))
+    return sorted(taken)
+
+
+def _locked_counts(text: str, forms: Sequence[tuple[str, re.Pattern[str]]]) -> Counter[str]:
+    """Occurrences of each locked term (any of its forms, longest first, no overlap)."""
+    return Counter(term for _, _, term in _locked_spans(text, forms))
 
 
 def _whole_word(text: str) -> re.Pattern[str]:
+    """``text`` as whole words, any case; a one-word common noun (``lot``, ``situation``) also
+    matches its plural in ``s`` (``lots``, ``situations``), whichever forms the pack lists."""
     words = text.split()
     phrase = r"\s+".join(re.escape(word) for word in words)
-    return re.compile(rf"(?<!\w){phrase}(?!\w)", re.IGNORECASE)
+    plural = (
+        len(words) == 1
+        and text != text.upper()
+        and text[-1].isalpha()
+        and text[-1].lower() not in "sx"
+    )
+    return re.compile(rf"(?<!\w){phrase}{'s?' if plural else ''}(?!\w)", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -416,7 +494,10 @@ def check_translation(source: str, translated: str, vocabulary: Vocabulary) -> l
             changed = sorted(set(before_terms) ^ set(after_terms)) or sorted(
                 term for term in before_terms if before_terms[term] != after_terms[term]
             )
-            problems.append(f"locked terms changed: {', '.join(changed)}")
+            problems.append(
+                f"locked terms changed: {', '.join(changed)} (keep each term placeholder exactly "
+                "once and never write these words yourself)"
+            )
     for term, rendering, pattern in vocabulary.banned:
         if len(pattern.findall(translated)) > len(pattern.findall(source)):
             problems.append(
@@ -429,6 +510,35 @@ def check_translation(source: str, translated: str, vocabulary: Vocabulary) -> l
     if detect_injection(translated) and not detect_injection(source):
         problems.append("the translation addresses an AI system")
     return problems
+
+
+def repair_terms(segment: Segment, translated: str, vocabulary: Vocabulary) -> str:
+    """``translated`` with each locked term the model wrote as its own word (any written form
+    of that term, case-insensitive, whole words) where the term's placeholder is missing put
+    back as that placeholder, in order.
+
+    A locked term is never translated, so writing its word instead of its placeholder changes
+    nothing on the page; the repair only lets :func:`check_translation` see the placeholder.
+    A missing placeholder replaced by anything else (another word, another term) is left
+    missing and still rejected, and a term's word with no missing placeholder of that term
+    (an English "a lot of") is left as written and still rejected.
+    """
+    missing: dict[str, list[int]] = {}
+    present = Counter(_PLACEHOLDER_RE.findall(translated))
+    for index, term in enumerate(segment.terms, start=1):
+        if term is not None and not present[str(index)]:
+            missing.setdefault(term, []).append(index)
+    if not missing:
+        return translated
+    parts: list[str] = []
+    position = 0
+    for start, end, term in _locked_spans(translated, vocabulary.forms):
+        queue = missing.get(term)
+        if not queue:
+            continue
+        parts += [translated[position:start], f"⟦{queue.pop(0)}⟧"]
+        position = end
+    return "".join(parts) + translated[position:]
 
 
 # -- the model call --------------------------------------------------------------------------
@@ -584,38 +694,55 @@ async def _translate_batch(
 async def translate_plan(
     llm: LlmClient, plan: PagePlan, pack: DomainPack, vocabulary: Vocabulary | None = None
 ) -> TranslationResult:
-    """Translate every segment of ``plan``; retry once, then keep the page untranslated."""
+    """Translate every segment of ``plan``; retry the rejected segments once, then keep the
+    page untranslated.
+
+    The first attempt sends the segments in batches. A segment whose translation passes
+    :func:`check_translation` (after :func:`repair_terms`) is kept; only the rejected ones are
+    sent again, with their own problems listed. When a whole batch failed (the model call
+    failed, or it merged, dropped, added or reordered segments) none of its translations is
+    trusted and its segments are retried one per call. The page is ``translated`` only when
+    every segment passed.
+    """
     vocabulary = vocabulary or Vocabulary.of(pack)
     result = TranslationResult(texts={})
     if not plan.segments:
         return result
+    accepted: dict[str, str] = {}
     pending = list(plan.segments)
-    problems: list[str] = []
+    problems: dict[str, list[str]] = {}
+    alone: set[str] = set()  # segments of a batch that failed as a whole: one per call
     for _attempt in range(2):
-        previous = problems[:30]
-        texts: dict[str, str] = {}
-        problems = []
-        for batch in _batches(pending):
-            got, found = await _translate_batch(llm, plan, batch, pack, previous)
+        batches = _batches([s for s in pending if s.id not in alone])
+        batches += [[segment] for segment in pending if segment.id in alone]
+        failed: dict[str, list[str]] = {}
+        alone = set()
+        for batch in batches:
+            previous = [f"{s.id}: {item}" for s in batch for item in problems.get(s.id, ())]
+            got, found = await _translate_batch(llm, plan, batch, pack, previous[:30])
             result.calls += 1
-            texts.update(got)
-            problems += found
-        for segment in pending:
-            translated = texts.get(segment.id)
-            if translated is None:
-                problems.append(f"{segment.id}: no translation")
+            if found:  # the batch failed as a whole
+                failed.update({segment.id: list(found) for segment in batch})
+                alone.update(segment.id for segment in batch)
                 continue
-            problems += [
-                f"{segment.id}: {problem}"
-                for problem in check_translation(segment.text, translated, vocabulary)
-            ]
-        if not problems:
-            result.texts = {segment.id: texts[segment.id] for segment in plan.segments}
+            for segment in batch:
+                translated = repair_terms(segment, got[segment.id], vocabulary)
+                rejected = check_translation(segment.text, translated, vocabulary)
+                if rejected:
+                    failed[segment.id] = rejected
+                else:
+                    accepted[segment.id] = translated
+        if not failed:
+            result.texts = {segment.id: accepted[segment.id] for segment in plan.segments}
             result.status = "translated"
             return result
+        pending = [segment for segment in plan.segments if segment.id in failed]
+        problems = failed
     result.texts = {segment.id: segment.text for segment in plan.segments}
     result.status = "untranslated"
-    result.problems = problems
+    result.problems = [
+        f"{segment.id}: {item}" for segment in pending for item in problems[segment.id]
+    ]
     return result
 
 
@@ -632,12 +759,25 @@ def assemble_mirror(plan: PagePlan, result: TranslationResult, pack: DomainPack)
         else None
     )
     glossed: set[str] = set()
+    forms = Vocabulary.of(pack).forms if glosses is not None else ()
+    recase = result.status == "translated"
     lines: list[str] = []
     for line in plan.lines:
         if isinstance(line, Segment):
             text = texts.get(line.id, line.text)
-            restored = _unmask(text, line.tokens, line.terms, glosses, glossed)
-            lines.append(plan.prefixes.get(line.id, "") + restored)
+            prefix = plan.prefixes.get(line.id, "")
+            # never a gloss in a heading: the first use in the text below gets it
+            in_heading = prefix.lstrip().startswith("#")
+            restored = _unmask(
+                text,
+                line.tokens,
+                line.terms,
+                None if in_heading else glosses,
+                glossed,
+                forms,
+                recase,
+            )
+            lines.append(prefix + restored)
         else:
             lines.append(line)
     if result.status != "translated":
@@ -652,7 +792,9 @@ def assemble_mirror(plan: PagePlan, result: TranslationResult, pack: DomainPack)
         segment = by_id.get(segment_id)
         if segment is None:
             return fallback
-        text = _unmask(texts.get(segment_id, segment.text), segment.tokens)
+        text = _unmask(
+            texts.get(segment_id, segment.text), segment.tokens, segment.terms, recase=recase
+        )
         return " ".join(text.split()) or fallback
 
     data["summary"] = text_of("summary", fm.summary)
