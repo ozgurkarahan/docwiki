@@ -12,6 +12,8 @@ export interface DocwikiSource {
   /** Content slug of the document page (`evidence/<source_id>/index`): pages, full text. */
   document?: string | null
   docType?: string | null
+  /** The domain pack's label of the type (`PV de réception`): shown instead of the key. */
+  docTypeLabel?: string | null
   docNumber?: string | null
   revision?: string | null
   /** The document's own date (its extraction, else its file name), ISO. */
@@ -78,7 +80,12 @@ export interface DocwikiSettings {
   /** The register grouped by scope, phase and type; null when no source has a scope. */
   register?: DocwikiRegisterGroup[] | null
   /** Explorer order: hub folders first; the `entities` folder's name when the wiki has scopes. */
-  explorer?: { hubFolders: string[]; entitiesTitle: string | null }
+  explorer?: {
+    hubFolders: string[]
+    entitiesTitle: string | null
+    /** Folder → title, e.g. `topics/moreau` → `Chantier Moreau` (per-scope topics). */
+    folderTitles?: Record<string, string>
+  }
   /**
    * Filed research answers published in `static/docwiki/answers.json` (ADR 0007); the "Ask this
    * wiki" drawer is rendered only when there is at least one.
@@ -89,6 +96,20 @@ export interface DocwikiSettings {
 }
 
 export const settings = raw as DocwikiSettings
+
+/**
+ * The display name of a document type: the domain pack's label (`PV de réception`); a release
+ * built before the labels shows its key in words (`Site meeting minutes`).
+ */
+export function docTypeName(
+  docType: string | null | undefined,
+  label: string | null | undefined,
+): string | null {
+  if (label && label.trim()) return label.trim()
+  if (!docType) return null
+  const words = docType.replace(/-/g, " ")
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
 
 /**
  * Current or replaced: only for documents that have revisions (a number or an indice); a photo, a

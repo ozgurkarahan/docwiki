@@ -164,9 +164,20 @@ async def test_views_are_computed_by_code_and_cited_row_by_row(make_harness, tmp
     assert "computed by code, not by a language model" in overdue.body
     # the école's lift is the most overdue, then the Moreau scaffold; the mixer is not due
     rows = [line for line in overdue.body.split("\n") if line.startswith("| ")][2:]
-    assert [line.split(" | ")[:3] for line in rows] == [
-        ["| ecole", "Nacelle N3", "2026-02-10"],
-        ["| moreau", "Échafaudage E1", "15/03/2026"],
+    # the chantier (linked to its hub) and the cited document come first
+    assert [line.split(" | ")[:4] for line in rows] == [
+        [
+            "| [ecole](../chantiers/ecole.md)",
+            "[Registre materiel ecole](../sources/registre-materiel-ecole.md)[^c1]",
+            "Nacelle N3",
+            "2026-02-10 |",
+        ],
+        [
+            "| [moreau](../chantiers/moreau.md)",
+            "[Registre materiel moreau](../sources/registre-materiel-moreau.md)[^c2]",
+            "Échafaudage E1",
+            "15/03/2026 |",
+        ],
     ]
     assert "Bétonnière" not in overdue.body
     cited = _cited_rows(root, overdue)
@@ -187,9 +198,20 @@ async def test_views_are_computed_by_code_and_cited_row_by_row(make_harness, tmp
     assert "Maçonnerie" in cited[2][2]
     body = situations.body
     assert "## Totals" in body
-    assert "| ecole | 1 | 1 000,50 € HT |" in body
-    assert "| moreau | 2 | 3 740,00 € HT |" in body
+    assert "| [ecole](../chantiers/ecole.md) | 1 | 1 000,50 € HT |" in body
+    assert "| [moreau](../chantiers/moreau.md) | 2 | 3 740,00 € HT |" in body
     assert "| **All** | 3 | 4 740,50 € HT |" in body
+    # the views have an index page; the hubs and the home page's dashboard link them
+    index = (root / "wiki" / "views" / "index.md").read_text(encoding="utf-8")
+    assert "[Situations par chantier](situations-par-chantier.md): 3 rows." in index
+    hub = (root / "wiki" / "chantiers" / "moreau.md").read_text(encoding="utf-8")
+    assert (
+        "- [Situations par chantier](../views/situations-par-chantier.md): 2 rows for this "
+        "chantier" in hub
+    )
+    home = (root / "wiki" / "index.md").read_text(encoding="utf-8")
+    assert "[Situations par chantier](views/situations-par-chantier.md) (3 rows)" in home
+    assert "[all computed views](views/index.md)" in home
     # the source pages the views read link to them (## Related)
     source = next(page for page in reader.list_pages("source") if page.title.startswith("Sit"))
     assert "- Computed view: [Situations par chantier](../views/situations-par-chantier.md)" in (

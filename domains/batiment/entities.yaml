@@ -14,7 +14,20 @@
 # documents stay one type (contractual and purchasing documents together): splitting it would
 # change the ids of the existing entries.
 types:
-  - {key: chantier, title: Chantiers, description: "The company's chantiers: client, contract type, phase, maître d'œuvre and conducteur de travaux of each one."}
+  # The hub page shows the attributes labelled here, in this order. `phase` is shown with its
+  # title from scopes.yaml ("3 Exécution"), so `phase_title` has no label and is not shown.
+  - key: chantier
+    title: Chantiers
+    description: "The company's chantiers: client, contract type, phase, maître d'œuvre and conducteur de travaux of each one."
+    attribute_labels:
+      code: Code
+      phase: Phase
+      contract_type: Contract type
+      client: Client
+      maitre_d_oeuvre: "Maître d'œuvre"
+      conducteur: Conducteur de travaux
+      address: Address
+      object: Works
   - {key: organisation, title: Organisations, description: "The contractor, its clients and its suppliers."}
   - {key: sous-traitant, title: Sous-traitants, description: "Subcontractors of the company, with the chantiers they work on."}
   - {key: maitre-d-oeuvre, title: Maîtres d'œuvre, description: "Architects and designers who direct the works for a maître d'ouvrage."}

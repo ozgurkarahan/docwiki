@@ -221,6 +221,20 @@ def _check_views(pack: DomainPack, errors: list[PackError]) -> None:
                         f"{name!r} is not a column of the query result",
                     )
                 )
+        for field_name, names in (
+            ("labels", list(view.labels)),
+            ("amounts", list(view.amounts)),
+            ("scope_columns", view.scope_columns),
+        ):
+            for name in names:
+                if name not in result or name.startswith("_"):
+                    errors.append(
+                        PackError(
+                            "views.yaml",
+                            f"{where}.{field_name}.{name}",
+                            f"{name!r} is not a displayed column of the query result",
+                        )
+                    )
 
 
 def _load_skills(root: Path, errors: list[PackError]) -> dict[str, str]:

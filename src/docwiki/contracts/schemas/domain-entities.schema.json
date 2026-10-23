@@ -41,6 +41,18 @@
           "default": "",
           "title": "Description",
           "type": "string"
+        },
+        "attribute_labels": {
+          "additionalProperties": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "default": {},
+          "propertyNames": {
+            "minLength": 1
+          },
+          "title": "Attribute Labels",
+          "type": "object"
         }
       },
       "required": [

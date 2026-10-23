@@ -373,7 +373,7 @@
     },
     "IndexFrontmatter": {
       "additionalProperties": false,
-      "description": "Index pages: ``index:home``, ``index:sources``, ``index:entities``,\n``index:entities/<type>``,\n``index:topics``, ``index:queries``.",
+      "description": "Index pages: ``index:home``, ``index:sources``, ``index:entities``,\n``index:entities/<type>``,\n``index:topics``, ``index:queries``, ``index:views``.",
       "properties": {
         "id": {
           "minLength": 1,
@@ -750,6 +750,18 @@
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "title": "Doc Type",
           "type": "string"
+        },
+        "doc_type_label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Doc Type Label"
         },
         "category": {
           "maxLength": 64,

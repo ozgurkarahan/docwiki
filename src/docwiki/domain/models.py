@@ -126,6 +126,13 @@ class DocType(ContractModel):
     category: Kebab
     authority: Authority
     rules: list[DocTypeRule] = []
+    label: NonEmptyStr | None = None
+    """Short display label (``PV de réception``) for the Documents register and the source page
+    header; the title when absent. Never derived from the key."""
+
+    @property
+    def display_label(self) -> str:
+        return self.label or self.title
 
 
 class TaxonomyFile(ContractModel):
@@ -157,6 +164,9 @@ class EntityType(ContractModel):
     title: NonEmptyStr
     """Plural display title (``Spare parts``): entity index title and related-section label."""
     description: str = ""
+    attribute_labels: dict[NonEmptyStr, NonEmptyStr] = {}
+    """Display label of each registry attribute key, in display order (``maitre_d_oeuvre`` →
+    ``Maître d'œuvre``). When given, the hub page shows only the labelled attributes."""
 
     @field_validator("key")
     @classmethod
@@ -459,6 +469,7 @@ class ResolutionFile(ContractModel):
 
 
 ViewColumn = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]*$", max_length=48)]
+ViewAmountUnit = Literal["HT", "TTC", "€"]
 VIEW_SYSTEM_COLUMNS: tuple[str, ...] = ("_source_id", "_table_id", "_row_id", "_scope")
 """Columns the engine adds to the ``rows`` relation of a view (v1.7, ADR 0011)."""
 
@@ -479,8 +490,17 @@ class ViewDef(ContractModel):
     sql: NonEmptyStr
     per_scope: bool = False
     totals: list[ViewColumn] = []
+    labels: dict[ViewColumn, NonEmptyStr] = {}
+    """Column header of each result column (``marche_ht`` → ``Marché HT``), in the pack's
+    language conventions; a result column without a label shows its name."""
+    amounts: dict[ViewColumn, ViewAmountUnit] = {}
+    """Result columns that are amounts in euros, with their basis: ``HT``, ``TTC`` or ``€``
+    (neither). Their cells and totals are written ``184 490,00 € HT``."""
+    scope_columns: list[ViewColumn] = []
+    """Result columns whose values are scope values (``autre_chantier``): shown with the scope's
+    label, linked to its hub page."""
 
-    @field_validator("doc_types", "totals")
+    @field_validator("doc_types", "totals", "scope_columns")
     @classmethod
     def _unique_lists(cls, value: list[str]) -> list[str]:
         _unique(value, "entry")

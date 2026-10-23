@@ -355,6 +355,8 @@ def site_settings(
             # The documents register (ADR 0010, slice B).
             "document": f"{EVIDENCE_MOUNT}/{page.id}/index" if has_document else None,
             "docType": _text(meta.get("doc_type")),
+            # The pack's label of the type ("PV de réception"), never the key (slice F review).
+            "docTypeLabel": _text(meta.get("doc_type_label")),
             "docNumber": _text(meta.get("doc_number")),
             "revision": _text(meta.get("revision")),
             "date": dated or _path_date(source_path),

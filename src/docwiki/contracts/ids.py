@@ -351,10 +351,10 @@ def query_page_path(query_id: str) -> str:
 
 def index_page_path(scope: str) -> str:
     """Path of an index page by scope: ``home``, ``sources``, ``entities``, ``entities/<type>``,
-    ``topics`` or ``queries``."""
+    ``topics``, ``queries`` or ``views``."""
     if scope == "home":
         return "index.md"
-    if scope in ("sources", "entities", "topics", "queries"):
+    if scope in ("sources", "entities", "topics", "queries", "views"):
         return f"{scope}/index.md"
     if scope.startswith("entities/") and is_kebab(scope.removeprefix("entities/")):
         return f"{scope}/index.md"

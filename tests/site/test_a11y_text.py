@@ -135,3 +135,40 @@ def test_focus_cycles_at_the_ends_only() -> None:
         "none": [-1, -1],
         "target": "docwiki-main",
     }
+
+
+def test_data_tables_stack_as_cards_except_on_evidence() -> None:
+    result = run(
+        """{
+          stacks: ["index", "hub", "view", "source", "topic", undefined, null, 3,
+                   "evidence", "evidence-index"].map(m.stacksTables),
+          labels: m.cellLabels(["Chantier", " Last  document\\n(dated) ", "", "Documents"], 5),
+          none: m.cellLabels([], 2),
+        }"""
+    )
+    assert result == {
+        "stacks": [True, True, True, True, True, True, True, True, False, False],
+        "labels": ["Chantier", "Last document (dated)", None, "Documents", None],
+        "none": [None, None],
+    }
+
+
+def test_a_view_names_its_table_boxes_after_its_title() -> None:
+    result = run(
+        """[
+          m.tableCaption("view", "Crew double bookings", "Rows", 0),
+          m.tableCaption("view", " Crew double bookings ", "Totals", 1),
+          m.tableCaption("view", "Crew double bookings", "", 1),
+          m.tableCaption("hub", "Chantier Moreau", "Details", 0),
+          m.tableCaption("view", "", "Rows", 0),
+          m.tableCaption("view", undefined, "Rows", 0),
+        ]"""
+    )
+    assert result == [
+        "Crew double bookings",
+        "Crew double bookings, totals",
+        "Crew double bookings",
+        None,
+        None,
+        None,
+    ]

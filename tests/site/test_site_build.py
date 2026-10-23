@@ -23,6 +23,7 @@ from site_testkit import (
     write_site,
 )
 
+from docwiki.contracts.catalog import CatalogPage
 from docwiki.contracts.gates import GateResult
 from docwiki.contracts.markdown import BACKLINKS_END, BACKLINKS_START
 from docwiki.site import (
@@ -38,7 +39,7 @@ from docwiki.site import (
     site_settings,
 )
 from docwiki.site import build as build_module
-from docwiki.site.register import register_groups
+from docwiki.site.register import explorer_settings, register_groups
 
 
 def test_pinned_quartz_version() -> None:
@@ -185,6 +186,7 @@ def test_site_settings_from_the_mock_release() -> None:
         "status": "current",
         "document": "evidence/src-59cf9366e50c/index",
         "docType": "schedule",
+        "docTypeLabel": None,
         "docNumber": "PLN-2026-003",
         "revision": "B",
         "date": None,
@@ -202,7 +204,7 @@ def test_site_settings_from_the_mock_release() -> None:
     assert len(settings["sources"]) == 3
     # no scopes: the flat register, the explorer without hubs and with "Entities"
     assert settings["scopes"] == {} and settings["register"] is None
-    assert settings["explorer"] == {"hubFolders": [], "entitiesTitle": None}
+    assert settings["explorer"] == {"hubFolders": [], "entitiesTitle": None, "folderTitles": {}}
     assert settings["answers"] == 1  # queries/2026-03-31-window-delivery-date.md
     custom = site_settings(
         release,
@@ -377,7 +379,24 @@ def test_site_settings_of_a_scoped_release(tmp_path: Path) -> None:
         "entreprise": {"title": "Entreprise", "hub": None},
         "moreau": {"title": "Chantier Moreau", "hub": HUB_PAGE},
     }
-    assert settings["explorer"] == {"hubFolders": ["chantiers"], "entitiesTitle": "Entreprise"}
+    assert settings["explorer"] == {
+        "hubFolders": ["chantiers"],
+        "entitiesTitle": "Entreprise",
+        "folderTitles": {},
+    }
+    # a per-scope topics folder shows the scope's name in the explorer
+    release = open_release(tmp_path / "scoped")
+    topic = CatalogPage(
+        id="topic:moreau/planning",
+        type="topic",
+        path="topics/moreau/planning.md",
+        title="Planning — Chantier Moreau",
+        summary="",
+        sensitivity="public",
+        scope="moreau",
+    )
+    catalog = release.catalog.model_copy(update={"pages": [*release.catalog.pages, topic]})
+    assert explorer_settings(catalog)["folderTitles"] == {"topics/moreau": "Chantier Moreau"}
     register = settings["register"]
     assert [(group["scope"], group["title"], group["count"]) for group in register] == [
         ("moreau", "Chantier Moreau", 2),
@@ -404,7 +423,8 @@ def test_register_groups_order() -> None:
         "s5": source("zeta", "3", "quote", docNumber="DEV-1", revision="B"),
         "s6": source("zeta", "3", None),
         "s7": source(None, None, "photo"),
-        "s8": source("zeta", "3", "minutes"),
+        "s8": source("zeta", "3", "minutes", docTypeLabel="Compte rendu de chantier"),
+        "s9": source("zeta", "1", "pv-de-reception"),
     }
     scopes = {
         "alpha": {"title": "Chantier Alpha", "hub": "chantiers/alpha"},
@@ -425,5 +445,8 @@ def test_register_groups_order() -> None:
     assert [item["type"] for item in types] == ["minutes", "quote", None]
     assert types[1]["sources"] == ["s5", "s1"], "by n° then indice"
     assert types[2]["title"] == "Other documents"
+    # the pack's label of the type, never its key (a release without labels: the key in words)
+    assert types[0]["title"] == "Compte rendu de chantier"
+    assert zeta["phases"][0]["types"][0]["title"] == "Pv de reception"
     assert groups[0]["phases"][0]["title"] == "No phase"
     assert register_groups({"s": source(None, "3", "quote")}, scopes) is None

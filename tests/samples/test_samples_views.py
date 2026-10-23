@@ -207,13 +207,22 @@ def test_financial_position_of_every_chantier(build: ViewBuild) -> None:
             for n, amount in enumerate(amounts)
         )
 
-    assert f"| moreau | 2 | {cells('39783.00', '47271.60', '13483.08', '0.00', '33788.52')} |" in (
-        page
-    )
+    moreau = cells("39783.00", "47271.60", "13483.08", "0.00", "33788.52")
+    assert f"| Chantier Moreau | 2 | {moreau} |" in page
+    nacrines = cells("184490.00", "202939.00", "192401.00", "9620.05", "10538.00")
+    assert f"| Chantier résidence Les Nacrines | 5 | {nacrines} |" in page
+    # a chantier without invoices: 0,00 € TTC like the others, never "0 € TTC"
     assert (
-        f"| nacrines | 5 | {cells('184490.00', '202939.00', '192401.00', '9620.05', '10538.00')} |"
-        in page
+        f"| Chantier école de Montferrine | 1 | "
+        f"{cells('87440.00', '104928.00', '0.00', '0.00', '104928.00')} |" in page
     )
+    # the pack's column labels; the chantier and the cited document first
+    assert (
+        "| Chantier | Document | Pièce | Objet | Marché HT | Marché TTC | Facturé TTC "
+        "| Retenue de garantie TTC | Reste à facturer TTC |" in page
+    )
+    # every amount cell of the rows is written the trade's way too
+    assert f"| {format_number(Decimal('184490.00'), unit=f'€{NBSP}HT')} |" in page
     # the planted figures, as people read them
     readable = page.replace(chr(0x202F), " ")  # narrow no-break spaces group thousands
     assert "47 271,60" in readable and "10 538,00" in readable

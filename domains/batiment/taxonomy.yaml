@@ -7,7 +7,9 @@
 #
 # Doc type keys are English kebab-case, except the documents named by a locked trade term of
 # terms.yaml (ADR 0012), which keep the French term: situation, ordre-de-service, pv-de-reception,
-# liste-des-reserves, dpgf, ccap, ppsps, acte-d-engagement and dc4.
+# liste-des-reserves, dpgf, ccap, ppsps, acte-d-engagement and dc4. Those types also give the
+# short `label` the site shows (the Documents register, the source page header) in the trade's
+# own spelling ("PV de réception", "DC4"); the other types show their title, never their key.
 #
 # Doc types are tried in this order and the first rule that matches wins: `filename_regex` is
 # searched in the file name (no folders), `text_regex` in the first `first_chars` characters of
@@ -84,6 +86,7 @@ doc_types:
       - {filename_regex: '(?i)\.(?:jpe?g|png|tiff?|heic)$'}
   - key: dpgf
     title: DPGF (décomposition du prix global et forfaitaire)
+    label: DPGF
     category: contract-documents
     authority: 8
     rules:
@@ -139,12 +142,14 @@ doc_types:
       - {filename_regex: '(?i)(?:^|[_ -])organigramme'}
   - key: ppsps
     title: PPSPS (site-specific health and safety plan)
+    label: PPSPS
     category: health-and-safety
     authority: 5
     rules:
       - {filename_regex: '(?i)(?:^|[_ -])ppsps(?:[_ .-]|$)'}
   - key: dc4
     title: Subcontracting declaration (DC4)
+    label: DC4
     category: subcontracting
     authority: 8
     rules:
@@ -157,36 +162,42 @@ doc_types:
       - {filename_regex: '(?i)(?:^|[_ -])contrat[_ -]de[_ -]sous[_ -]traitance'}
   - key: acte-d-engagement
     title: Acte d'engagement (public contract tender form)
+    label: "Acte d'engagement"
     category: contract-documents
     authority: 9
     rules:
       - {filename_regex: '(?i)(?:^|[_ -])acte[_ -]d[_ -]engagement'}
   - key: ccap
     title: CCAP (special administrative conditions)
+    label: CCAP
     category: contract-documents
     authority: 9
     rules:
       - {filename_regex: '(?i)(?:^|[_ -])ccap(?:[_ .-]|$)'}
   - key: ordre-de-service
     title: Ordre de service (OS)
+    label: Ordre de service
     category: contract-documents
     authority: 10
     rules:
       - {filename_regex: '(?i)(?:^|[_ -])ordre[_ -]de[_ -]service'}
   - key: situation
     title: Situation (progress payment application)
+    label: Situation
     category: billing
     authority: 6
     rules:
       - {filename_regex: '(?i)(?:^|[_ -])situation[_ -]n\d'}
   - key: pv-de-reception
     title: PV de réception (record of the réception)
+    label: PV de réception
     category: reception
     authority: 10
     rules:
       - {filename_regex: '(?i)(?:^|[_ -])(?:pv|proc[eè]s[_ -]verbal)[_ -]de[_ -]r[ée]ception'}
   - key: liste-des-reserves
     title: Réserves list and lifting status
+    label: Liste des réserves
     category: reception
     authority: 7
     rules:

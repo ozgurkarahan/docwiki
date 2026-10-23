@@ -76,7 +76,7 @@ TopicId = Annotated[
 ]
 Tag = Annotated[str, Field(pattern=r"^[a-z0-9]+(?:[-_/][a-z0-9]+)*$")]
 INDEX_ID_RE = re.compile(
-    r"^index:(home|sources|entities|topics|queries"
+    r"^index:(home|sources|entities|topics|queries|views"
     r"|entities/[a-z0-9]+(?:-[a-z0-9]+)*|hubs/[a-z0-9]+(?:-[a-z0-9]+)*)$"
 )
 HUB_ID_RE = re.compile(r"^hub:[a-z0-9]+(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -142,6 +142,9 @@ class SourceFrontmatter(_BaseFrontmatter):
     source_hash: Sha256Ref
     media_type: MediaType
     doc_type: Kebab
+    doc_type_label: str | None = None
+    """The domain pack's display label of ``doc_type`` (``PV de réception``), for readers and the
+    site; never derived from the key (v1.7)."""
     category: Kebab
     doc_number: str | None = None
     revision: str | None = None
@@ -321,7 +324,7 @@ class QueryFrontmatter(_BaseFrontmatter):
 class IndexFrontmatter(_BaseFrontmatter):
     """Index pages: ``index:home``, ``index:sources``, ``index:entities``,
     ``index:entities/<type>``,
-    ``index:topics``, ``index:queries``."""
+    ``index:topics``, ``index:queries``, ``index:views``."""
 
     type: Literal["index"] = "index"
 

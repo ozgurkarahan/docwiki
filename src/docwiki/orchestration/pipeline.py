@@ -166,7 +166,7 @@ from docwiki.stages.discover import (
     resolve_supersession,
     revalidate_state,
 )
-from docwiki.stages.hubs import build_hubs, doc_dates
+from docwiki.stages.hubs import build_hubs, doc_dates, source_scope
 from docwiki.stages.indexes import build_catalog, build_indexes, changes_since, run_page_path
 from docwiki.stages.links import apply_links, build_edges, md_link, replace_frontmatter
 from docwiki.stages.publish import finalize_and_publish, run_receipt_page
@@ -179,7 +179,7 @@ from docwiki.stages.verify import (
     scrub,
     verify_release,
 )
-from docwiki.stages.views import build_view_pages, view_sources
+from docwiki.stages.views import build_view_pages, build_views_index, view_sources
 from docwiki.storage.routed import local_path_for
 from docwiki.storage.state import StateStore, with_stage
 
@@ -1182,7 +1182,16 @@ class Pipeline:
 
         # computed views (v1.7, ADR 0011): figures computed by code, every row cited
         scopes = {sid: found.scope for sid, found in classifications.items()}
-        views = build_view_pages(pack, view_sources(source_pages, docs, scopes), stamp=stamp)
+        # the view pages name each chantier and link the ones that get a hub page
+        hub_scopes = {
+            scope
+            for page in source_pages.values()
+            if isinstance(page.frontmatter, SourceFrontmatter)
+            and (scope := source_scope(pack, page.frontmatter))
+        }
+        views = build_view_pages(
+            pack, view_sources(source_pages, docs, scopes), stamp=stamp, hub_scopes=hub_scopes
+        )
         cited.extend(views.cited)
         self.warnings.extend(views.warnings)
 
@@ -1230,7 +1239,12 @@ class Pipeline:
             removed_queries=dict.fromkeys(invalid_queries, _QUERY_LEFT_OUT),
         )
         # hub pages of the pack's scopes (v1.7, ADR 0011); none without scopes.yaml
-        hubs = build_hubs(content, pack, stamp=stamp, updated=day, dates=doc_dates(results))
+        hubs = build_hubs(
+            content, pack, stamp=stamp, updated=day, dates=doc_dates(results), views=views.results
+        )
+        views_index = build_views_index(
+            [page for page in content if page.frontmatter.type == "view"], stamp=stamp, updated=day
+        )
         bundle = build_indexes(
             content,
             pack,
@@ -1263,6 +1277,8 @@ class Pipeline:
             self._report("running"), stamp=stamp, updated=day, sensitivity=tier, final=False
         )
         pages = [*content, *hubs.pages, *bundle.pages, kit.agents, quality, receipt]
+        if views_index is not None:
+            pages.append(views_index)
         pages = self._normalize_updated(pages, day)
         by_path = {page.path: page for page in pages}
         quality = by_path[quality.path]
