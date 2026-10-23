@@ -95,7 +95,8 @@ def contrat_cadre(w: World) -> bytes:
     day = str(facts["date"])
     merchant = w.org("zava-materiaux")
     b = DocxBuilder(f"{merchant['name']} - {facts['title']}",
-                    f"{facts['title']} - {merchant['name']} et {w.builder['name']}")
+                    f"{facts['title']} - {merchant['name']} et {w.builder['name']}",
+                    legal=w.legal_line(merchant["key"], w.builder["key"]))
     b.title(str(facts["title"]))
     b.para("Entre les soussignés :", bold=True)
     b.para(str(facts["parties"]["fournisseur"]))
@@ -241,6 +242,7 @@ def suivi_facturation(w: World) -> bytes:
     factures += [
         ["Document", f"{facts['title']} au {fr_date(str(facts['date']))}"],
         ["Tenu par", f"{w.name(author)}, {w.role(author).lower()}"],
+        ["Observations", str(facts["moreau_note"])],
     ]
     b.sheet("Factures", facts["columns_factures"], factures,
             widths=[18, 14, 12, 40, 14, 12, 14, 16, 16, 52])

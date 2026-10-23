@@ -55,6 +55,11 @@ class World:
     def email(self, key: str) -> str:
         return str(self._people[key]["email"])
 
+    def legal_line(self, *keys: str) -> str:
+        """The fictional legal identity line of one or more organisations (all-zero format)."""
+        identity = str(self.data["world"]["legal_identity"])
+        return " ; ".join(f"{self.org_name(key)} - {identity}" for key in keys)
+
     def label(self, key: str) -> str:
         """Name of a person or of an organisation key."""
         if key in self._people:

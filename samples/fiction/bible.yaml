@@ -26,8 +26,11 @@
 # public figures. `check_note` records what was searched and found. Rejected candidates are not
 # named here.
 #
-# Identifiers: no company registration, tax, bank or phone number and no postal code is ever
-# printed. E-mail addresses use only the reserved `.example` domains listed below.
+# Identifiers: no real company registration, tax, bank or phone number and no postal code is
+# ever printed. The legal identity line of invoices, quotes, contracts and orders uses one
+# obviously fictional all-zero format (world.legal_identity) marked "identifiants fictifs"; the
+# only phone numbers are the public emergency numbers 15, 18 and 112 of the PPSPS. E-mail
+# addresses use only the reserved `.example` domains listed below.
 #
 # samples/fiction/allowlist.txt is generated from this file:
 #   uv run python samples/generators/allowlist.py
@@ -61,6 +64,7 @@ world:
     Local times are written without offset; e-mail headers use +0100 (winter time, until
     2026-03-28) or +0200 (summer time, from 2026-03-29).
   currency: EUR
+  legal_identity: "SIRET 000 000 000 00000 - RCS 000 000 000 - TVA FR00000000000 (identifiants fictifs)"
   languages:
     documents: fr
     wiki: en
@@ -91,6 +95,7 @@ world:
       - proseware-gestion.example
       - atelier-fabrikam.example
       - mairie-montferrine.example
+      - trey-prevention.example
 
 organisations:
   - key: lamna-batiment
@@ -244,6 +249,35 @@ organisations:
       "Fabrikam" with architecte and agence d'architecture: no architecture practice; the search
       engine only offered differently spelled practices of other names. Fabrikam is a Microsoft
       fictitious brand stem.
+  - key: trey-prevention
+    name: Trey Prévention
+    short: Trey
+    role: safety-coordinator
+    role_fr: coordonnateur SPS
+    description: >-
+      Safety and health coordination office appointed by the commune of Montferrine for the
+      school renovation (coordonnateur SPS: Gaëtan Ferlicot); receives the contractors' PPSPS.
+    email_domain: trey-prevention.example
+    microsoft_fictitious_brand: Trey
+    checked: true
+    check_note: >-
+      2026-10-23: searched "Trey Prévention" and "Trey Prevention" with coordination SPS and
+      sécurité: no company of that name (only general pages on the coordinator's role). Trey is a
+      Microsoft fictitious brand stem (Trey Research).
+  - key: humongous-assurances
+    name: Humongous Assurances
+    short: Humongous
+    role: insurer
+    role_fr: assureur
+    description: >-
+      Insurer of the professional and ten-year (décennale) liability of Lamna Bâtiment, named in
+      the general terms.
+    microsoft_fictitious_brand: Humongous
+    checked: true
+    check_note: >-
+      2026-10-23: searched "Humongous Assurances" and "Humongous" with assurance décennale and
+      assureur: no insurer or company of that name. Humongous Insurance is a Microsoft
+      fictitious brand.
   - key: commune-montferrine
     name: Commune de Montferrine
     short: Montferrine
@@ -543,7 +577,7 @@ products:
 # without brand; MAT- codes are internal to Lamna Bâtiment.
 equipment:
   - {code: MAT-01, name: "Bétonnière électrique 350 l", category: "Petit matériel", in_service: "2019-03-11", inspection: null, last_inspection: null, next_inspection: null, assignment: moreau}
-  - {code: MAT-02, name: "Mini-pelle 2,5 t", category: "Engin de terrassement", in_service: "2021-05-17", inspection: "VGP annuelle (12 mois)", last_inspection: "2025-11-18", next_inspection: "2026-11-18", assignment: depot}
+  - {code: MAT-02, name: "Mini-pelle 2,5 t", category: "Engin de terrassement", in_service: "2021-05-17", inspection: "Non soumis à VGP (jamais utilisée en levage)", last_inspection: null, next_inspection: null, assignment: depot}
   - {code: MAT-03, name: "Échafaudage de façade multidirectionnel (300 m²)", category: "Échafaudage", in_service: "2022-02-07", inspection: "Vérification trimestrielle et avant chaque remontage", last_inspection: "2026-03-20", next_inspection: "2026-06-20", assignment: nacrines}
   - {code: MAT-04, name: "Nacelle élévatrice articulée 12 m", category: "Appareil de levage de personnes", in_service: "2020-06-02", inspection: "VGP semestrielle (6 mois)", last_inspection: "2025-09-22", next_inspection: "2026-03-22", assignment: nacrines}
   - {code: MAT-05, name: "Monte-matériaux 200 kg", category: "Appareil de levage", in_service: "2018-09-24", inspection: "VGP annuelle (12 mois)", last_inspection: "2025-12-03", next_inspection: "2026-12-03", assignment: depot}
@@ -583,6 +617,7 @@ people:
   - {key: patrice-ollivro, name: Patrice Ollivro, organisation: zava-materiaux, role: "Directeur d'agence", role_en: Branch manager of Zava Matériaux in Valbrise, email: patrice.ollivro@zava-materiaux.example, languages: [fr], checked: true, check_note: "2026-10-23: searched the full name: no web results (only differently spelled surnames: a photographer, a company manager, a writer)."}
   - {key: clarisse-monfreuil, name: Clarisse Monfreuil, organisation: proseware-gestion, role: "Gestionnaire de copropriété", role_en: Property manager in charge of the résidence Les Nacrines, email: clarisse.monfreuil@proseware-gestion.example, languages: [fr], checked: true, check_note: "2026-10-23: searched the full name, and the surname with syndic, copropriété and gestionnaire: no person of that name and no syndic (the engine only suggested a real town with a similar name)."}
   - {key: helene-vasseroux, name: "Hélène Vasseroux", ascii_name: Helene Vasseroux, organisation: atelier-fabrikam, role: "Architecte", role_en: Architect (maître d'œuvre of the résidence Les Nacrines), email: helene.vasseroux@atelier-fabrikam.example, languages: [fr], checked: true, check_note: "2026-10-23: searched the full name with and without accents, and the surname with architecte: no person of that name; the closest is a nineteenth-century architect with a differently spelled surname."}
+  - {key: gaetan-ferlicot, name: "Gaëtan Ferlicot", ascii_name: Gaetan Ferlicot, organisation: trey-prevention, role: "Coordonnateur SPS", role_en: Safety and health coordinator of the school renovation, email: gaetan.ferlicot@trey-prevention.example, languages: [fr], checked: true, check_note: "2026-10-23: searched the full name with and without diaeresis: no person of that name (only other people with the first name and a differently spelled surname)."}
   - {key: agnes-vautrelle, name: "Agnès Vautrelle", ascii_name: Agnes Vautrelle, organisation: commune-montferrine, role: "Directrice générale des services", role_en: Head of the administration of the commune of Montferrine, email: agnes.vautrelle@mairie-montferrine.example, languages: [fr], checked: true, check_note: "2026-10-23: searched the full name with and without accent: no person of that name. A first candidate was rejected because its surname is the name of several real communes."}
 
 # Lots (work packages) of the quote. VAT rates are fictional sample values (see facts.vat).
@@ -672,6 +707,7 @@ timeline:
   - {date: "2026-03-15", event: "The attestation de vigilance of Adatum Électricité expires."}
   - {date: "2026-03-20", event: "Acte d'engagement of the school signed by Lamna Bâtiment."}
   - {date: "2026-03-26", event: "Site meeting n°12 of the résidence Les Nacrines (minutes by the maître d'œuvre)."}
+  - {date: "2026-03-27", event: "The maire of Montferrine accepts the offer (signs the acte d'engagement)."}
   - {date: "2026-03-30", event: "School contract notified by the commune of Montferrine; the preparation period starts."}
   - {date: "2026-03-31", event: "Situation n°4 of the résidence Les Nacrines (invoice FC-2026-022) and Adatum's situation de sous-traitance n°2."}
   - {date: "2026-04-01", event: "Opérations préalables à la réception at the résidence Les Nacrines."}
@@ -1066,7 +1102,8 @@ facts:
       general_assembly: "Les travaux ont été votés par l'assemblée générale des copropriétaires du 23/10/2025."
       object: >-
         L'entrepreneur réalise le ravalement des façades de la résidence Les Nacrines avec
-        isolation thermique par l'extérieur des façades nord et ouest, le remplacement des
+        isolation thermique par l'extérieur des façades nord et ouest et peinture minérale des
+        façades sud et est, le remplacement des
         fenêtres des deux cages d'escalier et des portes d'entrée des halls A et B, et la
         dépose et repose des équipements électriques de façade.
       lots:
@@ -1077,7 +1114,7 @@ facts:
         - {lot: 5, title: "Équipements électriques de façade"}
       lines:
         - {ref: "1.1", lot: 1, designation: "Échafaudages de façade, base vie et protections des abords", unit: ens, qty: 1, unit_price: 14600.00, total: 14600.00}
-        - {ref: "2.1", lot: 2, designation: "Nettoyage, traitement des fissures et peinture minérale des quatre façades", unit: m², qty: 1000.00, unit_price: 38.45, total: 38450.00}
+        - {ref: "2.1", lot: 2, designation: "Façades sud et est, nez de balcons, sous-faces et soubassements : nettoyage, traitement des fissures et peinture minérale", unit: m², qty: 769.00, unit_price: 50.00, total: 38450.00}
         - {ref: "3.1", lot: 3, designation: "Façades nord et ouest : isolant 140 mm, sous-enduit armé et enduit de finition", unit: m², qty: 420.00, unit_price: 220.00, total: 92400.00}
         - {ref: "4.1", lot: 4, designation: "Fenêtres aluminium des cages d'escalier (repères C1 à C12)", unit: u, qty: 12, unit_price: 1150.00, total: 13800.00}
         - {ref: "4.2", lot: 4, designation: "Portes d'entrée aluminium des halls A et B", unit: u, qty: 2, unit_price: 4300.00, total: 8600.00}
@@ -1123,7 +1160,9 @@ facts:
       accepted_by: clarisse-monfreuil
       nature: "Lot 5 - Dépose et repose des luminaires de façade et des platines d'interphone"
       amount_ht: 8400.00
-      vat_text: "TVA autoliquidée par l'entrepreneur principal"
+      vat_text: "prix ferme ; TVA autoliquidée par l'entrepreneur principal"
+      model_note: "Modèle DC4 utilisé par analogie pour un marché privé (loi du 31 décembre 1975)."
+      assignment_text: "Cession ou nantissement de créances résultant du marché : néant."
       payment_text: "Paiement par l'entrepreneur principal, à 30 jours fin de mois après visa des situations"
       period: "du 02/02/2026 au 27/03/2026"
       acceptance_sentence: "Le maître d'ouvrage accepte le sous-traitant et agrée ses conditions de paiement."
@@ -1134,7 +1173,7 @@ facts:
       countersigned_by: clarisse-monfreuil
       accepted_by: bertrand-sauzede
       accepted_on: "2026-02-17"
-      finding: "Lors de la réunion de chantier n°6 du 12/02/2026, 18 nez de balcons présentant des armatures apparentes ont été constatés sur les façades nord et ouest après la pose des échafaudages."
+      finding: "Lors de la réunion de chantier n°6 du 12/02/2026, 18 nez de balcons présentant des armatures apparentes ont été constatés sur les façades nord et ouest, après le nettoyage des façades et le relevé des fissures."
       object: "Travaux supplémentaires : reprise des nez de balcons dégradés."
       lines:
         - {ref: OS1.1, designation: "Reprise de nez de balcon : purge des bétons, passivation des armatures et reconstitution au mortier de réparation", unit: u, qty: 18, unit_price: 380.00, total: 6840.00}
@@ -1200,7 +1239,7 @@ facts:
       distribution_extra: [bertrand-sauzede]
       progress:
         - "Lot 1 : échafaudages maintenus jusqu'aux opérations préalables à la réception ; repli à partir du 13/04/2026."
-        - "Lot 2 : ravalement terminé sur les quatre façades."
+        - "Lot 2 : ravalement terminé sur les façades sud et est, les sous-faces et les soubassements."
         - "Lot 3 : isolation thermique par l'extérieur terminée sur les façades nord et ouest ; finitions des tableaux en cours."
         - "Lot 4 : fenêtres aluminium des cages d'escalier posées (repères C1 à C12). Portes d'entrée aluminium des halls A et B : livraison par VanArsdel Menuiseries prévue le 15/04/2026 (commande BC-2026-005)."
         - "Lot 5 : avancement 90 % ; repose des platines d'interphone du hall A à terminer."
@@ -1246,7 +1285,7 @@ facts:
       author: yohan-delbreil
       columns: ["N°", "Localisation", "Désignation", "Lot", "Entreprise", "État", "Levée le", "Observations"]
       rows:
-        - {id: R01, where: "Façade nord, 2e étage", what: "Faïençage de l'enduit sur 3 m²", lot: "Lot 2", by: lamna-batiment, lifted: "2026-04-08", note: ""}
+        - {id: R01, where: "Façade nord, 2e étage", what: "Faïençage de l'enduit sur 3 m²", lot: "Lot 3", by: lamna-batiment, lifted: "2026-04-08", note: ""}
         - {id: R02, where: "Façade ouest, balcon du 3e étage", what: "Fissure sur le nez de balcon repris (OS n°1)", lot: "OS n°1", by: lamna-batiment, lifted: null, note: "Intervention prévue le 17/04/2026"}
         - {id: R03, where: "Façade ouest, pied de façade", what: "Profilé de départ de l'isolant déformé sur 2 m", lot: "Lot 3", by: lamna-batiment, lifted: "2026-04-09", note: ""}
         - {id: R04, where: "Façade sud", what: "Joint de fractionnement de l'enduit à reprendre", lot: "Lot 2", by: lamna-batiment, lifted: "2026-04-14", note: ""}
@@ -1292,10 +1331,10 @@ facts:
         - {n: "2", title: "Maître d'ouvrage et maîtrise d'œuvre", text: "Le maître d'ouvrage est la commune de Montferrine, représentée par son maire. La maîtrise d'œuvre est assurée par les services techniques de la commune."}
         - {n: "3", title: "Prix", text: "Le marché est conclu à prix global et forfaitaire, décomposé dans la décomposition du prix global et forfaitaire (DPGF) remise par le titulaire. Les prix sont fermes."}
         - {n: "4", title: "Délais", text: "Une période de préparation de trois mois court à compter de la notification du marché. Les travaux sont exécutés pendant les vacances scolaires d'été, du 06/07/2026 au 28/08/2026. Aucun travail n'est réalisé en présence des élèves."}
-        - {n: "5", title: "Pénalités", text: "En cas de retard sur la date d'achèvement, le titulaire encourt, sans mise en demeure préalable, une pénalité de 300,00 € par jour calendaire de retard. Toute absence à une réunion de chantier est pénalisée de 150,00 € par absence."}
+        - {n: "5", title: "Pénalités", text: "En cas de retard sur la date d'achèvement, le titulaire encourt, sans mise en demeure préalable, une pénalité de 300,00 € par jour calendaire de retard, dans la limite de 5 % du montant HT du marché. Toute absence à une réunion de chantier est pénalisée de 150,00 € par absence."}
         - {n: "6", title: "Retenue de garantie", text: "Une retenue de garantie de 5 % est prélevée sur le montant de chaque acompte. Elle peut être remplacée par une garantie à première demande."}
-        - {n: "7", title: "Règlement des comptes", text: "Les acomptes sont mensuels. Le délai global de paiement est de 30 jours. Les sous-traitants acceptés dont les conditions de paiement ont été agréées sont payés directement par le maître d'ouvrage pour les prestations qu'ils exécutent."}
-        - {n: "8", title: "Sécurité et protection de la santé", text: "Le titulaire remet son plan particulier de sécurité et de protection de la santé (PPSPS) dans les 30 jours qui suivent la notification du marché."}
+        - {n: "7", title: "Règlement des comptes", text: "Une avance de 5 % du montant TTC du marché est versée au titulaire qui ne la refuse pas dans l'acte d'engagement. Les acomptes sont mensuels. Le délai global de paiement est de 30 jours. Les sous-traitants acceptés dont les conditions de paiement ont été agréées sont payés directement par le maître d'ouvrage pour les prestations qu'ils exécutent."}
+        - {n: "8", title: "Sécurité et protection de la santé", text: "Le maître d'ouvrage désigne un coordonnateur SPS. Le titulaire remet son plan particulier de sécurité et de protection de la santé (PPSPS) au coordonnateur dans les 30 jours qui suivent la notification du marché. Le dossier technique amiante (DTA) de l'école est tenu à sa disposition en mairie."}
         - {n: "9", title: "Réception", text: "Les opérations préalables à la réception ont lieu au plus tard le 27/08/2026. La réception est prononcée avant la rentrée scolaire du 01/09/2026."}
     dpgf:
       number: DEV-2026-031
@@ -1318,7 +1357,8 @@ facts:
         date: "2026-03-13"
         supersedes_sentence: "Cet indice annule et remplace la DPGF DEV-2026-031 indice A du 13/02/2026."
         changes_sentence: >-
-          Modifications après la réunion de négociation du 06/03/2026 : ajout des deux fenêtres
+          Modification de consistance demandée par la commune lors de la réunion de négociation
+          du 06/03/2026 : ajout des deux fenêtres
           de la bibliothèque à la demande de la commune (postes 2 et 3 : 16 fenêtres au lieu de
           14) ; prix unitaire de l'isolation des plafonds (poste 4) ramené de 54,00 € à 51,50 €
           HT ; poste 6 ramené de 16400,00 € à 15900,00 € HT.
@@ -1326,8 +1366,10 @@ facts:
         difference_from_a: {ht: 2240.00, ttc: 2688.00}
     acte_engagement:
       date: "2026-03-20"
+      accepted: "2026-03-27"
       notified: "2026-03-30"
       signatory: bertrand-sauzede
+      advance_text: "Avance : le titulaire renonce au bénéfice de l'avance de 5 % prévue à l'article 7 du CCAP."
       price: {ht: 87440.00, vat: 17488.00, ttc: 104928.00}
       basis: "DPGF DEV-2026-031 indice B du 13/03/2026"
       works_period: "du 06/07/2026 au 28/08/2026"
@@ -1403,6 +1445,7 @@ facts:
         - ["Maître d'ouvrage", "Commune de Montferrine"]
         - ["Entreprise titulaire", "Lamna Bâtiment, 4 rue des Artisans, Valbrise"]
         - ["Responsable du chantier", "Inès Roux, conductrice de travaux"]
+        - ["Coordonnateur SPS", "Gaëtan Ferlicot, Trey Prévention (désigné par le maître d'ouvrage)"]
         - ["Période des travaux", "du 06/07/2026 au 28/08/2026"]
         - ["Horaires", "7h30 - 16h30, du lundi au vendredi"]
         - ["Effectif maximal prévu", "8 personnes"]
@@ -1411,14 +1454,20 @@ facts:
         - ["Adatum Électricité", "Éclairage LED", "2", "du 03/08/2026 au 07/08/2026"]
         - ["Litware Plomberie", "Rénovation du bloc sanitaire", "2", "du 06/07/2026 au 31/07/2026"]
       hygiene: "Base vie installée dans la cour : vestiaire, sanitaires et réfectoire chauffés, raccordés aux réseaux de l'école."
+      asbestos: "Repérage amiante avant travaux : dossier technique amiante (DTA) de la commune consulté le 22/04/2026 ; aucun matériau amianté dans les menuiseries, les plafonds et le bloc sanitaire concernés par les travaux."
       risks:
-        - ["Travail en hauteur", "Dépose et pose des fenêtres, faux plafonds", "Échafaudage roulant MAT-07 avec garde-corps ; nacelle élévatrice MAT-04 utilisée uniquement avec une vérification générale périodique à jour"]
+        - ["Travail en hauteur", "Dépose et pose des fenêtres, faux plafonds", "Échafaudage roulant MAT-07 avec garde-corps ; nacelle élévatrice MAT-04 utilisée uniquement avec une vérification générale périodique à jour et par des conducteurs titulaires du CACES R486"]
         - ["Chute d'objets", "Dépose des menuiseries", "Balisage de la zone au sol, port du casque"]
         - ["Poussières", "Dépose des anciens plafonds", "Aspiration à la source, masques filtrants"]
         - ["Risque électrique", "Éclairage LED", "Consignation des circuits par Adatum Électricité avant intervention"]
         - ["Manutention", "Fenêtres aluminium (environ 45 kg)", "Manutention à deux et chariot porte-vitrage"]
         - ["Coactivité", "Accueil de loisirs dans le préau et la cantine", "Zones de travail séparées et balisées, accès distinct par la rue de l'École"]
-      first_aid: "Sauveteur secouriste du travail présent sur le chantier : Mathis Ancelin. Trousse de secours dans la base vie ; numéros d'urgence affichés dans la base vie."
+      first_aid: "Sauveteur secouriste du travail présent sur le chantier : Mathis Ancelin. Trousse de secours dans la base vie ; consignes et numéros d'urgence affichés dans la base vie."
+      emergency:
+        - ["SAMU", "15"]
+        - ["Sapeurs-pompiers", "18"]
+        - ["Numéro d'urgence européen", "112"]
+        - ["Hôpital le plus proche", "centre hospitalier de Valbrise (service des urgences)"]
     bon_de_commande:
       number: BC-2026-021
       date: "2026-04-02"
@@ -1445,8 +1494,9 @@ facts:
         - {title: "2. Acompte (clients particuliers)", items: ["Un acompte de 30 % du prix TTC est versé à la signature du contrat.", "Le solde est payé selon l'échéancier du contrat."]}
         - {title: "3. Marchés de copropriété et marchés publics", items: ["Les travaux sont facturés sur situations mensuelles.", "Une retenue de garantie de 5 % du montant TTC des situations est applicable ; elle est libérée un an après la réception, sauf opposition motivée pour réserves non levées, et peut être remplacée par une caution bancaire."]}
         - {title: "4. Paiement", items: ["Nos factures sont payables à 30 jours à compter de leur date, sauf stipulation contraire du marché.", "Tout retard de paiement entraîne des pénalités au taux de trois fois le taux d'intérêt légal et une indemnité forfaitaire pour frais de recouvrement de 40,00 €."]}
-        - {title: "5. Réception et garanties", items: ["La réception des travaux fait l'objet d'un procès-verbal, avec ou sans réserves.", "Les garanties légales courent à compter de la réception : garantie de parfait achèvement d'un an, garantie biennale de bon fonctionnement de deux ans et garantie décennale de dix ans.", "L'entreprise est titulaire d'une assurance de responsabilité décennale."]}
+        - {title: "5. Réception et garanties", items: ["La réception des travaux fait l'objet d'un procès-verbal, avec ou sans réserves.", "Les garanties légales courent à compter de la réception : garantie de parfait achèvement d'un an, garantie biennale de bon fonctionnement de deux ans et garantie décennale de dix ans.", "L'entreprise est titulaire d'une assurance de responsabilité décennale souscrite auprès de Humongous Assurances, valable sur tout le territoire national."]}
         - {title: "6. Réserve de propriété", items: ["Les matériaux livrés et non posés restent la propriété de l'entreprise jusqu'à leur complet paiement."]}
+        - {title: "7. Clients particuliers", items: ["Pour un contrat conclu hors établissement, le client particulier dispose d'un délai de rétractation de 14 jours à compter de la signature.", "En cas de litige, le client particulier peut recourir gratuitement à un médiateur de la consommation."]}
       derived_not_printed: {standard_deposit_percent: 30.00, standard_retention_percent: 5.00}
     organigramme:
       date: "2026-01-05"
@@ -1514,7 +1564,7 @@ facts:
         - {week: 15, start: "2026-04-07", end: "2026-04-10", person: sebastien-quintard, chantier: nacrines, task: "Levée des réserves R01 et R03"}
         - {week: 15, start: "2026-04-07", end: "2026-04-10", person: nordine-saadaoui, chantier: nacrines, task: "Levée des réserves R01 et R03"}
         - {week: 16, start: "2026-04-13", end: "2026-04-17", person: mathis-ancelin, chantier: moreau, task: "Isolation et plâtrerie de l'extension (tâche T11)"}
-        - {week: 16, start: "2026-04-16", end: "2026-04-17", person: mathis-ancelin, chantier: nacrines, task: "Levée de la réserve R02 : reprise du nez de balcon du 3e étage"}
+        - {week: 16, start: "2026-04-16", end: "2026-04-17", person: mathis-ancelin, chantier: nacrines, task: "Levée de la réserve R02 : reprise du nez de balcon du 3e étage depuis la nacelle MAT-04"}
         - {week: 16, start: "2026-04-13", end: "2026-04-17", person: kevin-rabaste, chantier: moreau, task: "Isolation et plâtrerie de l'extension (tâche T11)"}
         - {week: 16, start: "2026-04-13", end: "2026-04-17", person: anthony-lescoffier, chantier: moreau, task: "Isolation et plâtrerie de l'extension (tâche T11)"}
         - {week: 16, start: "2026-04-13", end: "2026-04-17", person: sebastien-quintard, chantier: nacrines, task: "Levée des réserves R04 et R07, repli des échafaudages"}
@@ -1539,7 +1589,7 @@ facts:
       title: "Registre des attestations des sous-traitants"
       columns: ["Sous-traitant", "Chantiers", "Document", "Date du document", "Valable jusqu'au", "Reçu le", "Observations"]
       rows:
-        - {org: adatum-electricite, chantiers: "Moreau ; résidence Les Nacrines ; école de Montferrine", document: "Extrait d'immatriculation", issued: "2026-01-05", valid_until: null, received: "2026-01-07", note: ""}
+        - {org: adatum-electricite, chantiers: "Moreau ; résidence Les Nacrines ; école de Montferrine", document: "Extrait d'immatriculation", issued: "2026-04-08", valid_until: null, received: "2026-04-10", note: "Renouvelé avec l'attestation de vigilance"}
         - {org: adatum-electricite, chantiers: "Moreau ; résidence Les Nacrines ; école de Montferrine", document: "Attestation de vigilance", issued: "2025-09-15", valid_until: "2026-03-15", received: "2025-09-18", note: ""}
         - {org: adatum-electricite, chantiers: "Moreau ; résidence Les Nacrines ; école de Montferrine", document: "Attestation de vigilance", issued: "2026-04-08", valid_until: "2026-10-08", received: "2026-04-10", note: "Renouvellement"}
         - {org: adatum-electricite, chantiers: "Moreau ; résidence Les Nacrines ; école de Montferrine", document: "Attestation d'assurance de responsabilité décennale 2026", issued: "2026-01-02", valid_until: "2026-12-31", received: "2026-01-07", note: ""}
@@ -1560,6 +1610,7 @@ facts:
         - {chantier: moreau, initial_ht: 37843.00, changes_ht: 1940.00, total_ht: 39783.00, vat: 7488.60, total_ttc: 47271.60, retention: "5 % (dernière échéance, un an après la réception)"}
         - {chantier: nacrines, initial_ht: 177650.00, changes_ht: 6840.00, total_ht: 184490.00, vat: 18449.00, total_ttc: 202939.00, retention: "5 % du TTC de chaque situation"}
         - {chantier: ecole-montferrine, initial_ht: 87440.00, changes_ht: 0.00, total_ht: 87440.00, vat: 17488.00, total_ttc: 104928.00, retention: "5 % de chaque acompte"}
+      moreau_note: "Chantier Moreau : 2e échéance (fin de maçonnerie) à facturer."
       moreau_invoice: {invoice: FC-2026-009, date: "2026-02-10", object: "Acompte de 30 % à la signature du contrat", ht: 11352.90, vat: 2130.18, ttc: 13483.08, retention: 0.00, net: 13483.08, status: "Payée le 10/02/2026"}
       derived_not_printed:
         position:
@@ -1571,7 +1622,7 @@ facts:
       author: bertrand-sauzede
       sensitivity: restricted
       title: "Tableau de bord des marges au 31/03/2026"
-      columns: ["Code chantier", "Chantier", "Montant du marché HT", "Déboursé sec prévisionnel HT", "Marge brute prévisionnelle HT", "Taux de marge brute", "Déboursé constaté HT", "Facturé HT", "Marge à date HT"]
+      columns: ["Code chantier", "Chantier", "Montant du marché HT", "Déboursé sec prévisionnel HT", "Marge brute prévisionnelle HT", "Taux de marge brute", "Déboursé constaté HT", "Facturé HT", "Écart facturé / déboursé HT"]
       rows:
         - {chantier: moreau, contract_ht: 39783.00, planned_cost_ht: 32236.30, planned_margin_ht: 7546.70, rate: "19,0 %", actual_cost_ht: 14892.60, billed_ht: 11352.90, margin_to_date_ht: -3539.70}
         - {chantier: nacrines, contract_ht: 184490.00, planned_cost_ht: 151862.40, planned_margin_ht: 32627.60, rate: "17,7 %", actual_cost_ht: 146318.20, billed_ht: 174910.00, margin_to_date_ht: 28591.80}
@@ -1803,11 +1854,17 @@ vocabulary:
     - BC
     - BL
     - BTP
+    - CACES
     - CCAP
     - CR
     - DC4
     - DEV
     - DPGF
+    - DTA
+    - RCS
+    - SAMU
+    - SIRET
+    - SPS
     - EUR
     - FA
     - FC
@@ -1834,6 +1891,8 @@ vocabulary:
     # starts) and the English e-mail header names. The corpus lane may append words.
     - Accord
     - Achats
+    - Appel
+    - Sapeurs-pompiers
     - Coactivité
     - Conduite
     - Effectif
