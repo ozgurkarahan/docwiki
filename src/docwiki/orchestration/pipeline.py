@@ -1306,6 +1306,7 @@ class Pipeline:
                 audience=self.audience,
                 canaries=self.ctx.canaries,
                 glossary_seeded=bool(pack.glossary.terms),
+                locked_terms={term.term: term.banned for term in pack.terms.terms if term.banned},
                 citations=[c for w in included if w.result for c in w.result.citations],
                 sources_total=len(considered),
                 quarantined=sum(1 for w in considered if w.status in ("quarantined", "failed")),

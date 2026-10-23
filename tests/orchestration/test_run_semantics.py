@@ -69,7 +69,7 @@ async def test_unchanged_quarantined_sources_are_not_retried(harness, corpus):
     assert shard.last_error and "unreadable test document" in shard.last_error
     gates = {gate.gate: gate for gate in first.gates}
     assert gates["G15"].status == "warn"
-    assert gates["G16"].status == "skipped"  # the pipeline passes no locked terms yet
+    assert gates["G16"].status == "skipped"  # the test pack locks no terms
     assert _valid(harness.current_release()) == []
     quality = (harness.current_release() / "wiki" / "_meta" / "quality.md").read_text("utf-8")
     assert "## Quarantined sources" in quality
