@@ -4,7 +4,8 @@ Only when the domain pack declares ``scopes.yaml``. Each scope value with at lea
 the release (the default scope, e.g. ``entreprise``, included) gets a hub page at
 ``<plural>/<scope>.md`` (``hub:<plural>/<scope>``): the scope's registry entry (its attributes as
 a table), its documents grouped by phase with their status, the topics and entities of its
-sources, the open contradictions of its own topics and the last document received.
+sources (an entity bound to another scope by its registry attribute is never listed), the open
+contradictions of its own topics and the last document received.
 
 Open contradictions are counted once per pair of sources (v1.7): the same disagreement between
 two documents is often stated by several topics of a scope, under subjects the model words
@@ -45,7 +46,7 @@ from docwiki.contracts.pages import (
     TopicFrontmatter,
 )
 from docwiki.domain.models import DomainPack, RegistryEntry
-from docwiki.domain.rules import scope_axes
+from docwiki.domain.rules import document_scope, entity_in_scope, scope_axes
 from docwiki.engine_types import CompiledResult
 from docwiki.stages.links import inline_text, md_link, one_line, plural
 
@@ -65,7 +66,7 @@ __all__ = [
     "source_scope",
 ]
 
-STAGE_VERSION = "2"
+STAGE_VERSION = "3"
 NO_PHASE = "No phase"
 MAX_SUBJECTS = 3
 """Subjects shown per open contradiction on a hub; the others are counted."""
@@ -74,9 +75,7 @@ _PATH_DATE_RE = re.compile(r"(?<!\d)(\d{4}-\d{2}-\d{2})(?!\d)")
 
 def source_scope(pack: DomainPack, fm: SourceFrontmatter) -> str | None:
     """The scope value of a source page: its frontmatter, else its raw path (never a model)."""
-    if pack.scopes is None:
-        return None
-    return fm.scope or scope_axes(pack, fm.source_path).scope
+    return document_scope(pack, fm.scope, fm.source_path)
 
 
 def _source_phase(pack: DomainPack, fm: SourceFrontmatter) -> str | None:
@@ -252,6 +251,13 @@ def _summaries(
     phase_rank = {phase.key: rank for rank, phase in enumerate(scopes.phases)}
     topics = [page for page in pages if isinstance(page.frontmatter, TopicFrontmatter)]
     entities = [page for page in pages if isinstance(page.frontmatter, EntityFrontmatter)]
+    registry = {entry.id: entry for entry in pack.entities.registry}
+
+    def fits(page: Page, scope: str) -> bool:
+        # an entity bound to another scope is not listed, whatever sources it shares
+        entry = registry.get(page.frontmatter.id)
+        return entry is None or entity_in_scope(pack, entry, scope)
+
     summaries: list[ScopeSummary] = []
     for scope, members in by_scope.items():
         ids = {page.frontmatter.id for page in members}
@@ -293,6 +299,7 @@ def _summaries(
                     page
                     for page in entities
                     if ids & set(page.frontmatter.sources)  # type: ignore[union-attr]
+                    and fits(page, scope)
                 ),
                 contradictions=open_contradictions(_by_title(own_topics)),
             )

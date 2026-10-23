@@ -21,6 +21,7 @@ import {
   cellLabels,
   foreignLang,
   loneElementIndex,
+  splitIsoDates,
   splitQuoted,
   stacksTables,
   tableCaption,
@@ -316,6 +317,28 @@ function childElements(node: Element, tagName: string): Element[] {
   )
 }
 
+/** The ISO days written in a data table's cell (`(2026-04-21)`) never wrap at their hyphens. */
+function keepDatesWhole(cell: Element) {
+  for (let index = 0; index < cell.children.length; index++) {
+    const child = cell.children[index]
+    if (child.type !== "text") continue
+    const parts = splitIsoDates(child.value)
+    if (!parts.some((part) => part.date)) continue
+    const nodes: ElementContent[] = parts.map((part) =>
+      part.date
+        ? {
+            type: "element",
+            tagName: "span",
+            properties: { className: ["docwiki-nowrap"] },
+            children: [text(part.text)],
+          }
+        : text(part.text),
+    )
+    cell.children.splice(index, 1, ...nodes)
+    index += nodes.length - 1
+  }
+}
+
 /**
  * The wiki's data tables: each body cell gets its column's header as `data-label`, which the
  * stacked cards show on narrow screens (`docwiki-cards`, not on evidence sidecars); a computed
@@ -340,6 +363,7 @@ function decorateTables(tree: HtmlRoot, type: string | undefined, title: unknown
         cellLabels(headers, cells.length).forEach((label, position) => {
           if (label) cells[position].properties = { ...cells[position].properties, dataLabel: label }
         })
+        if (stacksTables(type)) cells.forEach(keepDatesWhole)
       }
     }
     if (headers.length > 0 && stacksTables(type)) addClass(node, "docwiki-cards")

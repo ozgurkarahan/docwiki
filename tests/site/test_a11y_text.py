@@ -153,6 +153,24 @@ def test_data_tables_stack_as_cards_except_on_evidence() -> None:
     }
 
 
+def test_dates_in_data_cells_stay_whole() -> None:
+    result = run(
+        """[
+          " (2026-04-21)", "received 2026-04-21", "2026-04-21 and 2026-05-02", "no date",
+          "BC-2026-009", "x2026-04-21", "",
+        ].map((text) => m.splitIsoDates(text).map((p) => (p.date ? [p.text] : p.text)))"""
+    )
+    assert result == [
+        [" ", ["(2026-04-21)"]],
+        ["received ", ["2026-04-21"]],
+        [["2026-04-21"], " and ", ["2026-05-02"]],
+        ["no date"],
+        ["BC-2026-009"],
+        ["x2026-04-21"],
+        [],
+    ]
+
+
 def test_a_view_names_its_table_boxes_after_its_title() -> None:
     result = run(
         """[

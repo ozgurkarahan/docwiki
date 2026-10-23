@@ -128,6 +128,30 @@ export function cellLabels(headers: readonly string[], cells: number): (string |
   return labels
 }
 
+export interface DatePart {
+  text: string
+  date: boolean
+}
+
+const ISO_DAY_IN_TEXT = /\(?(?<![\w-])\d{4}-\d{2}-\d{2}(?![\w-])\)?/g
+
+/**
+ * Split a table cell's text into plain parts and its ISO days (`2026-04-21`, with the brackets
+ * around it), which the caller keeps on one line: a date never breaks at its hyphens.
+ */
+export function splitIsoDates(text: string): DatePart[] {
+  const parts: DatePart[] = []
+  let position = 0
+  for (const match of text.matchAll(ISO_DAY_IN_TEXT)) {
+    const start = match.index ?? 0
+    if (start > position) parts.push({ text: text.slice(position, start), date: false })
+    parts.push({ text: match[0], date: true })
+    position = start + match[0].length
+  }
+  if (position < text.length) parts.push({ text: text.slice(position), date: false })
+  return parts
+}
+
 /**
  * The accessible name of a table's scroll box on a computed view: the view's title for its first
  * table (the rows), the title and the section for the others ("…, totals"). Elsewhere `null`: the

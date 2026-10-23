@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 
 from docwiki.contracts.enums import max_sensitivity, sensitivity_rank
-from docwiki.domain.models import DomainPack, TopicDef
+from docwiki.domain.models import DomainPack, RegistryEntry, TopicDef
 
 __all__ = [
     "DEFAULT_MIN_SCORE",
@@ -20,6 +20,9 @@ __all__ = [
     "ScopeAxes",
     "TopicScore",
     "compare_revisions",
+    "document_scope",
+    "entity_in_scope",
+    "entity_scope",
     "explicit_references",
     "glob_to_regex",
     "glossary_synonym_rows",
@@ -242,6 +245,37 @@ def scope_axes(pack: DomainPack, raw_path: str) -> ScopeAxes:
         doc_type=doc_type if doc_type in known else None,
         lot=lot,
     )
+
+
+def document_scope(pack: DomainPack, scope: str | None, raw_path: str) -> str | None:
+    """The scope value of a document: the one already recorded (classification or source page),
+    else the one of its raw path; ``None`` when the pack declares no scopes (never a model)."""
+    if pack.scopes is None:
+        return None
+    return scope or scope_axes(pack, raw_path).scope
+
+
+def entity_scope(pack: DomainPack, entry: RegistryEntry) -> str | None:
+    """The scope value a registry entry belongs to (v1.7, ADR 0011): the value of its attribute
+    named after the pack's scope dimension (``chantier: moreau`` when ``scopes.name`` is
+    ``chantier``), normalised like a path scope. ``None`` (company-wide) when the pack declares no
+    scopes or the entry has no such attribute."""
+    scopes = pack.scopes
+    if scopes is None:
+        return None
+    value = entry.attributes.get(scopes.name)
+    if value is None or isinstance(value, bool):
+        return None
+    key = _scope_key(str(value))
+    return key or None
+
+
+def entity_in_scope(pack: DomainPack, entry: RegistryEntry, scope: str | None) -> bool:
+    """Whether a document or page of ``scope`` may mention ``entry``: always for a company-wide
+    entry; for an entry bound to one scope, only from that scope (a page of another scope, of the
+    default scope or without scope does not mention it, whatever names it shares)."""
+    owner = entity_scope(pack, entry)
+    return owner is None or owner == scope
 
 
 def order_revisions(
