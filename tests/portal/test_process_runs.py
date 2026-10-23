@@ -293,6 +293,17 @@ def test_a_new_version_of_a_document_reads_received_until_its_run(storage: Folde
     assert (row["state"], row["phase"]) == ("received", None)
     assert row["page_url"] == DONE_PAGE  # the version in the wiki is still linked
 
+    # the same bytes again end in a no-op run: once it has seen the file, it is in the wiki again
+    _write_report(
+        storage,
+        "run-29991231-235959-00000007",
+        status="no-op",
+        release_id=None,
+        started_at="2999-12-31T23:59:59Z",
+        finished_at="2999-12-31T23:59:59Z",
+    )
+    assert _rows(_service(storage).process(owner=True))[DONE_PATH]["state"] == "in_wiki"
+
 
 def test_published_originals_are_linked(storage: FolderStorage) -> None:
     sid = source_id_for(DONE_PATH)
