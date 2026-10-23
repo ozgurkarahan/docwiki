@@ -964,6 +964,7 @@ class Pipeline:
                     work.classification.doc_number or parse_doc_number(pack, name, text),
                     work.classification.revision or parse_revision(pack, name, text),
                     tuple(explicit_references(pack, text)),
+                    scope=work.classification.scope,
                 )
             )
         _, pairs = resolve_supersession(pack, records)

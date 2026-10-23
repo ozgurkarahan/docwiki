@@ -24,6 +24,10 @@ wiki/
   topics/
     index.md
     <topic-slug>.md        # curated multi-source syntheses
+    <scope>/<topic-slug>.md   # v1.7: a per-scope topic, once per scope that has sources for it
+  <scope-folder>/          # v1.7 (ADR 0011), only when the pack declares scopes, e.g. chantiers/
+    index.md               # the list of the hubs (id index:hubs/<scope-folder>)
+    <scope>.md             # one hub per scope value (id hub:<scope-folder>/<scope>), built by code
   queries/                 # research answers filed back after approval
     <yyyy-mm-dd>-<slug>.md
   _meta/
@@ -75,6 +79,11 @@ Source pages add: `source_id`, `source_path` (raw relative path), `source_hash`,
 `authority` (1–10 from the domain pack), `extraction` (`{adapter, version, provenance_mix}`).
 
 Entity pages add: `entity_type`, `key`, `aliases` (with language tags), `sources` (list of source ids).
+
+Hub pages (v1.7, ADR 0011) add: `scope_type` (the pack's scope name, e.g. `chantier`), `scope`
+(the scope value) and `sources` (the scope's sources). Source pages add `scope`, `phase` and `lot`
+when the pack declares scopes; per-scope topic pages add `scope` (their id is
+`topic:<scope>/<slug>`). Scope and axes come from the raw path and the pack, never from a model.
 
 Topic pages add: `topic_slug`, `sources` (list), `confidence` (`high|medium|low`),
 `contradictions` (count), `superseded_claims` (count).

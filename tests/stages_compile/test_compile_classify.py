@@ -149,3 +149,45 @@ def test_output_model_is_cached_per_enum_set() -> None:
     assert classification_output_model(("a", "b"), ("x",)) is first
     with pytest.raises(ValueError):
         classification_output_model((), ("x",))
+
+
+async def test_the_path_gives_the_scope_the_axes_and_a_named_type(pack: DomainPack) -> None:
+    """v1.7, ADR 0011: with scopes, the raw path decides scope, phase, lot and, when a segment
+    names a type of the pack, the type itself (before the rules and the model)."""
+    from docwiki.domain.models import ScopesFile
+
+    scoped = pack.model_copy(
+        update={
+            "scopes": ScopesFile.model_validate(
+                {
+                    "name": "chantier",
+                    "title": "Chantier",
+                    "plural": "chantiers",
+                    "default": {"key": "entreprise", "title": "Entreprise"},
+                    "paths": [
+                        {
+                            "regex": r"^chantiers/(?P<scope>[a-z0-9-]+)/(?P<phase>[0-5])[^/]*/"
+                            r"(?P<type>[a-z0-9-]+)/"
+                        }
+                    ],
+                    "lot_regex": r"(?i)lot[-_ ]?(?P<lot>\d{1,2})",
+                }
+            )
+        }
+    )
+    llm = FakeLlmClient()  # no handler: any model call would fail
+    doc = make_doc(
+        "chantiers/ecole/1-marche/schedule/planning lot 2.pdf",
+        [block("b0001", "Avenant n°1 au contrat de travaux : fenêtre de toit FT1.")],
+    )
+    result = await classify_source(doc, scoped, llm)
+    assert (result.method, result.doc_type, result.category) == (
+        "path",
+        "schedule",
+        "schedule-and-purchases",
+    )
+    assert (result.scope, result.phase, result.lot) == ("ecole", "1", "2")
+    outside = await classify_source(quote_b_doc(), scoped, llm)
+    assert (outside.method, outside.scope, outside.phase) == ("rule", "entreprise", None)
+    assert (await classify_source(quote_b_doc(), pack, llm)).scope is None
+    assert llm.requests == []

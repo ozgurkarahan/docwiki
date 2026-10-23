@@ -16,6 +16,7 @@
       "entities": [],
       "topics": [],
       "sources": [],
+      "scope": null,
       "lang": "en"
     },
     {
@@ -30,6 +31,7 @@
       "entities": [],
       "topics": [],
       "sources": [],
+      "scope": null,
       "lang": "en"
     },
     {
@@ -44,6 +46,7 @@
       "entities": [],
       "topics": [],
       "sources": [],
+      "scope": null,
       "lang": "en"
     },
     {
@@ -58,6 +61,7 @@
       "entities": [],
       "topics": [],
       "sources": [],
+      "scope": null,
       "lang": "en"
     },
     {
@@ -79,6 +83,7 @@
         "src-86eabe3d6d0d",
         "src-c6436ec50050"
       ],
+      "scope": null,
       "lang": "en"
     },
     {
@@ -93,6 +98,7 @@
       "entities": [],
       "topics": [],
       "sources": [],
+      "scope": null,
       "lang": "en"
     },
     {
@@ -114,6 +120,7 @@
         "src-86eabe3d6d0d",
         "src-c6436ec50050"
       ],
+      "scope": null,
       "lang": "en"
     },
     {
@@ -135,6 +142,7 @@
         "src-86eabe3d6d0d",
         "src-c6436ec50050"
       ],
+      "scope": null,
       "lang": "en"
     },
     {
@@ -149,6 +157,7 @@
       "entities": [],
       "topics": [],
       "sources": [],
+      "scope": null,
       "lang": "en"
     },
     {
@@ -163,6 +172,7 @@
       "entities": [],
       "topics": [],
       "sources": [],
+      "scope": null,
       "lang": "en"
     },
     {
@@ -177,6 +187,7 @@
       "entities": [],
       "topics": [],
       "sources": [],
+      "scope": null,
       "lang": "en"
     },
     {
@@ -198,6 +209,7 @@
         "src-86eabe3d6d0d",
         "src-c6436ec50050"
       ],
+      "scope": null,
       "lang": "en"
     },
     {
@@ -223,6 +235,7 @@
       "sources": [
         "src-165f1d3a109c"
       ],
+      "scope": null,
       "lang": "en"
     },
     {
@@ -237,6 +250,7 @@
       "entities": [],
       "topics": [],
       "sources": [],
+      "scope": null,
       "lang": "en"
     },
     {
@@ -262,6 +276,7 @@
       "sources": [
         "src-c6436ec50050"
       ],
+      "scope": null,
       "lang": "en"
     },
     {
@@ -288,6 +303,7 @@
       "sources": [
         "src-86eabe3d6d0d"
       ],
+      "scope": null,
       "lang": "en"
     },
     {
@@ -302,6 +318,7 @@
       "entities": [],
       "topics": [],
       "sources": [],
+      "scope": null,
       "lang": "en"
     },
     {
@@ -323,6 +340,7 @@
         "src-86eabe3d6d0d",
         "src-c6436ec50050"
       ],
+      "scope": null,
       "lang": "en"
     }
   ],
@@ -536,7 +554,9 @@
       "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "status": "current",
       "doc_number": null,
-      "revision": null
+      "revision": null,
+      "scope": null,
+      "phase": null
     },
     {
       "source_id": "src-86eabe3d6d0d",
@@ -545,7 +565,9 @@
       "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "status": "current",
       "doc_number": "PLN-2026-003",
-      "revision": "B"
+      "revision": "B",
+      "scope": null,
+      "phase": null
     },
     {
       "source_id": "src-c6436ec50050",
@@ -554,7 +576,9 @@
       "media_type": "application/pdf",
       "status": "superseded",
       "doc_number": "PLN-2026-003",
-      "revision": "A"
+      "revision": "A",
+      "scope": null,
+      "phase": null
     }
   ],
   "glossary": [

@@ -213,8 +213,8 @@
   ],
   "files": {
     "catalog.json": {
-      "sha256": "3a14143e20bf1de5f5db99bd9533e109332e73c46bc3e5a3810cd75228425b93",
-      "size": 16110
+      "sha256": "4879b7258a7f3f96ee383b72b750aa9c570ff59f27edb57a32958f3e90289ce6",
+      "size": 16614
     },
     "evidence/src-165f1d3a109c/index.md": {
       "sha256": "26f585c955d023b36f6dc62e409875e9be9d8c292d5af06eeadbb262c6e8d0d6",
@@ -325,8 +325,8 @@
       "size": 886
     },
     "wiki/catalog.json": {
-      "sha256": "3a14143e20bf1de5f5db99bd9533e109332e73c46bc3e5a3810cd75228425b93",
-      "size": 16110
+      "sha256": "4879b7258a7f3f96ee383b72b750aa9c570ff59f27edb57a32958f3e90289ce6",
+      "size": 16614
     },
     "wiki/entities/index.md": {
       "sha256": "5dd94ed4fe1c82c7f0224b043fec39ab6cbb2fef648a43ffa27e87024f924884",

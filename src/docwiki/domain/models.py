@@ -34,8 +34,12 @@ __all__ = [
     "GlossaryTerm",
     "LockedTerm",
     "PackInfo",
+    "PhaseDef",
     "RegistryEntry",
     "ResolutionFile",
+    "ScopeDefault",
+    "ScopePath",
+    "ScopesFile",
     "SensitivityFile",
     "SensitivityRule",
     "SupersessionFile",
@@ -195,6 +199,9 @@ class TopicDef(ContractModel):
     aliases: list[EntityAlias] = []
     min_score: Annotated[float, Field(gt=0)] | None = None
     min_sources: Annotated[int, Field(ge=1)] | None = None
+    per_scope: bool = False
+    """Written once per scope that has sources for it (``topics/<scope>/<slug>.md``) when the pack
+    declares scopes (v1.7, ADR 0011); otherwise one company-wide page."""
 
     @model_validator(mode="after")
     def _terms(self) -> Self:
@@ -230,6 +237,66 @@ class GlossaryFile(ContractModel):
     def _unique_terms(self) -> Self:
         _unique([t.term.casefold() for t in self.terms], "glossary term")
         return self
+
+
+SCOPE_GROUPS = frozenset({"scope", "phase", "type", "lot"})
+"""Named groups a scope path regex may capture."""
+
+
+class ScopePath(ContractModel):
+    """A raw-path regex; its named groups give the scope value and the axes."""
+
+    regex: NonEmptyStr
+
+    @field_validator("regex")
+    @classmethod
+    def _regex(cls, value: str) -> str:
+        try:
+            compiled = re.compile(value)
+        except re.error as exc:
+            raise ValueError(f"invalid regex: {exc}") from exc
+        unknown = set(compiled.groupindex) - SCOPE_GROUPS
+        if unknown:
+            raise ValueError(f"unknown named groups {sorted(unknown)}; use {sorted(SCOPE_GROUPS)}")
+        return value
+
+
+class PhaseDef(ContractModel):
+    key: NonEmptyStr
+    title: NonEmptyStr
+
+
+class ScopeDefault(ContractModel):
+    key: Kebab
+    title: NonEmptyStr
+
+
+class ScopesFile(ContractModel):
+    """``scopes.yaml`` (v1.7, ADR 0011): the pack's one scope dimension (a chantier), read from
+    the raw path, never from a model."""
+
+    name: Kebab
+    """The scope type (``chantier``): the registry entity type that describes each scope value."""
+    title: NonEmptyStr
+    plural: Kebab
+    """The wiki folder of the hub pages (``chantiers``)."""
+    default: ScopeDefault
+    """The scope of a document no path regex matches (``entreprise``)."""
+    paths: list[ScopePath] = []
+    phases: list[PhaseDef] = []
+    lot_regex: str | None = None
+    """A regex with a ``lot`` group, tried on the file name when no path regex gave a lot."""
+
+    @field_validator("lot_regex")
+    @classmethod
+    def _lot(cls, value: str | None) -> str | None:
+        _check_regex(value)
+        if value is not None and "lot" not in re.compile(value).groupindex:
+            raise ValueError("lot_regex needs a named group 'lot'")
+        return value
+
+    def phase_title(self, key: str | None) -> str | None:
+        return next((phase.title for phase in self.phases if phase.key == key), None)
 
 
 class LockedTerm(ContractModel):
@@ -317,6 +384,7 @@ class DomainPack(ContractModel):
     topics: TopicsFile
     glossary: GlossaryFile
     terms: TermsFile = Field(default_factory=TermsFile)
+    scopes: ScopesFile | None = None
     sensitivity: SensitivityFile
     supersession: SupersessionFile | None = None
     resolution: ResolutionFile = Field(default_factory=ResolutionFile)

@@ -53,6 +53,7 @@ __all__ = [
     "ExtractionSummary",
     "Frontmatter",
     "GlossaryFrontmatter",
+    "HubFrontmatter",
     "IndexFrontmatter",
     "LogFrontmatter",
     "MetaFrontmatter",
@@ -67,11 +68,15 @@ __all__ = [
 
 SourceId = Annotated[str, Field(pattern=SOURCE_ID_RE.pattern)]
 ReleaseId = Annotated[str, Field(pattern=RELEASE_ID_RE.pattern)]
-TopicId = Annotated[str, Field(pattern=r"^topic:[a-z0-9]+(?:-[a-z0-9]+)*$")]
+TopicId = Annotated[
+    str, Field(pattern=r"^topic:(?:[a-z0-9]+(?:-[a-z0-9]+)*/)?[a-z0-9]+(?:-[a-z0-9]+)*$")
+]
 Tag = Annotated[str, Field(pattern=r"^[a-z0-9]+(?:[-_/][a-z0-9]+)*$")]
 INDEX_ID_RE = re.compile(
-    r"^index:(home|sources|entities|topics|queries|entities/[a-z0-9]+(?:-[a-z0-9]+)*)$"
+    r"^index:(home|sources|entities|topics|queries"
+    r"|entities/[a-z0-9]+(?:-[a-z0-9]+)*|hubs/[a-z0-9]+(?:-[a-z0-9]+)*)$"
 )
+HUB_ID_RE = re.compile(r"^hub:[a-z0-9]+(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*$")
 META_ID_RE = re.compile(r"^meta:[a-z0-9]+(?:[-/][a-z0-9]+)*$")
 
 
@@ -137,6 +142,11 @@ class SourceFrontmatter(_BaseFrontmatter):
     category: Kebab
     doc_number: str | None = None
     revision: str | None = None
+    scope: Kebab | None = None
+    """The scope value the document belongs to (``moreau``, or the default ``entreprise``), from
+    its raw path; ``None`` when the pack declares no scopes (v1.7, ADR 0011)."""
+    phase: str | None = None
+    lot: str | None = None
     status: SourceStatus
     supersedes: list[SourceId] = []
     superseded_by: list[SourceId] = []
@@ -198,6 +208,8 @@ class EntityFrontmatter(_BaseFrontmatter):
 class TopicFrontmatter(_BaseFrontmatter):
     type: Literal["topic"] = "topic"
     topic_slug: Kebab
+    scope: Kebab | None = None
+    """For a topic written once per scope (``per_scope`` in the catalog): its scope value."""
     sources: list[SourceId] = []
     confidence: Confidence
     contradictions: Annotated[int, Field(ge=0)] = 0
@@ -210,8 +222,29 @@ class TopicFrontmatter(_BaseFrontmatter):
 
     @model_validator(mode="after")
     def _consistency(self) -> Self:
-        if self.id != format_topic_id(self.topic_slug):
-            raise ValueError("topic page id must be 'topic:<topic_slug>'")
+        if self.id != format_topic_id(self.topic_slug, self.scope):
+            raise ValueError("topic page id must be 'topic:[<scope>/]<topic_slug>'")
+        return self
+
+
+class HubFrontmatter(_BaseFrontmatter):
+    """The hub page of one scope value (v1.7, ADR 0011), built by code: ``hub:<folder>/<key>``
+    at ``<folder>/<key>.md`` (``chantiers/moreau.md``)."""
+
+    type: Literal["hub"] = "hub"
+    scope_type: Kebab
+    scope: Kebab
+    sources: list[SourceId] = []
+
+    @field_validator("sources")
+    @classmethod
+    def _sources(cls, value: list[str]) -> list[str]:
+        return _sorted_unique(value, "sources")
+
+    @model_validator(mode="after")
+    def _consistency(self) -> Self:
+        if not HUB_ID_RE.match(self.id) or not self.id.endswith(f"/{self.scope}"):
+            raise ValueError("hub page id must be 'hub:<folder>/<scope>'")
         return self
 
 
@@ -274,6 +307,7 @@ Frontmatter = Annotated[
     SourceFrontmatter
     | EntityFrontmatter
     | TopicFrontmatter
+    | HubFrontmatter
     | QueryFrontmatter
     | IndexFrontmatter
     | MetaFrontmatter

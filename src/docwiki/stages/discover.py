@@ -31,6 +31,7 @@ from docwiki.domain.rules import (
     parse_doc_number,
     parse_revision,
     revision_rank,
+    scope_axes,
     sensitivity_for,
     supersession_pairs,
 )
@@ -169,6 +170,15 @@ class SupersessionRecord:
     doc_number: str | None
     revision: str | None
     references: tuple[str, ...] = ()
+    scope: str | None = None
+    """Revisions and explicit references only connect documents of the same scope (v1.7)."""
+
+    @property
+    def key(self) -> str | None:
+        """The revision group: the document number, within its scope."""
+        if not self.doc_number:
+            return None
+        return f"{self.scope}/{self.doc_number}" if self.scope else self.doc_number
 
 
 def resolve_supersession(
@@ -191,19 +201,20 @@ def resolve_supersession(
             revision_rank(pack, record.revision)
         except ValueError:
             continue
-        ranked.append((record.source_id, record.doc_number, record.revision))
+        ranked.append((record.source_id, record.key, record.revision))
     groups = order_revisions(pack, ranked) if pack.supersession else {}
     pairs = set(supersession_pairs(pack, ranked)) if pack.supersession else set()
     by_number: dict[str, list[str]] = {}
     for record in items:
-        if record.doc_number:
-            by_number.setdefault(record.doc_number, []).append(record.source_id)
+        if record.key:
+            by_number.setdefault(record.key, []).append(record.source_id)
     explicit: set[tuple[str, str]] = set()
     for record in items:
         for number in record.references:
             if number == record.doc_number:
                 continue
-            for older in by_number.get(number, []):
+            target = f"{record.scope}/{number}" if record.scope else number
+            for older in by_number.get(target, []):
                 if older != record.source_id:
                     explicit.add((record.source_id, older))
     for newer, older in explicit:
@@ -355,6 +366,7 @@ def discover(
             item.source_id,
             item.state.revision_group or parse_doc_number(pack, PurePosixPath(item.raw_path).name),
             parse_revision(pack, PurePosixPath(item.raw_path).name),
+            scope=scope_axes(pack, item.raw_path).scope,
         )
         for item in plan.active_items()
     ]

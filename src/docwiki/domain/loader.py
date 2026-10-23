@@ -17,6 +17,7 @@ from docwiki.domain.models import (
     GlossaryFile,
     PackInfo,
     ResolutionFile,
+    ScopesFile,
     SensitivityFile,
     SupersessionFile,
     TaxonomyFile,
@@ -36,6 +37,7 @@ PACK_FILES: dict[str, tuple[type[BaseModel], bool]] = {
     "supersession.yaml": (SupersessionFile, False),
     "resolution.yaml": (ResolutionFile, False),
     "terms.yaml": (TermsFile, False),
+    "scopes.yaml": (ScopesFile, False),
 }
 """File name → (schema model, required)."""
 
@@ -218,6 +220,7 @@ def load_pack(path: str | Path, *, overlay: str | Path | None = None) -> DomainP
             topics=parsed["topics.yaml"],
             glossary=parsed["glossary.yaml"],
             terms=parsed.get("terms.yaml", TermsFile()),
+            scopes=parsed.get("scopes.yaml"),
             sensitivity=parsed["sensitivity.yaml"],
             supersession=parsed.get("supersession.yaml"),
             resolution=parsed.get("resolution.yaml", ResolutionFile()),

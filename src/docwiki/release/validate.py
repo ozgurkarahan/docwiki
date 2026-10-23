@@ -28,6 +28,7 @@ from docwiki.contracts.ids import (
     SOURCE_ID_RE,
     check_wiki_path,
     entity_page_path,
+    hub_page_path,
     index_page_path,
     query_page_path,
     topic_page_path,
@@ -55,6 +56,7 @@ from docwiki.contracts.pages import (
     EvidenceFrontmatter,
     EvidenceIndexFrontmatter,
     EvidencePage,
+    HubFrontmatter,
     Page,
     QueryFrontmatter,
     SkillFile,
@@ -293,6 +295,8 @@ def _expected_page_path(page: Page) -> str | None:
         return entity_page_path(fm.id)
     if isinstance(fm, TopicFrontmatter):
         return topic_page_path(fm.id)
+    if isinstance(fm, HubFrontmatter):
+        return hub_page_path(fm.id)
     if isinstance(fm, QueryFrontmatter):
         return query_page_path(fm.id)
     if fm.type == "index":

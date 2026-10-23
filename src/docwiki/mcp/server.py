@@ -74,7 +74,9 @@ _LOOPBACK_HOSTS = ["127.0.0.1:*", "localhost:*", "[::1]:*"]
 _LOOPBACK_ORIGINS = ["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*"]
 
 SearchKind = Literal["page-section", "source-block"]
-PageTypeName = Literal["source", "entity", "topic", "query", "index", "meta", "glossary", "log"]
+PageTypeName = Literal[
+    "source", "entity", "topic", "hub", "query", "index", "meta", "glossary", "log"
+]
 SourceStatusName = Literal["failed", "quarantined", "pending", "deleted", "done"]
 ProposalStatusName = Literal["open", "accepted", "rejected"]
 SourceIdStr = Annotated[str, Field(pattern=r"^src-[0-9a-f]{12}$")]

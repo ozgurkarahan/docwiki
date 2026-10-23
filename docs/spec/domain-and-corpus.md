@@ -15,6 +15,7 @@ A domain pack is a folder under `domains/<pack>/`:
 | `supersession.yaml` | `doc_number_regex`, `revision_regex`, `revision_order` (e.g. `[A, B, C]` or numeric), `explicit_reference_regex` |
 | `resolution.yaml` | contradiction resolution policy: `order: [authority, recency]`, notes shown on topic pages |
 | `hints.md` | optional reviewed domain notes appended to compile prompts (no document text) |
+| `scopes.yaml` | optional scope dimension (v1.7, [ADR 0011](../adr/0011-company-wide-wiki.md)): `name` (the scope type, e.g. `chantier`, also the registry entity type of each scope value), `title`, `plural` (the hubs' folder), `default: {key, title}` (documents outside any scope), `paths: [{regex}]` (first match on the raw path; named groups `scope`, `phase`, `type`, `lot`), `phases: [{key, title}]`, `lot_regex` (a `lot` group, on the file name). A `type` group naming a doc type decides the document's type before the rules. Topics with `per_scope: true` are written once per scope. Supersession groups are keyed by (scope, document number). |
 | `terms.yaml` | optional locked trade vocabulary (v1.7, [ADR 0012](../adr/0012-french-canonical-and-locked-vocabulary.md)): `terms: [{term, forms, gloss, banned}]`; kept in the documents' language with the English gloss on first use, given to the compile, entity and topic prompts; gate G16 fails a page with a banned rendering |
 | `skills/<skill>/SKILL.md.j2` | at most 3 domain skill templates (see §4) |
 

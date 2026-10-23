@@ -40,7 +40,11 @@ class Classification(BaseModel):
     lang: str = "en"
     confidence: float = Field(ge=0.0, le=1.0)
     rule_id: str | None = None
-    method: Literal["rule", "llm"]
+    method: Literal["path", "rule", "llm"]
+    scope: str | None = None
+    """Scope value from the raw path (v1.7, ADR 0011); ``None`` when the pack has no scopes."""
+    phase: str | None = None
+    lot: str | None = None
 
 
 @dataclass(frozen=True)
