@@ -9,13 +9,15 @@ const LANG_TAG = /^([a-z]{2,3})(-[a-z0-9]{2,8})*$/i
 
 /**
  * The `lang` attribute for content in a document's own language, or `null` when there is nothing
- * to mark: the pages are English, so English (or an unknown or malformed tag) needs no mark.
+ * to mark: content in the page's language (`pageLang`, English by default; a French page quoting a
+ * French document needs no mark), or an unknown or malformed tag.
  */
-export function foreignLang(lang: unknown): string | null {
+export function foreignLang(lang: unknown, pageLang: string = "en"): string | null {
   if (typeof lang !== "string") return null
   const tag = lang.trim()
   const match = LANG_TAG.exec(tag)
-  if (!match || match[1].toLowerCase() === "en") return null
+  const page = typeof pageLang === "string" ? pageLang.split("-")[0].toLowerCase() : "en"
+  if (!match || match[1].toLowerCase() === page) return null
   return tag.toLowerCase()
 }
 

@@ -8,6 +8,7 @@ import { SKIP_TARGET_ID } from "../../plugins/transformers/docwiki-a11y"
 import { QuartzComponent, QuartzComponentConstructor, QuartzComponentProps } from "../types"
 // @ts-ignore
 import script from "./scripts/a11y.inline"
+import { pageStrings } from "./settings"
 
 export default (() => {
   const SkipLink: QuartzComponent = ({ fileData, displayClass }: QuartzComponentProps) => {
@@ -19,7 +20,7 @@ export default (() => {
         data-router-ignore="true"
         data-no-popover="true"
       >
-        Skip to content
+        {pageStrings(fileData).a11y.skip}
       </a>
     )
   }

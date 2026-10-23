@@ -203,12 +203,74 @@ source page and a topic page with the drawer open, at 1280×800 and 390×844, li
   references and back links, the drawer's citation markers (inline padding, which does not move
   the lines) and source lists. Main actions are 44 px on the phone: the tabs, Sign in, the story
   cards, "Try: …", the floating button, the drawer's close and Ask buttons, the menu button.
-- **Language.** The pages are English (`lang="en"`); the documents' own words are marked with the
-  document's language (`original_lang` of the source page, given to the site as the source's
-  `lang`, when it is not English): the quoted passages ("…", “…”, « … ») and the non-notice
-  blockquotes of a source page, the verbatim blockquotes and the table rows of an evidence
-  sidecar. Source titles are the compiled English titles and the drawer's citations carry no
-  excerpt, so neither is marked. Nothing is translated.
+- **Language.** Each page has the `lang` of its language (§11: French at the root of a French
+  wiki, English under `en/`; English for a wiki without languages); the documents' own words are
+  marked with the document's language (`original_lang` of the source page, given to the site as
+  the source's `lang`, when it differs from the page's): the quoted passages ("…", “…”, « … »)
+  and the non-notice blockquotes of a source page, the verbatim blockquotes and the table rows of
+  an evidence sidecar. Source titles are the compiled titles of the page's language and the
+  drawer's citations carry no excerpt, so neither is marked. The site translates nothing itself.
 - **Zoom.** At 320 px and at 200 % zoom (640 CSS px) no page scrolls sideways; a wide table
   scrolls inside its own box, which becomes a focusable, labelled region.
 - The pure parts are in `docwiki-a11y.ts`, tested with Node.
+
+## 11. Languages: French canonical, English mirror
+
+(v1.7, slice G, [ADR 0012](../adr/0012-french-canonical-and-locked-vocabulary.md) decision 3.)
+
+- **What the build reads** (one adapter in `src/docwiki/site/build.py`): the manifest's
+  `wiki_languages` (`["fr", "en"]`, the first canonical); without it, the `lang` of the home
+  page in `catalog.json` (else of `wiki/index.md`), the other languages being those of the
+  catalog's pages. A mirror exists when `wiki/<lang>/index.md` does. Canonical pages are at
+  `wiki/<path>` (`lang: fr`); a mirror's pages at `wiki/<lang>/<same path>` (`lang: en`,
+  `translation_of: <id>`, the same `id`), linking the mirror's pages and the shared evidence.
+  Catalog pages are unique by `(id, lang)`. A release without any of this (the mock release)
+  builds exactly as before: one tree, English.
+- **Trees.** The canonical tree is the content root; each mirror is under `<lang>/` with the same
+  slugs, `documents` and `pipeline` included (written by `docwiki.site.process_page` in each
+  language). Evidence sidecars, document pages and originals exist once, in the canonical tree;
+  they are shown in the canonical language, and the mirror's pages link to them.
+  `docwiki-site.json` gives `languages` and, per mirror, its title, sources (page and title),
+  scopes, register, explorer and steps. With a mirror the build also writes
+  `static/docwiki/languages.json` (`{"schema": 1, "canonical": "fr", "languages": ["fr", "en"]}`)
+  for the portal.
+- **Page language.** A page's language is its frontmatter `lang` when it is one of the wiki's
+  languages, else its tree's; `<html lang>` follows (the client sets it again after Quartz's
+  in-site navigation). Quartz's own components (search, theme and reader buttons, table of
+  contents, backlinks, graph, dates and reading time, folder and tag listings) get the locale of
+  that language (`DocWiki.Localized`); the site title, the breadcrumbs' root and the tabs lead to
+  the home, documents and pipeline pages of that language. A mirror's home (`en/index`, a folder
+  page for Quartz) reads like the home page: the story, "About this wiki", no folder listing.
+- **Strings.** Every string of the overlay's components and scripts (tabs, status chip and status
+  vocabulary, Sign in, the drawer, the register, the pipeline page, the story home, the banner,
+  the skip link, "Scroll sideways →", badges' words and meanings…) comes from one typed table per
+  language: `site/quartz/components/docwiki/i18n/en.ts` and `fr.ts` (`Strings` in `strings.ts`).
+  The locked trade terms stay untranslated in English (réception, avenant, situation, PV,
+  réserves, DPGF, CCAP, PPSPS, conducteur de travaux, indice, lot…). The wiki's citation markers
+  stay English in the Markdown (`✓ quote verified`); the reader sees them in the page's language.
+  A language without a table gets English.
+- **Switch.** "FR · EN" in the header: plain links with `hreflang` and `lang`, the page's language
+  marked `aria-current="true"`, at least 24 × 24 px (44 px tall on phones); with a switch, the
+  tabs, Sign in and the switch share the first row and the chip goes under them; on phones the
+  tabs have the first row and the chip, Sign in and the switch the second. Each link leads to the
+  same slug in the other language, else (evidence) to its documents page, else to its home, as a
+  full page load; clicking it sets the cookie `docwiki_lang=<lang>` (one year, `SameSite=Lax`).
+  Each page's head lists its `<link rel="alternate" hreflang>` twins (absolute with a base URL)
+  and `x-default` (the canonical page).
+- **Explorer and search.** One explorer per language: the canonical one never lists a mirror's
+  folder; a mirror's lists only its folder, as the root, with the same grouping and folder titles.
+  The content-index loader (`static/docwiki/content-index.js`, given the languages) hands Quartz's
+  search, explorer and graph the pages of the language of the page on screen (evidence is shared
+  by both).
+- **Links from the portal and the drawer.** The pipeline page and the header link the wiki pages of
+  the portal's replies in the page's language (`/sources/x` → `/en/sources/x`; evidence, static
+  files and files stay shared); the drawer's "Pages in the wiki" are the pages of its language.
+  Filed answers are those of the canonical tree (`queries/`).
+- **Negotiation (portal).** With `languages.json`, a top-level navigation (`Sec-Fetch-Dest` absent
+  or `document`) to a canonical HTML page whose twin exists is redirected (302, query kept) to
+  `/<lang>/…` when the reader's language is a mirror's: the `docwiki_lang` cookie when it names a
+  language of the site (it wins), else `Accept-Language` (the mirror's best q-value strictly above
+  the canonical's; ties stay canonical). Mirror pages, `static/`, `evidence/`, `api/`, `404` and
+  non-HTML files are never redirected; canonical HTML responses carry `Vary: Accept-Language,
+  Cookie`. Old URLs redirect in both languages (`/how-it-works`, `/en/how-it-works` → `pipeline`).
+  Without `languages.json` (or with one language) the portal behaves as before.

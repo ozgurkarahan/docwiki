@@ -11,6 +11,11 @@ anchors (:mod:`docwiki.site.links`) and the security scan (:mod:`docwiki.site.sc
 research answers (``queries/``) are published as ``static/docwiki/answers.json`` for the "Ask this
 wiki" drawer (:mod:`docwiki.site.answers`). No symlinks are used, so it runs unprivileged on
 Windows.
+
+A release with an English mirror of its French wiki (ADR 0012, ``wiki/en/…``) is built as two
+trees with the same slugs; the release's language contract is read in one place
+(:func:`open_release`, ``_split_catalog``) and handed to the overlay through
+``docwiki-site.json`` (site.md §11).
 """
 
 from __future__ import annotations
@@ -24,7 +29,7 @@ import stat
 import subprocess
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, Protocol
 
@@ -39,16 +44,18 @@ from docwiki.release.reader import ReleaseNotFoundError, ReleaseReader
 from docwiki.site.answers import build_answers, write_answers
 from docwiki.site.errors import SiteBuildError
 from docwiki.site.linkcheck import check_links
-from docwiki.site.process_page import STAGES, write_documents_page, write_process_page
+from docwiki.site.process_page import stages, write_documents_page, write_process_page
 from docwiki.site.register import explorer_settings, register_groups, scope_info
 from docwiki.site.security import REPO_URL, default_allowed_hosts, scan_site
 
 __all__ = [
     "DEFAULT_BANNER",
+    "LANGUAGES_FILE",
     "PORTABLE_DIR",
     "QUARTZ_REPOSITORY",
     "SETTINGS_FILE",
     "CommandRunner",
+    "Languages",
     "ReleaseView",
     "SiteBuildError",
     "apply_overlay",
@@ -65,6 +72,7 @@ __all__ = [
     "read_quartz_version",
     "site_settings",
     "subprocess_runner",
+    "write_languages",
 ]
 
 QUARTZ_REPOSITORY = "https://github.com/jackyzha0/quartz.git"
@@ -82,15 +90,16 @@ UNUSED_QUARTZ_FILES = (
     "quartz/static/icon.png",
 )
 """Quartz static assets the DocWiki layout never references (giscus themes load from a CDN)."""
+LANGUAGES_FILE = "static/docwiki/languages.json"
+"""The site's languages (``{"schema": 1, "canonical": "fr", "languages": ["fr", "en"]}``), written
+only when the release has a mirror; the portal reads it to send English readers to the mirror."""
 INSTALL_STAMP = ".docwiki-install"
 PORTABLE_DIR = ".docwiki"
 """Machine files of a portable wiki folder (``manifest.json``, ``current.json``, ``search.db``,
 ``tables/``); never part of the site content."""
 _PORTABLE_MARKERS = ("manifest.json", "current.json")
 _TAG_RE = re.compile(r"^v\d+\.\d+\.\d+$")
-_HOST_PATH_RE = re.compile(
-    r"^[a-z0-9]([a-z0-9.\-]*[a-z0-9])?(:\d{1,5})?(/[A-Za-z0-9._~\-/]*)?$"
-)
+_HOST_PATH_RE = re.compile(r"^[a-z0-9]([a-z0-9.\-]*[a-z0-9])?(:\d{1,5})?(/[A-Za-z0-9._~\-/]*)?$")
 _FICTIONAL_RE = re.compile(r"^>\s*(\*\*)?FICTIONAL\b", re.MULTILINE)
 
 
@@ -205,12 +214,27 @@ class _Location:
 
 
 @dataclass(frozen=True)
+class Languages:
+    """The wiki's languages (ADR 0012 decision 3): the canonical one at the root of the wiki, and
+    the mirrors, each a translated copy under ``<lang>/`` with the same slugs."""
+
+    canonical: str = "en"
+    mirrors: tuple[str, ...] = ()
+
+    @property
+    def all(self) -> tuple[str, ...]:
+        return (self.canonical, *self.mirrors)
+
+
+@dataclass(frozen=True)
 class ReleaseView:
     """What the site needs from a release: its wiki, its evidence and its catalog.
 
     ``layout`` is ``release`` (``releases/<id>/`` with ``wiki/`` and ``evidence/``, published or
     staged before ``manifest.json`` exists, as in the pipeline's ``site`` stage) or ``portable``
     (wiki content at the folder root, ``evidence/`` inside it, machine files under ``.docwiki/``).
+    ``catalog`` lists the canonical pages; ``mirrors`` holds one catalog per mirror language, its
+    page paths relative to the mirror's folder (``sources/x.md`` for ``wiki/en/sources/x.md``).
     """
 
     root: Path
@@ -218,6 +242,8 @@ class ReleaseView:
     wiki_dir: Path
     evidence_dir: Path
     layout: Layout = "release"
+    languages: Languages = field(default_factory=Languages)
+    mirrors: Mapping[str, Catalog] = field(default_factory=dict)
 
     @property
     def release_id(self) -> str:
@@ -240,7 +266,7 @@ class ReleaseView:
 
     def manifest(self) -> ReleaseManifest | None:
         path = self.manifest_path
-        return ReleaseManifest.from_json(path.read_bytes()) if path.is_file() else None
+        return _read_manifest(path.read_bytes()) if path.is_file() else None
 
 
 def is_portable_wiki(path: str | Path) -> bool:
@@ -264,16 +290,144 @@ def _locate(path: str | Path) -> _Location:
     return _Location(root, wiki, root / ReleaseFiles.EVIDENCE_DIR, "release", catalogs)
 
 
+# ----- The language contract of a release (ADR 0012 decision 3) -----
+# The one place that knows how a release states its languages: the manifest's `wiki_languages`
+# (first = canonical), the pages' `lang` and `translation_of` in the catalog and the frontmatter,
+# and the mirror under `wiki/<lang>/` with the same paths. The schema-1 contract models do not
+# carry these fields, so they are read here and left out of the strict models.
+
+_LANG_RE = re.compile(r"^[a-z]{2}$")
+_PAGE_LANGUAGE_KEYS = ("lang", "translation_of")
+_CATALOG_LANGUAGE_KEYS = ("wiki_languages", "languages")
+_MANIFEST_LANGUAGE_KEYS = ("wiki_languages",)
+
+
+def _lang(value: Any) -> str | None:
+    return value if isinstance(value, str) and _LANG_RE.match(value) else None
+
+
+def _without(item: Mapping[str, Any], keys: Sequence[str]) -> dict[str, Any]:
+    return {key: value for key, value in item.items() if key not in keys}
+
+
+def _read_manifest(data: bytes) -> ReleaseManifest:
+    raw = json.loads(data)
+    if isinstance(raw, dict) and any(key in raw for key in _MANIFEST_LANGUAGE_KEYS):
+        return ReleaseManifest.from_json(json.dumps(_without(raw, _MANIFEST_LANGUAGE_KEYS)))
+    return ReleaseManifest.from_json(data)
+
+
+def _manifest_languages(path: Path) -> list[str] | None:
+    """``wiki_languages`` of the release manifest (first = canonical), when it states them."""
+    try:
+        raw = json.loads(path.read_bytes()) if path.is_file() else None
+    except (OSError, ValueError):
+        return None
+    value = raw.get("wiki_languages") if isinstance(raw, dict) else None
+    if not isinstance(value, list):
+        return None
+    return list(dict.fromkeys(lang for lang in map(_lang, value) if lang)) or None
+
+
+def _index_lang(wiki_dir: Path) -> str | None:
+    try:
+        meta, _ = read_frontmatter((wiki_dir / WikiFiles.INDEX).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return _lang(meta.get("lang")) if isinstance(meta, dict) else None
+
+
+def _split_catalog(
+    raw: Any, wiki_dir: Path, declared: list[str] | None
+) -> tuple[Catalog, Languages, dict[str, Catalog]]:
+    """The canonical catalog, the languages and one catalog per mirror (its paths relative to the
+    mirror's folder). A catalog without any of the language contract is validated as before."""
+    pages = [page for page in raw.get("pages") or [] if isinstance(page, dict)]
+    page_langs = {_lang(page.get("lang")) for page in pages}
+    if declared:
+        canonical, candidates = declared[0], declared[1:]
+    else:
+        home = next((page for page in pages if page.get("path") == WikiFiles.INDEX), {})
+        canonical = _lang(home.get("lang")) or _index_lang(wiki_dir) or "en"
+        candidates = sorted(lang for lang in page_langs if lang and lang != canonical)
+    mirrors = tuple(
+        lang
+        for lang in dict.fromkeys(candidates)
+        if lang != canonical and (wiki_dir / lang / WikiFiles.INDEX).is_file()
+    )
+    languages = Languages(canonical, mirrors)
+    plain = page_langs <= {None, "en"} and not any(key in raw for key in _CATALOG_LANGUAGE_KEYS)
+    if plain and not mirrors:
+        return Catalog.from_json(json.dumps(raw)), languages, {}
+
+    def tree(page: Mapping[str, Any]) -> str:
+        path = str(page.get("path") or "")
+        lang = next((lang for lang in mirrors if path.startswith(f"{lang}/")), None)
+        if lang is None and page.get("translation_of") and page.get("lang") in mirrors:
+            lang = str(page["lang"])
+        return lang or canonical
+
+    by_tree: dict[str, list[dict[str, Any]]] = {lang: [] for lang in languages.all}
+    for page in pages:
+        lang = tree(page)
+        item = _without(page, _PAGE_LANGUAGE_KEYS)
+        item["path"] = str(item.get("path") or "").removeprefix(f"{lang}/")
+        by_tree[lang].append(item)
+    top = _without(raw, _CATALOG_LANGUAGE_KEYS)
+    known = {page.get("id") for page in by_tree[canonical]}
+    edges: dict[tuple[Any, ...], dict[str, Any]] = {}
+    for edge in raw.get("edges") or []:
+        if not isinstance(edge, dict) or _lang(edge.get("lang")) not in (None, canonical):
+            continue
+        if edge.get("from") in known and edge.get("to") in known:
+            edges.setdefault((edge.get("from"), edge.get("to"), edge.get("kind")), edge)
+    glossary = [
+        _without(entry, ("lang",))
+        for entry in raw.get("glossary") or []
+        if isinstance(entry, dict) and _lang(entry.get("lang")) in (None, canonical)
+    ]
+    canonical_pages = {
+        "pages": by_tree[canonical],
+        "edges": [_without(edge, ("lang",)) for edge in edges.values()],
+        "glossary": glossary,
+    }
+    catalog = Catalog.from_json(json.dumps({**top, **canonical_pages}))
+    mirrored = {
+        lang: Catalog.from_json(
+            json.dumps({**top, "pages": by_tree[lang], "edges": [], "glossary": []})
+        )
+        for lang in mirrors
+    }
+    return catalog, languages, mirrored
+
+
 def open_release(path: str | Path) -> ReleaseView:
     """A portable wiki folder, a release folder (staged or published), a ``releases/`` folder with
     ``current.json``, or a folder that contains ``releases/current.json``."""
     found = _locate(path)
     for candidate in found.catalogs:
-        if candidate.is_file():
-            catalog = Catalog.from_json(candidate.read_bytes())
-            return ReleaseView(
-                found.root, catalog, found.wiki_dir, found.evidence_dir, found.layout
-            )
+        if not candidate.is_file():
+            continue
+        raw = json.loads(candidate.read_bytes())
+        if not isinstance(raw, dict):
+            raise SiteBuildError(f"{candidate} is not a catalog")
+        manifest = (
+            found.root / PORTABLE_DIR / ReleaseFiles.MANIFEST
+            if found.layout == "portable"
+            else found.root / ReleaseFiles.MANIFEST
+        )
+        catalog, languages, mirrors = _split_catalog(
+            raw, found.wiki_dir, _manifest_languages(manifest)
+        )
+        return ReleaseView(
+            found.root,
+            catalog,
+            found.wiki_dir,
+            found.evidence_dir,
+            found.layout,
+            languages,
+            mirrors,
+        )
     raise SiteBuildError(f"no catalog.json in {found.layout} {found.root}")
 
 
@@ -333,6 +487,7 @@ def site_settings(
     titles = {page.id: page.title for page in release.catalog.pages if page.type == "source"}
     revisions = {source.source_id: source.revision for source in release.catalog.sources}
     sources: dict[str, dict[str, str | None]] = {}
+    replaced_by: dict[str, str] = {}
     for page in release.catalog.pages:
         if page.type != "source":
             continue
@@ -344,6 +499,8 @@ def site_settings(
         meta = _source_meta(release, page.path)
         source_path = _text(meta.get("source_path"))
         later = [sid for sid in meta.get("superseded_by") or [] if sid in titles]
+        if later:
+            replaced_by[page.id] = later[0]
         document = release.evidence_dir / page.id / "index.md"
         has_document = document.is_file()
         dated = _document_date(document) if has_document else None
@@ -372,9 +529,12 @@ def site_settings(
             # The document's own language: its quotations are marked `lang` (slice H).
             "lang": _text(meta.get("original_lang")),
         }
-    scopes = scope_info(release.catalog)
+    languages = release.languages
+    scopes = scope_info(release.catalog, languages.canonical)
     return {
         "schema": 1,
+        # The wiki's languages, the canonical one first (ADR 0012); the UI follows each page's.
+        "languages": list(languages.all),
         "pageTitle": page_title,
         "baseUrl": base_url,
         "repoUrl": repo_url,
@@ -396,10 +556,58 @@ def site_settings(
         "sources": dict(sorted(sources.items())),
         # The register grouped by scope, phase and type; null when no source has a scope.
         "scopes": scopes,
-        "register": register_groups(sources, scopes),
+        "register": register_groups(sources, scopes, languages.canonical),
         "explorer": explorer_settings(release.catalog),
         "answers": len(build_answers(release)["answers"]) if answers is None else answers,
-        "steps": [{"name": name, "text": text} for name, text in STAGES],
+        "steps": _steps(languages.canonical),
+        # What differs in each mirror (`en/…`): its title, page links and titles, register and
+        # explorer; slugs are full content slugs, the explorer's folders relative to the mirror.
+        "mirrors": {
+            lang: _mirror_settings(release, lang, sources, replaced_by)
+            for lang in languages.mirrors
+        },
+    }
+
+
+def _steps(lang: str) -> list[dict[str, str]]:
+    return [{"name": name, "text": text} for name, text in stages(lang)]
+
+
+def _mirror_settings(
+    release: ReleaseView,
+    lang: str,
+    sources: Mapping[str, Mapping[str, str | None]],
+    replaced_by: Mapping[str, str],
+) -> dict[str, Any]:
+    """The settings of the mirror ``lang``: the canonical sources with the mirror's page and title
+    (an untranslated source keeps its canonical page), its scopes, register and explorer."""
+    catalog = release.mirrors[lang]
+    prefix = f"{lang}/"
+    pages = {page.id: page for page in catalog.pages if page.type == "source"}
+    mirrored: dict[str, dict[str, str | None]] = {}
+    for source_id, source in sources.items():
+        page = pages.get(source_id)
+        later = pages.get(replaced_by.get(source_id, ""))
+        mirrored[source_id] = {
+            **source,
+            "page": prefix + page.path.removesuffix(".md") if page else source["page"],
+            "title": page.title if page else source["title"],
+            "supersededBy": later.title if later else source["supersededBy"],
+        }
+    scopes = {
+        value: {"title": item["title"], "hub": prefix + item["hub"] if item["hub"] else None}
+        for value, item in scope_info(catalog, lang).items()
+    }
+    index_text = (release.wiki_dir / lang / WikiFiles.INDEX).read_text(encoding="utf-8")
+    meta, _ = read_frontmatter(index_text)
+    return {
+        "pageTitle": str(meta.get("title") or "DocWiki"),
+        "sources": mirrored,
+        "citedPages": sum(1 for page in catalog.pages if page.sources),
+        "scopes": scopes,
+        "register": register_groups(mirrored, scopes, lang),
+        "explorer": explorer_settings(catalog),
+        "steps": _steps(lang),
     }
 
 
@@ -487,6 +695,16 @@ def apply_overlay(overlay_dir: Path, quartz_dir: Path) -> list[str]:
     return written
 
 
+def write_languages(languages: Languages, quartz_dir: Path) -> Path:
+    """Write :data:`LANGUAGES_FILE` under the checkout's ``quartz/`` (Quartz publishes its
+    ``static/`` folder as is); returns the file."""
+    target = quartz_dir / LANGUAGES_FILE
+    target.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"schema": 1, "canonical": languages.canonical, "languages": list(languages.all)}
+    target.write_text(json.dumps(payload) + "\n", encoding="utf-8", newline="\n")
+    return target
+
+
 def _git_output(runner: CommandRunner, checkout: Path, *args: str) -> str:
     return runner([_tool("git"), "-C", str(checkout), *args], cwd=checkout).strip()
 
@@ -516,16 +734,25 @@ def ensure_quartz(
     if _valid_checkout(checkout, tag, runner):
         log(f"reusing Quartz {tag} in {checkout}")
         runner([git, "-C", str(checkout), "reset", "--hard", "--quiet"], cwd=checkout)
-        runner(
-            [git, "-C", str(checkout), "clean", "-fdxq", "-e", "node_modules"], cwd=checkout
-        )
+        runner([git, "-C", str(checkout), "clean", "-fdxq", "-e", "node_modules"], cwd=checkout)
     else:
         _rmtree(checkout)
         cache_dir.mkdir(parents=True, exist_ok=True)
         log(f"cloning Quartz {tag} into {checkout}")
         runner(
-            [git, "-c", "advice.detachedHead=false", "clone", "--quiet", "--depth", "1",
-             "--branch", tag, QUARTZ_REPOSITORY, str(checkout)],
+            [
+                git,
+                "-c",
+                "advice.detachedHead=false",
+                "clone",
+                "--quiet",
+                "--depth",
+                "1",
+                "--branch",
+                tag,
+                QUARTZ_REPOSITORY,
+                str(checkout),
+            ],
             cwd=cache_dir,
         )
     lock_hash = hashlib.sha256((checkout / "package-lock.json").read_bytes()).hexdigest()
@@ -533,8 +760,7 @@ def ensure_quartz(
     if not stamp.is_file() or stamp.read_text(encoding="utf-8").strip() != lock_hash:
         log("installing Quartz dependencies (npm ci)")
         runner(
-            [_tool("npm"), "ci", "--ignore-scripts", "--no-audit", "--no-fund",
-             "--loglevel=error"],
+            [_tool("npm"), "ci", "--ignore-scripts", "--no-audit", "--no-fund", "--loglevel=error"],
             cwd=checkout,
         )
         stamp.write_text(lock_hash + "\n", encoding="utf-8")
@@ -638,8 +864,15 @@ def build_site(
     apply_overlay(overlay, checkout)
     write_answers(answers, checkout)
     files = assemble_content(release, checkout / "content")
-    write_process_page(checkout / "content")
-    write_documents_page(checkout / "content")
+    languages = release.languages
+    for lang in languages.all:
+        folder = (
+            checkout / "content" if lang == languages.canonical else checkout / "content" / lang
+        )
+        write_process_page(folder, lang)
+        write_documents_page(folder, lang)
+    if languages.mirrors:
+        write_languages(languages, checkout / "quartz")
     settings = site_settings(
         release,
         base_url=base,
@@ -655,8 +888,7 @@ def build_site(
         json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
     log(
-        f"building {files} content files of {release.layout} {release.release_id} "
-        f"with Quartz {tag}"
+        f"building {files} content files of {release.layout} {release.release_id} with Quartz {tag}"
     )
     runner(
         [_tool("node"), "quartz/bootstrap-cli.mjs", "build", "-d", "content", "-o", "public"],

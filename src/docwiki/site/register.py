@@ -17,11 +17,22 @@ __all__ = ["explorer_settings", "hub_folders", "register_groups", "scope_info"]
 _LAST = "￿"
 """Sorts missing values after every real one."""
 
+_WORDS: dict[str, dict[str, str]] = {
+    "en": {"other": "Other documents", "phase": "Phase {}", "no_phase": "No phase"},
+    "fr": {"other": "Autres documents", "phase": "Phase {}", "no_phase": "Sans phase"},
+}
+"""The register's own words in the page's language (ADR 0012); English for any other language."""
 
-def scope_info(catalog: Catalog) -> dict[str, dict[str, str | None]]:
+
+def _words(lang: str) -> dict[str, str]:
+    return _WORDS.get(lang, _WORDS["en"])
+
+
+def scope_info(catalog: Catalog, lang: str = "en") -> dict[str, dict[str, str | None]]:
     """``{value: {title, hub}}`` for every scope value of the release: the title of its hub page
     (``Chantier Moreau``) and the hub's content slug (``chantiers/moreau``); a scope without a
-    hub (the default scope) is titled by its value capitalised (``Entreprise``)."""
+    hub (the default scope) is titled by its value capitalised (``Entreprise``) in every
+    language ``lang``."""
     info: dict[str, dict[str, str | None]] = {
         page.scope: {"title": page.title, "hub": page.path.removesuffix(".md")}
         for page in catalog.pages
@@ -61,13 +72,13 @@ def explorer_settings(catalog: Catalog) -> dict[str, Any]:
     }
 
 
-def _type_title(doc_type: str | None, label: str | None = None) -> str:
+def _type_title(doc_type: str | None, label: str | None = None, lang: str = "en") -> str:
     """The pack's label of a doc type (``docTypeLabel``); a release built before the labels
     shows its key in words."""
     if label:
         return label
     if not doc_type:
-        return "Other documents"
+        return _words(lang)["other"]
     text = doc_type.replace("-", " ")
     return text[:1].upper() + text[1:]
 
@@ -84,14 +95,16 @@ def _source_key(item: tuple[str, Mapping[str, Any]]) -> tuple[str, ...]:
 
 
 def register_groups(
-    sources: Mapping[str, Mapping[str, Any]], scopes: Mapping[str, Mapping[str, str | None]]
+    sources: Mapping[str, Mapping[str, Any]],
+    scopes: Mapping[str, Mapping[str, str | None]],
+    lang: str = "en",
 ) -> list[dict[str, Any]] | None:
     """Sources grouped by scope (hub title), then phase, then type; ``None`` when no source has
     a scope.
 
     Scope groups: scopes with a hub first (by title), then the others (the default scope), then
     sources without a scope. Phases in key order (``0`` … ``5``), sources without a phase
-    last; types alphabetically, untyped last.
+    last; types alphabetically, untyped last. The register's own words are in ``lang``.
     """
     if not any(source.get("scope") for source in sources.values()):
         return None
@@ -101,7 +114,7 @@ def register_groups(
 
     def title(scope: str | None) -> str:
         if scope is None:
-            return "Other documents"
+            return _words(lang)["other"]
         return str((scopes.get(scope) or {}).get("title") or scope)
 
     def scope_order(scope: str | None) -> tuple[int, str]:
@@ -115,7 +128,7 @@ def register_groups(
             "title": title(scope),
             "hub": (scopes.get(scope) or {}).get("hub") if scope else None,
             "count": len(by_scope[scope]),
-            "phases": _phases(by_scope[scope]),
+            "phases": _phases(by_scope[scope], lang),
         }
         for scope in sorted(by_scope, key=scope_order)
     ]
@@ -125,7 +138,8 @@ def _type_label(items: Iterable[tuple[str, Mapping[str, Any]]]) -> str | None:
     return next((str(item["docTypeLabel"]) for _, item in items if item.get("docTypeLabel")), None)
 
 
-def _phases(items: Iterable[tuple[str, Mapping[str, Any]]]) -> list[dict[str, Any]]:
+def _phases(items: Iterable[tuple[str, Mapping[str, Any]]], lang: str) -> list[dict[str, Any]]:
+    words = _words(lang)
     by_phase: dict[str | None, list[tuple[str, Mapping[str, Any]]]] = {}
     for item in items:
         by_phase.setdefault(item[1].get("phase") or None, []).append(item)
@@ -137,11 +151,11 @@ def _phases(items: Iterable[tuple[str, Mapping[str, Any]]]) -> list[dict[str, An
         phases.append(
             {
                 "phase": phase,
-                "title": f"Phase {phase}" if phase else "No phase",
+                "title": words["phase"].format(phase) if phase else words["no_phase"],
                 "types": [
                     {
                         "type": doc_type,
-                        "title": _type_title(doc_type, _type_label(by_type[doc_type])),
+                        "title": _type_title(doc_type, _type_label(by_type[doc_type]), lang),
                         "sources": [
                             source_id for source_id, _ in sorted(by_type[doc_type], key=_source_key)
                         ],

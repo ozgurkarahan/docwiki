@@ -2,6 +2,7 @@
 // components, which are not vendored: attributes are corrected after each page navigation (Quartz
 // morphs the whole body, so they are set again on every `nav`).
 import { SKIP_TARGET_ID } from "../../../plugins/transformers/docwiki-a11y"
+import { clientStrings } from "../i18n"
 
 /**
  * The skip link moves the focus itself: following `#docwiki-main` natively would fire `popstate`,
@@ -16,6 +17,7 @@ function onSkip(event: MouseEvent) {
 
 /** One `main` landmark (the page column) and the two side panels, so no content is outside one. */
 function landmarks() {
+  const t = clientStrings().a11y
   const center = document.querySelector<HTMLElement>("#quartz-body > .center")
   if (center && !document.querySelector("main, [role='main']")) center.setAttribute("role", "main")
   // The page column's <header> (tabs, banner) is inside that landmark: not a second banner. Its
@@ -26,12 +28,12 @@ function landmarks() {
   const left = document.querySelector<HTMLElement>("#quartz-body > .sidebar.left")
   if (left && !left.hasAttribute("role")) {
     left.setAttribute("role", "navigation")
-    left.setAttribute("aria-label", "Wiki")
+    left.setAttribute("aria-label", t.wikiNav)
   }
   const right = document.querySelector<HTMLElement>("#quartz-body > .sidebar.right")
   if (right && !right.hasAttribute("role") && right.childElementCount > 0) {
     right.setAttribute("role", "complementary")
-    right.setAttribute("aria-label", "About this page")
+    right.setAttribute("aria-label", t.aboutPage)
   }
 }
 
@@ -53,7 +55,7 @@ function explorers() {
   for (const explorer of document.querySelectorAll<HTMLElement>(".explorer")) {
     const menu = explorer.querySelector<HTMLElement>(".mobile-explorer")
     if (menu) {
-      menu.setAttribute("aria-label", "Browse the wiki")
+      menu.setAttribute("aria-label", clientStrings().a11y.browseWiki)
       menu.querySelector("svg")?.setAttribute("aria-hidden", "true")
     }
     // A group whose state is said by the buttons that control it.
