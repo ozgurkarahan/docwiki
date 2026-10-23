@@ -166,6 +166,7 @@ from docwiki.stages.discover import (
     resolve_supersession,
     revalidate_state,
 )
+from docwiki.stages.hubs import build_hubs, doc_dates
 from docwiki.stages.indexes import build_catalog, build_indexes, changes_since, run_page_path
 from docwiki.stages.links import apply_links, build_edges, md_link, replace_frontmatter
 from docwiki.stages.publish import finalize_and_publish, run_receipt_page
@@ -1209,6 +1210,8 @@ class Pipeline:
             removed=removed,
             removed_queries=dict.fromkeys(invalid_queries, _QUERY_LEFT_OUT),
         )
+        # hub pages of the pack's scopes (v1.7, ADR 0011); none without scopes.yaml
+        hubs = build_hubs(content, pack, stamp=stamp, updated=day, dates=doc_dates(results))
         bundle = build_indexes(
             content,
             pack,
@@ -1220,6 +1223,7 @@ class Pipeline:
             new_entries=entries,
             topic_skips=topic_skips,
             extra_paths=[WikiFiles.AGENTS, WikiFiles.QUALITY, run_page_path(self.run_id)],
+            hubs=hubs,
         )
         injections = [item for sid in sorted(contained) for item in contained[sid].items]
         quarantined = [
@@ -1239,7 +1243,7 @@ class Pipeline:
         receipt = run_receipt_page(
             self._report("running"), stamp=stamp, updated=day, sensitivity=tier, final=False
         )
-        pages = [*content, *bundle.pages, kit.agents, quality, receipt]
+        pages = [*content, *hubs.pages, *bundle.pages, kit.agents, quality, receipt]
         pages = self._normalize_updated(pages, day)
         by_path = {page.path: page for page in pages}
         quality = by_path[quality.path]
@@ -1248,7 +1252,7 @@ class Pipeline:
             writer.write_page(page)
         writer.write_wiki_file(WikiFiles.LLMS, bundle.llms_txt)
         write_agent_kit(kit, writer.write_wiki_file)
-        self.clock.count("indexes", items=len(bundle.pages) + 1)
+        self.clock.count("indexes", items=len(hubs.pages) + len(bundle.pages) + 1)
 
         # evidence sidecars and tables
         self.check_lease()

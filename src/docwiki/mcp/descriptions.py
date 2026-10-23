@@ -44,7 +44,8 @@ TOOLS: dict[str, str] = {
     ),
     "read_page": (
         "Read one wiki page by page id (for example 'topic:<slug>', '<entity-type>:<key>', "
-        "'src-<12 hex>', 'index:home', 'glossary', 'log', 'meta:agents') or by wiki path (for "
+        "'src-<12 hex>', 'hub:<folder>/<scope>', 'index:home', 'glossary', 'log', 'meta:agents') "
+        "or by wiki path (for "
         "example 'topics/<slug>.md'; '#anchor' selects a section). Returns the frontmatter "
         "(status, supersedes/superseded_by, sources, authority...), the Markdown body - or only "
         "the requested section with its subsections - the list of sections, outgoing page links, "
@@ -56,7 +57,8 @@ TOOLS: dict[str, str] = {
     "get_index": (
         "Get an index page of the wiki as Markdown: 'home' (purpose, categories, topics, stats, "
         "recent changes), 'sources' (every document with category and status), 'entities', "
-        "'entities/<type>', 'topics', 'queries' (filed research answers), 'glossary' or 'log'. "
+        "'entities/<type>', 'topics', 'queries' (filed research answers), 'hubs/<folder>' (the "
+        "hub pages of a company-wide wiki, one per scope such as a project), 'glossary' or 'log'. "
         "Use it to browse when search terms are unknown or to list everything of one kind. "
         "Paged with offset."
     ),
@@ -173,7 +175,10 @@ PARAMS: dict[str, str] = {
         "Restrict hit kinds: 'page-section' (compiled wiki sections) and/or 'source-block' "
         "(text extracted from original documents)."
     ),
-    "types": "Restrict to page types, for example ['topic', 'entity', 'source'].",
+    "types": (
+        "Restrict to page types, for example ['topic', 'entity', 'source']; 'hub' is the "
+        "overview page of one scope (a project) when the wiki has scopes."
+    ),
     "entity": (
         "Entity page id '<entity-type>:<key>': keep the entity page and the pages that "
         "reference it."
@@ -185,7 +190,8 @@ PARAMS: dict[str, str] = {
     "page": "Page id (for example 'topic:<slug>' or 'src-<12 hex>') or wiki path ('topics/x.md').",
     "section": "Heading text or anchor of one section to read (subsections included).",
     "scope": (
-        "Index to read: home, sources, entities, entities/<type>, topics, queries, glossary, log."
+        "Index to read: home, sources, entities, entities/<type>, topics, queries, "
+        "hubs/<folder>, glossary, log."
     ),
     "term": "Term, acronym or synonym to look up (any language). Omit to list the glossary.",
     "source_id": "Source id: 'src-' followed by 12 hex digits.",

@@ -40,6 +40,7 @@ from docwiki.engine_types import CitedLocator, Classification, CompiledResult, T
 from docwiki.llm import LlmClient, LlmError
 from docwiki.stages.classify import data_nonce
 from docwiki.stages.entities import source_order
+from docwiki.stages.hubs import scope_label, source_scope
 from docwiki.stages.llm_failures import describe_failure, is_systemic
 from docwiki.stages.models import (
     FactRecord,
@@ -218,6 +219,7 @@ def _request(
     labels: Mapping[str, str],
     facts: Sequence[_Fact],
     infos: Mapping[str, SourceInfo],
+    scope: str | None = None,
 ) -> str:
     lines = [
         "# Task",
@@ -227,6 +229,9 @@ def _request(
         f"- slug: {topic.slug}",
         f"- title: {topic.title}",
     ]
+    if scope is not None and pack.scopes is not None:
+        # A per-scope topic (v1.7, ADR 0011): only the sources of this scope feed it.
+        lines.append(f"- {pack.scopes.title.lower()}: {scope_label(pack, scope)} ({scope})")
     if topic.description:
         lines.append(f"- description: {topic.description}")
     if topic.keywords:
@@ -409,10 +414,12 @@ def _render(
     tiers: Mapping[str, str],
     pack: DomainPack,
     stamp: DocwikiStamp,
+    scope: str | None = None,
 ) -> tuple[Page, list[CitedLocator]]:
-    path = topic_page_path(format_topic_id(topic.slug))
+    topic_id = format_topic_id(topic.slug, scope)
+    path = topic_page_path(topic_id)
     footnotes = Footnotes(path, {sid: info.title for sid, info in infos.items()})
-    title = topic.title
+    title = topic.title if scope is None else f"{topic.title} — {scope_label(pack, scope)}"
     lines = [f"# {title}", ""]
     banner = banner_line(pack)
     if banner:
@@ -477,7 +484,7 @@ def _render(
     lines += ["", *footnotes.sources_section()]
     current = sum(1 for sid in sources if infos[sid].status == "current")
     frontmatter = TopicFrontmatter(
-        id=format_topic_id(topic.slug),
+        id=topic_id,
         title=title,
         summary=summary,
         sensitivity=max_sensitivity(*(tiers[sid] for sid in sources)),  # type: ignore[arg-type]
@@ -485,6 +492,7 @@ def _render(
         tags=normalize_tags([topic.slug]),
         docwiki=stamp,
         topic_slug=topic.slug,
+        scope=scope,
         sources=sorted(sources),
         confidence=_confidence(current, synthesis),  # type: ignore[arg-type]
         contradictions=len(synthesis.contradictions),
@@ -513,25 +521,29 @@ async def _synthesize(
     labels: Mapping[str, str],
     facts: Sequence[_Fact],
     infos: Mapping[str, SourceInfo],
+    scope: str | None = None,
 ) -> TopicSynthesisOutput | None:
     """The model's synthesis, or None when the call fails for this topic only."""
+    metadata = {"stage": "topics", "topic": topic.slug}
+    if scope is not None:
+        metadata["scope"] = scope
     try:
         result = await llm.structured(
             tier="smart",
             system=load_prompt("topic-synthesis").text,
-            user=_request(topic, pack, sources, labels, facts, infos),
+            user=_request(topic, pack, sources, labels, facts, infos, scope),
             output=TopicSynthesisOutput,
             schema_name=SCHEMA_NAME,
             prompt_version=PROMPT_VERSION,
             max_output_tokens=MAX_OUTPUT_TOKENS,
-            metadata={"stage": "topics", "topic": topic.slug},
+            metadata=metadata,
         )
     except LlmError as exc:
         if is_systemic(exc):
             raise
         logger.warning(
             "topic %s: synthesis call failed (%s); the topic is skipped as insufficient_evidence",
-            topic.slug,
+            topic.slug if scope is None else f"{scope}/{topic.slug}",
             describe_failure(exc),
         )
         return None
@@ -568,37 +580,65 @@ async def build_topic_pages(
         tiers[result.source_id] = max_sensitivity(tier, state.sensitivity) if state else tier
     records = {result.source_id: fact_records(result) for result in usable}
     feeding = route_sources(usable, pack)
+    scopes = {
+        sid: source_scope(pack, page.frontmatter)  # type: ignore[arg-type]
+        for sid, page in source_pages.items()
+        if sid in infos
+    }
     skips: list[TopicSkip] = []
-    jobs: list[tuple[TopicDef, list[str], dict[str, str], list[_Fact]]] = []
+    # (topic, scope) → why it was not written; one skip per per-scope topic without any page
+    scoped_skips: dict[str, list[TopicSkip]] = {}
+    jobs: list[tuple[TopicDef, str | None, list[str], dict[str, str], list[_Fact]]] = []
+
+    def skip(topic: TopicDef, scope: str | None, reason: str, sources: Sequence[str]) -> None:
+        item = TopicSkip(topic.slug, reason, tuple(sorted(sources)))  # type: ignore[arg-type]
+        if scope is None:
+            skips.append(item)
+        else:
+            scoped_skips.setdefault(topic.slug, []).append(item)
+
     for topic in pack.topics.topics:
         routed = feeding.get(topic.slug, [])
         minimum = topic.min_sources if topic.min_sources is not None else DEFAULT_MIN_SOURCES
-        allowed = [sid for sid in routed if allowed_for_audience(tiers[sid], audience)]
-        ordered = sorted(allowed, key=lambda sid: source_order(infos[sid]))
-        if len(allowed) < minimum:
-            reason = "audience" if len(routed) >= minimum else "insufficient_evidence"
-            skips.append(TopicSkip(topic.slug, reason, tuple(sorted(allowed))))  # type: ignore[arg-type]
-            continue
-        if not any(infos[sid].status == "current" for sid in allowed):
-            skips.append(TopicSkip(topic.slug, "no_current_sources", tuple(sorted(allowed))))
-            continue
-        labels = {source_id: f"S{number}" for number, source_id in enumerate(ordered, start=1)}
-        facts = _select_facts(topic, ordered, records, infos)
-        if not facts:
-            skips.append(TopicSkip(topic.slug, "insufficient_evidence", tuple(sorted(allowed))))
-            continue
-        jobs.append((topic, ordered, labels, facts))
+        if topic.per_scope and pack.scopes is not None:
+            # v1.7 (ADR 0011): one page per scope that has routed sources, from those only.
+            groups: dict[str, list[str]] = {}
+            for sid in routed:
+                groups.setdefault(scopes.get(sid) or pack.scopes.default.key, []).append(sid)
+            planned: list[tuple[str | None, list[str]]] = [
+                (scope, groups[scope]) for scope in sorted(groups)
+            ]
+            if not planned:
+                skips.append(TopicSkip(topic.slug, "insufficient_evidence", ()))
+        else:
+            planned = [(None, routed)]
+        for scope, members in planned:
+            allowed = [sid for sid in members if allowed_for_audience(tiers[sid], audience)]
+            ordered = sorted(allowed, key=lambda sid: source_order(infos[sid]))
+            if len(allowed) < minimum:
+                reason = "audience" if len(members) >= minimum else "insufficient_evidence"
+                skip(topic, scope, reason, allowed)
+                continue
+            if not any(infos[sid].status == "current" for sid in allowed):
+                skip(topic, scope, "no_current_sources", allowed)
+                continue
+            labels = {source_id: f"S{number}" for number, source_id in enumerate(ordered, start=1)}
+            facts = _select_facts(topic, ordered, records, infos)
+            if not facts:
+                skip(topic, scope, "insufficient_evidence", allowed)
+                continue
+            jobs.append((topic, scope, ordered, labels, facts))
     outputs = await asyncio.gather(
         *(
-            _synthesize(llm, topic, pack, ordered, labels, facts, infos)
-            for topic, ordered, labels, facts in jobs
+            _synthesize(llm, topic, pack, ordered, labels, facts, infos, scope)
+            for topic, scope, ordered, labels, facts in jobs
         )
     )
     pages: list[Page] = []
     cited: list[CitedLocator] = []
-    for (topic, ordered, labels, facts), output in zip(jobs, outputs, strict=True):
+    for (topic, scope, ordered, labels, facts), output in zip(jobs, outputs, strict=True):
         if output is None:
-            skips.append(TopicSkip(topic.slug, "insufficient_evidence", tuple(sorted(ordered))))
+            skip(topic, scope, "insufficient_evidence", ordered)
             continue
         synthesis = _verify(output, facts, labels, infos)
         if not (
@@ -607,9 +647,17 @@ async def build_topic_pages(
             or synthesis.contradictions
             or synthesis.superseded
         ):
-            skips.append(TopicSkip(topic.slug, "insufficient_evidence", tuple(sorted(ordered))))
+            skip(topic, scope, "insufficient_evidence", ordered)
             continue
-        page, locators = _render(topic, ordered, synthesis, infos, tiers, pack, stamp)
+        page, locators = _render(topic, ordered, synthesis, infos, tiers, pack, stamp, scope)
         pages.append(page)
         cited.extend(locators)
+    written = {page.frontmatter.topic_slug for page in pages}  # type: ignore[union-attr]
+    for slug, items in scoped_skips.items():
+        if slug in written:
+            continue  # some scopes have a page: the others simply have none
+        reasons = {item.reason for item in items}
+        reason = reasons.pop() if len(reasons) == 1 else "insufficient_evidence"
+        sources = sorted({sid for item in items for sid in item.sources})
+        skips.append(TopicSkip(slug, reason, tuple(sources)))  # type: ignore[arg-type]
     return pages, cited, skips

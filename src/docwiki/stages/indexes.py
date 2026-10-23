@@ -40,6 +40,7 @@ from docwiki.contracts.pages import (
 )
 from docwiki.domain.models import DomainPack
 from docwiki.engine_types import TopicSkip
+from docwiki.stages.hubs import HubBundle, dashboard_lines, scope_label
 from docwiki.stages.links import inline_text, md_link, one_line, plural
 
 __all__ = [
@@ -357,11 +358,14 @@ def build_indexes(
     new_entries: Sequence[LogEntry],
     topic_skips: Sequence[TopicSkip] = (),
     extra_paths: Iterable[str] = (),
+    hubs: HubBundle | None = None,
 ) -> IndexBundle:
     """Home page, source/entity/topic/query indexes, glossary, log and ``llms.txt``.
 
     ``pages`` are the content pages after the ``links`` stage; ``extra_paths`` lists other wiki
     pages of the release (``AGENTS.md``, ``_meta/…``) so that log links to them stay live.
+    ``hubs`` (v1.7, ADR 0011, only when the pack declares scopes) adds the company dashboard to
+    the home page; its pages are written by the caller.
     """
     common = {"stamp": stamp, "updated": updated, "sensitivity": sensitivity}
     sources = [p for p in pages if isinstance(p.frontmatter, SourceFrontmatter)]
@@ -474,12 +478,24 @@ def build_indexes(
         )
     )
 
-    # topics/index.md
+    # topics/index.md (v1.7: per-scope topics under their scope)
     body = ["# Topics", ""]
-    if topics:
-        body += [_item(page, WikiFiles.TOPICS_INDEX) for page in _by_title(topics)]
-    else:
+    company = [page for page in topics if getattr(page.frontmatter, "scope", None) is None]
+    scoped: dict[str, list[Page]] = {}
+    for page in topics:
+        scope = getattr(page.frontmatter, "scope", None)
+        if scope is not None:
+            scoped.setdefault(scope, []).append(page)
+    if company:
+        body += [_item(page, WikiFiles.TOPICS_INDEX) for page in _by_title(company)]
+    elif not topics:
         body.append("No topic has enough evidence for a synthesis yet.")
+    labels = {scope: scope_label(pack, scope) for scope in scoped}
+    for scope in sorted(scoped, key=lambda key: (labels[key].casefold(), key)):
+        if body[-1]:
+            body.append("")
+        body += [f"## {inline_text(labels[scope])}", ""]
+        body += [_item(page, WikiFiles.TOPICS_INDEX) for page in _by_title(scoped[scope])]
     pack_topics = {topic.slug: topic for topic in pack.topics.topics}
     skipped = [skip for skip in topic_skips if skip.topic_slug in pack_topics]
     if skipped:
@@ -537,6 +553,7 @@ def build_indexes(
 
     # log.md
     existing = {page.path for page in pages} | {page.path for page in generated}
+    existing |= {page.path for page in (hubs.pages if hubs else [])}
     existing |= {WikiFiles.INDEX, WikiFiles.LOG, WikiFiles.AGENTS, WikiFiles.QUALITY}
     existing |= {run_page_path(run_id), *extra_paths}
     log_body = _log_body(previous_log, new_entries, existing)
@@ -585,6 +602,11 @@ def build_indexes(
         "`llms.txt` and `catalog.json` index every page.",
         "",
     ]
+    dashboard = dashboard_lines(hubs, pack, path) if hubs else []
+    if dashboard:
+        # The company dashboard (v1.7, ADR 0011) comes first, before "How to navigate".
+        position = body.index("## How to navigate")
+        body[position:position] = dashboard
     if category_lines:
         body += ["## Categories", ""]
         for (_, title, count, superseded), anchor in zip(category_lines, anchors, strict=True):
@@ -657,6 +679,13 @@ def build_indexes(
         "- [Agent guide](AGENTS.md): page types, citation rules, skills and tools",
         "- [Glossary](glossary.md): acronyms and multilingual synonyms",
         "- [Log](log.md): recent changes",
+    ]
+    hubs_index = next(
+        (page for page in (hubs.pages if hubs else []) if page.frontmatter.type == "index"), None
+    )
+    if hubs_index is not None:
+        llms.append(_item(hubs_index, WikiFiles.LLMS))
+    llms += [
         "",
         "## Topics",
         "",

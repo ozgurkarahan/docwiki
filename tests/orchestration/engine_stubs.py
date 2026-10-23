@@ -818,3 +818,42 @@ def write_corpus(root: Path, *, include_docx: bool = True) -> Path:
         target.parent.mkdir(parents=True, exist_ok=True)
         document.save(str(target))
     return root
+
+
+SCOPED_CORPUS_TEXT = {
+    # the same quote number in two chantiers: the beta indice B must not supersede alpha's A
+    "chantiers/alpha/1-marche/quote/DEV-2026-014 indice A.txt": (
+        "FICTIONAL - NOT FOR OPERATIONAL USE\n"
+        "Quote DEV-2026-014 indice A of Lamna Bâtiment for the window delivery of the Chantier "
+        "Alpha.\n"
+        "The bay window F1 is made by VanArsdel Menuiseries; its delivery date is the end of "
+        "March 2026.\n"
+    ),
+    "chantiers/alpha/3-execution/note/2026-03-02 supplier note.txt": (
+        "Note from VanArsdel Menuiseries about the window delivery of the Chantier Alpha.\n"
+        "The delivery date of the bay window is moved to Monday 20 April 2026.\n"
+    ),
+    "chantiers/beta/1-marche/quote/DEV-2026-014 indice B.txt": (
+        "FICTIONAL - NOT FOR OPERATIONAL USE\n"
+        "Quote DEV-2026-014 indice B of Lamna Bâtiment for the window delivery of the Chantier "
+        "Beta.\n"
+        "This quote cancels and replaces the quote DEV-2026-014 indice A.\n"
+        "The window F2 has a delivery date in May 2026.\n"
+    ),
+    "chantiers/beta/note/site visit.txt": (
+        "Site visit of the Chantier Beta: the window delivery of the window F2 is confirmed.\n"
+        "The delivery date of the window F2 is Tuesday 12 May 2026.\n"
+    ),
+    "entreprise/note/workshop note.txt": (
+        "Workshop note of Lamna Bâtiment: the kitchen units of the showroom are cleaned.\n"
+    ),
+}
+
+
+def write_scoped_corpus(root: Path) -> Path:
+    """A company with two chantiers (alpha, beta) and its own documents (v1.7, ADR 0011)."""
+    for rel, text in SCOPED_CORPUS_TEXT.items():
+        path = root.joinpath(*rel.split("/"))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8", newline="\n")
+    return root

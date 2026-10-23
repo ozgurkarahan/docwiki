@@ -51,7 +51,11 @@ the build copies `evidence/` into the published site.
   from LLM output.**
 - Entity id: `<type>:<key>`; type and key come from the domain pack registry (key is kebab-case).
   Page path `entities/<type>/<key>.md`.
-- Topic id: `topic:<slug>` from the topic catalog; page path `topics/<slug>.md`.
+- Topic id: `topic:<slug>` from the topic catalog; page path `topics/<slug>.md`. A topic marked
+  `per_scope` (v1.7) has one id per scope: `topic:<scope>/<slug>` at `topics/<scope>/<slug>.md`.
+- Hub id (v1.7): `hub:<plural>/<scope>` at `<plural>/<scope>.md`; the hubs index is
+  `index:hubs/<plural>` at `<plural>/index.md`. `<plural>` is `scopes.plural` of the pack (never
+  `sources`, `entities`, `topics`, `queries` or `evidence`); no scope value may be `index`.
 - Query page id: `query:<yyyy-mm-dd>-<slug>`.
 - Paths must match `^[a-z0-9][a-z0-9\-/._]*$` and must never contain Python enum or class reprs
   (no `.` inside directory names, no uppercase).
@@ -63,7 +67,7 @@ Common fields (all pages):
 | Field | Type | Notes |
 |---|---|---|
 | `id` | string | As defined above |
-| `type` | enum | `source`, `entity`, `topic`, `index`, `query`, `meta`, `glossary`, `log` |
+| `type` | enum | `source`, `entity`, `topic`, `hub` (v1.7), `index`, `query`, `meta`, `glossary`, `log` |
 | `title` | string | Human title |
 | `summary` | string | 1–2 sentences, used by indexes and search |
 | `lang` | string | Always `en` for compiled pages (canonical language) |
@@ -114,7 +118,28 @@ Entity page: summary, `## Facts` (aggregated, cited), `## Timeline` (dated event
 Topic page: summary, `## Overview`, thematic sections (cited), `## Contradictions` (each item
 lists both claims with citations, authority and date, and the resolution rule applied),
 `## Superseded information` (old claim, replacement, superseding source), `## Sources consulted`,
-`## Related`, backlinks block, footnotes.
+`## Related`, backlinks block, footnotes. A per-scope topic (v1.7) has the same body, is titled
+`<topic title> — <scope label>` and is synthesised from the sources of its scope only.
+
+Hub page (v1.7, ADR 0011), built by code, no model and no footnotes (it links to the cited pages):
+
+```
+# <scope label>          (the registry entry of type scopes.name with key = the scope value:
+                          its label; the default scope: its title; else the scope value)
+> FICTIONAL sample notice (only in the public sample domain)
+<n documents, last received YYYY-MM-DD.>
+## Details               (the registry entry's attributes: | Attribute | Value |)
+## Documents             (### Phase <key> <title> in pack order, then ### No phase; each source
+                          with its status: current, or superseded by <links>)
+## Topics                (the scope's per-scope topics and the company topics citing its sources)
+## Entities              (entity pages mentioned by its sources)
+## Open contradictions   (its per-scope topics with contradictions > 0, with their count)
+## Last document received (by the document's date, else a YYYY-MM-DD in its file name, else the
+                          source page's updated date)
+```
+
+The hub's `sources` are the scope's sources and its sensitivity is their highest tier. Every scope
+value with at least one source in the release has a hub, the default scope included.
 
 ## 5. Links, anchors and citations
 
@@ -137,12 +162,21 @@ lists both claims with citations, authority and date, and the resolution rule ap
 ## 6. Index and machine files
 
 - `index.md`: what this wiki is, how to navigate (start here → categories → topics → entities →
-  glossary → log), counts, list of topics, recent changes (last 10 log entries).
+  glossary → log), counts, list of topics, recent changes (last 10 log entries). When the pack
+  declares scopes (v1.7), its first section is the **company dashboard**, titled with the plural
+  of `scopes.title` (`## Chantiers`): a table `| <scope title> | Phase | Client | Documents |
+  Last document received | Open contradictions |` with one row per hub (link), the highest phase
+  of its sources (pack order, `<key> <title>`), the registry attribute `client`, the number of
+  sources, the last document received (link and date) and the number of open contradictions,
+  followed by a link to `<plural>/index.md`; the other sections are unchanged.
+- `<plural>/index.md` (v1.7): one line per hub. `topics/index.md` lists the company topics, then
+  the per-scope topics under one `## <scope label>` heading per scope.
 - `log.md`: append-only. One entry per change:
   `## [YYYY-MM-DD] <ingest|update|supersede|withdraw|topic|query|lint> | <title>` followed by bullets
   linking the affected pages. Never rewritten; new releases append.
 - `llms.txt`: llmstxt.org format: `# <wiki title>`, `> <summary>`, then sections `## Start here`,
-  `## Topics`, `## Entities`, `## Sources` with `- [Title](path.md): summary` lines.
+  `## Topics`, `## Entities`, `## Sources` with `- [Title](path.md): summary` lines (v1.7: with
+  scopes, `## Start here` also links `<plural>/index.md`).
 - `catalog.json` (schema 1):
   ```json
   {"schema": 1, "release_id": "...", "audience": "public", "generated_at": "...",

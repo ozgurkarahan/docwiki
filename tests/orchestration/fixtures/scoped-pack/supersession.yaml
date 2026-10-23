@@ -1,0 +1,4 @@
+doc_number_regex: "(?P<number>DEV-\\d{4}-\\d{3})"
+revision_regex: "(?i)\\bindice[ ._-]?(?P<rev>[A-Z])\\b"
+revision_order: [A, B, C, D]
+explicit_reference_regex: "(?i)cancels\\s+and\\s+replaces\\s+(?:the\\s+quote\\s+)?(?P<number>DEV-\\d{4}-\\d{3})"
