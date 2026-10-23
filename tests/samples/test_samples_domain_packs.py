@@ -401,13 +401,13 @@ def test_resolution_rule_on_the_planted_contradictions(
     assert arbitrated.startswith(
         rule + "to arbitrate; the rule does not decide between eco-planning and eco-mail-mairie. "
     )
-    assert "arbitrate the point with the client" in arbitrated and "prevails" not in arbitrated
+    assert "arbitrer le point avec le client" in arbitrated and "prevails" not in arbitrated
     # ... and so is the client's constraint against our own PPSPS (authority 5 vs 3)
     safety = resolution_statement(pack, info("eco-ppsps"), info("eco-mail-mairie"))
     assert safety.startswith(
         rule + "to arbitrate; the rule does not decide between eco-ppsps and eco-mail-mairie. "
     )
-    assert "arbitrate the point with the client" in safety and "prevails" not in safety
+    assert "arbitrer le point avec le client" in safety and "prevails" not in safety
     # documents the client signs are never paired with its e-mails: the rule decides
     pairs = {frozenset(pair.types) for pair in pack.resolution.arbitrate}
     for signed in ("works-contract", "contract-amendment", "ordre-de-service", "acte-d-engagement"):
