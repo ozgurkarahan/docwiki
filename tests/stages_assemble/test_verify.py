@@ -28,7 +28,7 @@ from docwiki.stages.verify import (
 )
 
 MOCK = Path(__file__).resolve().parents[2] / "samples" / "fixtures" / "mock-release"
-MOCK_ID = "20260401T090000Z-7ce99a3f"
+MOCK_ID = "20260401T090000Z-8a41b109"
 RUN_ID = "run-20260401-090000-0a1b2c3d"
 
 
