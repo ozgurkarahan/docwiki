@@ -2447,6 +2447,28 @@ body:has(.docwiki-banner) article blockquote.docwiki-notice--fictional {
   display: none;
 }
 
+// The story home (Story.tsx): the tab each card leads to, the proof-of-concept line, and the
+// floating Ask button stepping aside on a phone while the question to try is on screen.
+.docwiki-story-tab {
+  font-size: 0.75rem;
+  font-weight: $semiBoldWeight;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--darkgray);
+}
+
+.docwiki-story-poc {
+  margin: 0.2rem 0 0.8rem;
+  color: var(--darkgray);
+  font-size: 0.9rem;
+}
+
+@media all and ($mobile) {
+  body.docwiki-try-visible .docwiki-ask-fab {
+    visibility: hidden;
+  }
+}
+
 // ----- Footer -----
 
 footer.docwiki-footer {
