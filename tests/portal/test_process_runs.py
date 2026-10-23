@@ -256,3 +256,26 @@ def test_no_rebuild_without_a_queue(storage: FolderStorage) -> None:
     client = _client(_service(storage))
     assert client.put("/api/owner/runs/key-0001", headers=WRITE).status_code == 503
     assert client.get("/api/owner/me", headers=SIGNED_IN).json()["rebuild"] is None
+
+
+@pytest.mark.parametrize(
+    ("stage", "expected"),
+    [("compile", ("compile", 4, "write")), ("site", ("site", 12, "check"))],
+)
+def test_a_changed_document_in_the_wiki_follows_its_run(
+    storage: FolderStorage, stage: str, expected: tuple[str, int, str]
+) -> None:
+    """A new version of a document already in the wiki: its old state says done, the run is at
+    work on it, so it is processing where the run is (not "In the wiki")."""
+    _write_report(
+        storage,
+        "run-29991231-235959-00000009",
+        status="running",
+        finished_at=None,
+        release_id=None,
+        current_stage=stage,
+        documents=[{"source_id": source_id_for(DONE_PATH), "path": DONE_PATH, "change": "changed"}],
+        stages=[],
+    )
+    row = _rows(_service(storage).process(owner=True))[DONE_PATH]
+    assert (row["state"], row["stage"], row["step"], row["phase"]) == ("processing", *expected)
