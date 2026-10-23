@@ -11,10 +11,11 @@ number (``verify_citations`` drops narrow and ordinary no-break spaces).
 from __future__ import annotations
 
 import re
+from decimal import Decimal
 
 from docwiki.contracts import Page
 
-__all__ = ["format_amounts", "format_page_amounts"]
+__all__ = ["format_amounts", "format_number", "format_page_amounts"]
 
 THIN = " "
 """Narrow no-break space: the thousands separator."""
@@ -37,6 +38,17 @@ def _group(digits: str) -> str:
 def _vat(match: re.Match[str]) -> str:
     word = match.group(1).lower()
     return f"€{NBSP}{'HT' if word.startswith('excl') else 'TTC'}"
+
+
+def format_number(value: Decimal, *, unit: str | None = None) -> str:
+    """A number computed by code, the French way: ``Decimal("12390.50")`` → ``12 390,50``
+    (thousands grouped with a narrow no-break space, comma decimals, the value's own decimal
+    places); ``unit`` follows after a no-break space (``12 390,50 € HT``)."""
+    text = format(value, "f")
+    sign = "-" if text.startswith("-") else ""
+    digits, _, decimals = text.lstrip("-").partition(".")
+    number = sign + _group(digits) + (f",{decimals}" if decimals else "")
+    return f"{number}{NBSP}{unit}" if unit else number
 
 
 def format_amounts(text: str) -> str:

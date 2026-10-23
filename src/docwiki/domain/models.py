@@ -47,6 +47,8 @@ __all__ = [
     "TermsFile",
     "TopicDef",
     "TopicsFile",
+    "ViewDef",
+    "ViewsFile",
     "locked_terms_note",
 ]
 
@@ -386,6 +388,55 @@ class ResolutionFile(ContractModel):
         return value
 
 
+ViewColumn = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]*$", max_length=48)]
+VIEW_SYSTEM_COLUMNS: tuple[str, ...] = ("_source_id", "_table_id", "_row_id", "_scope")
+"""Columns the engine adds to the ``rows`` relation of a view (v1.7, ADR 0011)."""
+
+
+class ViewDef(ContractModel):
+    """One computed view of ``views.yaml`` (v1.7, ADR 0011): a read-only SQL ``SELECT`` over the
+    relation ``rows``, the union of the tables of the current documents of ``doc_types`` with
+    their columns renamed by header (``columns``: output name → header aliases, matched without
+    case or accents), plus ``_source_id``, ``_table_id``, ``_row_id`` and ``_scope``. The result
+    must keep ``_source_id`` and ``_row_id`` so every row stays cited; ``totals`` are result
+    columns summed by code (per scope when ``per_scope``)."""
+
+    slug: Kebab
+    title: NonEmptyStr
+    description: str = ""
+    doc_types: Annotated[list[Kebab], Field(min_length=1)]
+    columns: Annotated[dict[ViewColumn, list[NonEmptyStr]], Field(min_length=1)]
+    sql: NonEmptyStr
+    per_scope: bool = False
+    totals: list[ViewColumn] = []
+
+    @field_validator("doc_types", "totals")
+    @classmethod
+    def _unique_lists(cls, value: list[str]) -> list[str]:
+        _unique(value, "entry")
+        return value
+
+    @field_validator("description")
+    @classmethod
+    def _one_line(cls, value: str) -> str:
+        if "\n" in value.strip():
+            raise ValueError("description must be a single line")
+        return value.strip()
+
+
+class ViewsFile(ContractModel):
+    """``views.yaml``: computed views, cross-document figures computed by code from the
+    documents' tables, every row cited (v1.7, ADR 0011)."""
+
+    views: list[ViewDef] = []
+
+    @field_validator("views")
+    @classmethod
+    def _slugs(cls, value: list[ViewDef]) -> list[ViewDef]:
+        _unique([view.slug for view in value], "view slug")
+        return value
+
+
 class DomainPack(ContractModel):
     """A validated domain pack (optionally with the runtime overlay applied)."""
 
@@ -396,6 +447,7 @@ class DomainPack(ContractModel):
     glossary: GlossaryFile
     terms: TermsFile = Field(default_factory=TermsFile)
     scopes: ScopesFile | None = None
+    views: ViewsFile | None = None
     sensitivity: SensitivityFile
     supersession: SupersessionFile | None = None
     resolution: ResolutionFile = Field(default_factory=ResolutionFile)

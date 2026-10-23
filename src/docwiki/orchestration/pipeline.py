@@ -179,6 +179,7 @@ from docwiki.stages.verify import (
     scrub,
     verify_release,
 )
+from docwiki.stages.views import build_view_pages, view_sources
 from docwiki.storage.routed import local_path_for
 from docwiki.storage.state import StateStore, with_stage
 
@@ -1173,11 +1174,23 @@ class Pipeline:
                 self.warnings.append(f"queries: {query_id} left out of this release ({reason})")
         dropped_queries.update(invalid_queries)
 
+        # computed views (v1.7, ADR 0011): figures computed by code, every row cited
+        scopes = {sid: found.scope for sid, found in classifications.items()}
+        views = build_view_pages(pack, view_sources(source_pages, docs, scopes), stamp=stamp)
+        cited.extend(views.cited)
+        self.warnings.extend(views.warnings)
+
         # links
         self.check_lease()
         self.clock.start("links")
         with stage_span("links", run_id=self.run_id):
-            content = [*source_pages.values(), *entity_pages, *topic_pages, *query_pages]
+            content = [
+                *source_pages.values(),
+                *entity_pages,
+                *topic_pages,
+                *query_pages,
+                *views.pages,
+            ]
             linked = apply_links(content, pack)
             # Amounts the French trade way, 2 390,00 € HT (prose only; quotes stay verbatim).
             content = [format_page_amounts(page) for page in linked.pages]

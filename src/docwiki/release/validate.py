@@ -32,6 +32,7 @@ from docwiki.contracts.ids import (
     index_page_path,
     query_page_path,
     topic_page_path,
+    view_page_path,
 )
 from docwiki.contracts.layout import (
     CORE_SKILLS,
@@ -62,6 +63,7 @@ from docwiki.contracts.pages import (
     SkillFile,
     SourceFrontmatter,
     TopicFrontmatter,
+    ViewFrontmatter,
 )
 from docwiki.contracts.safety import find_violations
 from docwiki.release.layout import PORTABLE_META_DIR, ReleaseLayout
@@ -297,6 +299,8 @@ def _expected_page_path(page: Page) -> str | None:
         return topic_page_path(fm.id)
     if isinstance(fm, HubFrontmatter):
         return hub_page_path(fm.id)
+    if isinstance(fm, ViewFrontmatter):
+        return view_page_path(fm.id)
     if isinstance(fm, QueryFrontmatter):
         return query_page_path(fm.id)
     if fm.type == "index":
@@ -777,10 +781,14 @@ def _check_catalog(state: _State, manifest: ReleaseManifest | None) -> None:
 
 
 def _check_page_sources(state: _State, page: Page, tiers: Mapping[str, str], rel: str) -> None:
-    """The ``sources`` of an entity, topic, hub or query page have a page in the release (G02)
-    and the page tier is their highest tier (G07); ``tiers`` maps page ids to their sensitivity."""
+    """The ``sources`` of an entity, topic, hub, view or query page have a page in the release
+    (G02) and the page tier is their highest tier (G07); ``tiers`` maps page ids to their
+    sensitivity."""
     fm = page.frontmatter
-    if not isinstance(fm, EntityFrontmatter | TopicFrontmatter | HubFrontmatter | QueryFrontmatter):
+    if not isinstance(
+        fm,
+        EntityFrontmatter | TopicFrontmatter | HubFrontmatter | ViewFrontmatter | QueryFrontmatter,
+    ):
         return
     found: list[str] = []
     for source_id in fm.sources:

@@ -1003,6 +1003,96 @@
       ],
       "title": "TopicFrontmatter",
       "type": "object"
+    },
+    "ViewFrontmatter": {
+      "additionalProperties": false,
+      "description": "A computed view (v1.7, ADR 0011): rows selected by the pack's read-only SQL over the\ntables of the current documents of some types, computed by code and cited row by row;\n``view:<slug>`` at ``views/<slug>.md``. ``sources`` are the documents whose tables the view\nreads, ``rows`` the number of result rows.",
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "view",
+          "default": "view",
+          "title": "Type",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "lang": {
+          "const": "en",
+          "default": "en",
+          "title": "Lang",
+          "type": "string"
+        },
+        "sensitivity": {
+          "enum": [
+            "public",
+            "internal",
+            "restricted"
+          ],
+          "title": "Sensitivity",
+          "type": "string"
+        },
+        "updated": {
+          "format": "date",
+          "title": "Updated",
+          "type": "string"
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "pattern": "^[a-z0-9]+(?:[-_/][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "docwiki": {
+          "$ref": "#/$defs/DocwikiStamp"
+        },
+        "view_slug": {
+          "maxLength": 64,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "View Slug",
+          "type": "string"
+        },
+        "sources": {
+          "default": [],
+          "items": {
+            "pattern": "^src-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
+        "rows": {
+          "minimum": 0,
+          "title": "Rows",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "summary",
+        "sensitivity",
+        "updated",
+        "docwiki",
+        "view_slug",
+        "rows"
+      ],
+      "title": "ViewFrontmatter",
+      "type": "object"
     }
   },
   "discriminator": {
@@ -1015,7 +1105,8 @@
       "meta": "#/$defs/MetaFrontmatter",
       "query": "#/$defs/QueryFrontmatter",
       "source": "#/$defs/SourceFrontmatter",
-      "topic": "#/$defs/TopicFrontmatter"
+      "topic": "#/$defs/TopicFrontmatter",
+      "view": "#/$defs/ViewFrontmatter"
     },
     "propertyName": "type"
   },
@@ -1031,6 +1122,9 @@
     },
     {
       "$ref": "#/$defs/HubFrontmatter"
+    },
+    {
+      "$ref": "#/$defs/ViewFrontmatter"
     },
     {
       "$ref": "#/$defs/QueryFrontmatter"

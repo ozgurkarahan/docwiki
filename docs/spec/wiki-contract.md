@@ -28,6 +28,8 @@ wiki/
   <scope-folder>/          # v1.7 (ADR 0011), only when the pack declares scopes, e.g. chantiers/
     index.md               # the list of the hubs (id index:hubs/<scope-folder>)
     <scope>.md             # one hub per scope value (id hub:<scope-folder>/<scope>), built by code
+  views/                   # v1.7 (ADR 0011), only when the pack has views.yaml
+    <view-slug>.md         # one computed view (id view:<slug>): rows selected by code, cited row by row
   queries/                 # research answers filed back after approval
     <yyyy-mm-dd>-<slug>.md
   _meta/
@@ -67,7 +69,7 @@ Common fields (all pages):
 | Field | Type | Notes |
 |---|---|---|
 | `id` | string | As defined above |
-| `type` | enum | `source`, `entity`, `topic`, `hub` (v1.7), `index`, `query`, `meta`, `glossary`, `log` |
+| `type` | enum | `source`, `entity`, `topic`, `hub` (v1.7), `view` (v1.7), `index`, `query`, `meta`, `glossary`, `log` |
 | `title` | string | Human title |
 | `summary` | string | 1–2 sentences, used by indexes and search |
 | `lang` | string | Always `en` for compiled pages (canonical language) |
@@ -88,6 +90,10 @@ Hub pages (v1.7, ADR 0011) add: `scope_type` (the pack's scope name, e.g. `chant
 (the scope value) and `sources` (the scope's sources). Source pages add `scope`, `phase` and `lot`
 when the pack declares scopes; per-scope topic pages add `scope` (their id is
 `topic:<scope>/<slug>`). Scope and axes come from the raw path and the pack, never from a model.
+
+View pages (v1.7, ADR 0011) add: `view_slug`, `sources` (every current document whose tables
+the view reads; the page's sensitivity is their highest tier) and `rows` (the number of result
+rows). Id `view:<slug>`, path `views/<slug>.md`.
 
 Topic pages add: `topic_slug`, `sources` (list), `confidence` (`high|medium|low`),
 `contradictions` (count), `superseded_claims` (count).
@@ -140,6 +146,16 @@ Hub page (v1.7, ADR 0011), built by code, no model and no footnotes (it links to
 
 The hub's `sources` are the scope's sources and its sensitivity is their highest tier. Every scope
 value with at least one source in the release has a hub, the default scope included.
+
+View page (v1.7, ADR 0011), built by code from the pack's `views.yaml`, never by a model: the
+title, the pack banner, the view's description, a sentence saying the figures were computed by
+code from the cited rows, `## Rows` (a table of the result rows, the scope first when the pack
+declares scopes; each row ends with a link to its source page and one footnote to the evidence
+sidecar of exactly that row, badge `table`), `## Totals` when the view asks for them (sums of the
+cited rows computed with exact decimals, per scope when `per_scope`, then all rows; cells that are
+not numbers are counted and left out), `## Sources` (footnotes). Only tables parsed
+deterministically and located by rows (XLSX sheets, CSV files, DOCX tables) take part. The source
+pages a view reads list it under `## Related` (`Computed view: …`).
 
 ## 5. Links, anchors and citations
 

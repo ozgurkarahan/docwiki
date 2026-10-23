@@ -23,6 +23,7 @@ from docwiki.domain.models import (
     TaxonomyFile,
     TermsFile,
     TopicsFile,
+    ViewsFile,
 )
 
 __all__ = ["PACK_FILES", "PackError", "PackValidationError", "format_location", "load_pack"]
@@ -38,6 +39,7 @@ PACK_FILES: dict[str, tuple[type[BaseModel], bool]] = {
     "resolution.yaml": (ResolutionFile, False),
     "terms.yaml": (TermsFile, False),
     "scopes.yaml": (ScopesFile, False),
+    "views.yaml": (ViewsFile, False),
 }
 """File name → (schema model, required)."""
 
@@ -153,6 +155,53 @@ def _cross_checks(pack: DomainPack, errors: list[PackError]) -> None:
             )
 
 
+def _check_views(pack: DomainPack, errors: list[PackError]) -> None:
+    """Each view's SQL is one ``SELECT`` that resolves over an empty ``rows`` relation and
+    keeps ``_source_id``, ``_row_id`` and its ``totals`` columns (v1.7, ADR 0011)."""
+    if pack.views is None:
+        return
+    from docwiki.domain.models import VIEW_SYSTEM_COLUMNS
+    from docwiki.release.tables import TableQueryError, rows_query_columns
+
+    doc_types = {doc_type.key for doc_type in pack.taxonomy.doc_types}
+    if pack.scopes is not None and pack.scopes.plural == "views":
+        errors.append(PackError("scopes.yaml", "plural", "'views' is the folder of the views"))
+    for index, view in enumerate(pack.views.views):
+        where = f"views[{index}]"
+        for type_index, doc_type in enumerate(view.doc_types):
+            if doc_type not in doc_types:
+                errors.append(
+                    PackError(
+                        "views.yaml",
+                        f"{where}.doc_types[{type_index}]",
+                        f"unknown doc type {doc_type!r}",
+                    )
+                )
+        try:
+            result = rows_query_columns([*view.columns, *VIEW_SYSTEM_COLUMNS], view.sql)
+        except TableQueryError as exc:
+            errors.append(PackError("views.yaml", f"{where}.sql", str(exc)))
+            continue
+        missing = [name for name in ("_source_id", "_row_id") if name not in result]
+        if missing:
+            errors.append(
+                PackError(
+                    "views.yaml",
+                    f"{where}.sql",
+                    f"the query must return {' and '.join(missing)} so every row stays cited",
+                )
+            )
+        for total_index, name in enumerate(view.totals):
+            if name not in result:
+                errors.append(
+                    PackError(
+                        "views.yaml",
+                        f"{where}.totals[{total_index}]",
+                        f"{name!r} is not a column of the query result",
+                    )
+                )
+
+
 def _load_skills(root: Path, errors: list[PackError]) -> dict[str, str]:
     templates: dict[str, str] = {}
     skills_dir = root / "skills"
@@ -221,6 +270,7 @@ def load_pack(path: str | Path, *, overlay: str | Path | None = None) -> DomainP
             glossary=parsed["glossary.yaml"],
             terms=parsed.get("terms.yaml", TermsFile()),
             scopes=parsed.get("scopes.yaml"),
+            views=parsed.get("views.yaml"),
             sensitivity=parsed["sensitivity.yaml"],
             supersession=parsed.get("supersession.yaml"),
             resolution=parsed.get("resolution.yaml", ResolutionFile()),
@@ -230,6 +280,7 @@ def load_pack(path: str | Path, *, overlay: str | Path | None = None) -> DomainP
     except ValidationError as exc:
         raise PackValidationError(errors_from_validation("skills", exc)) from exc
     _cross_checks(pack, errors)
+    _check_views(pack, errors)
     if errors:
         raise PackValidationError(errors)
     if overlay is not None:

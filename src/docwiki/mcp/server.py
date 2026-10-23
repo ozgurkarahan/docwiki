@@ -75,7 +75,7 @@ _LOOPBACK_ORIGINS = ["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*
 
 SearchKind = Literal["page-section", "source-block"]
 PageTypeName = Literal[
-    "source", "entity", "topic", "hub", "query", "index", "meta", "glossary", "log"
+    "source", "entity", "topic", "hub", "view", "query", "index", "meta", "glossary", "log"
 ]
 SourceStatusName = Literal["failed", "quarantined", "pending", "deleted", "done"]
 ProposalStatusName = Literal["open", "accepted", "rejected"]
