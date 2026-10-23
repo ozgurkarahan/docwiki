@@ -32,16 +32,15 @@ def test_manual_trigger_only(workflow: dict[Any, Any]) -> None:
     }
 
 
-def test_linux_least_privilege_and_no_active_login(
-    workflow: dict[Any, Any], workflow_text: str
-) -> None:
-    assert workflow["permissions"] == {"contents": "read"}
+def test_linux_least_privilege_and_an_oidc_login(workflow: dict[Any, Any]) -> None:
+    # OIDC only: a token for the federated credential, no stored password or key
+    assert workflow["permissions"] == {"contents": "read", "id-token": "write"}
     job = workflow["jobs"]["evaluate"]
     assert job["runs-on"] == "ubuntu-latest"
-    uses = [step.get("uses", "") for step in job["steps"]]
-    assert not any(action.startswith("azure/login") for action in uses)
-    assert "#   uses: azure/login@v2" in workflow_text
-    assert "# id-token: write" in workflow_text
+    logins = [step for step in job["steps"] if step.get("uses", "").startswith("azure/login")]
+    assert len(logins) == 1
+    assert set(logins[0]["with"]) == {"client-id", "tenant-id", "subscription-id"}
+    assert all(value.startswith("${{ secrets.") for value in logins[0]["with"].values())
     installs = [step["run"] for step in job["steps"] if "uv sync" in step.get("run", "")]
     assert installs and "--extra evals" in installs[0]
 
