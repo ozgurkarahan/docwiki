@@ -1,3 +1,4 @@
+import path from "path"
 import { Element, ElementContent, Root as HtmlRoot, Text as HtmlText } from "hast"
 import { toString as hastToString } from "hast-util-to-string"
 import { Heading, Html, Root as MdRoot } from "mdast"
@@ -42,6 +43,11 @@ export interface Options {
    * else its folder's (`en/…`), and the page's own words (badges, legends) are in it.
    */
   languages: string[]
+  /**
+   * The mirror pages kept untranslated, content slug (`en/sources/x`) → summary: their text is in
+   * the canonical language, which the page marks (`lang`), except the notice that says so.
+   */
+  untranslated: Record<string, string>
 }
 
 const defaultOptions: Options = {
@@ -49,6 +55,7 @@ const defaultOptions: Options = {
   siteBanner: false,
   sourceLangs: {},
   languages: ["en"],
+  untranslated: {},
 }
 
 /** mdast parents whose children are blocks (a raw HTML node there becomes a paragraph). */
@@ -147,8 +154,30 @@ function lastParagraph(element: Element): Element | undefined {
   return undefined
 }
 
+const BACK_LABEL = /^Back to reference (\S+)$/
+
+/**
+ * The footnotes' words that remark-rehype writes in English: the section's (hidden) heading
+ * "Footnotes" and each back link's name "Back to reference 1-2", in the page's language.
+ */
+function localizeFootnotes(section: Element, t: Strings) {
+  visit(section, "element", (node: Element) => {
+    if (node.tagName === "h2" && node.properties?.id === "footnote-label") {
+      const index = node.children.findIndex((child) => child.type === "text")
+      if (index >= 0) node.children.splice(index, 1, text(t.wiki.footnotes))
+      return SKIP
+    }
+    const label = node.properties?.ariaLabel
+    if (node.tagName === "a" && node.properties?.dataFootnoteBackref !== undefined) {
+      const found = typeof label === "string" ? BACK_LABEL.exec(label) : null
+      if (found) node.properties.ariaLabel = t.wiki.footnoteBack(found[1])
+    }
+  })
+}
+
 /** Wrap the provenance badge that ends each footnote definition in a styled span. */
 function decorateFootnotes(section: Element, t: Strings): Set<BadgeKind> {
+  localizeFootnotes(section, t)
   const used = new Set<BadgeKind>()
   visit(section, "element", (item: Element) => {
     if (item.tagName !== "li") return
@@ -313,6 +342,106 @@ function markLanguage(tree: HtmlRoot, type: string | undefined, lang: string) {
   })
 }
 
+function hasClass(node: ElementContent | HtmlRoot["children"][number], name: string): boolean {
+  return node.type === "element" && classList(node).includes(name)
+}
+
+/**
+ * A mirror page kept untranslated (WCAG 3.1.2): its text is in the canonical language `lang`, so
+ * every block of the body is marked with it, except the notice that says so (in the page's
+ * language) and the footnotes' heading and badges (the page's words); the footnotes' citations are
+ * marked too.
+ */
+function markUntranslated(tree: HtmlRoot, lang: string, pageLang: string) {
+  for (const node of tree.children) {
+    if (node.type !== "element" || hasClass(node, "docwiki-notice--untranslated")) continue
+    if (isFootnotes(node)) {
+      for (const child of node.children) {
+        if (child.type !== "element" || child.tagName !== "ol") continue
+        child.properties = { ...child.properties, lang }
+        visit(child, "element", (badge: Element) => {
+          if (!classList(badge).includes("docwiki-badge")) return
+          badge.properties = { ...badge.properties, lang: pageLang }
+          return SKIP
+        })
+      }
+      continue
+    }
+    node.properties = { ...node.properties, lang }
+  }
+}
+
+/** The content slug a Markdown link of the page `slug` leads to (`en/sources/x`), else null. */
+function linkSlug(slug: string, href: string): string | null {
+  if (/^[a-z][a-z0-9+.-]*:|^\/\/|^#/i.test(href)) return null
+  let target = href.split(/[?#]/, 1)[0]
+  try {
+    target = decodeURIComponent(target)
+  } catch {
+    return null
+  }
+  if (!target) return null
+  const folder = path.posix.dirname(slug)
+  const resolved = path.posix.normalize(path.posix.join(folder === "." ? "" : folder, target))
+  return resolved.replace(/\.md$/, "").replace(/\/$/, "/index")
+}
+
+/** Elements that end the inline run after a listed link (a nested list, a paragraph). */
+const BLOCKS = new Set(["ul", "ol", "p", "div", "table", "blockquote", "pre"])
+
+/**
+ * Lists of a mirror page (its home, a hub): a link to an untranslated page shows that page's
+ * title in the canonical language `lang`, and its list item may go on with that page's summary
+ * (`: …`); both are marked.
+ */
+function markUntranslatedLinks(
+  tree: HtmlRoot,
+  slug: string,
+  untranslated: Record<string, string>,
+  lang: string,
+) {
+  const summaries = new Map<Element, string>()
+  visit(tree, "element", (node: Element) => {
+    if (node.tagName !== "a") return
+    const href = node.properties?.href
+    const target = typeof href === "string" ? linkSlug(slug, href) : null
+    if (!target || !Object.prototype.hasOwnProperty.call(untranslated, target)) return
+    node.properties = { ...node.properties, lang }
+    summaries.set(node, untranslated[target])
+    return SKIP
+  })
+  visit(tree, "element", (item: Element) => {
+    // A tight list item holds the link, a loose one its paragraph.
+    if (item.tagName !== "li" && item.tagName !== "p") return
+    const first = item.children.findIndex(
+      (child) => child.type !== "text" || child.value.trim() !== "",
+    )
+    const link = item.children[first]
+    const summary = link?.type === "element" ? summaries.get(link) : undefined
+    if (!summary) return
+    let end = first + 1
+    while (end < item.children.length) {
+      const child = item.children[end]
+      if (child.type === "element" && BLOCKS.has(child.tagName)) break
+      end++
+    }
+    const rest = item.children.slice(first + 1, end)
+    const words = rest
+      .map((child) => hastToString(child))
+      .join("")
+      .replace(/^\s*[:—–-]\s*/, "")
+      .replace(/\s+/g, " ")
+      .trim()
+    if (words !== summary) return
+    item.children.splice(first + 1, rest.length, {
+      type: "element",
+      tagName: "span",
+      properties: { lang },
+      children: rest,
+    })
+  })
+}
+
 /** Blocks where a link alone is a control rather than a link inside a sentence. */
 const LONE_LINK_PARENTS = new Set(["li", "p", "td", "th", "dd"])
 
@@ -457,10 +586,32 @@ export const DocWiki: QuartzTransformerPlugin<Partial<Options>> = (userOpts) => 
                   : null,
               pageLang,
             )
-            if (lang) markLanguage(tree, type, lang)
+            // A mirror page kept untranslated is in the canonical language (gate G17 warns).
+            const canonical = opts.languages[0] ?? pageLang
+            const slug = file.data.slug ?? "index"
+            const untranslated =
+              pageLang !== canonical &&
+              (Object.prototype.hasOwnProperty.call(opts.untranslated, slug) ||
+                tree.children.some((node) => hasClass(node, "docwiki-notice--untranslated")))
+            if (untranslated) {
+              markUntranslated(tree, canonical, pageLang)
+              file.data.docwikiTextLang = canonical
+            } else if (lang) {
+              markLanguage(tree, type, lang)
+            }
+            if (pageLang !== canonical && Object.keys(opts.untranslated).length > 0) {
+              markUntranslatedLinks(tree, slug, opts.untranslated, canonical)
+            }
           }
         },
       ]
     },
+  }
+}
+
+declare module "vfile" {
+  interface DataMap {
+    /** The language of a page's text when it differs from the page's (an untranslated mirror). */
+    docwikiTextLang: string
   }
 }

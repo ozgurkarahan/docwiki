@@ -65,6 +65,10 @@ const config: QuartzConfig = {
         releaseDate: settings.releaseDate,
         siteBanner: !!settings.banner,
         languages: [...languages],
+        untranslated: Object.assign(
+          {},
+          ...Object.values(settings.mirrors ?? {}).map((mirror) => mirror.untranslated ?? {}),
+        ),
         sourceLangs: Object.fromEntries(
           Object.entries(settings.sources).map(([id, source]) => [id, source.lang ?? null]),
         ),

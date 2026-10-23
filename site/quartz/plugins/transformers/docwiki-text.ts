@@ -4,6 +4,7 @@
 // string tables (import-free modules): the words come in the page's language (`t`, English by
 // default).
 import { en } from "../../components/docwiki/i18n/en.ts"
+import { fr } from "../../components/docwiki/i18n/fr.ts"
 import type { BadgeWords, Strings } from "../../components/docwiki/i18n/strings.ts"
 
 /** The table passed in, else English (an `Array.map` callback gets an index there). */
@@ -141,11 +142,31 @@ export function splitProvenanceBadge(text: string): BadgeSplit | undefined {
   }
 }
 
-export type NoticeKind = "fictional" | "superseded" | "warning"
+export type NoticeKind = "fictional" | "superseded" | "warning" | "untranslated"
 
-/** Kind of a leading notice blockquote (`> FICTIONAL …`, `> **Superseded** by …`). */
+/**
+ * Whether a notice is the one of a mirror page kept untranslated (the engine's
+ * `mirror.untranslated`: "Untranslated: …", "Non traduit : …" in any UI language, any space
+ * before the colon), with or without a leading marker token (`[!docwiki-notice]`).
+ */
+export function isUntranslatedNotice(text: string): boolean {
+  const head = text
+    .trimStart()
+    .replace(/^(?:\[!?[\w-]+\]|docwiki-notice\b)\s*/i, "")
+    .toLowerCase()
+  return [en, fr].some((t) => {
+    const words = t.wiki.untranslated.toLowerCase()
+    return head.startsWith(words) && /^\s*:/.test(head.slice(words.length))
+  })
+}
+
+/**
+ * Kind of a leading notice blockquote (`> FICTIONAL …`, `> **Superseded** by …`,
+ * `> **Untranslated:** …`).
+ */
 export function noticeKind(text: string): NoticeKind | undefined {
   const head = text.trimStart()
+  if (isUntranslatedNotice(head)) return "untranslated"
   if (/^FICTIONAL\b/.test(head)) return "fictional"
   if (/^superseded\b/i.test(head)) return "superseded"
   if (/^(warning|withdrawn)\b/i.test(head)) return "warning"

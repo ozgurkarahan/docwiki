@@ -19,7 +19,10 @@ from site_testkit import (
     MINUTES,
     MINUTES_PAGE,
     MOCK_TITLE,
+    PLAN_A_PAGE,
+    UNTRANSLATED_SUMMARY,
     make_bilingual,
+    make_untranslated,
 )
 
 from docwiki.site import REPO_URL, build_site, check_links, default_allowed_hosts, scan_site
@@ -38,6 +41,7 @@ EVIDENCE = f"evidence/{MINUTES}/para-0007"
 def site(tmp_path_factory: pytest.TempPathFactory) -> Path:
     root = tmp_path_factory.mktemp("bilingual")
     release = make_bilingual(root / "release")
+    make_untranslated(release, PLAN_A_PAGE)
     return build_site(release, root / "public", base_url=BASE_URL, log=print)
 
 
@@ -148,7 +152,7 @@ def test_switch_keeps_the_slug(site: Path) -> None:
 def test_ui_strings_in_the_page_language(site: Path) -> None:
     french, english = page(site, MINUTES_PAGE), page(site, EN_MINUTES)
     for text, words in (
-        (french, ["Aller au contenu", "Traitement", "Parcourir", "Rechercher", "Table des Matières",
+        (french, ["Aller au contenu", "Traitement", "Parcourir", "Rechercher", "Table des matières",
                   "Exemple fictif.", "Voir le document", 'aria-label="Langue"',
                   'aria-label="Fil d']),
         (english, ["Skip to content", "Pipeline", "Browse", "Search", "Table of Contents",
@@ -225,3 +229,84 @@ def test_document_quotations_marked_only_in_the_mirror(site: Path) -> None:
     assert en_article and fr_article
     assert 'lang="fr"' in en_article.group(0)
     assert 'lang="fr"' not in fr_article.group(0)
+
+
+def article(text: str) -> str:
+    found = re.search(r"<article.*?</article>", text, re.S)
+    assert found
+    return found.group(0)
+
+
+def start_tags(text: str, tag: str) -> list[str]:
+    return re.findall(rf"<{tag}(?:\s[^>]*)?>", text)
+
+
+def test_footnotes_speak_the_page_language(site: Path) -> None:
+    """remark-rehype's English "Footnotes" and "Back to reference N" follow the page (B2)."""
+    french = html_lib.unescape(page(site, MINUTES_PAGE))
+    english = page(site, EN_MINUTES)
+    assert '<h2 class="sr-only" id="footnote-label">Notes<' in french
+    assert '<h2 class="sr-only" id="footnote-label">Footnotes<' in english
+    assert "aria-label=\"Retour à l'appel de note 1\"" in french
+    assert "Back to reference" not in french
+    assert 'aria-label="Back to reference 1"' in english
+
+
+def test_untranslated_mirror_is_marked_in_the_canonical_language(site: Path) -> None:
+    """An English page kept untranslated shows French text: its body and title are marked
+    `lang="fr"`, the English notice that says so is not (B3, WCAG 3.1.2)."""
+    text = page(site, f"en/{PLAN_A_PAGE}")
+    assert html_lang(text) == "en"
+    body = article(text)
+    notice = re.search(r"<blockquote([^>]*)>\s*<p><strong>Untranslated:", body)
+    assert notice, "no untranslated notice"
+    assert "docwiki-notice--untranslated" in notice.group(1)
+    assert "lang=" not in notice.group(1)
+    # Every section heading and list of the body is marked; the hidden footnotes
+    # heading is the page's own word.
+    for tag in ("h2", "h3", "ul"):
+        tags = [t for t in start_tags(body, tag) if 'id="footnote-label"' not in t]
+        tags = [t for t in tags if "docwiki-badge-legend" not in t]
+        assert tags and all('lang="fr"' in t for t in tags), (tag, tags)
+    h1 = start_tags(text, "h1")
+    assert len(h1) == 1 and 'lang="fr"' in h1[0]
+    # Footnotes: the citations are marked, their badges are in the page's language.
+    assert any('lang="fr"' in t for t in start_tags(body, "ol"))
+    badges = [t for t in start_tags(body, "span") if '"docwiki-badge docwiki-badge--' in t]
+    assert badges and all('lang="fr"' not in t for t in badges)
+    # A translated mirror page keeps its own language, French quotations aside.
+    translated = page(site, EN_MINUTES)
+    assert not any('lang="fr"' in t for t in start_tags(article(translated), "h2"))
+    assert 'lang="fr"' not in start_tags(translated, "h1")[0]
+
+
+def test_untranslated_pages_listed_in_the_canonical_language(site: Path) -> None:
+    """The mirror's home lists the untranslated page: its title and French summary are marked;
+    the sources index's own (English) words after the same link are not."""
+    name = PLAN_A_PAGE.split("/")[1]
+    home = article(page(site, "en/index"))
+    assert re.search(rf'<a href="[^"]*/{name}"[^>]* lang="fr"', home)
+    assert f'<span lang="fr">: {UNTRANSLATED_SUMMARY}</span>' in home
+    index = article(page(site, "en/sources/index"))
+    assert re.search(rf'<a href="[^"]*/{name}"[^>]* lang="fr"', index)
+    assert ": superseded by" in index and '<span lang="fr">: superseded' not in index
+
+
+def test_quartz_words_follow_the_page_language(site: Path) -> None:
+    """The words Quartz writes in English whatever the locale: the search icon's title (the
+    button was named "Search Recherche"), the global graph button, the RSS link."""
+    french, english = page(site, MINUTES_PAGE), page(site, EN_MINUTES)
+    for text in (french, english):
+        assert "<title>Search</title>" not in text
+        assert 'aria-label="Global Graph"' not in text
+    assert 'aria-label="Graphe global"' in french and 'aria-label="Global graph"' in english
+    assert 'title="Flux RSS"' in french and 'title="RSS feed"' in english
+    assert "Table des Matières" not in french
+
+
+def test_collapsed_explorer_folders_leave_the_tab_order(site: Path) -> None:
+    """Links in a collapsed folder (0 px tall) leave the Tab order once it has collapsed (B4)."""
+    css = re.sub(r"\s*([{}>:;,])\s*", r"\1", (site / "index.css").read_text(encoding="utf-8"))
+    assert ".explorer .folder-outer:not(.open)>ul{visibility:hidden" in css
+    # An open folder's links come back at once; nothing sets them visible inside a closed one.
+    assert ".explorer .folder-outer>ul{transition:visibility" in css

@@ -8,8 +8,14 @@ export default (() => {
   const ArticleTitle: QuartzComponent = ({ fileData, displayClass }: QuartzComponentProps) => {
     const title = fileData.frontmatter?.title
     if (!title) return null
+    // An untranslated mirror page keeps its canonical title (DocWiki transformer).
     return (
-      <h1 id={SKIP_TARGET_ID} class={classNames(displayClass, "article-title")} tabIndex={-1}>
+      <h1
+        id={SKIP_TARGET_ID}
+        class={classNames(displayClass, "article-title")}
+        tabIndex={-1}
+        lang={fileData.docwikiTextLang}
+      >
         {title}
       </h1>
     )

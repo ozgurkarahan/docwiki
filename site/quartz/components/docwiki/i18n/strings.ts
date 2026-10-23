@@ -78,6 +78,17 @@ export interface Strings {
     tableNamed: (heading: string) => string
     openImage: string
     provenanceBadges: string
+    /** The footnotes section's (hidden) heading and each back link's name ("1", "1-2"). */
+    footnotes: string
+    footnoteBack: (reference: string) => string
+    /**
+     * The first words of the notice of a mirror page kept untranslated (the engine's
+     * `mirror.untranslated`, src/docwiki/contracts/i18n.py), without the colon.
+     */
+    untranslated: string
+    /** Names Quartz leaves in English: the global graph button and the RSS feed link. */
+    globalGraph: string
+    rssFeed: string
   }
 
   /** Citation and provenance badges: the words shown for the wiki's (English) markers. */

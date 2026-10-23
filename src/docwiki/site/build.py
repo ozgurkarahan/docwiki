@@ -36,6 +36,7 @@ from typing import Any, Literal, Protocol
 from docwiki.contracts.catalog import Catalog
 from docwiki.contracts.frontmatter import read_frontmatter
 from docwiki.contracts.gates import GateResult
+from docwiki.contracts.i18n import untranslated_marker
 from docwiki.contracts.ids import parse_release_id
 from docwiki.contracts.layout import EVIDENCE_MOUNT, ReleaseFiles, WikiFiles
 from docwiki.contracts.manifest import ReleaseManifest
@@ -608,7 +609,28 @@ def _mirror_settings(
         "register": register_groups(mirrored, scopes, lang),
         "explorer": explorer_settings(catalog),
         "steps": _steps(lang),
+        "untranslated": _untranslated(release, lang, catalog),
     }
+
+
+def _untranslated(release: ReleaseView, lang: str, catalog: Catalog) -> dict[str, str]:
+    """The mirror pages of ``lang`` kept untranslated (their body carries the
+    ``mirror.untranslated`` notice, as gate G17 checks), content slug → summary: the site marks
+    their text, and their summary where a list shows it, with the canonical language (WCAG
+    3.1.2)."""
+    marker = untranslated_marker(lang)
+    found: dict[str, str] = {}
+    for page in catalog.pages:
+        try:
+            text = (release.wiki_dir / lang / page.path).read_text(encoding="utf-8")
+            meta, body = read_frontmatter(text)
+        except (OSError, ValueError):
+            continue
+        if body.lstrip().startswith(marker) or f"\n{marker}" in body:
+            summary = meta.get("summary") if isinstance(meta, dict) else None
+            slug = f"{lang}/{page.path.removesuffix('.md')}"
+            found[slug] = " ".join(summary.split()) if isinstance(summary, str) else ""
+    return dict(sorted(found.items()))
 
 
 _PATH_DATE_RE = re.compile(r"(?<!\d)(20\d{2}-[01]\d-[0-3]\d)(?!\d)")
