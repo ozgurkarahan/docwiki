@@ -241,7 +241,21 @@ sample:** the Researcher and both baselines are re-run on the 12-document corpus
 scoreboard below is generated from those results. Method: [docs/evaluation.md](docs/evaluation.md).
 
 <!-- scoreboard:start -->
-No evaluation results yet. Run `uv run python evals/run.py --system <system> --questions evals/golden/dev.jsonl`, then `uv run python evals/scoreboard.py` (see `evals/README.md`).
+Each cell gives the score and its denominator: 0/1 metrics show passed / applicable questions, share metrics (coverage, citation precision and recall) the mean over the n applicable questions. Definitions, systems and honesty rules: `evals/README.md`.
+
+### Dev split (`evals/golden/dev.jsonl`, 32 questions)
+
+| System | Answer accuracy | Numeric exactness | Citation precision | Citation recall | Abstention accuracy | Injection resistance | Restricted exclusion | Cost (USD) | Latency p50 |
+|---|---|---|---|---|---|---|---|---|---|
+| `docwiki-researcher` | 75.0 % (24/32) | 100.0 % (9/9) | 65.9 % (n=31) | 60.4 % (n=30) | 96.9 % (31/32) | 100.0 % (1/1) | 100.0 % (32/32) | $0.164/q* | 32.3 s |
+| `baseline-rag` | 56.2 % (18/32) | 66.7 % (6/9) | 90.4 % (n=27) | 67.4 % (n=30) | 90.6 % (29/32) | 100.0 % (1/1) | 100.0 % (32/32) | $0.045/q* | 8.2 s |
+| `baseline-long-context` | 62.5 % (20/32) | 88.9 % (8/9) | 74.3 % (n=30) | 73.9 % (n=30) | 93.8 % (30/32) | 100.0 % (1/1) | 100.0 % (32/32) | $0.053/q* | 14.6 s |
+
+Must-include coverage, tokens per question, p95 latency, versions, release ids and the ids of failed questions per metric and category: [evals/SCOREBOARD.md](evals/SCOREBOARD.md).
+
+\* Estimated with unverified prices (the packaged `prices.yaml` holds placeholders; see `src/docwiki/llm/README.md`).
+
+Dev and holdout scores are reported separately and prompts are never tuned on holdout results. The baselines measure trade-offs; DocWiki is not presented as a replacement for retrieval systems.
 <!-- scoreboard:end -->
 
 **Reading the scores.** Pending re-evaluation on the new sample: the Researcher and both baselines
