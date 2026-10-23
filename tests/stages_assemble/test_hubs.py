@@ -9,7 +9,7 @@ import pytest
 from assemble_helpers import DAY, STAMP, pack, source_page, topic_page
 
 from docwiki.contracts.ids import source_id_for
-from docwiki.contracts.pages import Page, TopicFrontmatter
+from docwiki.contracts.pages import ContradictionPair, Page, TopicFrontmatter
 from docwiki.domain import load_pack
 from docwiki.stages.hubs import HubBundle, build_hubs, dashboard_lines
 from docwiki.stages.indexes import build_indexes
@@ -132,3 +132,47 @@ def test_a_title_that_shows_its_date_does_not_repeat_it():
 
     assert _date_suffix("Compte rendu n°3 (2026-03-24)", date(2026, 3, 24)) == ""
     assert _date_suffix("Compte rendu n°3", date(2026, 3, 24)) == " (2026-03-24)"
+
+
+def test_open_contradictions_are_counted_once_per_pair_of_sources():
+    """The same disagreement stated by several topics of a scope counts once (v1.7); a topic
+    written before v1.7 has no pairs and counts with its number."""
+    scoped = load_pack(SCOPED)
+    note_path = "chantiers/alpha/3-execution/note/2026-03-02 supplier note.txt"
+    a, b, note = source_id_for(ALPHA_A), source_id_for(ALPHA_B), source_id_for(note_path)
+
+    def stating(slug: str, title: str, pairs: list[tuple[list[str], str]]) -> Page:
+        page = _scoped_topic(slug, "alpha", title, [a, b, note], len(pairs))
+        data = page.frontmatter.model_dump()
+        data["contradiction_pairs"] = [
+            ContradictionPair(sources=sorted(ids), subject=subject) for ids, subject in pairs
+        ]
+        return Page(path=page.path, frontmatter=TopicFrontmatter(**data), body=page.body)
+
+    pages = [
+        source_page(ALPHA_A, "Indice A", "# Indice A\n", slug="indice-a"),
+        source_page(ALPHA_B, "Indice B", "# Indice B\n", slug="indice-b"),
+        source_page(note_path, "Supplier note", "# Supplier note\n", slug="supplier-note"),
+        stating("windows", "Windows — Alpha", [([a, b], "Width of F1"), ([b, note], "Delivery")]),
+        stating("schedule", "Schedule — Alpha", [([b, a], "width of F1"), ([a, b], "F1 width")]),
+        stating("costs", "Costs — Alpha", [([a, b], "Price"), ([a, b], "Total")]),
+        _scoped_topic("old", "alpha", "Old — Alpha", [a, b], 2),
+    ]
+    content = apply_links(pages, load_pack(SCOPED)).pages
+    hubs = build_hubs(content, scoped, stamp=STAMP, updated=DAY)
+    summary = next(item for item in hubs.summaries if item.scope == "alpha")
+    # the pairs {a, b} and {b, note}, plus the 2 contradictions of the topic without pairs
+    assert summary.open_count == 4
+    alpha = next(page for page in hubs.pages if page.path == "chantiers/alpha.md").body
+    section = alpha.split("## Open contradictions\n\n", 1)[1].split("\n\n", 1)[0]
+    assert section.splitlines() == [
+        "- [Indice A](../sources/indice-a.md) and [Indice B](../sources/indice-b.md): Price; "
+        "Total; width of F1; and 1 more (in [Costs — Alpha](../topics/alpha/costs.md), "
+        "[Schedule — Alpha](../topics/alpha/schedule.md), "
+        "[Windows — Alpha](../topics/alpha/windows.md)).",
+        "- [Indice B](../sources/indice-b.md) and [Supplier note](../sources/supplier-note.md): "
+        "Delivery (in [Windows — Alpha](../topics/alpha/windows.md)).",
+        "- [Old — Alpha](../topics/alpha/old.md): 2 contradictions",
+    ]
+    rows = dashboard_lines(hubs, scoped, "index.md")
+    assert next(line for line in rows if "[Chantier Alpha]" in line).endswith("| 4 |")

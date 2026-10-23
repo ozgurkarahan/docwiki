@@ -46,6 +46,7 @@ from docwiki.contracts.locators import Locator, locator_key
 
 __all__ = [
     "Alias",
+    "ContradictionPair",
     "DocwikiStamp",
     "EntityFrontmatter",
     "EvidenceFrontmatter",
@@ -207,6 +208,25 @@ class EntityFrontmatter(_BaseFrontmatter):
         return self
 
 
+class ContradictionPair(ContractModel):
+    """One open contradiction of a topic page (v1.7): its two sources (sorted ids) and subject."""
+
+    sources: Annotated[list[SourceId], Field(min_length=2, max_length=2)]
+    subject: NonEmptyStr
+
+    @field_validator("sources")
+    @classmethod
+    def _sources(cls, value: list[str]) -> list[str]:
+        return _sorted_unique(value, "contradiction sources")
+
+    @field_validator("subject")
+    @classmethod
+    def _subject(cls, value: str) -> str:
+        if "\n" in value:
+            raise ValueError("subject must be a single line")
+        return value
+
+
 class TopicFrontmatter(_BaseFrontmatter):
     type: Literal["topic"] = "topic"
     topic_slug: Kebab
@@ -215,7 +235,11 @@ class TopicFrontmatter(_BaseFrontmatter):
     sources: list[SourceId] = []
     confidence: Confidence
     contradictions: Annotated[int, Field(ge=0)] = 0
+    """The number of open contradictions on the page (changes by an amending document excluded)."""
     superseded_claims: Annotated[int, Field(ge=0)] = 0
+    contradiction_pairs: list[ContradictionPair] = []
+    """The open contradictions themselves, one per item of ``contradictions`` (v1.7); empty on
+    pages written before v1.7, which hubs then count by ``contradictions`` alone."""
 
     @field_validator("sources")
     @classmethod
@@ -226,6 +250,8 @@ class TopicFrontmatter(_BaseFrontmatter):
     def _consistency(self) -> Self:
         if self.id != format_topic_id(self.topic_slug, self.scope):
             raise ValueError("topic page id must be 'topic:[<scope>/]<topic_slug>'")
+        if self.contradiction_pairs and len(self.contradiction_pairs) != self.contradictions:
+            raise ValueError("contradiction_pairs must list every open contradiction")
         return self
 
 

@@ -5,6 +5,12 @@ the release (the default scope, e.g. ``entreprise``, included) gets a hub page a
 ``<plural>/<scope>.md`` (``hub:<plural>/<scope>``): the scope's registry entry (its attributes as
 a table), its documents grouped by phase with their status, the topics and entities of its
 sources, the open contradictions of its own topics and the last document received.
+
+Open contradictions are counted once per pair of sources (v1.7): the same disagreement between
+two documents is often stated by several topics of a scope, under subjects the model words
+differently, so the topics' ``contradiction_pairs`` are merged by their unordered pair of source
+ids; changes by an amending document are not open and never recorded there. A topic page written
+before v1.7 has no pairs and counts with its ``contradictions`` number.
 ``<plural>/index.md`` (``index:hubs/<plural>``) lists the hubs and the home page shows one
 dashboard row per scope (:func:`dashboard_lines`).
 
@@ -39,16 +45,20 @@ from docwiki.stages.links import inline_text, md_link, one_line, plural
 __all__ = [
     "STAGE_VERSION",
     "HubBundle",
+    "OpenContradiction",
     "ScopeSummary",
     "build_hubs",
     "dashboard_lines",
     "doc_dates",
+    "open_contradictions",
     "scope_label",
     "source_scope",
 ]
 
-STAGE_VERSION = "1"
+STAGE_VERSION = "2"
 NO_PHASE = "No phase"
+MAX_SUBJECTS = 3
+"""Subjects shown per open contradiction on a hub; the others are counted."""
 _PATH_DATE_RE = re.compile(r"(?<!\d)(\d{4}-\d{2}-\d{2})(?!\d)")
 
 
@@ -119,6 +129,39 @@ def _attribute_name(key: str) -> str:
 
 
 @dataclass
+class OpenContradiction:
+    """One distinct open contradiction of a scope (v1.7): two sources that disagree, the
+    subjects the topics gave it and the topics stating it. A topic written before v1.7 records
+    no pairs: it is one item with no ``sources``, counted by its ``contradictions``."""
+
+    sources: tuple[str, ...]
+    subjects: list[str] = field(default_factory=list)
+    topics: list[Page] = field(default_factory=list)
+    count: int = 1
+
+
+def open_contradictions(topics: Sequence[Page]) -> list[OpenContradiction]:
+    """The distinct open contradictions of topic pages (sorted by title), merged by source pair."""
+    pairs: dict[tuple[str, ...], OpenContradiction] = {}
+    legacy: list[OpenContradiction] = []
+    for page in topics:
+        fm = page.frontmatter
+        assert isinstance(fm, TopicFrontmatter)
+        if not fm.contradiction_pairs:
+            if fm.contradictions:
+                legacy.append(OpenContradiction((), [], [page], fm.contradictions))
+            continue
+        for pair in fm.contradiction_pairs:
+            key = tuple(pair.sources)
+            item = pairs.setdefault(key, OpenContradiction(key))
+            if pair.subject.casefold() not in {subject.casefold() for subject in item.subjects}:
+                item.subjects.append(pair.subject)
+            if all(topic.path != page.path for topic in item.topics):
+                item.topics.append(page)
+    return [*pairs.values(), *legacy]
+
+
+@dataclass
 class ScopeSummary:
     """What the hub and the dashboard row of one scope value show."""
 
@@ -133,7 +176,13 @@ class ScopeSummary:
     last_date: date
     topics: list[Page] = field(default_factory=list)
     entities: list[Page] = field(default_factory=list)
-    contradictions: list[Page] = field(default_factory=list)
+    contradictions: list[OpenContradiction] = field(default_factory=list)
+    """The scope's distinct open contradictions, from its own topics."""
+
+    @property
+    def open_count(self) -> int:
+        """The number of distinct open contradictions (the dashboard's column)."""
+        return sum(item.count for item in self.contradictions)
 
 
 @dataclass
@@ -209,11 +258,7 @@ def _summaries(
                     for page in entities
                     if ids & set(page.frontmatter.sources)  # type: ignore[union-attr]
                 ),
-                contradictions=_by_title(
-                    page
-                    for page in own_topics
-                    if page.frontmatter.contradictions  # type: ignore[union-attr]
-                ),
+                contradictions=open_contradictions(_by_title(own_topics)),
             )
         )
     default = scopes.default.key
@@ -275,6 +320,34 @@ def _documents(summary: ScopeSummary, pack: DomainPack, by_id: Mapping[str, Page
             lines.append(f"- {link}: {_status(page, summary.path, by_id)}")
         lines.append("")
     return lines
+
+
+def _contradiction_lines(
+    items: Sequence[OpenContradiction], path: str, by_id: Mapping[str, Page]
+) -> list[str]:
+    """One line per distinct open contradiction: its two sources, subjects and topics; then the
+    topics written before v1.7 with their count."""
+    rows: list[tuple[bool, list[str], str]] = []
+    for item in items:
+        topics = ", ".join(md_link(p.frontmatter.title, path, p.path) for p in item.topics)
+        if not item.sources:
+            line = f"- {topics}: {item.count} {plural('contradiction', item.count)}"
+            rows.append((True, [], line))
+            continue
+        # the two sources in title order, each linked to its page (its id when it has none)
+        sides = sorted(
+            (by_id[sid].frontmatter.title if sid in by_id else sid, sid) for sid in item.sources
+        )
+        names = [name.casefold() for name, _ in sides]
+        links = [
+            md_link(name, path, by_id[sid].path) if sid in by_id else sid for name, sid in sides
+        ]
+        shown = [inline_text(subject) for subject in item.subjects[:MAX_SUBJECTS]]
+        more = len(item.subjects) - len(shown)
+        subjects = "; ".join(shown) + (f"; and {more} more" if more > 0 else "")
+        line = f"- {links[0]} and {links[1]}: {subjects} (in {topics})."
+        rows.append((False, names, line))
+    return [line for *_, line in sorted(rows, key=lambda row: (row[0], row[1]))]
 
 
 def _counts(summary: ScopeSummary) -> str:
@@ -340,12 +413,7 @@ def _hub_page(
         lines.append("No registry entity is mentioned by these documents yet.")
     lines += ["", "## Open contradictions", ""]
     if summary.contradictions:
-        for page in summary.contradictions:
-            number = page.frontmatter.contradictions  # type: ignore[union-attr]
-            lines.append(
-                f"- {md_link(page.frontmatter.title, path, page.path)}: "
-                f"{number} {plural('contradiction', number)}"
-            )
+        lines += _contradiction_lines(summary.contradictions, path, by_id)
     else:
         lines.append(f"No open contradictions in the topics of this {noun}.")
     lines += [
@@ -451,7 +519,7 @@ def dashboard_lines(bundle: HubBundle, pack: DomainPack, from_path: str) -> list
             f"| {inline_text(str(client)) if client is not None else '—'} "
             f"| {len(item.sources)} "
             f"| {last}{_date_suffix(item.last.frontmatter.title, item.last_date)} "
-            f"| {sum(page.frontmatter.contradictions for page in item.contradictions)} |"  # type: ignore[union-attr]
+            f"| {item.open_count} |"
         )
     lines += [
         "",

@@ -67,7 +67,7 @@ the MCP server to validate proposal decisions),
 |---|---|---|---|
 | source | `source_id` | `sources/<slug>.md` | `source_id, source_path, source_hash, media_type, doc_type, category, doc_number, revision, status, supersedes, superseded_by, original_lang, pages, entities, topics, authority (1–10), extraction{adapter, version, provenance_mix}` |
 | entity | `<type>:<key>` | `entities/<type>/<key>.md` | `entity_type, key, aliases[{text, lang}], sources` |
-| topic | `topic:<slug>` | `topics/<slug>.md` | `topic_slug, sources, confidence, contradictions, superseded_claims` |
+| topic | `topic:<slug>` | `topics/<slug>.md` | `topic_slug, sources, confidence, contradictions, superseded_claims, contradiction_pairs` (v1.7, optional) |
 | query | `query:<date>-<slug>` | `queries/<date>-<slug>.md` | `question, asked_by, sources, approved_by` |
 | index | `index:home`, `index:sources`, `index:entities`, `index:entities/<type>`, `index:topics`, `index:queries` | `index.md`, `<scope>/index.md` | — |
 | glossary / log | `glossary` / `log` | `glossary.md` / `log.md` | — |

@@ -144,6 +144,27 @@ def _cross_checks(pack: DomainPack, errors: list[PackError]) -> None:
                         f"unknown entity or topic id {ref!r}",
                     )
                 )
+    for index, amendment in enumerate(pack.resolution.amendments):
+        for field in ("amending", "amended"):
+            for type_index, key in enumerate(getattr(amendment, field)):
+                if key not in doc_types:
+                    errors.append(
+                        PackError(
+                            "resolution.yaml",
+                            f"amendments[{index}].{field}[{type_index}]",
+                            f"unknown doc type {key!r}",
+                        )
+                    )
+    for index, pair in enumerate(pack.resolution.arbitrate):
+        for type_index, key in enumerate(pair.types):
+            if key not in doc_types:
+                errors.append(
+                    PackError(
+                        "resolution.yaml",
+                        f"arbitrate[{index}].types[{type_index}]",
+                        f"unknown doc type {key!r}",
+                    )
+                )
     for index, rule in enumerate(pack.sensitivity.rules):
         if rule.doc_type is not None and rule.doc_type not in doc_types:
             errors.append(

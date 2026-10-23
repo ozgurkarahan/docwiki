@@ -13,6 +13,14 @@ Code keeps only known fact ids, current-source facts in the overview and section
 domain pack's resolution rule (authority, then recency) for each contradiction without applying
 it silently. Footnotes map every fact back to its source locators.
 
+The pack's ``resolution.yaml`` may refine how the rule is stated (v1.7), by code only: a
+contradiction between a document of an amended type (a contract) and a document of a type that
+amends it (an amendment, a service order) of the same scope is a change, listed as "changed by"
+and not counted as open; when the rule's winner is of an amended type and its scope has current
+amending documents, the statement links them and says the point is to review; a pair of
+``arbitrate`` types is never decided by the rule (to arbitrate, with the pack's reason). The
+frontmatter records the open contradictions (``contradictions`` and ``contradiction_pairs``).
+
 A synthesis call that fails for its request only (content filter, output invalid or truncated,
 see :mod:`docwiki.stages.llm_failures`) does not stop the other topics: that topic is skipped with
 reason ``insufficient_evidence`` (the closest :class:`~docwiki.engine_types.TopicSkip` reason, as
@@ -26,12 +34,12 @@ import asyncio
 import logging
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 
 from docwiki.contracts.enums import Sensitivity, allowed_for_audience, max_sensitivity
 from docwiki.contracts.ids import format_topic_id, normalize_tags, topic_page_path
 from docwiki.contracts.markdown import relative_link
-from docwiki.contracts.pages import DocwikiStamp, Page, TopicFrontmatter
+from docwiki.contracts.pages import ContradictionPair, DocwikiStamp, Page, TopicFrontmatter
 from docwiki.contracts.state import SourceState
 from docwiki.domain import DomainPack, route_topics, score_topic
 from docwiki.domain.models import TopicDef, locked_terms_note
@@ -70,12 +78,14 @@ __all__ = [
     "MAX_FACT_TOKENS",
     "PROMPT_VERSION",
     "STAGE_VERSION",
+    "ScopeContext",
     "build_topic_pages",
+    "is_change",
     "resolution_statement",
     "route_sources",
 ]
 
-STAGE_VERSION = "1"
+STAGE_VERSION = "2"
 PROMPT_VERSION = load_prompt("topic-synthesis").version
 SCHEMA_NAME = "topic_synthesis"
 MAX_FACT_TOKENS = 16_000
@@ -119,9 +129,23 @@ class _Synthesis:
     overview: list[_Claim]
     sections: list[tuple[str, list[_Claim]]]
     contradictions: list[_Contradiction]
+    """The open contradictions."""
     superseded: list[_Superseded]
     dropped: int
     total: int
+    changes: list[_Contradiction] = field(default_factory=list)
+    """Contradictions that are changes by an amending document: ``side_a`` is the amended
+    document (the contract), ``side_b`` the amending one (v1.7)."""
+
+
+@dataclass(frozen=True)
+class ScopeContext:
+    """What a resolution statement may say about the scope of one source (v1.7)."""
+
+    label: str
+    """The scope's name in a sentence (its registry label), or "" when the pack has no scopes."""
+    amending: tuple[tuple[SourceInfo, str], ...] = ()
+    """The scope's current documents of an amending type, each with its Markdown link."""
 
 
 def route_sources(results: Sequence[CompiledResult], pack: DomainPack) -> dict[str, list[str]]:
@@ -141,38 +165,94 @@ def route_sources(results: Sequence[CompiledResult], pack: DomainPack) -> dict[s
     }
 
 
-def resolution_statement(pack: DomainPack, first: SourceInfo, second: SourceInfo) -> str:
-    """The pack's contradiction rule stated for two sources (never applied silently)."""
+def _sentence(text: str) -> str:
+    text = text.strip()
+    text = text[:1].upper() + text[1:]
+    return text if text.endswith((".", "!", "?")) else f"{text}."
+
+
+def _not_older(amending: SourceInfo, amended: SourceInfo) -> bool:
+    """An amending document dated before the document it would amend cannot change it."""
+    return not (amending.date and amended.date and amending.date < amended.date)
+
+
+def is_change(pack: DomainPack, amended: SourceInfo, amending: SourceInfo) -> bool:
+    """Whether ``amending`` may change ``amended``: its type amends that type (the pack's
+    ``amendments``) and it is not dated before it. The caller checks they share a scope."""
+    return pack.resolution.amendment(amending.doc_type, amended.doc_type) and _not_older(
+        amending, amended
+    )
+
+
+def _amended_review(
+    pack: DomainPack,
+    winner: SourceInfo,
+    sides: set[str],
+    context: Mapping[str, ScopeContext] | None,
+) -> str | None:
+    """Why a winner of an amended type is to review: its scope's amending documents."""
+    types = pack.resolution.amending_types(winner.doc_type)
+    scope = (context or {}).get(winner.source_id)
+    if not types or scope is None:
+        return None
+    links = [
+        link
+        for info, link in scope.amending
+        if info.doc_type in types and info.source_id not in sides and _not_older(info, winner)
+    ]
+    if not links:
+        return None
+    where = f" of {scope.label}" if scope.label else ""
+    return (
+        f"the terms of {winner.title} may have been changed by the amending documents{where}: "
+        f"{', '.join(links)}; check them before relying on either statement."
+    )
+
+
+def resolution_statement(
+    pack: DomainPack,
+    first: SourceInfo,
+    second: SourceInfo,
+    context: Mapping[str, ScopeContext] | None = None,
+) -> str:
+    """The pack's contradiction rule stated for two sources (never applied silently).
+
+    A pair of the pack's ``arbitrate`` types is stated as to arbitrate, whatever the rule would
+    say. ``context`` maps source ids to their scope's amending documents (v1.7): a winner of an
+    amended type whose scope has some is stated as to review, with their links.
+    """
     criteria = list(pack.resolution.order)
     rule = ", then ".join(criteria)
+    head = f"Resolution rule ({rule}): "
+    pair = pack.resolution.arbitration(first.doc_type, second.doc_type)
+    if pair is not None:
+        return (
+            f"{head}to arbitrate; the rule does not decide between {first.title} and "
+            f"{second.title}. {_sentence(pair.reason)}"
+        )
     for criterion in criteria:
         if criterion == "authority" and first.authority != second.authority:
             winner, loser = (
-                (first, second)
-                if first.authority > second.authority
-                else (
-                    second,
-                    first,
-                )
+                (first, second) if first.authority > second.authority else (second, first)
             )
-            return (
-                f"Resolution rule ({rule}): {winner.title} prevails (authority "
-                f"{winner.authority} vs {loser.authority})."
-            )
-        if (
+            why = f"authority {winner.authority} vs {loser.authority}"
+        elif (
             criterion == "recency"
             and first.date is not None
             and second.date is not None
             and first.date != second.date
         ):
             winner, loser = (first, second) if first.date > second.date else (second, first)
-            return (
-                f"Resolution rule ({rule}): {winner.title} prevails (dated "
-                f"{winner.date.isoformat()} vs {loser.date.isoformat()})."  # type: ignore[union-attr]
-            )
+            why = f"dated {winner.date.isoformat()} vs {loser.date.isoformat()}"  # type: ignore[union-attr]
+        else:
+            continue
+        review = _amended_review(pack, winner, {first.source_id, second.source_id}, context)
+        if review is not None:
+            return f"{head}to review; the rule would favour {winner.title} ({why}), but {review}"
+        return f"{head}{winner.title} prevails ({why})."
     return (
-        f"Resolution rule ({rule}): the rule does not decide between them (same authority and "
-        "no usable dates); review both sources."
+        f"{head}the rule does not decide between them (same authority and no usable dates); "
+        "review both sources."
     )
 
 
@@ -387,6 +467,30 @@ def _verify(
     return _Synthesis(summary, overview, sections, contradictions, superseded, dropped, total)
 
 
+def _split_changes(
+    synthesis: _Synthesis,
+    pack: DomainPack,
+    infos: Mapping[str, SourceInfo],
+    scope_of: Mapping[str, str | None],
+) -> _Synthesis:
+    """Move the contradictions between an amended and an amending document of the same scope
+    to ``changes`` (amended side first): they are changes, not open contradictions."""
+    if not pack.resolution.amendments:
+        return synthesis
+    still: list[_Contradiction] = []
+    changes: list[_Contradiction] = []
+    for item in synthesis.contradictions:
+        a, b = item.side_a[0].record.source_id, item.side_b[0].record.source_id
+        same_scope = scope_of.get(a) == scope_of.get(b)
+        if same_scope and is_change(pack, infos[a], infos[b]):
+            changes.append(item)
+        elif same_scope and is_change(pack, infos[b], infos[a]):
+            changes.append(_Contradiction(item.subject, item.side_b, item.side_a))
+        else:
+            still.append(item)
+    return replace(synthesis, contradictions=still, changes=[*synthesis.changes, *changes])
+
+
 def _confidence(current_sources: int, synthesis: _Synthesis) -> str:
     ratio = synthesis.dropped / synthesis.total if synthesis.total else 1.0
     if current_sources >= 3 and not synthesis.contradictions and ratio <= 0.2:
@@ -415,10 +519,14 @@ def _render(
     pack: DomainPack,
     stamp: DocwikiStamp,
     scope: str | None = None,
+    scope_of: Mapping[str, str | None] | None = None,
+    amending: Mapping[str | None, Sequence[str]] | None = None,
 ) -> tuple[Page, list[CitedLocator]]:
     topic_id = format_topic_id(topic.slug, scope)
     path = topic_page_path(topic_id)
     footnotes = Footnotes(path, {sid: info.title for sid, info in infos.items()})
+    sensitivity = max_sensitivity(*(tiers[sid] for sid in sources))
+    context = _contexts(pack, sources, infos, tiers, sensitivity, path, scope_of, amending)
     title = topic.title if scope is None else f"{topic.title} — {scope_label(pack, scope)}"
     lines = [f"# {title}", ""]
     banner = banner_line(pack)
@@ -451,13 +559,25 @@ def _render(
                 f"- **{item.subject}.** {_source_link(first, path)} states: "
                 f"{_fact_texts(item.side_a, footnotes)} ({_meta(first)}). "
                 f"{_source_link(second, path)} states: {_fact_texts(item.side_b, footnotes)} "
-                f"({_meta(second)}). {resolution_statement(pack, first, second)}"
+                f"({_meta(second)}). {resolution_statement(pack, first, second, context)}"
             )
+    else:
+        lines.append("No contradictions were found between current sources.")
+    if synthesis.changes:
+        lines += ["", "Changed by an amending document (changes of terms, not contradictions):", ""]
+        for item in synthesis.changes:
+            amended = infos[item.side_a[0].record.source_id]
+            amending_doc = infos[item.side_b[0].record.source_id]
+            lines.append(
+                f"- **{item.subject}.** {_source_link(amended, path)} states: "
+                f"{_fact_texts(item.side_a, footnotes)} ({_meta(amended)}). Changed by "
+                f"{_source_link(amending_doc, path)}: {_fact_texts(item.side_b, footnotes)} "
+                f"({_meta(amending_doc)})."
+            )
+    if synthesis.contradictions or synthesis.changes:
         notes = clean_inline(pack.resolution.notes)
         if notes:
             lines += ["", f"Resolution policy: {notes}"]
-    else:
-        lines.append("No contradictions were found between current sources.")
     lines += ["", "## Superseded information", ""]
     if synthesis.superseded:
         for entry in synthesis.superseded:
@@ -487,7 +607,7 @@ def _render(
         id=topic_id,
         title=title,
         summary=summary,
-        sensitivity=max_sensitivity(*(tiers[sid] for sid in sources)),  # type: ignore[arg-type]
+        sensitivity=sensitivity,  # type: ignore[arg-type]
         updated=release_date(stamp),
         tags=normalize_tags([topic.slug]),
         docwiki=stamp,
@@ -497,9 +617,43 @@ def _render(
         confidence=_confidence(current, synthesis),  # type: ignore[arg-type]
         contradictions=len(synthesis.contradictions),
         superseded_claims=len(synthesis.superseded),
+        contradiction_pairs=[
+            ContradictionPair(
+                sources=sorted({item.side_a[0].record.source_id, item.side_b[0].record.source_id}),
+                subject=item.subject,
+            )
+            for item in synthesis.contradictions
+        ],
     )
     page = Page(path=path, frontmatter=frontmatter, body="\n".join(lines) + "\n")
     return page, footnotes.cited_locators()
+
+
+def _contexts(
+    pack: DomainPack,
+    sources: Sequence[str],
+    infos: Mapping[str, SourceInfo],
+    tiers: Mapping[str, str],
+    sensitivity: str,
+    path: str,
+    scope_of: Mapping[str, str | None] | None,
+    amending: Mapping[str | None, Sequence[str]] | None,
+) -> dict[str, ScopeContext]:
+    """Source id → its scope's amending documents that this page may link: none of a higher tier
+    than the page, whose tier stays the highest of its sources (gate G07)."""
+    if not amending or scope_of is None:
+        return {}
+    contexts: dict[str, ScopeContext] = {}
+    for source_id in sources:
+        value = scope_of.get(source_id)
+        label = scope_label(pack, value) if pack.scopes is not None and value else ""
+        docs = tuple(
+            (infos[sid], _source_link(infos[sid], path))
+            for sid in amending.get(value, ())
+            if allowed_for_audience(tiers[sid], sensitivity)  # type: ignore[arg-type]
+        )
+        contexts[source_id] = ScopeContext(label, docs)
+    return contexts
 
 
 def _claim_refs(claim: _Claim, footnotes: Footnotes) -> str:
@@ -585,6 +739,21 @@ async def build_topic_pages(
         for sid, page in source_pages.items()
         if sid in infos
     }
+    scope_of: dict[str, str | None] = {
+        sid: (scopes.get(sid) or pack.scopes.default.key) if pack.scopes is not None else None
+        for sid in infos
+    }
+    # v1.7: the current documents of an amending type, per scope (resolution.yaml amendments)
+    amending_types = {key for rule in pack.resolution.amendments for key in rule.amending}
+    amending: dict[str | None, list[str]] = {}
+    for sid in sorted(tiers, key=lambda sid: source_order(infos[sid])):
+        info = infos[sid]
+        if (
+            info.doc_type in amending_types
+            and info.status == "current"
+            and allowed_for_audience(tiers[sid], audience)  # type: ignore[arg-type]
+        ):
+            amending.setdefault(scope_of[sid], []).append(sid)
     skips: list[TopicSkip] = []
     # (topic, scope) → why it was not written; one skip per per-scope topic without any page
     scoped_skips: dict[str, list[TopicSkip]] = {}
@@ -640,16 +809,19 @@ async def build_topic_pages(
         if output is None:
             skip(topic, scope, "insufficient_evidence", ordered)
             continue
-        synthesis = _verify(output, facts, labels, infos)
+        synthesis = _split_changes(_verify(output, facts, labels, infos), pack, infos, scope_of)
         if not (
             synthesis.overview
             or synthesis.sections
             or synthesis.contradictions
+            or synthesis.changes
             or synthesis.superseded
         ):
             skip(topic, scope, "insufficient_evidence", ordered)
             continue
-        page, locators = _render(topic, ordered, synthesis, infos, tiers, pack, stamp, scope)
+        page, locators = _render(
+            topic, ordered, synthesis, infos, tiers, pack, stamp, scope, scope_of, amending
+        )
         pages.append(page)
         cited.extend(locators)
     written = {page.frontmatter.topic_slug for page in pages}  # type: ignore[union-attr]

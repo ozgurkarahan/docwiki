@@ -30,7 +30,7 @@ sections 1 and 3 and loads with `docwiki.domain.load_pack("domains/batiment")`.
 | `terms.yaml` | The locked trade vocabulary (ADR 0012): kept in French with an English gloss; banned renderings where they are wrong |
 | `sensitivity.yaml` | `public` by default; the price study and the margin dashboard are `restricted` by path (their doc type folder, or any `restricted/` folder) and by doc type |
 | `supersession.yaml` | Quote and DPGF (`DEV-`) and schedule (`PLN-`) numbers at the start of the file name or text, revisions `indice A` to `indice H`, explicit references only as "annule et remplace"; groups are keyed by (chantier, number) |
-| `resolution.yaml` | Contradictions: authority first, then recency, with the notes shown on topic pages |
+| `resolution.yaml` | Contradictions: authority first, then recency, with the notes shown on topic pages; the avenant and the OS amend the contract of their chantier (a change, or a contract term to review); a client e-mail against a schedule is arbitrated with the client |
 | `hints.md` | Reviewed compile hints (no document text): chantiers, French terms, exact amounts, HT/TTC, day-first dates, indices, amendments and OS, situations, réserves, registers |
 | `canaries.txt` | The injection canary of the sample corpus (gate G08) |
 | `skills/` | Domain skill templates: `check-supplier-invoice`, `prepare-site-meeting`, `track-contract-amounts` |

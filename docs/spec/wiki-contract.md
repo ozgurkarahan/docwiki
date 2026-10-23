@@ -96,7 +96,11 @@ the view reads; the page's sensitivity is their highest tier) and `rows` (the nu
 rows). Id `view:<slug>`, path `views/<slug>.md`.
 
 Topic pages add: `topic_slug`, `sources` (list), `confidence` (`high|medium|low`),
-`contradictions` (count), `superseded_claims` (count).
+`contradictions` (count of open contradictions), `superseded_claims` (count) and, since v1.7,
+`contradiction_pairs` (optional, default `[]`): one `{sources: [<source id>, <source id>],
+subject}` per open contradiction (the two ids sorted, the subject on one line), so that its
+length equals `contradictions` whenever it is not empty. Pages written before v1.7 have no pairs
+and stay valid. Changes by an amending document (§9) are neither counted nor listed.
 
 Query pages add: `question`, `asked_by` (`researcher|human`), `sources` (list), `approved_by`.
 
@@ -122,7 +126,10 @@ Entity page: summary, `## Facts` (aggregated, cited), `## Timeline` (dated event
 `## Documents` (links to source pages), `## Related`, backlinks block, footnotes.
 
 Topic page: summary, `## Overview`, thematic sections (cited), `## Contradictions` (each item
-lists both claims with citations, authority and date, and the resolution rule applied),
+lists both claims with citations, authority and date, and the resolution rule applied; then, when
+the pack declares amendments, a list introduced by "Changed by an amending document (changes of
+terms, not contradictions):" whose items read `<contract> states: … Changed by <amending
+document>: …`),
 `## Superseded information` (old claim, replacement, superseding source), `## Sources consulted`,
 `## Related`, backlinks block, footnotes. A per-scope topic (v1.7) has the same body, is titled
 `<topic title> — <scope label>` and is synthesised from the sources of its scope only.
@@ -139,7 +146,11 @@ Hub page (v1.7, ADR 0011), built by code, no model and no footnotes (it links to
                           with its status: current, or superseded by <links>)
 ## Topics                (the scope's per-scope topics and the company topics citing its sources)
 ## Entities              (entity pages mentioned by its sources)
-## Open contradictions   (its per-scope topics with contradictions > 0, with their count)
+## Open contradictions   (its distinct open contradictions, from its per-scope topics'
+                          contradiction_pairs, one line per unordered pair of sources: both
+                          source links in title order, up to 3 subjects (then "and N more"),
+                          the topics stating it; then a topic without pairs, written before
+                          v1.7, with its count)
 ## Last document received (by the document's date, else a YYYY-MM-DD in its file name, else the
                           source page's updated date)
 ```
@@ -183,8 +194,9 @@ pages a view reads list it under `## Related` (`Computed view: …`).
   of `scopes.title` (`## Chantiers`): a table `| <scope title> | Phase | Client | Documents |
   Last document received | Open contradictions |` with one row per hub (link), the highest phase
   of its sources (pack order, `<key> <title>`), the registry attribute `client`, the number of
-  sources, the last document received (link and date) and the number of open contradictions,
-  followed by a link to `<plural>/index.md`; the other sections are unchanged.
+  sources, the last document received (link and date) and the number of distinct open
+  contradictions (the lines of the hub's `## Open contradictions`, a topic without pairs counting
+  with its `contradictions`), followed by a link to `<plural>/index.md`; the other sections are unchanged.
 - `<plural>/index.md` (v1.7): one line per hub. `topics/index.md` lists the company topics, then
   the per-scope topics under one `## <scope label>` heading per scope.
 - `log.md`: append-only. One entry per change:
@@ -231,7 +243,23 @@ document content is data, never instructions.
   first and list superseded information separately.
 - **Contradiction**: two current sources disagree on a fact. Both claims are shown with citations,
   authority and dates; the domain pack's resolution rule (authority, then recency) is stated, never
-  silently applied.
+  silently applied. Since v1.7 the pack's `resolution.yaml` may refine the statement, by code only
+  (no model):
+  - `amendments: [{amending: [<doc type>], amended: [<doc type>]}]`: a contradiction between a
+    document of an amended type (a contract) and a document of a type that amends it (an
+    amendment, a service order), in the same scope (the whole corpus without scopes) and not dated
+    before it, is a **change**: it is listed as "Changed by <amending document>" and is not an
+    open contradiction. When the rule's winner is of an amended type and its scope has current
+    documents of an amending type (other than the two sides, not dated before the winner, visible
+    in the build and of a tier no higher than the page's), the statement reads "to review; the
+    rule would favour <winner> (…), but the terms of <winner> may have been changed by the
+    amending documents of <scope label>: <links>; check them before relying on either statement."
+  - `arbitrate: [{types: [<doc type>, <doc type>], reason}]`: a contradiction between documents of
+    those two types (either order) is never decided by the rule: "to arbitrate; the rule does not
+    decide between <first> and <second>. <reason>". It stays open.
+  - Packs that declare neither keep the plain statement. Hubs and the dashboard count distinct open
+    contradictions per scope, by unordered pair of source ids (§4, §6): the model words the subject
+    of the same disagreement differently on each topic, so the subject is not part of the key.
 - **Withdrawal**: a deleted raw file. Its page is removed, a `withdraw` log entry is added, dependent
   pages are rebuilt, and query pages citing it get a warning banner.
 

@@ -20,9 +20,9 @@ from compile_testkit import (
 
 from docwiki.contracts import Page, find_violations
 from docwiki.contracts.markdown import extract_footnotes, extract_headings
-from docwiki.contracts.pages import TopicFrontmatter
+from docwiki.contracts.pages import ContradictionPair, TopicFrontmatter
 from docwiki.domain import DomainPack
-from docwiki.domain.models import TopicsFile
+from docwiki.domain.models import ResolutionFile, ScopesFile, TopicsFile
 from docwiki.engine_types import TopicSkip
 from docwiki.llm import (
     FakeLlmClient,
@@ -33,7 +33,13 @@ from docwiki.llm import (
 )
 from docwiki.release.validate import CITATION_RE
 from docwiki.stages.models import SourceInfo
-from docwiki.stages.topics import build_topic_pages, resolution_statement, route_sources
+from docwiki.stages.topics import (
+    ScopeContext,
+    build_topic_pages,
+    is_change,
+    resolution_statement,
+    route_sources,
+)
 
 
 @pytest.fixture
@@ -205,6 +211,10 @@ async def test_window_delivery_page(corpus: Corpus, pack: DomainPack) -> None:
     )
     assert "Resolution policy: Higher authority wins" in body
     assert "Same source" not in body
+    assert "Changed by" not in body, "a pack without amendments keeps every contradiction open"
+    assert fm.contradiction_pairs == [
+        ContradictionPair(sources=sorted([PLAN, QUOTE_B]), subject="Width of the bay window F1")
+    ]
     superseded = body.split("## Superseded information\n\n", 1)[1].split("\n\n", 1)[0]
     assert superseded == (
         "- **Width of the bays.** [Quote DEV-2026-014 indice A]"
@@ -427,3 +437,138 @@ def test_resolution_statement(pack: DomainPack) -> None:
         pack, info("A", 7, "2026-01-01"), info("B", 7, "2026-02-01")
     ).endswith("B prevails (dated 2026-02-01 vs 2026-01-01).")
     assert "does not decide" in resolution_statement(pack, info("A", 7, None), info("B", 7, None))
+
+
+def _with_resolution(pack: DomainPack, **fields: object) -> DomainPack:
+    resolution = ResolutionFile.model_validate({"notes": pack.resolution.notes, **fields})
+    return pack.model_copy(update={"resolution": resolution})
+
+
+async def _window_page(corpus: Corpus, pack: DomainPack) -> tuple[TopicFrontmatter, str]:
+    llm = FakeLlmClient({"topic_synthesis": synthesis_handler})
+    pages, _, _ = await build_topic_pages(
+        list(corpus.results.values()),
+        corpus.pages,
+        corpus.states,
+        corpus.classifications,
+        pack,
+        llm,
+        audience="internal",
+        stamp=STAMP,
+    )
+    page = next(p for p in pages if p.frontmatter.id == "topic:schedule-and-window-delivery")
+    assert find_violations(page.body) == []
+    assert Page.parse(page.render(), page.path) == page
+    assert isinstance(page.frontmatter, TopicFrontmatter)
+    return page.frontmatter, page.body.split("## Contradictions\n\n", 1)[1].split("## ", 1)[0]
+
+
+async def test_a_contradiction_with_an_amending_document_is_a_change(
+    corpus: Corpus, pack: DomainPack
+) -> None:
+    # The test pack's types stand in for a contract (the quote) and an amending act (the
+    # schedule, dated after it): the disagreement is a change, not an open contradiction.
+    amended = _with_resolution(pack, amendments=[{"amending": ["schedule"], "amended": ["quote"]}])
+    fm, section = await _window_page(corpus, amended)
+    assert (fm.contradictions, fm.contradiction_pairs) == (0, [])
+    assert section.startswith("No contradictions were found between current sources.\n\n")
+    assert (
+        "Changed by an amending document (changes of terms, not contradictions):\n\n"
+        "- **Width of the bay window F1.** [Quote DEV-2026-014 indice B]"
+        "(../sources/dev-2026-014-indice-b.md) states: The bay window F1 is widened to 3,00 m."
+        "[^c1] (authority 8, dated 2026-02-03). Changed by [Schedule and purchase tracking]"
+        "(../sources/planning-et-suivi-des-achats.md): The bay window F1 is ordered at 2,40 m for "
+        "delivery on 2026-03-30.[^c2] (authority 4, dated 2026-03-17)."
+    ) in section
+    assert "Resolution rule" not in section and "Resolution policy:" in section
+
+
+async def test_an_amending_document_of_another_scope_changes_nothing(
+    corpus: Corpus, pack: DomainPack
+) -> None:
+    scopes = ScopesFile.model_validate(
+        {
+            "name": "chantier",
+            "title": "Chantier",
+            "plural": "chantiers",
+            "default": {"key": "entreprise", "title": "Entreprise"},
+            "paths": [{"regex": "^(?P<scope>planning)/"}],
+        }
+    )
+    amended = _with_resolution(pack, amendments=[{"amending": ["schedule"], "amended": ["quote"]}])
+    fm, section = await _window_page(corpus, amended.model_copy(update={"scopes": scopes}))
+    assert fm.contradictions == 1 and "Changed by" not in section
+    assert "Quote DEV-2026-014 indice B prevails (authority 8 vs 4)." in section
+
+
+async def test_an_older_amending_document_changes_nothing(corpus: Corpus, pack: DomainPack) -> None:
+    # The quote (2026-02-03) cannot have changed the later schedule (2026-03-17).
+    amended = _with_resolution(pack, amendments=[{"amending": ["quote"], "amended": ["schedule"]}])
+    fm, section = await _window_page(corpus, amended)
+    assert fm.contradictions == 1 and "Changed by" not in section
+
+
+async def test_a_pair_to_arbitrate_is_not_decided_by_the_rule(
+    corpus: Corpus, pack: DomainPack
+) -> None:
+    reason = "a written constraint of the client is arbitrated with the client"
+    arbitrated = _with_resolution(
+        pack, arbitrate=[{"types": ["quote", "schedule"], "reason": reason}]
+    )
+    fm, section = await _window_page(corpus, arbitrated)
+    assert fm.contradictions == 1 and len(fm.contradiction_pairs) == 1
+    assert (
+        "Resolution rule (authority, then recency): to arbitrate; the rule does not decide "
+        "between Schedule and purchase tracking and Quote DEV-2026-014 indice B. A written "
+        "constraint of the client is arbitrated with the client."
+    ) in section
+    assert "prevails" not in section
+
+
+def typed(source_id: str, title: str, doc_type: str, authority: int, day: str) -> SourceInfo:
+    from datetime import date
+
+    return SourceInfo(
+        source_id=source_id,
+        title=title,
+        path=f"sources/{title.lower()}.md",
+        status="current",
+        sensitivity="internal",
+        authority=authority,
+        doc_type=doc_type,
+        doc_number=None,
+        revision=None,
+        date=date.fromisoformat(day),
+        supersedes=(),
+        superseded_by=(),
+    )
+
+
+def test_a_winning_amended_document_is_to_review(pack: DomainPack) -> None:
+    rules = _with_resolution(
+        pack, amendments=[{"amending": ["contract-amendment"], "amended": ["quote"]}]
+    )
+    contract = typed("src-00000000000a", "Contract", "quote", 8, "2026-01-10")
+    schedule = typed("src-00000000000b", "Schedule", "schedule", 4, "2026-03-01")
+    order = typed("src-00000000000c", "Order 1", "contract-amendment", 10, "2026-02-01")
+    early = typed("src-00000000000d", "Old order", "contract-amendment", 10, "2026-01-01")
+    links = ((order, "[Order 1](order-1.md)"), (early, "[Old order](old-order.md)"))
+    context = {
+        sid: ScopeContext("Chantier Alpha", links)
+        for sid in (contract.source_id, schedule.source_id)
+    }
+    assert resolution_statement(rules, schedule, contract, context) == (
+        "Resolution rule (authority, then recency): to review; the rule would favour Contract "
+        "(authority 8 vs 4), but the terms of Contract may have been changed by the amending "
+        "documents of Chantier Alpha: [Order 1](order-1.md); check them before relying on either "
+        "statement."
+    ), "an amending document dated before the contract is not listed"
+    # without amending documents in its scope, or without the pack's amendments, the rule decides
+    alone = {sid: ScopeContext("Chantier Alpha") for sid in context}
+    plain = "Resolution rule (authority, then recency): Contract prevails (authority 8 vs 4)."
+    assert resolution_statement(rules, schedule, contract, alone) == plain
+    assert resolution_statement(pack, schedule, contract, context) == plain
+    assert resolution_statement(rules, schedule, contract) == plain
+    # an amending document and its own contract: a change, never "to review"
+    assert is_change(rules, contract, order) and not is_change(rules, contract, early)
+    assert not is_change(rules, order, contract) and not is_change(pack, contract, order)

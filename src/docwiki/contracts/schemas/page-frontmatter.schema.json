@@ -24,6 +24,33 @@
       "title": "Alias",
       "type": "object"
     },
+    "ContradictionPair": {
+      "additionalProperties": false,
+      "description": "One open contradiction of a topic page (v1.7): its two sources (sorted ids) and subject.",
+      "properties": {
+        "sources": {
+          "items": {
+            "pattern": "^src-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "title": "Sources",
+          "type": "array"
+        },
+        "subject": {
+          "minLength": 1,
+          "title": "Subject",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sources",
+        "subject"
+      ],
+      "title": "ContradictionPair",
+      "type": "object"
+    },
     "DocwikiStamp": {
       "additionalProperties": false,
       "description": "``docwiki: {schema: 1, release: <release_id>}``.",
@@ -989,6 +1016,14 @@
           "minimum": 0,
           "title": "Superseded Claims",
           "type": "integer"
+        },
+        "contradiction_pairs": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ContradictionPair"
+          },
+          "title": "Contradiction Pairs",
+          "type": "array"
         }
       },
       "required": [
