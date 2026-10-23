@@ -1,4 +1,2355 @@
 {
   "format": "docwiki.evals.latest/v1",
-  "splits": {}
+  "splits": {
+    "dev": {
+      "baseline-long-context": {
+        "file": "2026-10-23-baseline-long-context-dev.json",
+        "status": "ok",
+        "skipped": null,
+        "date": "2026-10-23",
+        "started_at": "2026-10-23T15:40:09Z",
+        "questions": 32,
+        "questions_total": 32,
+        "complete": true,
+        "overall": {
+          "questions": 32,
+          "errors": 0,
+          "answer_accuracy": {
+            "value": 0.625,
+            "n": 32,
+            "passed": 20
+          },
+          "must_include_coverage": {
+            "value": 0.8932,
+            "n": 30,
+            "passed": 19
+          },
+          "numeric_exactness": {
+            "value": 0.8889,
+            "n": 9,
+            "passed": 8
+          },
+          "citation_precision": {
+            "value": 0.7428,
+            "n": 30,
+            "passed": 12
+          },
+          "citation_recall": {
+            "value": 0.7386,
+            "n": 30,
+            "passed": 14
+          },
+          "abstention_accuracy": {
+            "value": 0.9375,
+            "n": 32,
+            "passed": 30
+          },
+          "injection_resistance": {
+            "value": 1.0,
+            "n": 1,
+            "passed": 1
+          },
+          "restricted_exclusion": {
+            "value": 1.0,
+            "n": 32,
+            "passed": 32
+          }
+        },
+        "by_category": {
+          "abstain": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "must_include_coverage": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_recall": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            }
+          },
+          "contradiction": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "must_include_coverage": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "citation_recall": {
+              "value": 0.0,
+              "n": 1,
+              "passed": 0
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            }
+          },
+          "injection": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "must_include_coverage": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 0.75,
+              "n": 1,
+              "passed": 0
+            },
+            "citation_recall": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "injection_resistance": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            }
+          },
+          "multi-hop": {
+            "questions": 10,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 0.6,
+              "n": 10,
+              "passed": 6
+            },
+            "must_include_coverage": {
+              "value": 0.9223,
+              "n": 10,
+              "passed": 6
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 0.7811,
+              "n": 10,
+              "passed": 3
+            },
+            "citation_recall": {
+              "value": 0.6125,
+              "n": 10,
+              "passed": 1
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 10,
+              "passed": 10
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 10,
+              "passed": 10
+            }
+          },
+          "multilingual": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "must_include_coverage": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "citation_recall": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            }
+          },
+          "numeric": {
+            "questions": 3,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "must_include_coverage": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "numeric_exactness": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "citation_precision": {
+              "value": 0.7619,
+              "n": 3,
+              "passed": 1
+            },
+            "citation_recall": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            }
+          },
+          "ocr": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 0.0,
+              "n": 1,
+              "passed": 0
+            },
+            "must_include_coverage": {
+              "value": 0.0,
+              "n": 1,
+              "passed": 0
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_recall": {
+              "value": 0.0,
+              "n": 1,
+              "passed": 0
+            },
+            "abstention_accuracy": {
+              "value": 0.0,
+              "n": 1,
+              "passed": 0
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            }
+          },
+          "restricted": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 0.0,
+              "n": 1,
+              "passed": 0
+            },
+            "must_include_coverage": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 0.0,
+              "n": 1,
+              "passed": 0
+            },
+            "citation_recall": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "abstention_accuracy": {
+              "value": 0.0,
+              "n": 1,
+              "passed": 0
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            }
+          },
+          "single-hop": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "must_include_coverage": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 0.5,
+              "n": 1,
+              "passed": 0
+            },
+            "citation_recall": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            }
+          },
+          "skill": {
+            "questions": 3,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 0.0,
+              "n": 3,
+              "passed": 0
+            },
+            "must_include_coverage": {
+              "value": 0.7222,
+              "n": 3,
+              "passed": 0
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 0.3757,
+              "n": 3,
+              "passed": 0
+            },
+            "citation_recall": {
+              "value": 0.5111,
+              "n": 3,
+              "passed": 0
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            }
+          },
+          "supersession": {
+            "questions": 3,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 0.3333,
+              "n": 3,
+              "passed": 1
+            },
+            "must_include_coverage": {
+              "value": 0.8857,
+              "n": 3,
+              "passed": 1
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 0.9524,
+              "n": 3,
+              "passed": 2
+            },
+            "citation_recall": {
+              "value": 0.8333,
+              "n": 3,
+              "passed": 1
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            }
+          },
+          "table": {
+            "questions": 6,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 0.8333,
+              "n": 6,
+              "passed": 5
+            },
+            "must_include_coverage": {
+              "value": 0.9583,
+              "n": 6,
+              "passed": 5
+            },
+            "numeric_exactness": {
+              "value": 0.8333,
+              "n": 6,
+              "passed": 5
+            },
+            "citation_precision": {
+              "value": 0.8255,
+              "n": 6,
+              "passed": 4
+            },
+            "citation_recall": {
+              "value": 1.0,
+              "n": 6,
+              "passed": 6
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 6,
+              "passed": 6
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 6,
+              "passed": 6
+            }
+          }
+        },
+        "cost": {
+          "currency": "USD",
+          "input_tokens": 1120507,
+          "cached_input_tokens": 1071360,
+          "output_tokens": 30213,
+          "reasoning_tokens": 20044,
+          "estimated_cost_usd": 1.687805,
+          "per_question_usd": 0.052744,
+          "priced_questions": 32,
+          "prices_verified": false,
+          "receipt_totals": {
+            "calls": 32,
+            "failed_calls": 0,
+            "attempts": 32,
+            "retries": 0,
+            "input_tokens": 1120507,
+            "cached_input_tokens": 1071360,
+            "output_tokens": 30213,
+            "reasoning_tokens": 20044,
+            "latency_s": 553.682,
+            "wait_s": 130.929,
+            "estimated_cost_usd": 1.687805,
+            "unpriced_calls": 0
+          }
+        },
+        "latency": {
+          "mean_s": 17.305,
+          "p50_s": 14.576,
+          "p95_s": 49.035,
+          "max_s": 61.568,
+          "total_s": 553.763
+        },
+        "judge": null,
+        "versions": {
+          "git_sha": "e8afd0ea670c93b1e4f814579e9674fb3f3201f1",
+          "release_id": null,
+          "metrics": "evals-metrics-v1",
+          "system": {
+            "tier": "smart",
+            "prompt_version": "baseline-long-context-v1",
+            "deployment": "smart",
+            "model": "gpt-5.5",
+            "model_version": "2026-04-24",
+            "model_source": "service",
+            "price_table": {
+              "name": "prices.yaml (packaged)",
+              "sha256": "4734ff62848bcc0c8d22899b3fe058f0866d01f997f7a19390364c464e2c2810",
+              "verified": false,
+              "source": "placeholder - verify at https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/"
+            }
+          }
+        },
+        "failures": {
+          "answer_accuracy": {
+            "ocr": [
+              "q010"
+            ],
+            "restricted": [
+              "q013"
+            ],
+            "skill": [
+              "q014",
+              "q015",
+              "q016"
+            ],
+            "multi-hop": [
+              "q017",
+              "q018",
+              "q021",
+              "q022"
+            ],
+            "table": [
+              "q024"
+            ],
+            "supersession": [
+              "q031",
+              "q032"
+            ]
+          },
+          "must_include_coverage": {
+            "ocr": [
+              "q010"
+            ],
+            "skill": [
+              "q014",
+              "q015",
+              "q016"
+            ],
+            "multi-hop": [
+              "q017",
+              "q018",
+              "q021",
+              "q022"
+            ],
+            "table": [
+              "q024"
+            ],
+            "supersession": [
+              "q031",
+              "q032"
+            ]
+          },
+          "numeric_exactness": {
+            "table": [
+              "q024"
+            ]
+          },
+          "citation_precision": {
+            "single-hop": [
+              "q001"
+            ],
+            "multi-hop": [
+              "q005",
+              "q006",
+              "q017",
+              "q018",
+              "q021",
+              "q022",
+              "q030"
+            ],
+            "injection": [
+              "q012"
+            ],
+            "restricted": [
+              "q013"
+            ],
+            "skill": [
+              "q014",
+              "q015",
+              "q016"
+            ],
+            "table": [
+              "q019",
+              "q020"
+            ],
+            "numeric": [
+              "q025",
+              "q026"
+            ],
+            "supersession": [
+              "q031"
+            ]
+          },
+          "citation_recall": {
+            "multi-hop": [
+              "q005",
+              "q017",
+              "q018",
+              "q021",
+              "q022",
+              "q027",
+              "q028",
+              "q029",
+              "q030"
+            ],
+            "contradiction": [
+              "q007"
+            ],
+            "ocr": [
+              "q010"
+            ],
+            "skill": [
+              "q014",
+              "q015",
+              "q016"
+            ],
+            "supersession": [
+              "q031",
+              "q032"
+            ]
+          },
+          "abstention_accuracy": {
+            "ocr": [
+              "q010"
+            ],
+            "restricted": [
+              "q013"
+            ]
+          }
+        },
+        "errors": []
+      },
+      "baseline-rag": {
+        "file": "2026-10-23-baseline-rag-dev.json",
+        "status": "ok",
+        "skipped": null,
+        "date": "2026-10-23",
+        "started_at": "2026-10-23T15:35:40Z",
+        "questions": 32,
+        "questions_total": 32,
+        "complete": true,
+        "overall": {
+          "questions": 32,
+          "errors": 0,
+          "answer_accuracy": {
+            "value": 0.5625,
+            "n": 32,
+            "passed": 18
+          },
+          "must_include_coverage": {
+            "value": 0.7885,
+            "n": 30,
+            "passed": 16
+          },
+          "numeric_exactness": {
+            "value": 0.6667,
+            "n": 9,
+            "passed": 6
+          },
+          "citation_precision": {
+            "value": 0.9037,
+            "n": 27,
+            "passed": 21
+          },
+          "citation_recall": {
+            "value": 0.6744,
+            "n": 30,
+            "passed": 13
+          },
+          "abstention_accuracy": {
+            "value": 0.9062,
+            "n": 32,
+            "passed": 29
+          },
+          "injection_resistance": {
+            "value": 1.0,
+            "n": 1,
+            "passed": 1
+          },
+          "restricted_exclusion": {
+            "value": 1.0,
+            "n": 32,
+            "passed": 32
+          },
+          "retrieval_recall": {
+            "value": 0.7694,
+            "n": 30,
+            "passed": 17
+          }
+        },
+        "by_category": {
+          "abstain": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "must_include_coverage": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_recall": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "retrieval_recall": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            }
+          },
+          "contradiction": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "must_include_coverage": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "citation_recall": {
+              "value": 0.0,
+              "n": 1,
+              "passed": 0
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "retrieval_recall": {
+              "value": 0.0,
+              "n": 1,
+              "passed": 0
+            }
+          },
+          "injection": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "must_include_coverage": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "citation_recall": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "injection_resistance": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "retrieval_recall": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            }
+          },
+          "multi-hop": {
+            "questions": 10,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 0.4,
+              "n": 10,
+              "passed": 4
+            },
+            "must_include_coverage": {
+              "value": 0.7473,
+              "n": 10,
+              "passed": 4
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 0.9444,
+              "n": 9,
+              "passed": 8
+            },
+            "citation_recall": {
+              "value": 0.475,
+              "n": 10,
+              "passed": 0
+            },
+            "abstention_accuracy": {
+              "value": 0.9,
+              "n": 10,
+              "passed": 9
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 10,
+              "passed": 10
+            },
+            "retrieval_recall": {
+              "value": 0.7,
+              "n": 10,
+              "passed": 3
+            }
+          },
+          "multilingual": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "must_include_coverage": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "citation_recall": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "retrieval_recall": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            }
+          },
+          "numeric": {
+            "questions": 3,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "must_include_coverage": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "numeric_exactness": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "citation_precision": {
+              "value": 0.7667,
+              "n": 3,
+              "passed": 1
+            },
+            "citation_recall": {
+              "value": 0.8889,
+              "n": 3,
+              "passed": 2
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "retrieval_recall": {
+              "value": 0.8889,
+              "n": 3,
+              "passed": 2
+            }
+          },
+          "ocr": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 0.0,
+              "n": 1,
+              "passed": 0
+            },
+            "must_include_coverage": {
+              "value": 0.0,
+              "n": 1,
+              "passed": 0
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_recall": {
+              "value": 0.0,
+              "n": 1,
+              "passed": 0
+            },
+            "abstention_accuracy": {
+              "value": 0.0,
+              "n": 1,
+              "passed": 0
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "retrieval_recall": {
+              "value": 0.0,
+              "n": 1,
+              "passed": 0
+            }
+          },
+          "restricted": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "must_include_coverage": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_recall": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "retrieval_recall": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            }
+          },
+          "single-hop": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "must_include_coverage": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "citation_recall": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "retrieval_recall": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            }
+          },
+          "skill": {
+            "questions": 3,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 0.0,
+              "n": 3,
+              "passed": 0
+            },
+            "must_include_coverage": {
+              "value": 0.6389,
+              "n": 3,
+              "passed": 0
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 0.5333,
+              "n": 3,
+              "passed": 0
+            },
+            "citation_recall": {
+              "value": 0.6056,
+              "n": 3,
+              "passed": 0
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "retrieval_recall": {
+              "value": 0.8056,
+              "n": 3,
+              "passed": 1
+            }
+          },
+          "supersession": {
+            "questions": 3,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 0.6667,
+              "n": 3,
+              "passed": 2
+            },
+            "must_include_coverage": {
+              "value": 0.9333,
+              "n": 3,
+              "passed": 2
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "citation_recall": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "retrieval_recall": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            }
+          },
+          "table": {
+            "questions": 6,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 0.5,
+              "n": 6,
+              "passed": 3
+            },
+            "must_include_coverage": {
+              "value": 0.744,
+              "n": 6,
+              "passed": 3
+            },
+            "numeric_exactness": {
+              "value": 0.5,
+              "n": 6,
+              "passed": 3
+            },
+            "citation_precision": {
+              "value": 1.0,
+              "n": 5,
+              "passed": 5
+            },
+            "citation_recall": {
+              "value": 0.8333,
+              "n": 6,
+              "passed": 5
+            },
+            "abstention_accuracy": {
+              "value": 0.8333,
+              "n": 6,
+              "passed": 5
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 6,
+              "passed": 6
+            },
+            "retrieval_recall": {
+              "value": 0.8333,
+              "n": 6,
+              "passed": 5
+            }
+          }
+        },
+        "cost": {
+          "currency": "USD",
+          "input_tokens": 200000,
+          "cached_input_tokens": 34816,
+          "output_tokens": 19361,
+          "reasoning_tokens": 12600,
+          "estimated_cost_usd": 1.424158,
+          "per_question_usd": 0.044505,
+          "priced_questions": 32,
+          "prices_verified": false,
+          "receipt_totals": {
+            "calls": 32,
+            "failed_calls": 0,
+            "attempts": 32,
+            "retries": 0,
+            "input_tokens": 200000,
+            "cached_input_tokens": 34816,
+            "output_tokens": 19361,
+            "reasoning_tokens": 12600,
+            "latency_s": 265.726,
+            "wait_s": 0.0,
+            "estimated_cost_usd": 1.424158,
+            "unpriced_calls": 0
+          }
+        },
+        "latency": {
+          "mean_s": 8.306,
+          "p50_s": 8.18,
+          "p95_s": 19.148,
+          "max_s": 21.52,
+          "total_s": 265.803
+        },
+        "judge": null,
+        "versions": {
+          "git_sha": "e8afd0ea670c93b1e4f814579e9674fb3f3201f1",
+          "release_id": null,
+          "metrics": "evals-metrics-v1",
+          "system": {
+            "tier": "smart",
+            "prompt_version": "baseline-rag-v1",
+            "deployment": "smart",
+            "model": "gpt-5.5",
+            "model_version": "2026-04-24",
+            "model_source": "service",
+            "price_table": {
+              "name": "prices.yaml (packaged)",
+              "sha256": "4734ff62848bcc0c8d22899b3fe058f0866d01f997f7a19390364c464e2c2810",
+              "verified": false,
+              "source": "placeholder - verify at https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/"
+            }
+          }
+        },
+        "failures": {
+          "answer_accuracy": {
+            "table": [
+              "q004",
+              "q023",
+              "q024"
+            ],
+            "ocr": [
+              "q010"
+            ],
+            "skill": [
+              "q014",
+              "q015",
+              "q016"
+            ],
+            "multi-hop": [
+              "q017",
+              "q018",
+              "q021",
+              "q022",
+              "q029",
+              "q030"
+            ],
+            "supersession": [
+              "q031"
+            ]
+          },
+          "must_include_coverage": {
+            "table": [
+              "q004",
+              "q023",
+              "q024"
+            ],
+            "ocr": [
+              "q010"
+            ],
+            "skill": [
+              "q014",
+              "q015",
+              "q016"
+            ],
+            "multi-hop": [
+              "q017",
+              "q018",
+              "q021",
+              "q022",
+              "q029",
+              "q030"
+            ],
+            "supersession": [
+              "q031"
+            ]
+          },
+          "numeric_exactness": {
+            "table": [
+              "q004",
+              "q023",
+              "q024"
+            ]
+          },
+          "citation_precision": {
+            "numeric": [
+              "q002",
+              "q026"
+            ],
+            "multi-hop": [
+              "q005"
+            ],
+            "skill": [
+              "q014",
+              "q015",
+              "q016"
+            ]
+          },
+          "citation_recall": {
+            "table": [
+              "q004"
+            ],
+            "multi-hop": [
+              "q005",
+              "q006",
+              "q017",
+              "q018",
+              "q021",
+              "q022",
+              "q027",
+              "q028",
+              "q029",
+              "q030"
+            ],
+            "contradiction": [
+              "q007"
+            ],
+            "ocr": [
+              "q010"
+            ],
+            "skill": [
+              "q014",
+              "q015",
+              "q016"
+            ],
+            "numeric": [
+              "q025"
+            ]
+          },
+          "abstention_accuracy": {
+            "table": [
+              "q004"
+            ],
+            "ocr": [
+              "q010"
+            ],
+            "multi-hop": [
+              "q029"
+            ]
+          },
+          "retrieval_recall": {
+            "table": [
+              "q004"
+            ],
+            "multi-hop": [
+              "q006",
+              "q017",
+              "q018",
+              "q021",
+              "q022",
+              "q029",
+              "q030"
+            ],
+            "contradiction": [
+              "q007"
+            ],
+            "ocr": [
+              "q010"
+            ],
+            "skill": [
+              "q014",
+              "q015"
+            ],
+            "numeric": [
+              "q025"
+            ]
+          }
+        },
+        "errors": []
+      },
+      "docwiki-researcher": {
+        "file": "2026-10-23-docwiki-researcher-dev.json",
+        "status": "ok",
+        "skipped": null,
+        "date": "2026-10-23",
+        "started_at": "2026-10-23T15:15:27Z",
+        "questions": 32,
+        "questions_total": 32,
+        "complete": true,
+        "overall": {
+          "questions": 32,
+          "errors": 0,
+          "answer_accuracy": {
+            "value": 0.75,
+            "n": 32,
+            "passed": 24
+          },
+          "must_include_coverage": {
+            "value": 0.9199,
+            "n": 30,
+            "passed": 23
+          },
+          "numeric_exactness": {
+            "value": 1.0,
+            "n": 9,
+            "passed": 9
+          },
+          "citation_precision": {
+            "value": 0.6588,
+            "n": 31,
+            "passed": 14
+          },
+          "citation_recall": {
+            "value": 0.6039,
+            "n": 30,
+            "passed": 10
+          },
+          "abstention_accuracy": {
+            "value": 0.9688,
+            "n": 32,
+            "passed": 31
+          },
+          "injection_resistance": {
+            "value": 1.0,
+            "n": 1,
+            "passed": 1
+          },
+          "restricted_exclusion": {
+            "value": 1.0,
+            "n": 32,
+            "passed": 32
+          }
+        },
+        "by_category": {
+          "abstain": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 0.0,
+              "n": 1,
+              "passed": 0
+            },
+            "must_include_coverage": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 0.0,
+              "n": 1,
+              "passed": 0
+            },
+            "citation_recall": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "abstention_accuracy": {
+              "value": 0.0,
+              "n": 1,
+              "passed": 0
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            }
+          },
+          "contradiction": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 0.0,
+              "n": 1,
+              "passed": 0
+            },
+            "must_include_coverage": {
+              "value": 0.5,
+              "n": 1,
+              "passed": 0
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 0.5,
+              "n": 1,
+              "passed": 0
+            },
+            "citation_recall": {
+              "value": 0.5,
+              "n": 1,
+              "passed": 0
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            }
+          },
+          "injection": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "must_include_coverage": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "citation_recall": {
+              "value": 0.5,
+              "n": 1,
+              "passed": 0
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "injection_resistance": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            }
+          },
+          "multi-hop": {
+            "questions": 10,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 0.6,
+              "n": 10,
+              "passed": 6
+            },
+            "must_include_coverage": {
+              "value": 0.8883,
+              "n": 10,
+              "passed": 6
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 0.8274,
+              "n": 10,
+              "passed": 6
+            },
+            "citation_recall": {
+              "value": 0.55,
+              "n": 10,
+              "passed": 1
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 10,
+              "passed": 10
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 10,
+              "passed": 10
+            }
+          },
+          "multilingual": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "must_include_coverage": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 0.4,
+              "n": 1,
+              "passed": 0
+            },
+            "citation_recall": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            }
+          },
+          "numeric": {
+            "questions": 3,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "must_include_coverage": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "numeric_exactness": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "citation_precision": {
+              "value": 0.2222,
+              "n": 3,
+              "passed": 0
+            },
+            "citation_recall": {
+              "value": 0.3333,
+              "n": 3,
+              "passed": 1
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            }
+          },
+          "ocr": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "must_include_coverage": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "citation_recall": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            }
+          },
+          "restricted": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "must_include_coverage": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_recall": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            }
+          },
+          "single-hop": {
+            "questions": 1,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "must_include_coverage": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "citation_recall": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 1,
+              "passed": 1
+            }
+          },
+          "skill": {
+            "questions": 3,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 0.6667,
+              "n": 3,
+              "passed": 2
+            },
+            "must_include_coverage": {
+              "value": 0.8333,
+              "n": 3,
+              "passed": 2
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 0.4833,
+              "n": 3,
+              "passed": 1
+            },
+            "citation_recall": {
+              "value": 0.5667,
+              "n": 3,
+              "passed": 1
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            }
+          },
+          "supersession": {
+            "questions": 3,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 0.6667,
+              "n": 3,
+              "passed": 2
+            },
+            "must_include_coverage": {
+              "value": 0.9048,
+              "n": 3,
+              "passed": 2
+            },
+            "numeric_exactness": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "citation_precision": {
+              "value": 0.6,
+              "n": 3,
+              "passed": 1
+            },
+            "citation_recall": {
+              "value": 0.4167,
+              "n": 3,
+              "passed": 1
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 3,
+              "passed": 3
+            }
+          },
+          "table": {
+            "questions": 6,
+            "errors": 0,
+            "answer_accuracy": {
+              "value": 1.0,
+              "n": 6,
+              "passed": 6
+            },
+            "must_include_coverage": {
+              "value": 1.0,
+              "n": 6,
+              "passed": 6
+            },
+            "numeric_exactness": {
+              "value": 1.0,
+              "n": 6,
+              "passed": 6
+            },
+            "citation_precision": {
+              "value": 0.7222,
+              "n": 6,
+              "passed": 3
+            },
+            "citation_recall": {
+              "value": 0.7778,
+              "n": 6,
+              "passed": 3
+            },
+            "abstention_accuracy": {
+              "value": 1.0,
+              "n": 6,
+              "passed": 6
+            },
+            "injection_resistance": {
+              "value": null,
+              "n": 0,
+              "passed": 0
+            },
+            "restricted_exclusion": {
+              "value": 1.0,
+              "n": 6,
+              "passed": 6
+            }
+          }
+        },
+        "cost": {
+          "currency": "USD",
+          "input_tokens": 766767,
+          "cached_input_tokens": 116992,
+          "output_tokens": 64213,
+          "reasoning_tokens": 31969,
+          "estimated_cost_usd": 5.233761,
+          "per_question_usd": 0.163555,
+          "priced_questions": 32,
+          "prices_verified": false,
+          "receipt_totals": null
+        },
+        "latency": {
+          "mean_s": 37.715,
+          "p50_s": 32.34,
+          "p95_s": 71.082,
+          "max_s": 87.811,
+          "total_s": 1206.885
+        },
+        "judge": null,
+        "versions": {
+          "git_sha": "e8afd0ea670c93b1e4f814579e9674fb3f3201f1",
+          "release_id": null,
+          "metrics": "evals-metrics-v1",
+          "system": {
+            "agent": "researcher",
+            "agent_version": "5",
+            "agent_definition_sha256": "f43b29dd82e92e209ffe8225d6ca97418df77ee6e251256da19d93db04b459b5",
+            "model_deployment": "smart",
+            "price_table": {
+              "name": "prices.yaml (packaged)",
+              "sha256": "4734ff62848bcc0c8d22899b3fe058f0866d01f997f7a19390364c464e2c2810",
+              "verified": false,
+              "source": "placeholder - verify at https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/"
+            }
+          }
+        },
+        "failures": {
+          "answer_accuracy": {
+            "contradiction": [
+              "q007"
+            ],
+            "abstain": [
+              "q011"
+            ],
+            "skill": [
+              "q016"
+            ],
+            "multi-hop": [
+              "q018",
+              "q021",
+              "q022",
+              "q029"
+            ],
+            "supersession": [
+              "q032"
+            ]
+          },
+          "must_include_coverage": {
+            "contradiction": [
+              "q007"
+            ],
+            "skill": [
+              "q016"
+            ],
+            "multi-hop": [
+              "q018",
+              "q021",
+              "q022",
+              "q029"
+            ],
+            "supersession": [
+              "q032"
+            ]
+          },
+          "citation_precision": {
+            "numeric": [
+              "q002",
+              "q025",
+              "q026"
+            ],
+            "table": [
+              "q004",
+              "q023",
+              "q024"
+            ],
+            "multi-hop": [
+              "q005",
+              "q006",
+              "q018",
+              "q030"
+            ],
+            "contradiction": [
+              "q007"
+            ],
+            "multilingual": [
+              "q009"
+            ],
+            "abstain": [
+              "q011"
+            ],
+            "skill": [
+              "q015",
+              "q016"
+            ],
+            "supersession": [
+              "q031",
+              "q032"
+            ]
+          },
+          "citation_recall": {
+            "table": [
+              "q004",
+              "q019",
+              "q020"
+            ],
+            "multi-hop": [
+              "q005",
+              "q006",
+              "q018",
+              "q021",
+              "q022",
+              "q027",
+              "q028",
+              "q029",
+              "q030"
+            ],
+            "contradiction": [
+              "q007"
+            ],
+            "injection": [
+              "q012"
+            ],
+            "skill": [
+              "q015",
+              "q016"
+            ],
+            "numeric": [
+              "q025",
+              "q026"
+            ],
+            "supersession": [
+              "q031",
+              "q032"
+            ]
+          },
+          "abstention_accuracy": {
+            "abstain": [
+              "q011"
+            ]
+          }
+        },
+        "errors": []
+      }
+    }
+  }
 }
