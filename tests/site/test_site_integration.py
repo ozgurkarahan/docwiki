@@ -120,7 +120,7 @@ def test_pages_render_the_docwiki_overlay(built_site: Path) -> None:
     # one fictional notice on the home page (the site banner); the provenance line comes first
     assert 'class="docwiki-banner"' in home and "docwiki-notice--fictional" not in home
     assert 'class="docwiki-about"' in home and "Compiled by" in home
-    assert "quality gates: 12 passed, 3 skipped" in home and "quality report" in home
+    assert "quality gates: 12 passed, 4 skipped" in home and "quality report" in home
     assert home.index('class="docwiki-about"') < home.index('id="how-to-navigate"')
     # the story first: the pattern, documents → pipeline → cited pages, a question to try
     assert 'class="docwiki-story"' in home and "docwiki-story" not in source
