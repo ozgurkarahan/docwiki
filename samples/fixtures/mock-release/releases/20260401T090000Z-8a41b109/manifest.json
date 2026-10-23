@@ -1,0 +1,400 @@
+{
+  "schema": 1,
+  "release_id": "20260401T090000Z-8a41b109",
+  "created_at": "2026-04-01T09:00:00Z",
+  "audience": "public",
+  "run_id": "run-20260401-090000-0a1b2c3d",
+  "inputs": {
+    "sources": {
+      "src-f0757603684a": "sha256:6b3193dd23bc5651698d42ee99b7afcfc27c9a200bb894107a30e5d5cf41cb2c",
+      "src-7630d0741377": "sha256:a00aa580f26ea7bf85ea4eb93bb555ac3a892553392dc11251295587fa934a11",
+      "src-59cf9366e50c": "sha256:3b46c47a34540bef170340c12f4bfdbc59b5e368d269bc8ca3d0cf36e5419ea0"
+    }
+  },
+  "versions": {
+    "docwiki": "0.1.0",
+    "wiki_schema": 1,
+    "domain_pack": "batiment-mock",
+    "domain_pack_hash": "mock-pack-v1",
+    "prompts": {
+      "compile": "mock-1"
+    },
+    "models": {},
+    "extractors": {
+      "local": "mock-1"
+    }
+  },
+  "counts": {
+    "entities": 3,
+    "evidence": 5,
+    "pages": 18,
+    "queries": 1,
+    "sources": 3,
+    "tables": 2,
+    "topics": 1
+  },
+  "gates": [
+    {
+      "gate": "G01",
+      "name": "frontmatter",
+      "blocking": true,
+      "status": "pass",
+      "metric": null,
+      "threshold": null,
+      "violations": 0,
+      "details": [],
+      "message": "Every page validates against its schema"
+    },
+    {
+      "gate": "G02",
+      "name": "links",
+      "blocking": true,
+      "status": "pass",
+      "metric": null,
+      "threshold": null,
+      "violations": 0,
+      "details": [],
+      "message": "100 % of internal links and anchors resolve"
+    },
+    {
+      "gate": "G03",
+      "name": "citations-present",
+      "blocking": true,
+      "status": "pass",
+      "metric": null,
+      "threshold": null,
+      "violations": 0,
+      "details": [],
+      "message": "Every key fact / topic claim has >= 1 citation"
+    },
+    {
+      "gate": "G04",
+      "name": "quote-verification",
+      "blocking": true,
+      "status": "skipped",
+      "metric": null,
+      "threshold": null,
+      "violations": 0,
+      "details": [],
+      "message": ">= 95 % of native-text/table citations verified"
+    },
+    {
+      "gate": "G05",
+      "name": "safe-content",
+      "blocking": true,
+      "status": "pass",
+      "metric": null,
+      "threshold": null,
+      "violations": 0,
+      "details": [],
+      "message": "No raw HTML, external links or javascript:/data: URLs"
+    },
+    {
+      "gate": "G06",
+      "name": "sidecars",
+      "blocking": true,
+      "status": "pass",
+      "metric": null,
+      "threshold": null,
+      "violations": 0,
+      "details": [],
+      "message": "Every cited locator has a sidecar"
+    },
+    {
+      "gate": "G07",
+      "name": "audience",
+      "blocking": true,
+      "status": "pass",
+      "metric": null,
+      "threshold": null,
+      "violations": 0,
+      "details": [],
+      "message": "No content above the build audience"
+    },
+    {
+      "gate": "G08",
+      "name": "injection-containment",
+      "blocking": true,
+      "status": "pass",
+      "metric": null,
+      "threshold": null,
+      "violations": 0,
+      "details": [],
+      "message": "Canary strings absent from kit, indexes, site"
+    },
+    {
+      "gate": "G09",
+      "name": "paths",
+      "blocking": true,
+      "status": "pass",
+      "metric": null,
+      "threshold": null,
+      "violations": 0,
+      "details": [],
+      "message": "All paths match the slug rules; no enum/class reprs"
+    },
+    {
+      "gate": "G10",
+      "name": "glossary",
+      "blocking": true,
+      "status": "skipped",
+      "metric": null,
+      "threshold": null,
+      "violations": 0,
+      "details": [],
+      "message": "Non-empty when the domain pack has seeds"
+    },
+    {
+      "gate": "G11",
+      "name": "supersession",
+      "blocking": true,
+      "status": "pass",
+      "metric": null,
+      "threshold": null,
+      "violations": 0,
+      "details": [],
+      "message": "Superseded sources marked; current claims first"
+    },
+    {
+      "gate": "G12",
+      "name": "tags",
+      "blocking": true,
+      "status": "pass",
+      "metric": null,
+      "threshold": null,
+      "violations": 0,
+      "details": [],
+      "message": "Tags lower-case and de-duplicated"
+    },
+    {
+      "gate": "G13",
+      "name": "orphans",
+      "blocking": false,
+      "status": "pass",
+      "metric": null,
+      "threshold": null,
+      "violations": 0,
+      "details": [],
+      "message": "<= 5 % of pages without inbound links"
+    },
+    {
+      "gate": "G14",
+      "name": "skills",
+      "blocking": true,
+      "status": "pass",
+      "metric": null,
+      "threshold": null,
+      "violations": 0,
+      "details": [],
+      "message": "Skill projections identical and valid"
+    },
+    {
+      "gate": "G15",
+      "name": "extraction",
+      "blocking": false,
+      "status": "skipped",
+      "metric": null,
+      "threshold": null,
+      "violations": 0,
+      "details": [],
+      "message": "<= 10 % sources quarantined"
+    },
+    {
+      "gate": "G16",
+      "name": "locked-vocabulary",
+      "blocking": true,
+      "status": "skipped",
+      "metric": null,
+      "threshold": null,
+      "violations": 0,
+      "details": [],
+      "message": "No wiki page renders a locked trade term with a banned English equivalent"
+    }
+  ],
+  "files": {
+    "catalog.json": {
+      "sha256": "42ff98c060f150a7d5da696a277a2196ed87fbcc214f24f06847beb50d005fab",
+      "size": 16273
+    },
+    "evidence/src-59cf9366e50c/index.md": {
+      "sha256": "34fc98d92be45fac348739ef637f5df3367b77c73e587d6581952b881e065306",
+      "size": 513
+    },
+    "evidence/src-59cf9366e50c/sheet-planning-r0006-r0009.md": {
+      "sha256": "e689669d0e645a4162c0496b38e608d67a28c71643d8c10f8c199f3d42b20d66",
+      "size": 1676
+    },
+    "evidence/src-59cf9366e50c/sheet-planning-r0024-r0025.md": {
+      "sha256": "5d29da8c0debc5ddda6f694707a7d8f10dfef798c7824b8db6ba5df899b470fa",
+      "size": 1238
+    },
+    "evidence/src-7630d0741377/img/p0001.png": {
+      "sha256": "673f58db28c1bc5df3c57dc285b616268c25ff0a814fc6f63c397d91cfbcae66",
+      "size": 158
+    },
+    "evidence/src-7630d0741377/index.md": {
+      "sha256": "0f2260844f0d7d8e3fc17849449215ede4fb9bc0dde44c8113c2dd58f57b2c9d",
+      "size": 406
+    },
+    "evidence/src-7630d0741377/p0001.md": {
+      "sha256": "4fd104ca4cf9800c050c3b819b013e20b18ae629b86aa0c34c4103dae10b035a",
+      "size": 925
+    },
+    "evidence/src-f0757603684a/index.md": {
+      "sha256": "051ef1ecfe8158e9ab3cea8e2b02c9d17a1b39709ed74186fc3f01d99eb33746",
+      "size": 399
+    },
+    "evidence/src-f0757603684a/para-0007.md": {
+      "sha256": "560a2703d7b6509f633fd0d9cbbed63f41acfa12e6cb5af396ac89c2d166d345",
+      "size": 501
+    },
+    "evidence/src-f0757603684a/para-0011.md": {
+      "sha256": "5f957d8904758a40c46a89760eb3e114e0835ef89a8e1631ba030dc302791df3",
+      "size": 655
+    },
+    "search.db": {
+      "sha256": "67359ff9fe9364b564d318469ecf32d77d25920444c5195a2683556f77d457dc",
+      "size": 106496
+    },
+    "tables/src-59cf9366e50c/index.json": {
+      "sha256": "7fac68b8f18210cd9bd7c4b4b6ca3dbf2261ff8e003259b867067c3f898838f9",
+      "size": 3009
+    },
+    "tables/src-59cf9366e50c/t01.parquet": {
+      "sha256": "ab9d47701034fe0e8d2f18fd55a0a9c19507f0992ab7e0d2e7e9508a60e8bb74",
+      "size": 2937
+    },
+    "tables/src-59cf9366e50c/t02.parquet": {
+      "sha256": "345b198aeeac4e66bfd1a4f119858dd36aec5b2e07bb758d1f0e63a3e2da0507",
+      "size": 2114
+    },
+    "wiki/.agents/skills/cite-sources/SKILL.md": {
+      "sha256": "0685c76d2f514d450dfed59ceb2dca43c924b5b3862cddb0421dab345ac0a4d0",
+      "size": 526
+    },
+    "wiki/.agents/skills/deep-research/SKILL.md": {
+      "sha256": "475c62fecae4719210d353d1bf0e29041c95697e3b2c90dd69e4f61bd3e66f92",
+      "size": 557
+    },
+    "wiki/.agents/skills/wiki-maintainer/SKILL.md": {
+      "sha256": "a1c9ea02feee816b590235fd420d717fccc76810f544a871eb4642a91cd0630b",
+      "size": 468
+    },
+    "wiki/.agents/skills/wiki-navigator/SKILL.md": {
+      "sha256": "2b76e1ade1c3c6ba18be2ea6e2c471ec4dd897c855d5e752a5352e3b835a0338",
+      "size": 589
+    },
+    "wiki/.claude/skills/cite-sources/SKILL.md": {
+      "sha256": "0685c76d2f514d450dfed59ceb2dca43c924b5b3862cddb0421dab345ac0a4d0",
+      "size": 526
+    },
+    "wiki/.claude/skills/deep-research/SKILL.md": {
+      "sha256": "475c62fecae4719210d353d1bf0e29041c95697e3b2c90dd69e4f61bd3e66f92",
+      "size": 557
+    },
+    "wiki/.claude/skills/wiki-maintainer/SKILL.md": {
+      "sha256": "a1c9ea02feee816b590235fd420d717fccc76810f544a871eb4642a91cd0630b",
+      "size": 468
+    },
+    "wiki/.claude/skills/wiki-navigator/SKILL.md": {
+      "sha256": "2b76e1ade1c3c6ba18be2ea6e2c471ec4dd897c855d5e752a5352e3b835a0338",
+      "size": 589
+    },
+    "wiki/.github/skills/cite-sources/SKILL.md": {
+      "sha256": "0685c76d2f514d450dfed59ceb2dca43c924b5b3862cddb0421dab345ac0a4d0",
+      "size": 526
+    },
+    "wiki/.github/skills/deep-research/SKILL.md": {
+      "sha256": "475c62fecae4719210d353d1bf0e29041c95697e3b2c90dd69e4f61bd3e66f92",
+      "size": 557
+    },
+    "wiki/.github/skills/wiki-maintainer/SKILL.md": {
+      "sha256": "a1c9ea02feee816b590235fd420d717fccc76810f544a871eb4642a91cd0630b",
+      "size": 468
+    },
+    "wiki/.github/skills/wiki-navigator/SKILL.md": {
+      "sha256": "2b76e1ade1c3c6ba18be2ea6e2c471ec4dd897c855d5e752a5352e3b835a0338",
+      "size": 589
+    },
+    "wiki/AGENTS.md": {
+      "sha256": "ea5b80b70de9fa562fc4548594aae584aa4db3444db936a77de3af5d6ec41bb7",
+      "size": 2667
+    },
+    "wiki/_meta/quality.md": {
+      "sha256": "5f0cd896a748e6ea3791c89b5fb242ba0d45645393e69a11e9879b807732667e",
+      "size": 886
+    },
+    "wiki/catalog.json": {
+      "sha256": "42ff98c060f150a7d5da696a277a2196ed87fbcc214f24f06847beb50d005fab",
+      "size": 16273
+    },
+    "wiki/entities/index.md": {
+      "sha256": "d2ae21ecf469c744f1e251c79673c88c16d8fc70c8ee070f93e6ba9191149d0f",
+      "size": 335
+    },
+    "wiki/entities/organisation/index.md": {
+      "sha256": "9e438169614ec5d502aa046114a26c3db57dcccb1e81c8daca589d6865851cc7",
+      "size": 509
+    },
+    "wiki/entities/organisation/vanarsdel-menuiseries.md": {
+      "sha256": "5d1e5cd81c7a07be146b27e84d9ea7d1faf7f99abff0729912933aefeec3f380",
+      "size": 2650
+    },
+    "wiki/entities/work-package/index.md": {
+      "sha256": "5f829e3869358c082fb38c3573375d783e4d56393e512b51ac2ae150e312898b",
+      "size": 707
+    },
+    "wiki/entities/work-package/lot-3-gros-oeuvre.md": {
+      "sha256": "d17799c935fe52b9ec88f17c766ff63c72556944d2e82f28fcce30c7e3726ebc",
+      "size": 2549
+    },
+    "wiki/entities/work-package/lot-5-menuiseries-exterieures.md": {
+      "sha256": "b8dc038346c02df65a18b8462fa160bd9ac9d4e8538f85c2755229bb61d02248",
+      "size": 3093
+    },
+    "wiki/glossary.md": {
+      "sha256": "10e486a2e791c9ac22ee0bd34981b1ef9bd5b4133177b84d46c3a5197c4b267b",
+      "size": 1200
+    },
+    "wiki/index.md": {
+      "sha256": "4246c5e220d7c924aeb046a838469c5b5d55be272362eadfbc311e5408e58571",
+      "size": 2475
+    },
+    "wiki/llms.txt": {
+      "sha256": "1e1311b56d6d660922a6978f7f97dbd4a8e37c16bc40d68d6efbb80373fb61e0",
+      "size": 1407
+    },
+    "wiki/log.md": {
+      "sha256": "638163b4416e2a8acc60e1ab6b6926a42cd5a20368cd4ea1aaddf2bab35782cb",
+      "size": 1234
+    },
+    "wiki/queries/2026-03-31-window-delivery-date.md": {
+      "sha256": "7ca20bf16abce00fb43208c94ec20148dd830dbc62164e260a8b33060bdba723",
+      "size": 1987
+    },
+    "wiki/sources/2026-03-24-compte-rendu-de-chantier-n3.md": {
+      "sha256": "1aae9dc30336b43852db3547d1948a551f47be68a4ad2738827551f33b220adb",
+      "size": 3115
+    },
+    "wiki/sources/index.md": {
+      "sha256": "36a4d60620bc7f6a7c46f882cde11a425562cd3873887d82713da1678fcff698",
+      "size": 806
+    },
+    "wiki/sources/pln-2026-003-indice-a-planning-et-suivi-des-achats.md": {
+      "sha256": "5a8ba4d97c39608dcd40549a1274e2630fce2db48d55feb8c062d569c9b326cc",
+      "size": 3421
+    },
+    "wiki/sources/pln-2026-003-indice-b-planning-et-suivi-des-achats.md": {
+      "sha256": "f2deb86e83edbdf2a0badaecd0acaf0ec19b3b0fb2e3f38239746f70ec01b444",
+      "size": 4137
+    },
+    "wiki/topics/index.md": {
+      "sha256": "0059f73fa1001e75527955f05b366ff095bb935705d536618e1868b46dca17dd",
+      "size": 394
+    },
+    "wiki/topics/planning.md": {
+      "sha256": "b140409f84df374eda74413a8ac1291516ecb49dee0654b300e94c749781c179",
+      "size": 4945
+    }
+  }
+}

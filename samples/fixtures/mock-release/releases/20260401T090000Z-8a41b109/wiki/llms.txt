@@ -1,0 +1,25 @@
+# Chantier Moreau mock wiki
+
+> Hand-made, fictional mock release of the DocWiki sample (CC BY 4.0) about a small building job. Every fact is cited to an evidence sidecar.
+
+## Start here
+
+- [Home](index.md): how to navigate this wiki
+- [Agent guide](AGENTS.md): page types, citation rules, skills and tools
+- [Glossary](glossary.md): acronyms and multilingual synonyms
+
+## Topics
+
+- [Planning](topics/planning.md): window delivery postponed from 2026-03-30 to 2026-04-20, with the progress of the walls
+
+## Entities
+
+- [Lot 3 - Gros œuvre](entities/work-package/lot-3-gros-oeuvre.md): the structural work of the extension, with the progress of the walls
+- [Lot 5 - Menuiseries extérieures](entities/work-package/lot-5-menuiseries-exterieures.md): the windows of the extension, delivery postponed to 2026-04-20
+- [VanArsdel Menuiseries](entities/organisation/vanarsdel-menuiseries.md): the company in charge of the window delivery
+
+## Sources
+
+- [Planning and purchase tracking, indice B](sources/pln-2026-003-indice-b-planning-et-suivi-des-achats.md): current schedule workbook, with the purchase tracking
+- [Planning and purchase tracking, indice A](sources/pln-2026-003-indice-a-planning-et-suivi-des-achats.md): superseded revision, printed as a PDF page
+- [Site meeting minutes n°3](sources/2026-03-24-compte-rendu-de-chantier-n3.md): minutes with the progress of the walls and the postponed delivery

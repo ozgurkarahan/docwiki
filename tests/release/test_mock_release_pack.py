@@ -103,9 +103,9 @@ def test_the_single_filed_answer_cites_two_kinds_of_evidence(
     cited = [
         reader.resolve_evidence(source_id, locator_key).frontmatter.provenance
         for source_id, locator_key in (
-            ("src-86eabe3d6d0d", "sheet-planning-r0006-r0009"),
-            ("src-165f1d3a109c", "para-0011"),
-            ("src-c6436ec50050", "p0001"),
+            ("src-59cf9366e50c", "sheet-planning-r0006-r0009"),
+            ("src-f0757603684a", "para-0011"),
+            ("src-7630d0741377", "p0001"),
         )
     ]
     assert set(cited) == {"deterministic-table", "native-text"}
@@ -113,5 +113,5 @@ def test_the_single_filed_answer_cites_two_kinds_of_evidence(
     bullets = [line for line in section.splitlines() if line.startswith("- ")]
     assert bullets == [
         "- search `date de livraison des fenêtres`",
-        "- get_evidence `src-86eabe3d6d0d/sheet-planning-r0006-r0009`",
+        "- get_evidence `src-59cf9366e50c/sheet-planning-r0006-r0009`",
     ]

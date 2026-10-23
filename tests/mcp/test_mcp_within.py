@@ -1,6 +1,6 @@
 """``within``: search and indexes restricted to one scope value (v1.7, ADR 0011).
 
-The committed mock release has no scopes (and a schema 1 search database); a scoped copy is
+The committed mock release has no scopes (no page carries one); a scoped copy is
 staged here: the two schedule revisions belong to the chantier ``moreau``, the minutes to the
 default scope ``entreprise``, with a hub page and the hubs index.
 """
@@ -112,7 +112,7 @@ def test_get_index_within_filters_the_entries(scoped: ReadTools, as_json: Json) 
 
     # a company topic is listed under every scope of its sources
     assert (
-        "Schedule and window delivery"
+        "Planning"
         in as_json(scoped.get_index("topics", within="entreprise"))["markdown"]
     )
     home = as_json(scoped.get_index("home", within="entreprise"))
@@ -150,9 +150,9 @@ def test_unknown_within_lists_the_scopes(scoped: ReadTools) -> None:
 
 
 def test_a_release_without_scopes(reads: ReadTools, as_json: Json) -> None:
-    """The committed mock release: no scopes, a schema 1 search database, results as before."""
+    """The committed mock release: no scopes (no page carries one), results as before."""
     snap = reads.snapshot()
-    assert snap.search.has_scopes is False and snap.search.meta["schema"] == "1"
+    assert snap.search.scopes() == []
     data = as_json(reads.search("menuiseries", limit=50))
     assert data["hits"] and all("scope" not in hit for hit in data["hits"])
     assert "within" not in data

@@ -25,7 +25,7 @@ from docwiki.stages.publish import finalize_and_publish, run_receipt_page
 from docwiki.stages.sitehook import build_site_for_release
 
 MOCK = Path(__file__).resolve().parents[2] / "samples" / "fixtures" / "mock-release"
-MOCK_ID = "20260401T090000Z-7ce99a3f"
+MOCK_ID = "20260401T090000Z-8a41b109"
 VERSIONS = VersionInfo(docwiki="0.1.0", domain_pack="batiment-mock", domain_pack_hash="h")
 CREATED = datetime(2026, 4, 1, 9, 0, tzinfo=UTC)
 RUN_ID = "run-20260401-090000-0a1b2c3d"

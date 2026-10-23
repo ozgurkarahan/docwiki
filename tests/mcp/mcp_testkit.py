@@ -53,9 +53,9 @@ from docwiki.release import ReleaseWriter, StagedRelease
 
 FIXTURE_ROOT = Path(__file__).resolve().parents[2] / "samples" / "fixtures" / "mock-release"
 DOMAIN_PACK = Path(__file__).resolve().parents[2] / "domains" / "batiment"
-RELEASE_ID = "20260401T090000Z-7ce99a3f"
-PLAN_A, PLAN_B, MINUTES = "src-c6436ec50050", "src-86eabe3d6d0d", "src-165f1d3a109c"
-TOPIC_ID = "topic:schedule-and-window-delivery"
+RELEASE_ID = "20260401T090000Z-8a41b109"
+PLAN_A, PLAN_B, MINUTES = "src-7630d0741377", "src-59cf9366e50c", "src-f0757603684a"
+TOPIC_ID = "topic:planning"
 OID_CLAIM = "http://schemas.microsoft.com/identity/claims/objectidentifier"
 NOW = datetime(2026, 4, 3, 8, 30, 0, tzinfo=UTC)
 
@@ -129,7 +129,7 @@ def stage_release(
                 update["frontmatter"] = update["frontmatter"].model_copy(
                     update={"scope": scopes[fm.source_id]}
                 )
-            if topic_note and rel == "topics/schedule-and-window-delivery.md":
+            if topic_note and rel == "topics/planning.md":
                 update["body"] = page.body.replace(
                     "## Overview\n", f"## Overview\n\n{topic_note}\n", 1
                 )
@@ -454,7 +454,9 @@ BROKEN_PATH = "achats/scan-bon-de-livraison.pdf"
 ODD_PATH = "planning/export-atypique.csv"
 NEW_PATH = "planning/nouveau-planning.xlsx"
 GONE_PATH = "chantier/ancien-compte-rendu.txt"
-DONE_PATH = "chantier/2026-03-24_compte-rendu-de-chantier-n3.docx"
+DONE_PATH = (
+    "chantiers/moreau/3-execution/site-meeting-minutes/2026-03-24_compte-rendu-de-chantier-n3.docx"
+)
 
 
 def seed_pack(storage: FolderStorage) -> None:

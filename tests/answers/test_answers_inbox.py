@@ -26,7 +26,7 @@ MOCK_DIR = (
     / "fixtures"
     / "mock-release"
     / "releases"
-    / "20260401T090000Z-7ce99a3f"
+    / "20260401T090000Z-8a41b109"
 )
 
 
@@ -38,7 +38,7 @@ def storage(tmp_path: Path) -> FolderStorage:
 def filed_page():  # type: ignore[no-untyped-def]
     text = (
         "The windows arrive on 2026-04-20 [1].\n\nSources:\n"
-        "[1] Minutes — ¶ 11 — evidence/src-165f1d3a109c/para-0011.md\n"
+        "[1] Minutes — ¶ 11 — evidence/src-f0757603684a/para-0011.md\n"
     )
     answer = SimpleNamespace(text=text, sources=None, tool_calls=[], agent="a", version=None)
     return build_query_page(

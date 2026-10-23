@@ -1,3 +1,6 @@
+import shutil
+import sqlite3
+from contextlib import closing
 from datetime import date
 from pathlib import Path
 
@@ -290,10 +293,15 @@ def test_within_keeps_one_scope(tmp_path: Path, use_fts: bool) -> None:
         assert scoped[SRC_QUOTE] == "moreau" and scoped[BAIE] is None
 
 
-def test_schema_1_databases_are_still_read() -> None:
-    """The committed mock release predates the scope column (schema 1)."""
+def test_schema_1_databases_are_still_read(tmp_path: Path) -> None:
+    """A database written before the scope column (schema 1): the mock release's, downgraded."""
     release = Path(__file__).resolve().parents[2] / "samples" / "fixtures" / "mock-release"
-    fixture = release / "releases" / "20260401T090000Z-7ce99a3f" / "search.db"
+    fixture = tmp_path / "search.db"
+    shutil.copyfile(release / "releases" / "20260401T090000Z-8a41b109" / "search.db", fixture)
+    with closing(sqlite3.connect(fixture)) as connection, connection:
+        connection.execute("ALTER TABLE docs DROP COLUMN scope")
+        connection.execute("ALTER TABLE pages DROP COLUMN scope")
+        connection.execute("UPDATE meta SET value = '1' WHERE key = 'schema'")
     with SearchIndex.open(fixture) as index:
         assert index.meta["schema"] == "1" and not index.has_scopes
         assert index.scopes() == []

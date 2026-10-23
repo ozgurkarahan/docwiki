@@ -73,13 +73,13 @@ def test_answers_that_cannot_be_filed_fail_with_a_message(cli_env, tmp_path: Pat
 
 
 MOCK = Path(__file__).resolve().parents[2] / "samples" / "fixtures" / "mock-release"
-MOCK_DIR = MOCK / "releases" / "20260401T090000Z-7ce99a3f"
+MOCK_DIR = MOCK / "releases" / "20260401T090000Z-8a41b109"
 
 
 def test_a_dry_run_on_a_release_folder_or_storage_root_writes_nothing(
     cli_env, tmp_path: Path
 ) -> None:
-    sidecar = "evidence/src-165f1d3a109c/para-0011.md"
+    sidecar = "evidence/src-f0757603684a/para-0011.md"
     saved = tmp_path / "answer.json"
     saved.write_text(
         AgentAnswer(
@@ -100,5 +100,5 @@ def test_a_dry_run_on_a_release_folder_or_storage_root_writes_nothing(
         )
         assert result.exit_code == 0, result.output
         assert "page: queries/" in result.output
-        assert "(from release 20260401T090000Z-7ce99a3f)" in result.output
+        assert "(from release 20260401T090000Z-8a41b109)" in result.output
     assert not cli_env["work"].exists()  # no storage was opened

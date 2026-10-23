@@ -26,11 +26,11 @@ from docwiki.site import (
     write_answers,
 )
 
-RELEASE_ID = "20260401T090000Z-7ce99a3f"
+RELEASE_ID = "20260401T090000Z-8a41b109"
 MOCK_QUERY = "queries/2026-03-31-window-delivery-date"
 SIDECARS = (
-    "evidence/src-165f1d3a109c/para-0011",
-    "evidence/src-86eabe3d6d0d/sheet-planning-r0006-r0009",
+    "evidence/src-f0757603684a/para-0011",
+    "evidence/src-59cf9366e50c/sheet-planning-r0006-r0009",
 )
 COMPONENT_DIR = OVERLAY / "quartz" / "components" / "docwiki"
 
@@ -57,7 +57,7 @@ SUPERSEDED_PAGE = frontmatter(
     "query:2026-04-02-windows-lot-5",
     SUPERSEDED_QUESTION,
     day="2026-04-02",
-    sources=("src-86eabe3d6d0d", "src-c6436ec50050"),
+    sources=("src-59cf9366e50c", "src-7630d0741377"),
 ) + (
     f"\n# {SUPERSEDED_QUESTION}\n\n"
     "> **Superseded:** this answer cites [Planning and purchase tracking, indice A]"
@@ -80,12 +80,12 @@ SUPERSEDED_PAGE = frontmatter(
     f"release `{RELEASE_ID}`, then reviewed and filed by the owner on 2026-04-02. The agent "
     "made 2 tool calls:\n\n"
     "- search `window delivery T07`\n"
-    "- read_page `topics/schedule-and-window-delivery.md`\n\n"
+    "- read_page `topics/planning.md`\n\n"
     "## Sources\n\n"
     '[^c1]: [Planning and purchase tracking, indice B — sheet "Planning", rows 6–9]'
-    "(../evidence/src-86eabe3d6d0d/sheet-planning-r0006-r0009.md) · table\n"
+    "(../evidence/src-59cf9366e50c/sheet-planning-r0006-r0009.md) · table\n"
     "[^c2]: [Planning and purchase tracking, indice A — p. 1]"
-    "(../evidence/src-c6436ec50050/p0001.md) · ✓ quote verified\n"
+    "(../evidence/src-7630d0741377/p0001.md) · ✓ quote verified\n"
 )
 NOT_FOUND_QUESTION = "What energy-performance rating (DPE) will the house have after the works?"
 NOT_FOUND_PAGE = frontmatter(
@@ -154,27 +154,27 @@ def test_answers_of_the_mock_release() -> None:
             "n": 1,
             "title": "Planning and purchase tracking, indice B",
             "label": 'sheet "Planning", rows 6–9',
-            "href": "evidence/src-86eabe3d6d0d/sheet-planning-r0006-r0009",
+            "href": "evidence/src-59cf9366e50c/sheet-planning-r0006-r0009",
             "badge": "table",
         },
         {
             "n": 2,
             "title": "Site meeting minutes n°3",
             "label": "¶ 11",
-            "href": "evidence/src-165f1d3a109c/para-0011",
+            "href": "evidence/src-f0757603684a/para-0011",
             "badge": "✓ quote verified",
         },
         {
             "n": 3,
             "title": "Planning and purchase tracking, indice A",
             "label": "p. 1",
-            "href": "evidence/src-c6436ec50050/p0001",
+            "href": "evidence/src-7630d0741377/p0001",
             "badge": "✓ quote verified",
         },
     ]
     assert answer["steps"] == [
         'search "date de livraison des fenêtres"',
-        "get_evidence src-86eabe3d6d0d/sheet-planning-r0006-r0009",
+        "get_evidence src-59cf9366e50c/sheet-planning-r0006-r0009",
     ]
     assert answer["provenance"] == (
         "The Researcher searched the wiki in French for the delivery date of the windows, then "
@@ -182,13 +182,13 @@ def test_answers_of_the_mock_release() -> None:
     )
     assert answer["pages"] == [
         MOCK_QUERY,
-        "evidence/src-86eabe3d6d0d/sheet-planning-r0006-r0009",
-        "evidence/src-165f1d3a109c/para-0011",
-        "evidence/src-c6436ec50050/p0001",
-        "sources/2026-03-24-compte-rendu-de-chantier-n3",
+        "evidence/src-59cf9366e50c/sheet-planning-r0006-r0009",
+        "evidence/src-f0757603684a/para-0011",
+        "evidence/src-7630d0741377/p0001",
         "sources/pln-2026-003-indice-b-planning-et-suivi-des-achats",
         "sources/pln-2026-003-indice-a-planning-et-suivi-des-achats",
-        "topics/schedule-and-window-delivery",
+        "sources/2026-03-24-compte-rendu-de-chantier-n3",
+        "topics/planning",
         "entities/organisation/vanarsdel-menuiseries",
         "entities/work-package/lot-3-gros-oeuvre",
         "entities/work-package/lot-5-menuiseries-exterieures",
@@ -236,7 +236,7 @@ def test_banners_inline_markdown_steps_and_order(tmp_path: Path) -> None:
     ]
     assert filed["steps"] == [
         'search "window delivery T07"',
-        "read_page topics/schedule-and-window-delivery.md",
+        "read_page topics/planning.md",
     ]
     assert filed["provenance"] == (
         "Answered by the Researcher agent (docwiki-researcher version 3) on 2026-04-02 from "
@@ -247,18 +247,18 @@ def test_banners_inline_markdown_steps_and_order(tmp_path: Path) -> None:
         (
             1,
             'sheet "Planning", rows 6–9',
-            "evidence/src-86eabe3d6d0d/sheet-planning-r0006-r0009",
+            "evidence/src-59cf9366e50c/sheet-planning-r0006-r0009",
             "table",
         ),
-        (2, "p. 1", "evidence/src-c6436ec50050/p0001", "✓ quote verified"),
+        (2, "p. 1", "evidence/src-7630d0741377/p0001", "✓ quote verified"),
     ]
     assert filed["pages"] == [
         "queries/2026-04-02-windows-lot-5",
-        "evidence/src-86eabe3d6d0d/sheet-planning-r0006-r0009",
-        "evidence/src-c6436ec50050/p0001",
+        "evidence/src-59cf9366e50c/sheet-planning-r0006-r0009",
+        "evidence/src-7630d0741377/p0001",
         "sources/pln-2026-003-indice-b-planning-et-suivi-des-achats",
         "sources/pln-2026-003-indice-a-planning-et-suivi-des-achats",
-        "topics/schedule-and-window-delivery",
+        "topics/planning",
         "entities/organisation/vanarsdel-menuiseries",
         "entities/work-package/lot-3-gros-oeuvre",
         "entities/work-package/lot-5-menuiseries-exterieures",
@@ -320,7 +320,7 @@ def test_malformed_citations_fail_the_build(tmp_path: Path, body: str, message: 
 
 
 def test_other_pages_in_queries_fail_the_build(tmp_path: Path) -> None:
-    topic = MOCK_RELEASE_DIR / "wiki" / "topics" / "schedule-and-window-delivery.md"
+    topic = MOCK_RELEASE_DIR / "wiki" / "topics" / "planning.md"
     release = release_with(tmp_path, {"queries/window-delivery.md": topic.read_text("utf-8")})
     with pytest.raises(SiteBuildError, match="a topic page in queries/"):
         build_answers(open_release(release))
@@ -410,7 +410,7 @@ def test_an_answer_filed_by_the_answers_lane_reaches_the_drawer(tmp_path: Path) 
         tool_calls=[
             SimpleNamespace(name="search", arguments={"query": "window delivery date"}, status=""),
             SimpleNamespace(
-                name="read_page", arguments={"path": "topics/schedule-and-window-delivery.md"}
+                name="read_page", arguments={"path": "topics/planning.md"}
             ),
         ],
         agent="docwiki-researcher",
@@ -441,7 +441,7 @@ def test_an_answer_filed_by_the_answers_lane_reaches_the_drawer(tmp_path: Path) 
     assert all(c["title"] and c["label"] and c["badge"] for c in newest["citations"])
     assert newest["steps"] == [
         'search "window delivery date"',
-        "read_page topics/schedule-and-window-delivery.md",
+        "read_page topics/planning.md",
     ]
     provenance = newest["provenance"]
     assert provenance.startswith(
@@ -452,7 +452,7 @@ def test_an_answer_filed_by_the_answers_lane_reaches_the_drawer(tmp_path: Path) 
     assert provenance.endswith(" The agent made 2 tool calls in 21 s:")
     assert "`" not in provenance and "\n" not in provenance
     expected = {
-        "topics/schedule-and-window-delivery",
+        "topics/planning",
         "entities/work-package/lot-5-menuiseries-exterieures",
         minutes,
         plan,

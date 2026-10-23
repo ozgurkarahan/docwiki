@@ -37,9 +37,9 @@ MOCK_RELEASE_DIR = (
     / "fixtures"
     / "mock-release"
     / "releases"
-    / "20260401T090000Z-7ce99a3f"
+    / "20260401T090000Z-8a41b109"
 )
-PLAN_A, PLAN_B, MINUTES = "src-c6436ec50050", "src-86eabe3d6d0d", "src-165f1d3a109c"
+PLAN_A, PLAN_B, MINUTES = "src-7630d0741377", "src-59cf9366e50c", "src-f0757603684a"
 MOCK_QUERY = "queries/2026-03-31-window-delivery-date.md"
 STAMP = DocwikiStamp(release="20260501T090000Z-0b1c2d3e")
 DAY = date(2026, 5, 1)
@@ -243,7 +243,7 @@ def test_a_carried_answer_is_re_cited_from_the_current_release() -> None:
 
     (page,) = pages
     assert page.frontmatter.sensitivity == "internal"
-    assert page.frontmatter.sources == [MINUTES, PLAN_B, PLAN_A]
+    assert page.frontmatter.sources == sorted([MINUTES, PLAN_B, PLAN_A])
     assert _definitions(page) == [
         '[Planning and purchase tracking, indice B — sheet "Planning", rows 6–9]'
         f"(../evidence/{PLAN_B}/sheet-planning-r0006-r0009.md) · table",

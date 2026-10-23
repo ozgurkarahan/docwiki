@@ -25,10 +25,10 @@ from docwiki.contracts.storage import FolderStorage
 from docwiki.release.validate import CITATION_RE
 
 MOCK = Path(__file__).resolve().parents[2] / "samples" / "fixtures" / "mock-release"
-MOCK_ID = "20260401T090000Z-7ce99a3f"
+MOCK_ID = "20260401T090000Z-8a41b109"
 MOCK_DIR = MOCK / "releases" / MOCK_ID
-MINUTES = "evidence/src-165f1d3a109c/para-0011.md"
-PLAN = "evidence/src-86eabe3d6d0d/sheet-planning-r0006-r0009.md"
+MINUTES = "evidence/src-f0757603684a/para-0011.md"
+PLAN = "evidence/src-59cf9366e50c/sheet-planning-r0006-r0009.md"
 DAY = date(2026, 10, 20)
 
 
@@ -74,7 +74,7 @@ def test_a_cited_answer_becomes_a_contract_query_page(release: FolderRelease) ->
             calls=(
                 call("search", {"query": "window delivery `date`"}),
                 call("get_evidence", f'{{"path": "{MINUTES}"}}'),
-                call("query_table", {"source_id": "src-86eabe3d6d0d", "sql": "SELECT 1"}, "failed"),
+                call("query_table", {"source_id": "src-59cf9366e50c", "sql": "SELECT 1"}, "failed"),
             ),
         ),
         question="  When are the windows of the extension delivered? ",
@@ -88,7 +88,7 @@ def test_a_cited_answer_becomes_a_contract_query_page(release: FolderRelease) ->
     assert fm.id == "query:2026-10-20-when-are-the-windows-of-the-extension-delivered"
     assert fm.question == fm.title == "When are the windows of the extension delivered?"
     assert fm.asked_by == "human" and fm.approved_by == APPROVED_BY == "owner"
-    assert fm.sources == ["src-165f1d3a109c", "src-86eabe3d6d0d"]
+    assert fm.sources == ["src-59cf9366e50c", "src-f0757603684a"]
     assert fm.sensitivity == "public" and fm.updated == DAY and fm.lang == "en"
     assert fm.docwiki.release == MOCK_ID
     assert fm.summary == "The windows of the extension are delivered on 2026-04-20."
@@ -113,7 +113,7 @@ def test_a_cited_answer_becomes_a_contract_query_page(release: FolderRelease) ->
     assert "reviewed and filed by the owner on 2026-10-20" in page.body
     assert "- search `window delivery 'date'`" in page.body
     assert f"- get_evidence `{MINUTES}`" in page.body
-    assert "- query_table `src-86eabe3d6d0d SELECT 1` (failed)" in page.body
+    assert "- query_table `src-59cf9366e50c SELECT 1` (failed)" in page.body
     assert "3 tool calls in 21 s" in page.body
     assert filed.numbers_checked == 2 and filed.warnings == () and not filed.not_found
 
@@ -129,7 +129,7 @@ def test_the_same_sidecar_cited_twice_shares_one_footnote(release: FolderRelease
     )
     refs, definitions = extract_footnotes(filed.page.body)
     assert [label for label, _ in refs] == ["c1", "c1"] and len(definitions) == 1
-    assert filed.page.frontmatter.sources == ["src-165f1d3a109c"]
+    assert filed.page.frontmatter.sources == ["src-f0757603684a"]
     assert filed.warnings == ("sources listed but never cited in the text were left out: [2]",)
 
 
@@ -195,7 +195,7 @@ def test_unsafe_markdown_is_removed_and_headings_are_demoted(release: FolderRele
         ),
         (
             "They arrive on 2026-04-20 [1].\n\nSources:\n"
-            "[1] Minutes — ¶ 99 — evidence/src-165f1d3a109c/para-0099.md\n",
+            "[1] Minutes — ¶ 99 — evidence/src-f0757603684a/para-0099.md\n",
             "no evidence sidecar",
         ),
     ],
@@ -236,6 +236,6 @@ def test_storage_release_reads_the_current_release(tmp_path: Path) -> None:
     assert release.evidence(MINUTES) is not None
     assert release.evidence("evidence/../wiki/index.md") is None
     filed = build_query_page(answer(CITED), question="Delivery?", release=release, filed_on=DAY)
-    assert filed.page.frontmatter.sources == ["src-165f1d3a109c", "src-86eabe3d6d0d"]
+    assert filed.page.frontmatter.sources == ["src-59cf9366e50c", "src-f0757603684a"]
     with pytest.raises(FilingError, match="no release"):
         StorageRelease(FolderStorage(tmp_path / "empty"))

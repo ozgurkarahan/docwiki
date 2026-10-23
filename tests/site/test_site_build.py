@@ -183,7 +183,7 @@ def test_site_settings_from_the_mock_release() -> None:
         "title": "Planning and purchase tracking, indice B",
         "original": None,
         "status": "current",
-        "document": "evidence/src-86eabe3d6d0d/index",
+        "document": "evidence/src-59cf9366e50c/index",
         "docType": "schedule",
         "docNumber": "PLN-2026-003",
         "revision": "B",

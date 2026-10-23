@@ -1,0 +1,149 @@
+{
+  "schema": 1,
+  "source_id": "src-59cf9366e50c",
+  "sensitivity": "public",
+  "tables": [
+    {
+      "id": "t01",
+      "file": "t01.parquet",
+      "locator": {
+        "kind": "xlsx-rows",
+        "sheet": "Planning",
+        "sheet_slug": null,
+        "row_start": 1,
+        "row_end": 25,
+        "cols": null
+      },
+      "provenance": "deterministic-table",
+      "columns": [
+        {
+          "name": "tache",
+          "header": "Tâche",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "designation",
+          "header": "Désignation",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "lot",
+          "header": "Lot",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "intervenant",
+          "header": "Intervenant",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "debut",
+          "header": "Début",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "fin",
+          "header": "Fin",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "avancement",
+          "header": "Avancement",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "observations",
+          "header": "Observations",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 23,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006",
+        "r0007",
+        "r0008",
+        "r0009",
+        "r0010",
+        "r0011",
+        "r0012",
+        "r0013",
+        "r0014",
+        "r0015",
+        "r0016",
+        "r0017",
+        "r0018",
+        "r0019",
+        "r0021",
+        "r0022",
+        "r0023",
+        "r0024",
+        "r0025"
+      ]
+    },
+    {
+      "id": "t02",
+      "file": "t02.parquet",
+      "locator": {
+        "kind": "xlsx-rows",
+        "sheet": "Achats",
+        "sheet_slug": null,
+        "row_start": 1,
+        "row_end": 9,
+        "cols": null
+      },
+      "provenance": "deterministic-table",
+      "columns": [
+        {
+          "name": "n_commande",
+          "header": "N° commande",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "date",
+          "header": "Date",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "fournisseur",
+          "header": "Fournisseur",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "objet",
+          "header": "Objet",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "commande_ht",
+          "header": "Commandé HT",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "facture_ht",
+          "header": "Facturé HT",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "statut",
+          "header": "Statut",
+          "type": "VARCHAR"
+        }
+      ],
+      "row_count": 8,
+      "row_ids": [
+        "r0002",
+        "r0003",
+        "r0004",
+        "r0005",
+        "r0006",
+        "r0007",
+        "r0008",
+        "r0009"
+      ]
+    }
+  ]
+}

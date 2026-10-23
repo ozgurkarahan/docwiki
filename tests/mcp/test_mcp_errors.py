@@ -119,7 +119,7 @@ async def test_inputs_over_their_size_limit(server: MCPServer) -> None:
 
 async def test_missing_objects(server: MCPServer) -> None:
     async with Client(server) as client:
-        page = await failure(client, "read_page", {"page": "topic:schedule-and-window-deliver"})
+        page = await failure(client, "read_page", {"page": "topic:plannin"})
         assert page["code"] == "not_found"
         assert TOPIC_ID in page["details"]["suggestions"]
         scope = await failure(client, "get_index", {"scope": "everything"})

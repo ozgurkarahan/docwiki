@@ -55,7 +55,7 @@ from docwiki.release.writer import hash_release_files
 from docwiki.search.index import SearchBlock, build_search_db
 
 HERE = Path(__file__).resolve().parent
-RELEASE_ID = "20260401T090000Z-7ce99a3f"
+RELEASE_ID = "20260401T090000Z-8a41b109"
 CREATED_AT = datetime(2026, 4, 1, 9, 0, 0, tzinfo=UTC)
 AUDIENCE = "public"
 RUN_ID = "run-20260401-090000-0a1b2c3d"
@@ -67,7 +67,7 @@ VERSIONS = VersionInfo(
     extractors={"local": "mock-1"},
 )
 # Schedule indice A (PDF, superseded), schedule indice B (XLSX, current) and the minutes (DOCX).
-PLAN_A, PLAN_B, MINUTES = "src-c6436ec50050", "src-86eabe3d6d0d", "src-165f1d3a109c"
+PLAN_A, PLAN_B, MINUTES = "src-7630d0741377", "src-59cf9366e50c", "src-f0757603684a"
 SKIPPED_GATES = ("G04", "G10", "G15", "G16")
 
 GLOSSARY = [
