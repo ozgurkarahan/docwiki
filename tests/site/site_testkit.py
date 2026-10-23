@@ -34,6 +34,84 @@ def make_portable(dest: Path, release_dir: Path = MOCK_RELEASE_DIR) -> Path:
     return dest
 
 
+SCOPES = {PLAN_A: "moreau", PLAN_B: "moreau", MINUTES: "entreprise"}
+"""The scoped copy of the mock release: the schedule belongs to the chantier, the minutes to the
+default scope (v1.7, ADR 0011)."""
+HUB_PAGE = "chantiers/moreau"
+
+
+def make_scoped(dest: Path, release_dir: Path = MOCK_RELEASE_DIR) -> Path:
+    """A copy of the mock release whose sources have a scope and a phase, with the hub page of
+    ``moreau`` and the hubs index (no manifest: the site does not need one)."""
+    from docwiki.contracts.catalog import Catalog, catalog_page_for
+    from docwiki.contracts.pages import Page, parse_frontmatter
+
+    shutil.copytree(release_dir, dest, ignore=shutil.ignore_patterns("manifest.json"))
+    wiki = dest / "wiki"
+    stamp = {"schema": 1, "release": MOCK_RELEASE_ID}
+    common = {"summary": "Fictional sample.", "sensitivity": "public", "updated": "2026-04-01"}
+    pages = [
+        Page(
+            path=f"{HUB_PAGE}.md",
+            frontmatter=parse_frontmatter(
+                {
+                    **common,
+                    "id": "hub:chantiers/moreau",
+                    "type": "hub",
+                    "title": "Chantier Moreau",
+                    "scope_type": "chantier",
+                    "scope": "moreau",
+                    "sources": sorted([PLAN_A, PLAN_B]),
+                    "docwiki": stamp,
+                }
+            ),
+            body=f"# Chantier Moreau\n\nThe documents of the chantier.\n\n"
+            f"- [Planning and purchase tracking, indice B](../{PLAN_B_PAGE}.md)\n",
+        ),
+        Page(
+            path="chantiers/index.md",
+            frontmatter=parse_frontmatter(
+                {
+                    **common,
+                    "id": "index:hubs/chantiers",
+                    "type": "index",
+                    "title": "Chantiers",
+                    "docwiki": stamp,
+                }
+            ),
+            body="# Chantiers\n\n- [Chantier Moreau](moreau.md): 2 documents\n",
+        ),
+    ]
+    for page in pages:
+        (wiki / page.path).parent.mkdir(parents=True, exist_ok=True)
+        (wiki / page.path).write_bytes(page.render().encode("utf-8"))
+    for rel in (PLAN_A_PAGE, PLAN_B_PAGE, MINUTES_PAGE):
+        file = wiki / f"{rel}.md"
+        page = Page.parse(file.read_text(encoding="utf-8"), f"{rel}.md")
+        scope = SCOPES[page.frontmatter.id]
+        update = {"scope": scope, "phase": "3" if scope == "moreau" else None}
+        page = page.model_copy(update={"frontmatter": page.frontmatter.model_copy(update=update)})
+        file.write_bytes(page.render().encode("utf-8"))
+    for path in (dest / "catalog.json", wiki / "catalog.json"):
+        catalog = Catalog.from_json(path.read_bytes())
+        entries = {entry.path: entry for entry in catalog.pages}
+        for page in pages:
+            entries[page.path] = catalog_page_for(page.frontmatter, page.path)
+        for rel in (PLAN_A_PAGE, PLAN_B_PAGE):
+            entries[f"{rel}.md"] = entries[f"{rel}.md"].model_copy(update={"scope": "moreau"})
+        entries[f"{MINUTES_PAGE}.md"] = entries[f"{MINUTES_PAGE}.md"].model_copy(
+            update={"scope": "entreprise"}
+        )
+        sources = [
+            item.model_copy(update={"scope": SCOPES[item.source_id]}) for item in catalog.sources
+        ]
+        updated = catalog.model_copy(
+            update={"pages": sorted(entries.values(), key=lambda e: e.path), "sources": sources}
+        )
+        path.write_bytes(updated.to_json().encode("utf-8"))
+    return dest
+
+
 def write_site(root: Path, files: dict[str, str]) -> Path:
     """Write a small fake built site (``relative path → text``)."""
     for rel, text in files.items():

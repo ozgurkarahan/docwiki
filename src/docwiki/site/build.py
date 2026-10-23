@@ -40,6 +40,7 @@ from docwiki.site.answers import build_answers, write_answers
 from docwiki.site.errors import SiteBuildError
 from docwiki.site.linkcheck import check_links
 from docwiki.site.process_page import STAGES, write_documents_page, write_process_page
+from docwiki.site.register import explorer_settings, register_groups, scope_info
 from docwiki.site.security import REPO_URL, default_allowed_hosts, scan_site
 
 __all__ = [
@@ -362,7 +363,12 @@ def site_settings(
             else None,
             "supersededBy": titles[later[0]] if later else None,
             "supersededByRevision": revisions.get(later[0]) if later else None,
+            # Scope and axes (v1.7, ADR 0011): None when the pack declares no scopes.
+            "scope": _text(meta.get("scope")),
+            "phase": _text(meta.get("phase")),
+            "lot": _text(meta.get("lot")),
         }
+    scopes = scope_info(release.catalog)
     return {
         "schema": 1,
         "pageTitle": page_title,
@@ -384,6 +390,10 @@ def site_settings(
         "qualityPage": _content_slug(release, WikiFiles.QUALITY),
         "quality": _quality_summary(gates or []),
         "sources": dict(sorted(sources.items())),
+        # The register grouped by scope, phase and type; null when no source has a scope.
+        "scopes": scopes,
+        "register": register_groups(sources, scopes),
+        "explorer": explorer_settings(release.catalog),
         "answers": len(build_answers(release)["answers"]) if answers is None else answers,
         "steps": [{"name": name, "text": text} for name, text in STAGES],
     }

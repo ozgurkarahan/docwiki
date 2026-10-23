@@ -52,7 +52,16 @@ INDEX_SCOPES: dict[str, str] = {
     "glossary": "glossary",
     "log": "log",
 }
-"""Fixed ``get_index`` scopes; ``entities/<type>`` scopes come from the catalog."""
+"""Fixed ``get_index`` scopes; ``entities/<type>`` and ``hubs/<folder>`` scopes come from the
+catalog."""
+
+SCOPE_VALUE_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+"""A ``within`` value: one scope value of the wiki (kebab-case, like the catalog's ``scope``)."""
+MAX_SCOPE_CHARS = 64
+_SCOPED_TYPES = frozenset({"source", "entity", "topic", "hub", "query"})
+"""Index entries pointing at these page types are filtered by ``within``; links to indexes and
+other navigation pages (glossary, log, meta) are kept."""
+_HEADING_RE = re.compile(r"^(#{1,6})[ \t]+\S")
 
 PROVENANCE_BY_BADGE: dict[str, str] = {
     "✓ quote verified": "native-text",
@@ -84,6 +93,8 @@ def _page_ref(entry: CatalogPage) -> dict[str, Any]:
     ref["type"] = entry.type
     if entry.status:
         ref["status"] = entry.status
+    if entry.scope:
+        ref["scope"] = entry.scope
     return ref
 
 
@@ -254,6 +265,99 @@ class ReadTools:
         return [s.heading for s in split_sections(body) if s.heading and 2 <= s.level <= 3]
 
     @staticmethod
+    def _scope_values(snap: Snapshot) -> list[str]:
+        """Every scope value of the release (pages and sources of the catalog)."""
+
+        def build() -> list[str]:
+            values = {page.scope for page in snap.catalog.pages if page.scope}
+            values |= {source.scope for source in snap.catalog.sources if source.scope}
+            return sorted(values)
+
+        return snap.cached("scope-values", build)
+
+    def _within(self, snap: Snapshot, within: str | None) -> str | None:
+        """The validated ``within`` filter (``None`` when absent)."""
+        if within is None or not within.strip():
+            return None
+        value = within.strip()
+        if len(value) > MAX_SCOPE_CHARS or not SCOPE_VALUE_RE.match(value):
+            raise ToolInputError(
+                f"invalid within {within!r}: give one scope value of the wiki in kebab-case "
+                "(for example a chantier code); list them with get_index('hubs/<folder>')",
+                code="invalid_argument",
+            )
+        known = self._scope_values(snap)
+        if value not in known:
+            message = (
+                f"unknown scope {value!r}; scopes of this wiki: {', '.join(known)}"
+                if known
+                else "this wiki has no scopes: call again without within"
+            )
+            raise ToolInputError(message, code="not_found", details={"scopes": known})
+        return value
+
+    def _in_scope(self, snap: Snapshot, entry: CatalogPage, within: str) -> bool:
+        """A page with a scope matches its own; a company page (entity, company topic, filed
+        answer) matches when one of its sources is of that scope."""
+        if entry.scope:
+            return entry.scope == within
+        scopes: dict[str, str | None] = snap.cached(
+            "source-scopes",
+            lambda: {source.source_id: source.scope for source in snap.catalog.sources},
+        )
+        return any(scopes.get(source_id) == within for source_id in entry.sources)
+
+    def _index_target(self, snap: Snapshot, entry: CatalogPage, line: str) -> CatalogPage | None:
+        """The page an index line lists: the first link of the line to a wiki page."""
+        by_path = self._by_path(snap)
+        for link in extract_links(line):
+            resolved = resolve_href(entry.path, link.href)
+            if resolved.external or not resolved.path:
+                continue
+            target = by_path.get(resolved.path)
+            if target is not None:
+                return target
+        return None
+
+    def _filter_index(
+        self, snap: Snapshot, entry: CatalogPage, body: str, within: str
+    ) -> tuple[str, int, int]:
+        """The index body without the entries (list items, table rows) that point at a page of
+        another scope, and without the sections they leave empty; returns (body, kept, removed).
+        """
+        lines: list[str] = []
+        # one row per heading: [line number in `lines`, level, had entries, kept an entry]
+        sections: list[list[int]] = []
+        kept = removed = 0
+        for line in body.split("\n"):
+            heading = _HEADING_RE.match(line)
+            if heading:
+                sections.append([len(lines), len(heading.group(1)), 0, 0])
+                lines.append(line)
+                continue
+            target = self._index_target(snap, entry, line)
+            if target is None or target.type not in _SCOPED_TYPES:
+                lines.append(line)
+                continue
+            keep = self._in_scope(snap, target, within)
+            if sections:
+                sections[-1][2] = 1
+                sections[-1][3] |= int(keep)
+            if keep:
+                kept += 1
+                lines.append(line)
+            else:
+                removed += 1
+        drop: set[int] = set()
+        for index, (start, level, had, had_kept) in enumerate(sections):
+            if level < 2 or not had or had_kept:
+                continue
+            end = sections[index + 1][0] if index + 1 < len(sections) else len(lines)
+            drop.update(range(start, end))
+        text = "\n".join(line for number, line in enumerate(lines) if number not in drop)
+        return _BLANK_RUNS_RE.sub("\n\n", text).rstrip() + "\n", kept, removed
+
+    @staticmethod
     def _refs_in(text: str) -> list[str]:
         refs, _ = extract_footnotes(text)
         return list(dict.fromkeys(label for label, _ in refs))
@@ -269,10 +373,12 @@ class ReadTools:
         topic: str | None = None,
         limit: int = 10,
         offset: int = 0,
+        within: str | None = None,
     ) -> str:
         snap = self.snapshot()
         if not query.strip():
             raise ToolInputError("query must not be empty")
+        scope = self._within(snap, within)
         if topic and not topic.startswith("topic:"):
             topic = f"topic:{topic}"
         by_id = self._by_id(snap)
@@ -289,6 +395,7 @@ class ReadTools:
             entity=entity or None,
             topic=topic or None,
             limit=offset + limit,
+            within=scope,
         )[offset:]
         expanded = [" ".join(phrase) for phrase in snap.search.expand(query)]
         rows = [self._hit(snap, hit) for hit in hits]
@@ -297,6 +404,7 @@ class ReadTools:
             payload: dict[str, Any] = {
                 "release_id": snap.release_id,
                 "query": query,
+                **({"within": scope} if scope else {}),
                 "expanded_terms": expanded,
                 "offset": offset,
                 "hits": list(items),
@@ -328,6 +436,8 @@ class ReadTools:
         }
         if entry is not None and entry.status:
             row["status"] = entry.status
+        if entry is not None and entry.scope:
+            row["scope"] = entry.scope
         if hit.source_id:
             row["source_id"] = hit.source_id
         if hit.kind == "source-block" and hit.source_id and hit.locator_key:
@@ -413,15 +523,19 @@ class ReadTools:
         scopes += sorted(
             page_id.removeprefix("index:")
             for page_id in by_id
-            if page_id.startswith("index:entities/")
+            if page_id.startswith(("index:entities/", "index:hubs/"))
         )
         return [scope for scope in scopes if INDEX_SCOPES.get(scope, f"index:{scope}") in by_id]
 
-    def get_index(self, scope: str = "home", offset: int = 0) -> str:
+    def get_index(self, scope: str = "home", offset: int = 0, within: str | None = None) -> str:
         snap = self.snapshot()
         wanted = (scope or "home").strip().strip("/").lower().removeprefix("index:")
+        by_id = self._by_id(snap)
+        hubs = sorted(page_id for page_id in by_id if page_id.startswith("index:hubs/"))
+        if wanted == "hubs" and len(hubs) == 1:
+            wanted = hubs[0].removeprefix("index:")
         page_id = INDEX_SCOPES.get(wanted, f"index:{wanted}")
-        entry = self._by_id(snap).get(page_id)
+        entry = by_id.get(page_id)
         if entry is None:
             valid = ", ".join(self._index_scopes(snap))
             raise ToolInputError(
@@ -429,7 +543,12 @@ class ReadTools:
                 code="not_found",
                 details={"scopes": self._index_scopes(snap)},
             )
+        scope_value = self._within(snap, within)
         _, body, citations, _ = self._page_parts(snap, entry)
+        filtered: dict[str, Any] = {}
+        if scope_value:
+            body, kept, removed = self._filter_index(snap, entry, body, scope_value)
+            filtered = {"within": scope_value, "entries_kept": kept, "entries_removed": removed}
 
         def build(window: str, next_offset: int | None) -> dict[str, Any]:
             payload: dict[str, Any] = {
@@ -438,6 +557,7 @@ class ReadTools:
                 "page_id": entry.id,
                 "path": entry.path,
                 "title": entry.title,
+                **filtered,
                 "offset": offset,
                 "chars_total": len(body),
                 "markdown": window,

@@ -21,6 +21,24 @@ export interface DocwikiSource {
   /** Title and indice of the revision that replaces this one. */
   supersededBy?: string | null
   supersededByRevision?: string | null
+  /** Scope value (a chantier code, or the default scope), phase key and lot (v1.7, ADR 0011). */
+  scope?: string | null
+  phase?: string | null
+  lot?: string | null
+}
+
+/** One scope of the Documents register: its phases, each with its document types. */
+export interface DocwikiRegisterGroup {
+  scope: string | null
+  title: string
+  /** Content slug of the scope's hub page (`chantiers/moreau`), when it has one. */
+  hub: string | null
+  count: number
+  phases: {
+    phase: string | null
+    title: string
+    types: { type: string | null; title: string; sources: string[] }[]
+  }[]
 }
 
 export interface DocwikiQuality {
@@ -53,6 +71,12 @@ export interface DocwikiSettings {
   /** Gate counts from the release manifest, or from the run for a staged release. */
   quality: DocwikiQuality | null
   sources: Record<string, DocwikiSource>
+  /** Every scope value with its title and hub page (empty when the pack declares no scopes). */
+  scopes?: Record<string, { title: string; hub: string | null }>
+  /** The register grouped by scope, phase and type; null when no source has a scope. */
+  register?: DocwikiRegisterGroup[] | null
+  /** Explorer order: hub folders first; the `entities` folder's name when the wiki has scopes. */
+  explorer?: { hubFolders: string[]; entitiesTitle: string | null }
   /**
    * Filed research answers published in `static/docwiki/answers.json` (ADR 0007); the "Ask this
    * wiki" drawer is rendered only when there is at least one.

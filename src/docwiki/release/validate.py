@@ -68,6 +68,7 @@ from docwiki.contracts.pages import (
 from docwiki.contracts.safety import find_violations
 from docwiki.release.layout import PORTABLE_META_DIR, ReleaseLayout
 from docwiki.release.tables import SourceTablesIndex
+from docwiki.search.index import READABLE_SCHEMAS
 
 __all__ = ["CITATION_RE", "validate_page", "validate_release"]
 
@@ -1013,8 +1014,9 @@ def _check_search_db(state: _State) -> None:
             state.add("G01", "search-schema", f"missing tables {sorted(missing)}", shown)
             return
         meta = dict(conn.execute("SELECT key, value FROM meta"))
-        if meta.get("schema") != "1":
-            state.add("G01", "search-schema", "meta.schema must be '1'", shown)
+        if meta.get("schema") not in READABLE_SCHEMAS:
+            accepted = " or ".join(f"'{value}'" for value in sorted(READABLE_SCHEMAS))
+            state.add("G01", "search-schema", f"meta.schema must be {accepted}", shown)
         if state.release_id and meta.get("release_id") != state.release_id:
             state.add(
                 "G01",

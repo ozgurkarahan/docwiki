@@ -84,7 +84,7 @@ SQLite with FTS5 (fallback: a BM25 implementation over the same table when FTS5 
 ```sql
 CREATE TABLE docs(rowid INTEGER PRIMARY KEY, kind TEXT, page_id TEXT, path TEXT, title TEXT,
                   section TEXT, anchor TEXT, source_id TEXT, locator_key TEXT, sensitivity TEXT,
-                  status TEXT, lang TEXT, text TEXT);
+                  status TEXT, lang TEXT, text TEXT, scope TEXT);
 CREATE VIRTUAL TABLE docs_fts USING fts5(title, section, text, content='docs', content_rowid='rowid',
                                          tokenize='unicode61 remove_diacritics 2');
 CREATE TABLE synonyms(term TEXT, synonym TEXT, lang TEXT);
@@ -94,6 +94,9 @@ CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT);
 `kind` is `page-section` (one row per section of each page) or `source-block` (one row per
 extracted block, so answer-bearing details omitted by compilation remain searchable).
 Queries expand terms with glossary synonyms before matching.
+`scope` (schema 2, v1.7) is the scope value of the row's page (a source page and its blocks, a
+per-scope topic, a hub) and `NULL` for company pages; the additive `pages` table carries it too,
+for the MCP `within` filter. Readers accept schema 1 databases (no scopes).
 
 ## 7. Quality gates
 
