@@ -12,9 +12,9 @@ from docwiki.release import validate_release
 
 FIXTURE_ROOT = Path(__file__).resolve().parents[2] / "samples" / "fixtures" / "mock-release"
 
-RELEASE = "20260401T090000Z-7ce99a3f"
-PLAN_A, PLAN_B, MINUTES = "src-c6436ec50050", "src-86eabe3d6d0d", "src-165f1d3a109c"
-TOPIC = "topics/schedule-and-window-delivery.md"
+RELEASE = "20260401T090000Z-8a41b109"
+PLAN_A, PLAN_B, MINUTES = "src-7630d0741377", "src-59cf9366e50c", "src-f0757603684a"
+TOPIC = "topics/planning.md"
 PLAN_A_PAGE = "sources/pln-2026-003-indice-a-planning-et-suivi-des-achats.md"
 PLAN_B_PAGE = "sources/pln-2026-003-indice-b-planning-et-suivi-des-achats.md"
 LOT_3 = "entities/work-package/lot-3-gros-oeuvre.md"
@@ -91,8 +91,8 @@ MUTATIONS: dict[str, tuple[Mutation, str, str]] = {
     "broken anchor": (
         lambda r: edit(
             wiki(r, "index.md"),
-            "(topics/schedule-and-window-delivery.md)",
-            "(topics/schedule-and-window-delivery.md#nope)",
+            "(topics/planning.md)",
+            "(topics/planning.md#nope)",
         ),
         "G02",
         "anchor-unresolved",

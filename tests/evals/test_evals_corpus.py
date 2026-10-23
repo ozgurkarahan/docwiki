@@ -323,12 +323,12 @@ def test_release_catalog_loading(tmp_path: Path, repo_root: Path) -> None:
     mock = repo_root / "samples" / "fixtures" / "mock-release"
     for location in (mock, mock / "releases"):
         catalog = ReleaseCatalog.load(location)
-        assert catalog.release_id == "20260401T090000Z-7ce99a3f"
+        assert catalog.release_id == "20260401T090000Z-8a41b109"
         assert catalog.audience == "public"
         assert {source.source_id for source in catalog.sources} == {
-            "src-165f1d3a109c",
-            "src-86eabe3d6d0d",
-            "src-c6436ec50050",
+            "src-59cf9366e50c",
+            "src-7630d0741377",
+            "src-f0757603684a",
         }
         assert all(source.sha256 and len(source.sha256) == 64 for source in catalog.sources)
         assert any(source.title for source in catalog.sources)
@@ -355,11 +355,13 @@ def test_mock_release_sources_map_to_the_corpus(repo_root: Path) -> None:
     manifest = CorpusManifest.load(repo_root / "samples" / "corpus")
     catalog = ReleaseCatalog.load(repo_root / "samples" / "fixtures" / "mock-release")
     resolver = SourceResolver(manifest, catalog)
-    assert resolver.path_for_id("src-165f1d3a109c") == (
-        "full/chantier/2026-03-24_compte-rendu-de-chantier-n3.docx"
+    assert resolver.path_for_id("src-f0757603684a") == (
+        "full/chantiers/moreau/3-execution/site-meeting-minutes/"
+        "2026-03-24_compte-rendu-de-chantier-n3.docx"
     )
-    assert resolver.path_for_id("src-86eabe3d6d0d") == (
-        "held-back/planning/PLN-2026-003_indice-B_planning-et-suivi-des-achats.xlsx"
+    assert resolver.path_for_id("src-59cf9366e50c") == (
+        "held-back/chantiers/moreau/3-execution/schedule/"
+        "PLN-2026-003_indice-B_planning-et-suivi-des-achats.xlsx"
     )
     assert resolver.path_for_id("src-000000000000") is None
 

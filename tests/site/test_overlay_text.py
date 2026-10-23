@@ -245,22 +245,22 @@ def test_drawer_groups_links_labels_and_state() -> None:
     result = run_helpers(
         """
         const answers = ["a", "b", "c"].map((id) => ({id, pages: [`queries/${id}`]}))
-        answers[0].pages.push("topics/schedule-and-window-delivery")
-        answers[2].pages.push("topics/schedule-and-window-delivery")
+        answers[0].pages.push("topics/planning")
+        answers[2].pages.push("topics/planning")
         const groups = (slug) =>
           m.groupAnswers(answers, slug).map((g) => [g.title, g.answers.map((a) => a.id)])
         console.log(JSON.stringify({
-          topic: groups("topics/schedule-and-window-delivery"),
+          topic: groups("topics/planning"),
           home: groups("index"),
           own: groups("queries/b"),
           empty: m.groupAnswers([], "index"),
           hrefs: [
             ["index", "evidence/src-1/p0001"],
-            ["topics/schedule-and-window-delivery", "evidence/src-1/p0001"],
+            ["topics/planning", "evidence/src-1/p0001"],
             ["evidence/src-1/p0002", "evidence/src-1/sheet-plan-r0002-r0004#row-3"],
             ["entities/work-package/lot-5", "queries/2026-02-12-a"],
             ["sources/index", "queries/2026-02-12-a"],
-            ["topics/schedule-and-window-delivery", "index"],
+            ["topics/planning", "index"],
             ["queries/2026-02-12-a", "sources/index"],
             ["queries/2026-02-12-a", "static/docwiki/answers.json"],
           ].map(([from, to]) => m.relativeHref(from, to)),
@@ -380,7 +380,7 @@ LIVE_ANSWER = {
             "n": 1,
             "title": "Site meeting minutes",
             "label": "¶ 7",
-            "href": "evidence/src-165f1d3a109c/para-0007",
+            "href": "evidence/src-f0757603684a/para-0007",
             "badge": "paraphrase",
         }
     ],

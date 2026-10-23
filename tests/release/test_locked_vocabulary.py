@@ -12,8 +12,8 @@ from docwiki.release.validate import validate_release
 from docwiki.stages.verify import verify_release
 
 MOCK = Path(__file__).resolve().parents[2] / "samples" / "fixtures" / "mock-release"
-MOCK_ID = "20260401T090000Z-7ce99a3f"
-TOPIC = "topics/schedule-and-window-delivery.md"
+MOCK_ID = "20260401T090000Z-8a41b109"
+TOPIC = "topics/planning.md"
 TERMS = {
     "conducteur de travaux": ["site manager", "works manager"],
     "réception": ["handover"],
@@ -71,7 +71,7 @@ def test_a_banned_rendering_in_the_title_fails_the_gate(release: Path):
     file = release / "wiki" / TOPIC
     text = file.read_text(encoding="utf-8")
     file.write_text(
-        text.replace("title: Schedule and window delivery", "title: Schedule and handover", 1),
+        text.replace("title: Planning", "title: Schedule and handover", 1),
         encoding="utf-8",
         newline="\n",
     )

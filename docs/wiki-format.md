@@ -82,9 +82,9 @@ the delivery date of the windows changed from one planning revision to the next.
 
 ```markdown
 ---
-id: topic:schedule-and-window-delivery
+id: topic:planning
 type: topic
-title: Schedule and window delivery
+title: Planning
 summary: Delivery and installation of the windows of the extension and the progress of the masonry, compiled from the schedule and the site meeting minutes.
 lang: en
 sensitivity: public
@@ -94,20 +94,20 @@ tags:
 - windows
 docwiki:
   schema: 1
-  release: 20260401T090000Z-7ce99a3f
-topic_slug: schedule-and-window-delivery
+  release: 20260401T090000Z-8a41b109
+topic_slug: planning
 sources:
-- src-165f1d3a109c
-- src-86eabe3d6d0d
-- src-c6436ec50050
+- src-59cf9366e50c
+- src-7630d0741377
+- src-f0757603684a
 confidence: medium
 contradictions: 1
 superseded_claims: 1
 ---
 
-# Schedule and window delivery
+# Planning
 
-> FICTIONAL SAMPLE - Lamna Bâtiment, the Moreau household, Valbrise and every organisation, person, product, amount and date in this wiki are invented. Not for operational use.
+> FICTIONAL SAMPLE - Lamna Bâtiment, its chantiers (the Moreau household, the résidence Les Nacrines, the école de Montferrine), Valbrise, Montferrine and every organisation, person, product, amount and date in this wiki are invented. Not for operational use.
 
 Delivery and installation of the windows of the extension and the progress of the masonry, compiled from three sources.
 
@@ -131,11 +131,11 @@ Resolution policy: signed site meeting minutes (authority 7) prevail over the sc
 
 ## Sources
 
-[^c1]: [Planning and purchase tracking, indice B — sheet "Planning", rows 6–9](../evidence/src-86eabe3d6d0d/sheet-planning-r0006-r0009.md) · table
-[^c2]: [Site meeting minutes n°3 — ¶ 11](../evidence/src-165f1d3a109c/para-0011.md) · ✓ quote verified
-[^c3]: [Site meeting minutes n°3 — ¶ 7](../evidence/src-165f1d3a109c/para-0007.md) · ✓ quote verified
-[^c4]: [Planning and purchase tracking, indice A — p. 1](../evidence/src-c6436ec50050/p0001.md) · ✓ quote verified
-[^c5]: [Planning and purchase tracking, indice B — sheet "Planning", rows 24–25](../evidence/src-86eabe3d6d0d/sheet-planning-r0024-r0025.md) · table
+[^c1]: [Planning and purchase tracking, indice B — sheet "Planning", rows 6–9](../evidence/src-59cf9366e50c/sheet-planning-r0006-r0009.md) · table
+[^c2]: [Site meeting minutes n°3 — ¶ 11](../evidence/src-f0757603684a/para-0011.md) · ✓ quote verified
+[^c3]: [Site meeting minutes n°3 — ¶ 7](../evidence/src-f0757603684a/para-0007.md) · ✓ quote verified
+[^c4]: [Planning and purchase tracking, indice A — p. 1](../evidence/src-7630d0741377/p0001.md) · ✓ quote verified
+[^c5]: [Planning and purchase tracking, indice B — sheet "Planning", rows 24–25](../evidence/src-59cf9366e50c/sheet-planning-r0024-r0025.md) · table
 ```
 
 The full page also has a section per theme (here `## Window delivery` and `## Masonry progress`),

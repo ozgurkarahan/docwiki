@@ -45,7 +45,7 @@ def test_search_filters_and_paging(reads: ReadTools, as_json: Json) -> None:
     topics = as_json(reads.search("window", types=["topic"]))
     assert {hit["page_id"] for hit in topics["hits"]} == {TOPIC_ID}
     by_topic = as_json(
-        reads.search("window", topic="schedule-and-window-delivery", kinds=["page-section"])
+        reads.search("window", topic="planning", kinds=["page-section"])
     )
     assert by_topic["hits"] and all(hit["kind"] == "page-section" for hit in by_topic["hits"])
     entity = as_json(reads.search("window", entity="work-package:lot-3-gros-oeuvre", limit=50))
@@ -112,7 +112,7 @@ def test_read_page_resolves_paths_sections_and_anchors(reads: ReadTools, as_json
 
 def test_read_page_errors_help_the_agent(reads: ReadTools) -> None:
     with pytest.raises(ToolInputError, match="Did you mean") as unknown:
-        reads.read_page("topic:schedule-and-window-deliver")
+        reads.read_page("topic:plannin")
     assert unknown.value.code == "not_found"
     assert TOPIC_ID in unknown.value.details["suggestions"]
     with pytest.raises(ToolInputError, match="get_evidence") as wrong_tool:
@@ -167,7 +167,7 @@ def test_get_evidence_returns_verbatim_content_with_provenance(
     assert data["evidence_path"] == f"evidence/{PLAN_B}/sheet-planning-r0006-r0009.md"
     assert "| T07 | Livraison des menuiseries | 5 | VanArsdel Menuiseries |" in data["content"]
     assert data["source"]["source_path"] == (
-        "planning/PLN-2026-003_indice-B_planning-et-suivi-des-achats.xlsx"
+        "chantiers/moreau/3-execution/schedule/PLN-2026-003_indice-B_planning-et-suivi-des-achats.xlsx"
     )
     assert data["tables_available"] is True
     pdf = as_json(reads.get_evidence(PLAN_A, "p0001.md"))

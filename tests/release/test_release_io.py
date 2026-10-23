@@ -273,14 +273,14 @@ def test_reader_api_on_the_fixture(builder: ModuleType) -> None:
         "log",
     }
     topic_ids = [page.id for page in reader.list_pages("topic")]
-    assert topic_ids == ["topic:schedule-and-window-delivery"]
-    by_id = reader.read_page("topic:schedule-and-window-delivery")
-    assert by_id == reader.read_page("topics/schedule-and-window-delivery.md")
+    assert topic_ids == ["topic:planning"]
+    by_id = reader.read_page("topic:planning")
+    assert by_id == reader.read_page("topics/planning.md")
     assert by_id.frontmatter.contradictions == 1  # type: ignore[union-attr]
-    section = reader.read_section("topic:schedule-and-window-delivery", "contradictions")
+    section = reader.read_section("topic:planning", "contradictions")
     assert section.startswith("## Contradictions\n") and "70 %" in section and "100 %" in section
     with pytest.raises(KeyError):
-        reader.read_section("topic:schedule-and-window-delivery", "Nope")
+        reader.read_section("topic:planning", "Nope")
     with pytest.raises(KeyError):
         reader.read_page("topic:missing")
     links = reader.links(builder.PLAN_A)
@@ -289,7 +289,7 @@ def test_reader_api_on_the_fixture(builder: ModuleType) -> None:
     }
     assert {(e.from_, e.kind) for e in links["backlinks"]} >= {
         (builder.PLAN_B, "supersedes"),
-        ("topic:schedule-and-window-delivery", "topic-of"),
+        ("topic:planning", "topic-of"),
     }
 
     evidence = reader.resolve_evidence(builder.PLAN_B, "sheet-planning-r0006-r0009")
@@ -318,7 +318,7 @@ def test_reader_api_on_the_fixture(builder: ModuleType) -> None:
 def test_reader_search_on_the_fixture(builder: ModuleType, fallback: bool) -> None:
     with ReleaseReader.open(FIXTURE_ROOT).open_search(force_fallback=fallback) as index:
         hits = index.search("window delivery postponed")
-        assert hits[0].page_id in {builder.PLAN_B, "topic:schedule-and-window-delivery"}
+        assert hits[0].page_id in {builder.PLAN_B, "topic:planning"}
         block = index.search("annoncé report", kinds=["source-block"])[0]
         assert (block.source_id, block.locator_key) == (builder.MINUTES, "para-0011")
         assert index.search("joinery")[0].page_id in {

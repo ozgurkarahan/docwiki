@@ -534,9 +534,9 @@ def test_cli_catalog_is_passed_to_the_corpus(
         ]
     )
     assert code == 0
-    assert mocked_cli["catalog"].release_id == "20260401T090000Z-7ce99a3f"
+    assert mocked_cli["catalog"].release_id == "20260401T090000Z-8a41b109"
     data = json.loads(next((tmp_path / "out").glob("*.json")).read_text(encoding="utf-8"))
-    assert data["versions"]["release_id"] == "20260401T090000Z-7ce99a3f"
+    assert data["versions"]["release_id"] == "20260401T090000Z-8a41b109"
 
 
 # ------------------------------------------------------------------------------- scopes

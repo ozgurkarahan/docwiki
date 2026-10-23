@@ -144,7 +144,7 @@ A wiki carries its Agent Skills in three identical folders (`.agents/skills`,
 - **Through MCP, from the repository root:** ask the agent to call `list_skills` and `get_skill`,
   for example *"Read the docwiki `deep-research` skill, then follow it"*.
 - **As native skills:** open the wiki folder of the release (for example
-  `samples/fixtures/mock-release/releases/20260401T090000Z-7ce99a3f/wiki/`) as the project or
+  `samples/fixtures/mock-release/releases/20260401T090000Z-8a41b109/wiki/`) as the project or
   working directory, so that the client discovers the skill folder it supports. Plain file reads
   then work too: `AGENTS.md`, `index.md` and the topic pages are ordinary Markdown.
 

@@ -111,7 +111,7 @@ def test_pages_render_the_docwiki_overlay(built_site: Path) -> None:
     assert 'class="docwiki-badge-legend"' in source
     assert 'class="docwiki-banner"' in source
     assert "docwiki-notice--fictional" in source
-    topic = html(built_site, "topics/schedule-and-window-delivery.html")
+    topic = html(built_site, "topics/planning.html")
     assert "docwiki-badge--table" in topic
     superseded = html(built_site, f"{PLAN_A_PAGE}.html")
     assert "docwiki-notice--superseded" in superseded

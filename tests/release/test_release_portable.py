@@ -23,9 +23,9 @@ from docwiki.release import (
 )
 
 FIXTURE_ROOT = Path(__file__).resolve().parents[2] / "samples" / "fixtures" / "mock-release"
-RELEASE = "20260401T090000Z-7ce99a3f"
-PLAN_A, PLAN_B, MINUTES = "src-c6436ec50050", "src-86eabe3d6d0d", "src-165f1d3a109c"
-TOPIC = "topics/schedule-and-window-delivery.md"
+RELEASE = "20260401T090000Z-8a41b109"
+PLAN_A, PLAN_B, MINUTES = "src-7630d0741377", "src-59cf9366e50c", "src-f0757603684a"
+TOPIC = "topics/planning.md"
 CANARY = "DOCWIKI-CANARY-TEST-TOKEN"
 
 
@@ -98,11 +98,11 @@ def test_reader_on_the_portable_folder(portable: Path) -> None:
     assert reader.file_for("wiki/index.md") == portable / "index.md"
     assert reader.file_for("site/index.html") is None
 
-    page = reader.read_page("topic:schedule-and-window-delivery")
+    page = reader.read_page("topic:planning")
     assert page.frontmatter.contradictions == 1  # type: ignore[union-attr]
     old_plan = reader.read_page("sources/pln-2026-003-indice-a-planning-et-suivi-des-achats.md")
     assert old_plan.frontmatter.status == "superseded"  # type: ignore[union-attr]
-    contradictions = reader.read_section("topic:schedule-and-window-delivery", "Contradictions")
+    contradictions = reader.read_section("topic:planning", "Contradictions")
     assert "70 %" in contradictions
     assert {edge.kind for edge in reader.links(PLAN_A)["backlinks"]} >= {"supersedes", "topic-of"}
     evidence = reader.resolve_evidence(MINUTES, "para-0011")
