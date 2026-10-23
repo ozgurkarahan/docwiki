@@ -489,20 +489,23 @@ class ProcessService:
     @staticmethod
     @staticmethod
     def _follow_run(row: dict[str, Any], stage: str | None, in_run: bool) -> dict[str, Any]:
-        """A document of the run at work: before its own stages (extract, classify, compile,
-        recorded in its state) it waits at the run's stage or at extract; past them, it is where
-        the run is."""
-        if (
-            not in_run
-            or stage not in STAGE_NAMES
-            or row["state"]
-            not in (
-                "received",
-                "queued",
-                "processing",
-            )
-        ):
+        """A document of the run at work is processing, even one whose earlier version is in the
+        wiki: before its own stages (extract, classify, compile, recorded in its state) it is at
+        the run's stage (a new document waits at extract); past them, it is where the run is."""
+        if not in_run or stage not in STAGE_NAMES:
             return row
+        if row["state"] in ("held_back", "failed", "removed"):
+            return row
+        at = STAGE_NAMES.index(stage) + 1
+        own = row["step"] if row["state"] == "processing" else None
+        if own is None:
+            waiting = row["state"] in ("received", "queued") and stage in PER_SOURCE_STAGES
+            where = "extract" if waiting else stage
+            row.update(state="processing", stage=where, step=STAGE_NAMES.index(where) + 1)
+        elif stage not in PER_SOURCE_STAGES and (at > own or own == len(STAGE_NAMES)):
+            row.update(stage=stage, step=at)
+        row["phase"] = document_phase(row["stage"])
+        return row
         at = STAGE_NAMES.index(stage) + 1
         own = row["step"] if row["state"] == "processing" else None
         if own is None:
