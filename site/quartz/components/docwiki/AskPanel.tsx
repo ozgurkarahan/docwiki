@@ -2,28 +2,35 @@
 // answers filed as queries/ pages (static/docwiki/answers.json) and, where the portal enables it,
 // lets a visitor ask the Researcher agent (/api/ask). Both are filled on the client with DOM nodes
 // and textContent only (scripts/askPanel.inline.ts). The button is part of every page and stays
-// hidden until the client knows there is something to show: filed answers, or a live agent.
+// hidden until the client knows there is something to show: filed answers, or a live agent. The
+// drawer speaks the page's language, and the wiki pages it links are the ones of that language.
 import { classNames } from "../../util/lang"
 import { QuartzComponent, QuartzComponentConstructor, QuartzComponentProps } from "../types"
 // @ts-ignore
 import script from "./scripts/askPanel.inline"
-import { settings } from "./settings"
+import { languages, pageLang, pageStrings, settings, settingsFor } from "./settings"
 
 const PANEL_ID = "docwiki-ask"
 
-/** Source id → [source page slug, title]: the wiki pages an answer's citations come from. */
-const sourcePages = JSON.stringify(
-  Object.fromEntries(
-    Object.entries(settings.sources)
-      .filter(([, source]) => source.page)
-      .map(([id, source]) => [id, [source.page, source.title]]),
-  ),
-)
+/** Source id → [source page slug, title] in `lang`: the pages an answer's citations come from. */
+function sourcePages(lang: string): string {
+  return JSON.stringify(
+    Object.fromEntries(
+      Object.entries(settingsFor(lang).sources)
+        .filter(([, source]) => source.page)
+        .map(([id, source]) => [id, [source.page, source.title]]),
+    ),
+  )
+}
+
+const pagesByLang = new Map(languages.map((lang) => [lang, sourcePages(lang)]))
 
 export default (() => {
   const AskPanel: QuartzComponent = ({ fileData, displayClass }: QuartzComponentProps) => {
     // The 404 page is served at any path, where its relative links would not resolve.
     if (fileData.slug === "404") return null
+    const lang = pageLang(fileData)
+    const t = pageStrings(fileData).ask
     return (
       <div class={classNames(displayClass, "docwiki-ask-root")}>
         <button
@@ -38,15 +45,15 @@ export default (() => {
             <path d="M9.7 9.4a2.4 2.4 0 0 1 4.6 1c0 1.6-2.3 2-2.3 3.4" />
             <path d="M12 16.7h.01" />
           </svg>
-          <span class="docwiki-ask-fab-label">Ask this wiki</span>
+          <span class="docwiki-ask-fab-label">{t.title}</span>
         </button>
         <aside
           id={PANEL_ID}
           class="docwiki-ask"
-          aria-label="Ask this wiki"
+          aria-label={t.title}
           data-repo-url={settings.repoUrl}
           data-filed-answers={String(settings.answers)}
-          data-source-pages={sourcePages}
+          data-source-pages={pagesByLang.get(lang) ?? sourcePages(lang)}
           hidden
         ></aside>
       </div>

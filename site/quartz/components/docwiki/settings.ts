@@ -1,5 +1,8 @@
 // Typed view of docwiki-site.json, written into the Quartz checkout by docwiki.site.build_site.
 import raw from "../../../docwiki-site.json"
+import { baseSlug, pageLanguage, slugIn, stringsFor } from "./i18n"
+import type { Strings } from "./i18n"
+import { en } from "./i18n/en.ts"
 
 export interface DocwikiSource {
   /** Content slug of the source page (`sources/<slug>`), when the release has one. */
@@ -54,8 +57,23 @@ export interface DocwikiQuality {
   blockingFailed: number
 }
 
+/** What differs in a mirror language (`en/…`, ADR 0012): slugs are full content slugs. */
+export interface DocwikiMirror {
+  pageTitle: string
+  sources: Record<string, DocwikiSource>
+  citedPages?: number
+  scopes?: Record<string, { title: string; hub: string | null }>
+  register?: DocwikiRegisterGroup[] | null
+  explorer?: DocwikiSettings["explorer"]
+  steps?: { name: string; text: string }[]
+}
+
 export interface DocwikiSettings {
   schema: 1
+  /** The wiki's languages, the canonical one first (`["fr", "en"]`); `["en"]` before slice G. */
+  languages?: string[]
+  /** One entry per mirror language (`en`): its title, sources, register and explorer. */
+  mirrors?: Record<string, DocwikiMirror>
   pageTitle: string
   baseUrl: string | null
   repoUrl: string
@@ -97,6 +115,81 @@ export interface DocwikiSettings {
 
 export const settings = raw as DocwikiSettings
 
+/** The wiki's languages, the canonical one first. */
+export const languages: readonly string[] =
+  settings.languages && settings.languages.length > 0 ? settings.languages : ["en"]
+
+/** The canonical language: the pages at the root of the site. */
+export const canonicalLang = languages[0]
+
+/** The mirror languages (each under its own folder: `en/`). */
+export const mirrorLangs: readonly string[] = languages.slice(1)
+
+/** The language of a page (its frontmatter's `lang`, else the folder it is in). */
+export function pageLang(fileData: {
+  slug?: string
+  frontmatter?: { lang?: unknown } | null
+}): string {
+  return pageLanguage(fileData.slug ?? "index", fileData.frontmatter?.lang, languages)
+}
+
+/** The UI strings of a page's language. */
+export function pageStrings(fileData: Parameters<typeof pageLang>[0]): Strings {
+  return stringsFor(pageLang(fileData))
+}
+
+/** The page's slug without its mirror folder (`en/sources/x` → `sources/x`). */
+export function pageBase(slug: string | undefined): string {
+  return baseSlug(slug ?? "index", languages)
+}
+
+/** The slug of `base` in `lang` (`documents` → `en/documents`). */
+export function inLang(base: string, lang: string): string {
+  return slugIn(base, lang, languages)
+}
+
+const slugSets = new WeakMap<object, Set<string>>()
+
+/** The slugs of the built pages (to know whether a page has a twin in another language). */
+export function builtSlugs(files: readonly { slug?: string }[]): Set<string> {
+  let found = slugSets.get(files)
+  if (!found) {
+    found = new Set(files.map((file) => file.slug ?? "").filter((slug) => slug !== ""))
+    slugSets.set(files, found)
+  }
+  return found
+}
+
+/**
+ * The same page in each language that has it (`[["fr", "sources/x"], ["en", "en/sources/x"]]`),
+ * for the `hreflang` alternates; empty for a wiki without a mirror or a page without a twin.
+ */
+export function twins(slug: string, files: readonly { slug?: string }[]): [string, string][] {
+  if (languages.length < 2 || slug === "404") return []
+  const built = builtSlugs(files)
+  const base = pageBase(slug)
+  const found = languages
+    .map((lang): [string, string] => [lang, inLang(base, lang)])
+    .filter(([, twin]) => twin === slug || built.has(twin))
+  return found.length > 1 ? found : []
+}
+
+/** The settings as seen from a page in `lang`: a mirror's title, page links and register. */
+export function settingsFor(lang: string): DocwikiSettings {
+  const mirror = settings.mirrors?.[lang]
+  if (!mirror || lang === canonicalLang) return settings
+  return {
+    ...settings,
+    pageTitle: mirror.pageTitle,
+    sources: mirror.sources,
+    citedPages: mirror.citedPages ?? settings.citedPages,
+    scopes: mirror.scopes ?? settings.scopes,
+    register: mirror.register ?? settings.register,
+    explorer: mirror.explorer ?? settings.explorer,
+    steps: mirror.steps ?? settings.steps,
+  }
+}
+
 /**
  * The display name of a document type: the domain pack's label (`PV de réception`); a release
  * built before the labels shows its key in words (`Site meeting minutes`).
@@ -117,26 +210,38 @@ export function docTypeName(
  */
 export function revisionStatus(
   source: DocwikiSource | undefined,
+  t: Strings = en,
 ): { state: "in_wiki" | "superseded"; words: string; title?: string } | null {
   if (!source) return null
+  const words = t.documents
   if (source.status === "superseded") {
     const by = source.supersededByRevision
-      ? `indice ${source.supersededByRevision}`
+      ? words.supersededByRevision(source.supersededByRevision)
       : source.supersededBy
     return by
-      ? { state: "superseded", words: `Superseded by ${by}`, title: source.supersededBy ?? undefined }
-      : { state: "superseded", words: "Superseded" }
+      ? {
+          state: "superseded",
+          words: words.supersededBy(by),
+          title: source.supersededBy ?? undefined,
+        }
+      : { state: "superseded", words: words.superseded }
   }
-  if (source.docNumber || source.revision) return { state: "in_wiki", words: "Current" }
+  if (source.docNumber || source.revision) return { state: "in_wiki", words: words.current }
   return null
 }
 
-const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "UTC" })
+const dateFormats = new Map<string, Intl.DateTimeFormat>()
 
-/** "20 Jan 2026" from an ISO date. */
-export function humanDate(iso: string | null | undefined): string | null {
+/** "20 Jan 2026" (or "20 janv. 2026") from an ISO date. */
+export function humanDate(iso: string | null | undefined, t: Strings = en): string | null {
   if (!iso) return null
   const date = new Date(`${iso.slice(0, 10)}T00:00:00Z`)
-  return Number.isNaN(date.getTime()) ? null : dateFormat.format(date)
+  if (Number.isNaN(date.getTime())) return null
+  let format = dateFormats.get(t.dateLocale)
+  if (!format) {
+    format = new Intl.DateTimeFormat(t.dateLocale, { dateStyle: "medium", timeZone: "UTC" })
+    dateFormats.set(t.dateLocale, format)
+  }
+  return format.format(date)
 }
 

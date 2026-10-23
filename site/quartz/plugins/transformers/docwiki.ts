@@ -13,10 +13,13 @@ import {
   isDocumentHref,
   isIsoDay,
   noticeKind,
+  shownBadge,
   splitProvenanceBadge,
   splitTrailingBadge,
   stripBacklinksBlock,
 } from "./docwiki-text"
+import { pageLanguage, stringsFor } from "../../components/docwiki/i18n"
+import type { Strings } from "../../components/docwiki/i18n"
 import {
   cellLabels,
   foreignLang,
@@ -34,9 +37,19 @@ export interface Options {
   siteBanner: boolean
   /** Source id → the document's own language (`original_lang`), for the `lang` marks. */
   sourceLangs: Record<string, string | null>
+  /**
+   * The wiki's languages, the canonical one first (ADR 0012): a page's language is its `lang`,
+   * else its folder's (`en/…`), and the page's own words (badges, legends) are in it.
+   */
+  languages: string[]
 }
 
-const defaultOptions: Options = { releaseDate: null, siteBanner: false, sourceLangs: {} }
+const defaultOptions: Options = {
+  releaseDate: null,
+  siteBanner: false,
+  sourceLangs: {},
+  languages: ["en"],
+}
 
 /** mdast parents whose children are blocks (a raw HTML node there becomes a paragraph). */
 const FLOW_PARENTS = new Set(["root", "blockquote", "listItem", "footnoteDefinition"])
@@ -58,7 +71,9 @@ function text(value: string): HtmlText {
   return { type: "text", value }
 }
 
-function badgeElement(badge: Badge): Element {
+/** A badge in the page's language (the Markdown keeps the wiki's English marker). */
+function badgeElement(marker: Badge, t: Strings): Element {
+  const badge = shownBadge(marker, t)
   return {
     type: "element",
     tagName: "span",
@@ -70,10 +85,10 @@ function badgeElement(badge: Badge): Element {
   }
 }
 
-function splitNodes(split: BadgeSplit): ElementContent[] {
+function splitNodes(split: BadgeSplit, t: Strings): ElementContent[] {
   const nodes: ElementContent[] = []
   if (split.before) nodes.push(text(split.before))
-  nodes.push(badgeElement(split.badge))
+  nodes.push(badgeElement(split.badge, t))
   if (split.after) nodes.push(text(split.after))
   return nodes
 }
@@ -133,7 +148,7 @@ function lastParagraph(element: Element): Element | undefined {
 }
 
 /** Wrap the provenance badge that ends each footnote definition in a styled span. */
-function decorateFootnotes(section: Element): Set<BadgeKind> {
+function decorateFootnotes(section: Element, t: Strings): Set<BadgeKind> {
   const used = new Set<BadgeKind>()
   visit(section, "element", (item: Element) => {
     if (item.tagName !== "li") return
@@ -144,24 +159,24 @@ function decorateFootnotes(section: Element): Set<BadgeKind> {
       if (!child.value.trim()) continue
       const split = splitTrailingBadge(child.value)
       if (split) {
-        container.children.splice(i, 1, ...splitNodes(split))
+        container.children.splice(i, 1, ...splitNodes(split, t))
         used.add(split.badge.kind)
       }
       break
     }
     return SKIP
   })
-  if (used.size > 0) section.children.push(badgeLegend(used))
+  if (used.size > 0) section.children.push(badgeLegend(used, t))
   return used
 }
 
-function badgeLegend(used: Set<BadgeKind>): Element {
+function badgeLegend(used: Set<BadgeKind>, t: Strings): Element {
   const children: ElementContent[] = [
     {
       type: "element",
       tagName: "span",
       properties: { className: ["docwiki-badge-legend-title"] },
-      children: [text("Provenance badges")],
+      children: [text(t.wiki.provenanceBadges)],
     },
   ]
   for (const badge of CITATION_BADGES) {
@@ -170,7 +185,7 @@ function badgeLegend(used: Set<BadgeKind>): Element {
       type: "element",
       tagName: "span",
       properties: { className: ["docwiki-badge-legend-item"] },
-      children: [badgeElement(badge), text(` ${badge.meaning}`)],
+      children: [badgeElement(badge, t), text(` ${shownBadge(badge, t).meaning}`)],
     })
   }
   return {
@@ -210,7 +225,7 @@ function decorateNotices(
 }
 
 /** Evidence sidecars: badge in the `Provenance:` line, navigation line, zoomable specimen. */
-function decorateEvidence(tree: HtmlRoot) {
+function decorateEvidence(tree: HtmlRoot, t: Strings) {
   for (const node of tree.children) {
     if (node.type !== "element" || node.tagName !== "p") continue
     const content = hastToString(node)
@@ -220,7 +235,7 @@ function decorateEvidence(tree: HtmlRoot) {
       if (!parent || index === undefined) return
       const split = splitProvenanceBadge(child.value)
       if (!split) return
-      const nodes = splitNodes(split)
+      const nodes = splitNodes(split, t)
       parent.children.splice(index, 1, ...nodes)
       return [SKIP, index + nodes.length]
     })
@@ -238,7 +253,7 @@ function decorateEvidence(tree: HtmlRoot) {
         className: ["docwiki-zoom"],
         dataNoPopover: "true",
         dataRouterIgnore: "true",
-        title: "Open the full-size image",
+        title: t.wiki.openImage,
       },
       children: [node],
     })
@@ -387,6 +402,11 @@ export const DocWiki: QuartzTransformerPlugin<Partial<Options>> = (userOpts) => 
             disableRawHtml(tree)
             const frontmatter = file.data.frontmatter
             if (!frontmatter) return
+            // A page without `lang` in a wiki with a mirror takes its folder's language, so that
+            // Quartz writes the right `<html lang>`.
+            if (opts.languages.length > 1 && typeof frontmatter.lang !== "string") {
+              frontmatter.lang = pageLanguage(file.data.slug ?? "index", null, opts.languages)
+            }
             dropTitleHeading(tree, frontmatter.title)
             const type = typeof frontmatter.type === "string" ? frontmatter.type : undefined
             if (!frontmatter.description && typeof frontmatter.summary === "string") {
@@ -409,14 +429,20 @@ export const DocWiki: QuartzTransformerPlugin<Partial<Options>> = (userOpts) => 
         () => {
           return (tree: HtmlRoot, file) => {
             stripRawNodes(tree)
+            const pageLang = pageLanguage(
+              file.data.slug ?? "index",
+              file.data.frontmatter?.lang,
+              opts.languages,
+            )
+            const t = stringsFor(pageLang)
             const evidence = file.data.frontmatter?.type === "evidence"
             visit(tree, "element", (node: Element) => {
               if (!isFootnotes(node)) return
-              decorateFootnotes(node)
+              decorateFootnotes(node, t)
               return SKIP
             })
             decorateNotices(tree, evidence, file.data.slug, opts.siteBanner)
-            if (evidence) decorateEvidence(tree)
+            if (evidence) decorateEvidence(tree, t)
             decorateDocumentLinks(tree)
             markLoneLinks(tree)
             const frontmatter = file.data.frontmatter
@@ -429,6 +455,7 @@ export const DocWiki: QuartzTransformerPlugin<Partial<Options>> = (userOpts) => 
                 : typeof sourceId === "string"
                   ? opts.sourceLangs[sourceId]
                   : null,
+              pageLang,
             )
             if (lang) markLanguage(tree, type, lang)
           }

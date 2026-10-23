@@ -2231,6 +2231,92 @@ header:has(.docwiki-tabbar) {
   }
 }
 
+// With a language switch (ADR 0012): tabs, Sign in and the switch on the first row, the chip under
+// them. On phones the tabs have the first row to themselves (the French tabs and "Connexion" do
+// not fit beside each other at 390 px), the chip, Sign in and the switch share the second.
+.docwiki-tabbar:has(> .docwiki-lang) {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "tabs sign-in lang"
+    "chip chip chip";
+
+  > .docwiki-chip {
+    justify-self: start;
+  }
+
+  > .docwiki-lang {
+    grid-area: lang;
+  }
+
+  @media all and ($mobile) {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "tabs tabs tabs"
+      "chip sign-in lang";
+
+    > .docwiki-chip {
+      box-sizing: border-box;
+      max-width: 100%;
+      min-width: 0;
+    }
+
+    a.docwiki-lang-link {
+      min-width: 36px;
+      padding: 0 0.2rem;
+    }
+  }
+}
+
+// The language switch (ADR 0012): "FR · EN", two plain links of at least 24 × 24 px (44 px tall
+// on phones, like the other header controls); the page's language is marked `aria-current`.
+.docwiki-lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  white-space: nowrap;
+}
+
+.docwiki-lang-sep {
+  color: var(--gray);
+}
+
+a.docwiki-lang-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 0.35rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--darkgray);
+  font-size: 0.9rem;
+  font-weight: $semiBoldWeight;
+  text-decoration: none;
+  background: none;
+
+  &:hover {
+    border-color: var(--dw-border);
+    color: var(--dark);
+  }
+
+  &[aria-current="true"] {
+    border-color: var(--secondary);
+    background: var(--highlight);
+    color: var(--dark);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--secondary);
+    outline-offset: 2px;
+  }
+
+  @media all and ($mobile) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 .docwiki-chip:not(.is-ready),
 .docwiki-sign-in:not(.is-ready) {
   visibility: hidden;

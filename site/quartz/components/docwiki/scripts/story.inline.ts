@@ -8,14 +8,17 @@
 //   live agent), it opens the drawer on its question through the drawer's ASK_EVENT hook.
 // - The third card scrolls to the wiki below (Quartz's router) and moves the focus there.
 import { ASK_EVENT, lastRunLine, relativeHref } from "../../../plugins/transformers/docwiki-text"
+import { clientStrings } from "../i18n"
 
 const PROCESS_PATH = "api/process"
 const WIKI_ANCHOR = "docwiki-wiki"
 
-/** The last line read this page load, shown at once on a later visit of the home page. */
-let runLine: string | null = null
+/** The last reply read this page load, shown at once on a later visit of the home page. */
+let runReply: unknown = null
 
 function showRun(slot: HTMLElement) {
+  // Worded in the language of the page on screen (the reply is the same in every language).
+  const runLine = runReply === null ? null : lastRunLine(runReply, clientStrings())
   if (runLine && slot.isConnected) slot.textContent = runLine
 }
 
@@ -28,8 +31,8 @@ async function readRun(slot: HTMLElement) {
       cache: "no-store",
     })
     if (!response.ok) return // a static host: the build-time text stays
-    const line = lastRunLine(await response.json())
-    if (line) runLine = line
+    const reply: unknown = await response.json()
+    if (lastRunLine(reply)) runReply = reply
     showRun(slot)
   } catch {
     // No portal or no JSON: the build-time text stays.

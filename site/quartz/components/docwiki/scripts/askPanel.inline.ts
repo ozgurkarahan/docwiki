@@ -5,12 +5,13 @@
 // fetched once per page load. Answers are data: they are rendered with DOM nodes and textContent
 // only, and their links are content slugs made relative to the current page. Other parts of a
 // page open the drawer on a question with the `ASK_EVENT` ("docwiki:ask") hook of docwiki-text.
+// Its words are in the page's language (i18n/en.ts, i18n/fr.ts); its wiki page links lead to the
+// pages of that language (`data-source-pages`); evidence is shared by every language.
 import type { AskAnswer, AskCitation, AskState } from "../../../plugins/transformers/docwiki-text"
 import {
   ASK_EVENT,
   ASK_STATE_KEY,
   LIVE_ASK_PATH,
-  LIVE_FAILED,
   LIVE_KEEP,
   LIVE_POLL_MS,
   LIVE_QUESTION_MAX,
@@ -39,10 +40,12 @@ import {
   relativeHref,
   renumberCitations,
   restoredState,
+  shownBadge,
   stepsLabel,
   waitingLabel,
 } from "../../../plugins/transformers/docwiki-text"
 import { cycleFocus } from "../../../plugins/transformers/docwiki-a11y"
+import { clientRoot, clientStrings } from "../i18n"
 
 const PANEL_ID = "docwiki-ask"
 const INPUT_ID = "docwiki-ask-input"
@@ -133,6 +136,13 @@ function currentSlug(): string {
   return document.body.dataset.slug ?? "index"
 }
 
+/** The page's slug in the canonical tree (`en/sources/x` → `sources/x`): answers name those. */
+function baseSlug(): string {
+  const slug = currentSlug()
+  const root = clientRoot()
+  return root && slug.startsWith(root) ? slug.slice(root.length) || "index" : slug
+}
+
 function loadAnswers(slug: string): Promise<AskAnswer[]> {
   if (answers) return Promise.resolve(answers)
   if (!loading) {
@@ -214,31 +224,31 @@ function link(slug: string, target: string, text: string, focusKey: string): HTM
 }
 
 function header(): HTMLElement {
+  const t = clientStrings().ask
   const head = element("div", "docwiki-ask-header")
   const titles = element("div", "docwiki-ask-titles")
-  const title = element("h2", "docwiki-ask-title", "Ask this wiki")
+  const title = element("h2", "docwiki-ask-title", t.title)
   title.tabIndex = -1
   title.dataset.focusKey = "title"
   const subtitle = element(
     "p",
     "docwiki-ask-subtitle",
-    liveEnabled
-      ? "Ask the Researcher agent. Its citations are checked before they are shown."
-      : "Answers by the Researcher agent, reviewed before publishing",
+    liveEnabled ? t.subtitleLive : t.subtitleFiled,
   )
   titles.append(title, subtitle)
   const close = button("docwiki-ask-close", "", "close")
   close.dataset.askAction = "close"
-  close.setAttribute("aria-label", "Close Ask this wiki")
-  close.title = "Close (Esc)"
+  close.setAttribute("aria-label", t.close)
+  close.title = t.closeTitle
   close.append(icon("M6 6l12 12", "M18 6L6 18"))
   head.append(titles, close)
   return head
 }
 
 function footer(repoUrl: string | undefined): HTMLElement {
-  const foot = element("p", "docwiki-ask-footer", "You can also ")
-  const text = "connect your coding agent to this wiki (MCP)"
+  const t = clientStrings().ask
+  const foot = element("p", "docwiki-ask-footer", t.footerBefore)
+  const text = t.footerLink
   if (repoUrl && /^https?:\/\//.test(repoUrl)) {
     const anchor = element("a", undefined, text)
     anchor.setAttribute("href", repoUrl)
@@ -253,7 +263,8 @@ function footer(repoUrl: string | undefined): HTMLElement {
 /** Example questions of the sample corpus, shown while no live answer of the session exists. */
 function examples(body: HTMLElement, list: readonly AskAnswer[]) {
   if (liveAnswers.size > 0) return
-  const questions = exampleQuestions(list, liveEnabled === true)
+  const t = clientStrings().ask
+  const questions = exampleQuestions(list, liveEnabled === true, t.examples)
   if (questions.length === 0) return
   const section = element("section", "docwiki-ask-group docwiki-ask-examples")
   const items = element("ul", "docwiki-ask-questions")
@@ -264,18 +275,19 @@ function examples(body: HTMLElement, list: readonly AskAnswer[]) {
     entry.append(choice)
     items.append(entry)
   })
-  section.append(element("h3", "docwiki-ask-group-title", "Try one of these"), items)
+  section.append(element("h3", "docwiki-ask-group-title", t.tryThese), items)
   body.append(section)
 }
 
 function questionList(body: HTMLElement, list: readonly AskAnswer[], slug: string) {
+  const t = clientStrings()
   examples(body, list)
-  const groups = groupAnswers(list, slug)
+  const groups = groupAnswers(list, slug, t)
   const live = Array.from(liveAnswers.values()).reverse()
-  if (live.length > 0) groups.unshift({ title: "Your live questions", answers: live })
+  if (live.length > 0) groups.unshift({ title: t.ask.yourLive, answers: live })
   if (groups.length === 0) {
     if (!liveEnabled) {
-      body.append(element("p", "docwiki-ask-status", "No answers have been filed yet."))
+      body.append(element("p", "docwiki-ask-status", t.ask.noAnswers))
     }
     return
   }
@@ -296,9 +308,10 @@ function questionList(body: HTMLElement, list: readonly AskAnswer[], slug: strin
 
 /** The Ask form above the question list: a labelled textarea, a button and a status line. */
 function liveForm(body: HTMLElement) {
+  const t = clientStrings()
   const form = element("form", "docwiki-ask-form")
   form.noValidate = true
-  const label = element("label", "docwiki-ask-form-label", "Ask the Researcher")
+  const label = element("label", "docwiki-ask-form-label", t.ask.askLabel)
   label.htmlFor = INPUT_ID
   const input = element("textarea", "docwiki-ask-input")
   input.id = INPUT_ID
@@ -317,7 +330,7 @@ function liveForm(body: HTMLElement) {
       form.requestSubmit()
     }
   })
-  const submit = button("docwiki-ask-submit", "Ask", "ask-submit")
+  const submit = button("docwiki-ask-submit", t.ask.askButton, "ask-submit")
   submit.type = "submit"
   submit.disabled = liveRun !== null
   const status = element("p", "docwiki-ask-live-status")
@@ -325,19 +338,14 @@ function liveForm(body: HTMLElement) {
   status.setAttribute("aria-live", "polite")
   status.tabIndex = -1
   status.dataset.focusKey = "live-status"
-  if (liveRun) status.textContent = waitingLabel((Date.now() - liveRun.started) / 1000)
+  if (liveRun) status.textContent = waitingLabel((Date.now() - liveRun.started) / 1000, t)
   form.append(label, input, submit, status)
   if (liveMessage) {
     const problem = element("p", "docwiki-ask-live-error", liveMessage)
     problem.setAttribute("role", "alert")
     form.append(problem)
   }
-  const hint = element(
-    "p",
-    "docwiki-ask-hint",
-    "Live answers are checked against the sources before they are shown. " +
-      "The owner has not reviewed them.",
-  )
+  const hint = element("p", "docwiki-ask-hint", t.ask.hint)
   hint.id = HINT_ID
   form.append(hint)
   form.addEventListener("submit", (event) => {
@@ -400,7 +408,9 @@ function onAskEvent(event: Event) {
 
 function waiting() {
   const status = document.querySelector<HTMLElement>(`#${PANEL_ID} .docwiki-ask-live-status`)
-  if (status && liveRun) status.textContent = waitingLabel((Date.now() - liveRun.started) / 1000)
+  if (status && liveRun) {
+    status.textContent = waitingLabel((Date.now() - liveRun.started) / 1000, clientStrings())
+  }
 }
 
 type LiveOutcome = { answer: AskAnswer } | { message: string }
@@ -438,7 +448,7 @@ async function pollLive(run: LiveRun) {
     const target = relativeHref(currentSlug(), `${LIVE_ASK_PATH}/${run.jobId}`)
     const response = await fetch(target, { credentials: "same-origin", cache: "no-store" })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    const result = parseLivePoll(await response.json())
+    const result = parseLivePoll(await response.json(), clientStrings())
     run.failures = 0
     if (result.state === "running") {
       waiting()
@@ -451,14 +461,14 @@ async function pollLive(run: LiveRun) {
   } catch (error) {
     console.error("DocWiki: the live answer could not be read", error)
     run.failures += 1
-    if (run.failures >= 3) endLive(run, { message: LIVE_FAILED })
+    if (run.failures >= 3) endLive(run, { message: clientStrings().ask.liveFailed })
     else run.timer = window.setTimeout(() => void pollLive(run), LIVE_POLL_MS)
   }
 }
 
 async function startLive() {
   if (liveRun) return
-  const checked = liveQuestion(liveDraft)
+  const checked = liveQuestion(liveDraft, clientStrings())
   if ("error" in checked) {
     liveMessage = checked.error
     paint("ask-input")
@@ -483,13 +493,13 @@ async function startLive() {
     })
     const payload = await response.json().catch((): unknown => null)
     if (!response.ok) {
-      endLive(run, { message: refusalMessage(payload) })
+      endLive(run, { message: refusalMessage(payload, clientStrings()) })
       return
     }
     run.jobId = parseJobId(payload)
   } catch (error) {
     console.error("DocWiki: the question could not be sent", error)
-    endLive(run, { message: LIVE_FAILED })
+    endLive(run, { message: clientStrings().ask.liveFailed })
     return
   }
   run.timer = window.setTimeout(() => void pollLive(run), LIVE_POLL_MS)
@@ -507,7 +517,7 @@ function citeMark(
     return mark
   }
   const anchor = link(slug, entry.href, `[${n}]`, focusKey)
-  const label = `Source ${n}: ${entry.title} — ${entry.label}`
+  const label = clientStrings().ask.source(n, entry.title, entry.label)
   anchor.setAttribute("aria-label", label)
   anchor.title = label
   mark.append(anchor)
@@ -518,11 +528,12 @@ function sourceItem(entry: AskCitation, slug: string): HTMLLIElement {
   const item = element("li")
   item.append(link(slug, entry.href, citationText(entry), `source:${entry.n}`))
   if (entry.badge) {
-    const badge = badgeForText(entry.badge)
+    const marker = badgeForText(entry.badge)
+    const badge = marker ? shownBadge(marker, clientStrings()) : undefined
     const chip = element(
       "span",
       badge ? `docwiki-badge docwiki-badge--${badge.kind}` : "docwiki-badge",
-      entry.badge,
+      badge ? badge.text : entry.badge,
     )
     if (badge) chip.title = badge.meaning
     item.append(" ", chip)
@@ -548,8 +559,9 @@ function wikiPages(item: AskAnswer): [string, string][] {
 
 function answerView(body: HTMLElement, answer: AskAnswer, slug: string) {
   // Sources are numbered in the order the answer first cites them.
+  const t = clientStrings()
   const item = renumberCitations(answer)
-  const back = button("docwiki-ask-back", "Back to questions", "back")
+  const back = button("docwiki-ask-back", t.ask.back, "back")
   back.dataset.askAction = "back"
   const article = element("article", "docwiki-ask-answer")
   const question = element("h3", "docwiki-ask-question-title", item.question)
@@ -590,7 +602,7 @@ function answerView(body: HTMLElement, answer: AskAnswer, slug: string) {
   article.append(text)
   const pages = wikiPages(item)
   if (pages.length > 0) {
-    article.append(element("h4", "docwiki-ask-sources-title", "Pages in the wiki"))
+    article.append(element("h4", "docwiki-ask-sources-title", t.ask.pagesInWiki))
     const list = element("ul", "docwiki-ask-sources docwiki-ask-pages")
     for (const [page, title] of pages) {
       const entry = element("li")
@@ -600,14 +612,14 @@ function answerView(body: HTMLElement, answer: AskAnswer, slug: string) {
     article.append(list)
   }
   if (item.citations.length > 0) {
-    article.append(element("h4", "docwiki-ask-sources-title", "Sources"))
+    article.append(element("h4", "docwiki-ask-sources-title", t.ask.sources))
     const sources = element("ul", "docwiki-ask-sources")
     for (const entry of item.citations) sources.append(sourceItem(entry, slug))
     article.append(sources)
   }
   if (item.steps.length > 0) {
     const details = element("details", "docwiki-ask-steps")
-    const summary = element("summary", undefined, stepsLabel(item.steps.length))
+    const summary = element("summary", undefined, stepsLabel(item.steps.length, t))
     summary.dataset.focusKey = "steps"
     const steps = element("ol")
     for (const step of item.steps) steps.append(element("li", undefined, step))
@@ -615,11 +627,11 @@ function answerView(body: HTMLElement, answer: AskAnswer, slug: string) {
     article.append(details)
   }
   const meta = element("div", "docwiki-ask-meta")
-  const line = provenanceLine(item)
+  const line = provenanceLine(item, t)
   if (line) meta.append(element("p", "docwiki-ask-provenance", line))
   if (!item.live) {
     const open = element("p", "docwiki-ask-open")
-    open.append(link(slug, item.slug, "Open as a page", "page"))
+    open.append(link(slug, item.slug, t.ask.openAsPage, "page"))
     meta.append(open)
   }
   article.append(meta)
@@ -639,20 +651,21 @@ function fill(body: HTMLElement, state: AskState) {
   if (liveEnabled) liveForm(body)
   // A build without filed answers has no answers.json: only the live questions are left.
   if (answers || filedCount === 0) {
-    questionList(body, answers ?? [], slug)
+    questionList(body, answers ?? [], baseSlug())
     body.scrollTop = state.scroll
     return
   }
   if (failed) {
-    const message = element("p", "docwiki-ask-status", "The answers could not be loaded.")
+    const t = clientStrings().ask
+    const message = element("p", "docwiki-ask-status", t.loadFailed)
     message.setAttribute("role", "alert")
-    const retry = button("docwiki-ask-retry", "Try again", "retry")
+    const retry = button("docwiki-ask-retry", t.tryAgain, "retry")
     retry.dataset.askAction = "retry"
     body.append(message, retry)
     return
   }
   body.setAttribute("aria-busy", "true")
-  const status = element("p", "docwiki-ask-status", "Loading answers…")
+  const status = element("p", "docwiki-ask-status", clientStrings().ask.loading)
   status.setAttribute("role", "status")
   body.append(status)
   loadAnswers(slug).then(
@@ -685,7 +698,7 @@ function focusOn(panel: HTMLElement, key: string) {
 function syncFab(fab: HTMLButtonElement, state: AskState) {
   fab.setAttribute("aria-expanded", state.open ? "true" : "false")
   const label = fab.querySelector(".docwiki-ask-fab-label")
-  if (label) label.textContent = fabLabel(state)
+  if (label) label.textContent = fabLabel(state, clientStrings())
 }
 
 /** Show the drawer as the stored state says, then move the focus to `focusKey` (if any). */
