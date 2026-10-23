@@ -37,8 +37,9 @@ Goals:
 - G5. Expose the wiki through an MCP server used by two Foundry prompt agents and by local agents.
 - G6. Detect contradictions and supersession between documents; respect sensitivity tiers.
 - G7. Prove quality with a golden set and baselines; publish honest, reproducible numbers.
-- G8. Ship a public sample (fictional French construction company: one client, one chantier)
-  browsable on Azure Container Apps.
+- G8. Ship a public sample (fictional French general contractor with several chantiers at
+  different phases and the company's own documents; v1.7, ADR 0011) browsable on Azure Container
+  Apps.
 
 Non-goals (v1): multi-tenant SaaS, private networking, real-time collaborative editing, audio/video
 beyond transcripts, vector database by default, replacing enterprise search.
