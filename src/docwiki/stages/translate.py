@@ -14,8 +14,11 @@ canonical language, ``wiki/<path>``) and gets an English mirror under ``wiki/en/
   are translated; the title, names, aliases, ids, numbers and every other field are copied;
 * a deterministic check (:func:`check_translation`) compares each segment with its translation:
   placeholders, numbers, dates, document numbers, amounts and locked terms must be identical
-  and no banned rendering of a locked term may appear. A rejected translation is retried once
-  with the problems listed; when it fails again the page is kept untranslated, with the
+  and no banned rendering of a locked term may appear. A locked term the model wrote as its
+  own word where its placeholder was is put back as the placeholder first
+  (:func:`repair_terms`). The rejected segments only are asked again once, with their problems
+  listed (one segment per call when the model merged or dropped segments of a batch); when one
+  fails again the page is kept untranslated, with the
   :func:`~docwiki.contracts.i18n.untranslated_marker` line and a run warning (gate G17 warns);
 * the result is cached in the artifact store under
   ``cache_key("translate", [content hash, target language, locked-terms digest],
@@ -77,13 +80,14 @@ __all__ = [
     "language_name",
     "plan_page",
     "relocate_page",
+    "repair_terms",
     "rewrite_links",
     "translate_plan",
     "translation_digest",
     "unrelocate_text",
 ]
 
-STAGE_VERSION = "3"
+STAGE_VERSION = "4"
 PROMPT_VERSION = load_prompt("translate").version
 SCHEMA_NAME = "translate_page"
 TRANSLATED_TYPES = frozenset({"source", "entity", "topic"})
@@ -327,18 +331,24 @@ def plan_page(page: Page, pack: DomainPack, target_lang: str) -> PagePlan:
 # -- the preservation check -----------------------------------------------------------------
 
 
-def _locked_counts(text: str, forms: Sequence[tuple[str, re.Pattern[str]]]) -> Counter[str]:
-    """Occurrences of each locked term (any of its forms, longest first, no overlap)."""
-    counts: Counter[str] = Counter()
-    taken: list[tuple[int, int]] = []
+def _locked_spans(
+    text: str, forms: Sequence[tuple[str, re.Pattern[str]]]
+) -> list[tuple[int, int, str]]:
+    """``(start, end, term)`` of each locked term written in ``text`` (any of its forms, longest
+    first, no overlap), in text order."""
+    taken: list[tuple[int, int, str]] = []
     for term, pattern in forms:
         for match in pattern.finditer(text):
-            span = match.span()
-            if any(span[0] < end and start < span[1] for start, end in taken):
+            start, end = match.span()
+            if any(start < other_end and other_start < end for other_start, other_end, _ in taken):
                 continue
-            taken.append(span)
-            counts[term] += 1
-    return counts
+            taken.append((start, end, term))
+    return sorted(taken)
+
+
+def _locked_counts(text: str, forms: Sequence[tuple[str, re.Pattern[str]]]) -> Counter[str]:
+    """Occurrences of each locked term (any of its forms, longest first, no overlap)."""
+    return Counter(term for _, _, term in _locked_spans(text, forms))
 
 
 def _whole_word(text: str) -> re.Pattern[str]:
@@ -416,7 +426,10 @@ def check_translation(source: str, translated: str, vocabulary: Vocabulary) -> l
             changed = sorted(set(before_terms) ^ set(after_terms)) or sorted(
                 term for term in before_terms if before_terms[term] != after_terms[term]
             )
-            problems.append(f"locked terms changed: {', '.join(changed)}")
+            problems.append(
+                f"locked terms changed: {', '.join(changed)} (keep each term placeholder exactly "
+                "once and never write these words yourself)"
+            )
     for term, rendering, pattern in vocabulary.banned:
         if len(pattern.findall(translated)) > len(pattern.findall(source)):
             problems.append(
@@ -429,6 +442,35 @@ def check_translation(source: str, translated: str, vocabulary: Vocabulary) -> l
     if detect_injection(translated) and not detect_injection(source):
         problems.append("the translation addresses an AI system")
     return problems
+
+
+def repair_terms(segment: Segment, translated: str, vocabulary: Vocabulary) -> str:
+    """``translated`` with each locked term the model wrote as its own word (any written form
+    of that term, case-insensitive, whole words) where the term's placeholder is missing put
+    back as that placeholder, in order.
+
+    A locked term is never translated, so writing its word instead of its placeholder changes
+    nothing on the page; the repair only lets :func:`check_translation` see the placeholder.
+    A missing placeholder replaced by anything else (another word, another term) is left
+    missing and still rejected, and a term's word with no missing placeholder of that term
+    (an English "a lot of") is left as written and still rejected.
+    """
+    missing: dict[str, list[int]] = {}
+    present = Counter(_PLACEHOLDER_RE.findall(translated))
+    for index, term in enumerate(segment.terms, start=1):
+        if term is not None and not present[str(index)]:
+            missing.setdefault(term, []).append(index)
+    if not missing:
+        return translated
+    parts: list[str] = []
+    position = 0
+    for start, end, term in _locked_spans(translated, vocabulary.forms):
+        queue = missing.get(term)
+        if not queue:
+            continue
+        parts += [translated[position:start], f"⟦{queue.pop(0)}⟧"]
+        position = end
+    return "".join(parts) + translated[position:]
 
 
 # -- the model call --------------------------------------------------------------------------
@@ -584,38 +626,55 @@ async def _translate_batch(
 async def translate_plan(
     llm: LlmClient, plan: PagePlan, pack: DomainPack, vocabulary: Vocabulary | None = None
 ) -> TranslationResult:
-    """Translate every segment of ``plan``; retry once, then keep the page untranslated."""
+    """Translate every segment of ``plan``; retry the rejected segments once, then keep the
+    page untranslated.
+
+    The first attempt sends the segments in batches. A segment whose translation passes
+    :func:`check_translation` (after :func:`repair_terms`) is kept; only the rejected ones are
+    sent again, with their own problems listed. When a whole batch failed (the model call
+    failed, or it merged, dropped, added or reordered segments) none of its translations is
+    trusted and its segments are retried one per call. The page is ``translated`` only when
+    every segment passed.
+    """
     vocabulary = vocabulary or Vocabulary.of(pack)
     result = TranslationResult(texts={})
     if not plan.segments:
         return result
+    accepted: dict[str, str] = {}
     pending = list(plan.segments)
-    problems: list[str] = []
+    problems: dict[str, list[str]] = {}
+    alone: set[str] = set()  # segments of a batch that failed as a whole: one per call
     for _attempt in range(2):
-        previous = problems[:30]
-        texts: dict[str, str] = {}
-        problems = []
-        for batch in _batches(pending):
-            got, found = await _translate_batch(llm, plan, batch, pack, previous)
+        batches = _batches([s for s in pending if s.id not in alone])
+        batches += [[segment] for segment in pending if segment.id in alone]
+        failed: dict[str, list[str]] = {}
+        alone = set()
+        for batch in batches:
+            previous = [f"{s.id}: {item}" for s in batch for item in problems.get(s.id, ())]
+            got, found = await _translate_batch(llm, plan, batch, pack, previous[:30])
             result.calls += 1
-            texts.update(got)
-            problems += found
-        for segment in pending:
-            translated = texts.get(segment.id)
-            if translated is None:
-                problems.append(f"{segment.id}: no translation")
+            if found:  # the batch failed as a whole
+                failed.update({segment.id: list(found) for segment in batch})
+                alone.update(segment.id for segment in batch)
                 continue
-            problems += [
-                f"{segment.id}: {problem}"
-                for problem in check_translation(segment.text, translated, vocabulary)
-            ]
-        if not problems:
-            result.texts = {segment.id: texts[segment.id] for segment in plan.segments}
+            for segment in batch:
+                translated = repair_terms(segment, got[segment.id], vocabulary)
+                rejected = check_translation(segment.text, translated, vocabulary)
+                if rejected:
+                    failed[segment.id] = rejected
+                else:
+                    accepted[segment.id] = translated
+        if not failed:
+            result.texts = {segment.id: accepted[segment.id] for segment in plan.segments}
             result.status = "translated"
             return result
+        pending = [segment for segment in plan.segments if segment.id in failed]
+        problems = failed
     result.texts = {segment.id: segment.text for segment in plan.segments}
     result.status = "untranslated"
-    result.problems = problems
+    result.problems = [
+        f"{segment.id}: {item}" for segment in pending for item in problems[segment.id]
+    ]
     return result
 
 
