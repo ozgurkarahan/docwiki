@@ -1,0 +1,47 @@
+# Locked trade vocabulary of the batiment pack (v1.7, ADR 0012). These French terms carry a
+# precise trade or legal meaning that an English word would change: the wiki keeps them in French,
+# exactly as written, and gives the English gloss in brackets the first time each appears on a
+# page. The compile, entity and topic prompts receive this list; the verify gate G16 fails a page
+# that renders a term with one of its banned English equivalents.
+terms:
+  - term: réception
+    forms: [réception des travaux, PV de réception]
+    gloss: formal acceptance of the works by the client, the legal act that records the réserves and starts the guarantee periods
+    banned: [handover, hand-over, handed over]
+  - term: conducteur de travaux
+    forms: [conductrice de travaux]
+    gloss: works manager, who runs the job for the contractor (schedule, purchases, site meetings)
+    banned: [site manager]
+  - term: chef de chantier
+    gloss: site foreman, who leads the crews on site day to day
+  - term: chef d'équipe
+    gloss: team leader of one trade's crew on site
+  - term: retenue de garantie
+    gloss: retention guarantee, a share of the price held back until the réserves are lifted
+  - term: avenant
+    forms: [avenant n°1]
+    gloss: contract amendment; every clause it does not change stays in force
+  - term: situation
+    forms: [situation de travaux]
+    gloss: progress payment application, the statement of the works done to date
+  - term: OS
+    forms: [ordre de service]
+    gloss: service order, a written instruction to start or change the works
+  - term: PV
+    forms: [procès-verbal]
+    gloss: formal record signed by the parties
+  - term: réserves
+    gloss: defects or missing items recorded at réception or on a delivery note, to be put right
+  - term: DOE
+    forms: [dossier des ouvrages exécutés]
+    gloss: as-built records file given to the client after réception
+  - term: PPSPS
+    gloss: the contractor's site-specific health and safety plan
+  - term: lot
+    gloss: numbered work package of a contract or a quote
+  - term: DPGF
+    forms: [décomposition du prix global et forfaitaire]
+    gloss: priced breakdown of a lump-sum price
+  - term: CCAP
+    forms: [cahier des clauses administratives particulières]
+    gloss: special administrative conditions of a contract

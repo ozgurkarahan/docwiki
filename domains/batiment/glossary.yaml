@@ -49,7 +49,7 @@ terms:
     synonyms: {fr: [échéancier, échéancier de paiement, échéancier de règlement], en: [schedule of payments]}
     see_also: [topic:payments-deposit-and-retention]
   - term: retention
-    definition: A share of the contract price held back by the client as a guarantee that defects noted at handover are put right, and released after an agreed period.
+    definition: A share of the contract price held back by the client as a guarantee that the réserves recorded at réception are put right, and released after an agreed period.
     synonyms: {fr: [retenue de garantie], en: [retention money, holdback]}
     see_also: [topic:payments-deposit-and-retention]
   - term: progress payment application
@@ -82,13 +82,16 @@ terms:
     definition: A trade supplier that sells and delivers building materials to contractors.
     synonyms: {fr: [négoce de matériaux, négociant en matériaux], en: [building materials supplier]}
     see_also: [organisation:zava-materiaux, topic:materials-deliveries-and-invoices]
-  - term: site manager
-    definition: The contractor's manager who organises a job, its schedule, purchases and site meetings.
-    synonyms: {fr: [conducteur de travaux, conductrice de travaux], en: [works manager]}
+  - term: conducteur de travaux
+    definition: The contractor's works manager, who runs a job, its schedule, purchases and site meetings (a locked term, kept in French).
+    synonyms: {fr: [conductrice de travaux], en: [works manager]}
     see_also: [person:ines-roux]
-  - term: foreman
-    definition: The leader of a team of workers on site.
-    synonyms: {fr: [chef d'équipe, chef de chantier], en: [team leader]}
+  - term: chef de chantier
+    definition: The site foreman, who leads the crews on site day to day (a locked term, kept in French).
+    synonyms: {en: [site foreman]}
+  - term: chef d'équipe
+    definition: The team leader of one trade's crew on site (a locked term, kept in French).
+    synonyms: {en: [team leader, foreman]}
     see_also: [person:mathis-ancelin]
 
   # --- purchasing and documents -----------------------------------------------------------------
@@ -146,9 +149,9 @@ terms:
     definition: The time allowed to carry out the works, from the start date to the planned completion.
     synonyms: {fr: [délai d'exécution, délais, délai], en: [contract period, completion time]}
     see_also: [topic:schedule-and-window-delivery]
-  - term: handover
-    definition: The formal acceptance of the works by the client, with or without reserves; it starts the guarantee periods and usually triggers the last payments.
-    synonyms: {fr: [réception des travaux], en: [acceptance of the works, practical completion]}
+  - term: réception
+    definition: The formal acceptance of the works by the client, with or without réserves; the legal act that starts the guarantee periods and usually triggers the last payments (a locked term, kept in French).
+    synonyms: {fr: [réception des travaux, PV de réception], en: [acceptance of the works]}
     see_also: [topic:schedule-and-window-delivery, topic:payments-deposit-and-retention]
   - term: weathertight
     definition: The stage at which a building is closed against the weather, with its roof covered and its openings closed.

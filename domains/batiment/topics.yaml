@@ -20,8 +20,8 @@ topics:
     title: Schedule and window delivery
     description: >-
       The works schedule, task dates and progress, the delivery date of the windows and its
-      postponement, and the planned completion and handover dates.
-    keywords: [schedule, scheduled, planning, rescheduled, delivery date, new delivery date, window delivery, delivery of the windows, windows delivery, windows, postponed, postponement, postpone, delay, delayed, shortage, new date, start date, completion date, planned completion, handover date]
+      postponement, and the planned completion and réception dates.
+    keywords: [schedule, scheduled, planning, rescheduled, delivery date, new delivery date, window delivery, delivery of the windows, windows delivery, windows, postponed, postponement, postpone, delay, delayed, shortage, new date, start date, completion date, planned completion, réception, réception date]
     aliases:
       - {text: livraison des menuiseries, lang: fr}
       - {text: report de livraison, lang: fr}

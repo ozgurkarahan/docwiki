@@ -64,7 +64,7 @@ from docwiki.contracts.proposals import (
 )
 from docwiki.contracts.safety import detect_injection
 from docwiki.domain import DomainPack
-from docwiki.domain.models import RegistryEntry
+from docwiki.domain.models import RegistryEntry, locked_terms_note
 from docwiki.domain.rules import normalize_for_matching
 from docwiki.engine_types import Classification, CompiledResult, VerifiedCitation
 from docwiki.llm import LlmClient, LlmError, StructuredResult
@@ -365,6 +365,9 @@ def _context(
     lines.append(f"Entity types for unknown_entities: {types}")
     terms = ", ".join(term.term for term in pack.glossary.terms) or "none"
     lines.append(f"Glossary terms already defined: {terms}")
+    locked = locked_terms_note(pack)
+    if locked:
+        lines.append(locked)
     if pack.hints and pack.hints.strip():
         lines += ["Domain notes:", pack.hints.strip()]
     if hints and hints.strip():

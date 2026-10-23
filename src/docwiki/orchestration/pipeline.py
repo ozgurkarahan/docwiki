@@ -157,6 +157,7 @@ from docwiki.release.validate import CITATION_RE, validate_page
 from docwiki.release.writer import ReleaseWriter
 from docwiki.search.index import blocks_from_extracted
 from docwiki.stages.agentkit import build_agent_kit, write_agent_kit
+from docwiki.stages.amounts import format_page_amounts
 from docwiki.stages.discover import (
     PlanItem,
     SupersessionRecord,
@@ -1176,7 +1177,8 @@ class Pipeline:
         with stage_span("links", run_id=self.run_id):
             content = [*source_pages.values(), *entity_pages, *topic_pages, *query_pages]
             linked = apply_links(content, pack)
-            content = linked.pages
+            # Amounts the French trade way, 2 390,00 € HT (prose only; quotes stay verbatim).
+            content = [format_page_amounts(page) for page in linked.pages]
             self.clock.count("links", items=len(content))
         self.clock.finish("links")
 
