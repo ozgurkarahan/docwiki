@@ -73,8 +73,9 @@ the MCP server to validate proposal decisions),
 | glossary / log | `glossary` / `log` | `glossary.md` / `log.md` | — |
 | meta | `meta:agents`, `meta:quality`, `meta:runs/<run_id>`, `meta:<name>` | `AGENTS.md`, `_meta/quality.md`, `_meta/runs/<run_id>.md`, `_meta/<name>.md` | — |
 
-Common fields: `id, type, title, summary (one line), lang ("en"), sensitivity, updated (date),
-tags, docwiki{schema: 1, release}`. Rules enforced by the models: tags lower-case ASCII words
+Common fields: `id, type, title, summary (one line), lang, sensitivity, updated (date),
+tags, docwiki{schema: 1, release}`; mirror pages (v1.7) add `translation_of` (equal to `id`),
+written only on them. `lang` is a language code (`en` by default). Rules enforced by the models: tags lower-case ASCII words
 joined by `-`, `_` or `/`, sorted, unique; id lists (`sources, entities, topics, supersedes, superseded_by`) sorted and unique;
 `superseded` ⇒ `superseded_by` non-empty, `current` ⇒ empty; ids consistent with their fields.
 `provenance_mix` counts blocks per provenance.
@@ -332,7 +333,8 @@ Checks:
 | G12 | tag errors in frontmatter |
 | G13 | warning when more than `orphan_threshold` of pages (except `index.md`) have no inbound link outside backlinks blocks |
 | G14 | skill projections byte-identical, core skills present, `SkillFile` limits, no extra files |
-| G16 | with `locked_terms` (`{locked term: [banned renderings]}`): no page title or body line (except `_meta/quality.md`) contains a banned rendering as a whole word or phrase, case-insensitive, plural `s`/`es` allowed; blockquote lines and text between double quotes (straight, curly or guillemets) are not checked; code `banned-rendering` |
+| G16 | with `locked_terms` (`{locked term: [banned renderings]}`): no page title or body line (except `_meta/quality.md`) contains a banned rendering as a whole word or phrase, case-insensitive, plural `s`/`es` allowed; blockquote lines and text between double quotes (straight, curly or guillemets) are not checked; code `banned-rendering`; mirror pages included |
+| G17 | (v1.7) with more than one `wiki_languages` (manifest, else catalog): each canonical page of a mirrored type has `<lang>/<path>` with `translation_of` = its id (warning `mirror-missing`); a mirror starting with the untranslated marker warns (`mirror-untranslated`); a mirror without its canonical page is a G01 `mirror-orphan`; `lang` per tree is a G01 `page-lang` check |
 
 G04 (quote verification) and G15 (quarantine rate) need pipeline data and stay with the `verify`
 stage, which reports G16 as skipped without `locked_terms`. `gate_results(violations, skipped=…,
@@ -414,7 +416,8 @@ warnings and never fails on them). `dump_overlay(overlay)` gives stable YAML.
 7. **Slugs**: NFC before hashing ids; small transliteration table; collisions suffix every
    colliding source (order-independent) unless a previous assignment exists.
 8. **Frontmatter canon**: id lists sorted/unique; optional keys written as `null`; one-line
-   summary; `lang` fixed to `en`; source `topics` list only topic pages of the release.
+   summary; `lang` the canonical wiki language (v1.7; `en` by default); source `topics` list only
+   topic pages of the release.
 9. **Evidence frontmatter** adds `title`; evidence indexes use `type: evidence-index`.
 10. **Tables layout** in releases (§10) incl. snake_case column names and type inference.
 11. **search.db** additive `pages`/`page_refs` tables and BM25 ranking outside FTS5 (FTS5's own

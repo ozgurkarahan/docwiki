@@ -45,6 +45,16 @@ Evidence sidecars live next to the wiki in the release (`releases/<id>/evidence/
 with relative paths `../evidence/...` from pages (see evidence-contract.md). For the public sample,
 the build copies `evidence/` into the published site.
 
+**Languages (v1.7, ADR 0012).** When the domain pack declares `wiki_languages` (first =
+canonical), the layout above is the canonical wiki, written in the canonical language, and each
+other language has a **mirror** at `wiki/<lang>/` with the same relative layout and the same
+slugs (`wiki/en/topics/moreau/planning.md`) for every source, entity, topic, view, hub, index,
+glossary and log page. Mirror pages keep the canonical page's `id` and add `translation_of`; their
+links point to mirror pages (the same relative layout under `<lang>/`) and, for pages that are
+not mirrored (filed research answers, `AGENTS.md`, `_meta/`), to the canonical page; citations
+link the canonical, untranslated evidence (`../../evidence/...`). `<lang>` is a reserved folder
+name at the wiki root. Without `wiki_languages` the wiki is English and has no mirror.
+
 ## 2. Identifiers and slugs
 
 - `source_id`: `src-` + first 12 hex chars of `sha256(<raw relative POSIX path, lower-cased>)`.
@@ -73,7 +83,8 @@ Common fields (all pages):
 | `type` | enum | `source`, `entity`, `topic`, `hub` (v1.7), `view` (v1.7), `index`, `query`, `meta`, `glossary`, `log` |
 | `title` | string | Human title |
 | `summary` | string | 1–2 sentences, used by indexes and search |
-| `lang` | string | Always `en` for compiled pages (canonical language) |
+| `lang` | string | The page's language (v1.7): the canonical wiki language (`wiki_languages[0]`, `en` by default) on canonical pages, the mirror language on mirror pages; a filed research answer keeps the language it was filed in; meta pages are `en` |
+| `translation_of` | string | Mirror pages only (v1.7): the id of the canonical page they translate, equal to their own `id` |
 | `sensitivity` | enum | `public`, `internal`, `restricted` (highest of its sources) |
 | `updated` | date | Release date of last change |
 | `tags` | list[string] | Lower-case, de-duplicated, sorted |
@@ -140,6 +151,10 @@ Source page:
 
 Entity page: summary, `## Facts` (aggregated, cited), `## Timeline` (dated events, cited),
 `## Documents` (links to source pages), `## Related`, backlinks block, footnotes.
+
+Section headings, generated sentences and labels are written in the page's language from the
+string tables (v1.7, `docwiki.contracts.i18n`; English shown here, e.g. `## Faits clés` in a French
+wiki); code that recognises a generated section accepts its heading in every core language.
 
 Topic page: summary, `## Overview`, thematic sections (cited), `## Contradictions` (each item
 lists both claims with citations, authority and date, and the resolution rule applied; then, when
@@ -239,7 +254,9 @@ definitions, links, code and quoted text (`"…"`, `“…”`, `« … »`), i.
 - `llms.txt`: llmstxt.org format: `# <wiki title>`, `> <summary>`, then sections `## Start here`,
   `## Topics`, `## Entities`, `## Sources` with `- [Title](path.md): summary` lines (v1.7: with
   scopes, `## Start here` also links `<plural>/index.md`).
-- `catalog.json` (schema 1):
+- `catalog.json` (schema 1; v1.7: `wiki_languages` when the wiki has mirrors, every page with
+  its `lang`, mirror entries with `translation_of`; pages are unique by `(id, lang)`, edges and
+  `sources` are the canonical wiki's):
   ```json
   {"schema": 1, "release_id": "...", "audience": "public", "generated_at": "...",
    "pages": [{"id": "...", "type": "...", "path": "...", "title": "...", "summary": "...",

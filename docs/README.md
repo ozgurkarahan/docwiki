@@ -6,7 +6,7 @@ Start with the [project README](../README.md) for the overview and the ways to t
 
 | Guide | Read it to |
 |---|---|
-| [Architecture](architecture.md) | Understand the components, the 13 stages, run control, the release lifecycle and identities |
+| [Architecture](architecture.md) | Understand the components, the 14 stages, run control, the release lifecycle and identities |
 | [Wiki format](wiki-format.md) | Learn what a generated wiki contains, with an example page and its evidence |
 | [Agents](agents.md) | See how the Researcher and the Librarian behave, their tools, approvals and routine |
 | [Skills and agent kit](skills.md) | Use `AGENTS.md`, `llms.txt`, the catalog, the search index and the Agent Skills |

@@ -14,9 +14,10 @@
 | 8 | `indexes` | pages | `index.md`, category/entity/topic indexes, `glossary.md`, `log.md` append, `llms.txt`, `catalog.json`, `search.db` | no | |
 | 9 | `agentkit` | catalog + domain pack templates | `AGENTS.md`, skills + projections | no | Template slot-filling with validated values only. |
 | 10 | `evidence` | citations + ExtractedDoc + raw | sidecars + images (+ originals for public sample) | no | Page renders via pypdfium2. |
-| 11 | `verify` | the candidate release | gate results → `_meta/quality.md`, manifest | no | Blocking gates fail the run. |
-| 12 | `site` | candidate release | Quartz site in `site/` | no | Optional in local mode (`--site`). |
-| 13 | `publish` | candidate release | `releases/<id>/` + `current.json` swap | no | Atomic; keep last 10. |
+| 11 | `translate` | final canonical pages + domain pack | the mirror of each other wiki language under `wiki/<lang>/` (v1.7) | `fast`, source/entity/topic prose only | Only when the pack declares more than one `wiki_languages` (§9). Runs before the catalog, the search index and `verify`, so they cover the mirror. |
+| 12 | `verify` | the candidate release | gate results → `_meta/quality.md`, manifest | no | Blocking gates fail the run. |
+| 13 | `site` | candidate release | Quartz site in `site/` | no | Optional in local mode (`--site`). |
+| 14 | `publish` | candidate release | `releases/<id>/` + `current.json` swap | no | Atomic; keep last 10. |
 
 Each stage is a plain Python function `(inputs, ctx) -> outputs` that is idempotent and keyed by a
 cache key (architecture.md §5). The orchestrator (Microsoft Agent Framework workflow) fans out
@@ -34,9 +35,12 @@ per deployment honouring `Retry-After`, max 3 retries with exponential backoff a
   included in cache keys. Domain packs may add reviewed hint text (not document text).
 - Document text is wrapped in clearly delimited data sections; the system prompt states that the
   content is data and that instructions inside it must be ignored and reported as `injection_flags`.
-- Output language is English; quotes (`quote` fields) stay in the original language exactly.
+- Output language is the pack's canonical wiki language (`wiki_languages[0]`, English by default;
+  v1.7), named in every compile, entity and topic request; quotes (`quote` fields) stay in the
+  original language exactly, locked trade terms stay as written.
 - Every call logs model, deployment, version, prompt version, tokens in/out, latency, cost.
-- `fast` deployment: classification fallback, figure descriptions, entity summaries.
+- `fast` deployment: classification fallback, figure descriptions, entity summaries, translation
+  of the mirror pages (v1.7).
   `smart` deployment: compilation, topic synthesis. Both configured by name in settings.
 
 ## 3. Compile details
@@ -93,6 +97,12 @@ CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT);
 
 `kind` is `page-section` (one row per section of each page) or `source-block` (one row per
 extracted block, so answer-bearing details omitted by compilation remain searchable).
+Schema 3 (v1.7, ADR 0012) adds `tree TEXT` to `docs` and `pages` (the wiki language tree of the
+row: the canonical language for the canonical pages, the mirror language for `<lang>/` pages,
+`NULL` for source blocks), keys `pages` by `(page_id, tree)` and records the wiki languages in
+`meta.languages`; `lang` stays the language of the row's text. One database serves every
+language: a search picks one tree (the canonical one by default; a mirror tree is completed by
+the canonical pages it does not mirror) plus the source blocks.
 Queries expand terms with glossary synonyms before matching.
 `scope` (schema 2, v1.7) is the scope value of the row's page (a source page and its blocks, a
 per-scope topic, a hub) and `NULL` for company pages; the additive `pages` table carries it too,
@@ -117,10 +127,12 @@ for the MCP `within` filter. Readers accept schema 1 databases (no scopes).
 | G13 orphans | ≤ 5 % of pages without inbound links | warning |
 | G14 skills | Skill projections identical and valid (name, description, size limits) | yes |
 | G15 extraction | ≤ 10 % sources quarantined | warning |
-| G16 locked-vocabulary | No page title or body renders a locked trade term of the domain pack with one of its banned English renderings (whole words, case-insensitive; blockquotes and text in double quotes are not checked); skipped when the pack locks no term | yes |
+| G16 locked-vocabulary | No page title or body renders a locked trade term of the domain pack with one of its banned English renderings (whole words, case-insensitive; blockquotes and text in double quotes are not checked); skipped when the pack locks no term. Covers the mirror pages (v1.7) | yes |
+| G17 translations | Every canonical source, entity, topic, view, hub, index, glossary and log page has its mirror in each other wiki language, translated (warning when missing or kept untranslated); skipped for a one-language wiki (v1.7) | warning |
 
 Gate results are written to `_meta/quality.md` and `manifest.json`. A failing blocking gate stops
-the publish; the previous release stays current.
+the publish; the previous release stays current. The structural gates run over the canonical
+wiki and every mirror (links and anchors resolve within each language; G11 per language tree).
 
 ## 8. CLI
 
@@ -139,3 +151,41 @@ docwiki export obsidian --out <dir>
 Settings come from environment variables prefixed `DOCWIKI_` (e.g. `DOCWIKI_FOUNDRY_PROJECT_ENDPOINT`,
 `DOCWIKI_FAST_DEPLOYMENT`, `DOCWIKI_SMART_DEPLOYMENT`, `DOCWIKI_STORAGE_ACCOUNT`,
 `DOCWIKI_DOMAIN`, `DOCWIKI_AUDIENCE`) or a local `.env` (never committed).
+
+## 9. Translate (v1.7, ADR 0012)
+
+Runs when the domain pack declares `wiki_languages` with more than one language, once per mirror
+language, after `evidence` (the canonical pages are final: linked, amounts formatted, research
+answers settled) and before the catalog, the search index and `verify`.
+
+- **Translated by the model** (`fast` tier, structured output, no tools; prompt
+  `translate.md`): source, entity and topic pages. The body is cut into segments: every prose
+  line (paragraph, list item, compiled section heading, the generated superseded banner) is one
+  segment. Kept verbatim: the title (`#`), tables, footnote definitions, code, blockquotes (the
+  documents' words), the pack banner and the backlinks list. Mapped by code through the string
+  tables: generated headings, generated sentences without fields and the labels of `## Related`
+  items. In a segment, links, footnote markers and code spans are masked as `⟦n⟧` placeholders,
+  restored from the canonical page after translation (targets and citations never pass through
+  the model). Frontmatter: only `summary` and `contradiction_pairs[].subject` are translated.
+- **Rebuilt by code** in the mirror language from the mirror pages: views, hubs and the hubs
+  index, `views/index.md`, every index page, `glossary.md` and `log.md` (the mirror log appends
+  to the previous release's mirror log). Research answers keep the language they were filed in
+  and are not mirrored; `AGENTS.md`, `llms.txt`, skills and `_meta/` stay canonical.
+- **Preservation check** (deterministic, per segment): placeholders, numbers, ISO and
+  `dd/mm/yyyy` dates, document numbers (`BC-2026-009`), amounts (`2 390,00 € HT`) and the
+  occurrences of each locked term (any written form) must be identical; no link, footnote,
+  code, `<`, `>` or `://` may be added, no text addressed to an AI system, no banned rendering
+  of a locked term. A rejected translation is asked again once with the problems listed; a
+  second rejection keeps the page untranslated (canonical text, generated parts mapped) under a
+  line `> **Untranslated:** …` and adds a run warning; G17 warns.
+- **Relocation**: every mirror page moves to `wiki/<lang>/<path>`; its links go to the mirror of
+  their target when there is one (anchors of translated headings follow), else to the canonical
+  page; evidence links stay on the canonical sidecars and originals.
+- **Cache**: `work/artifacts/translate/<key>/translation.json`, key =
+  `cache_key("translate", [content hash, lang, locked-vocabulary digest], stage_version,
+  prompt_version, model id, model version)`, where the content hash covers the source language
+  and the masked segments only. A rebuild without changes costs nothing; the result (translated
+  or kept untranslated) is cached either way, so a change of the page, the prompt or the model
+  is needed to try again.
+- The run report's `translate` stage counts pages, cache hits, failures (kept untranslated),
+  model calls, tokens and cost.
