@@ -45,3 +45,30 @@ terms:
   - term: CCAP
     forms: [cahier des clauses administratives particulières]
     gloss: special administrative conditions of a contract
+  # --- added after the trade review (slice F) --------------------------------------------------
+  - term: acompte
+    forms: [acomptes]
+    gloss: payment on account, a share of the price paid before the works are finished (at signature or as the works progress)
+  - term: décennale
+    forms: [garantie décennale, responsabilité décennale, assurance décennale]
+    gloss: the builder's ten-year liability from the réception for defects that endanger the building or make it unfit for use, with its compulsory insurance
+  - term: maître d'ouvrage
+    forms: [maîtrise d'ouvrage]
+    gloss: the client who commissions and pays for the works (a household, a copropriété, a commune)
+  - term: maître d'œuvre
+    forms: [maître d'oeuvre, maîtrise d'œuvre, maîtrise d'oeuvre]
+    gloss: the designer who directs the works for the client, usually an architect (issues the ordres de service, checks the situations, organises the réception)
+  - term: levée des réserves
+    forms: [lever les réserves, réserve levée, réserves levées]
+    gloss: putting right the réserves recorded at réception and recording that each one is done
+  - term: hors d'eau
+    forms: [hors d'eau et hors d'air, mise hors d'eau]
+    gloss: weathertight stage, structure and roof finished so that rain no longer gets in (hors d'air adds the closed openings)
+  - term: acte d'engagement
+    gloss: the form a tenderer signs to commit to a public contract at the stated price and terms
+  - term: DC4
+    forms: [déclaration de sous-traitance]
+    gloss: the subcontracting declaration by which the maître d'ouvrage accepts a subcontractor and approves its payment terms
+  - term: OPR
+    forms: [opérations préalables à la réception]
+    gloss: the joint inspection before the réception, which lists the réserves

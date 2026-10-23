@@ -1,8 +1,17 @@
 # Sensitivity tiers of the batiment sample. Paths are relative to the input root (raw/), for
-# example "restricted/2026-02-02_etude-de-prix-interne.xlsx" when samples/corpus/full is the
-# input, or "full/restricted/..." when samples/corpus is. When several rules match, the highest
-# tier wins; a build for an audience leaves out every source above it.
+# example "chantiers/moreau/0-commercial/price-study/2026-02-02_etude-de-prix-interne.xlsx" when
+# samples/corpus/full is the input, or "full/chantiers/..." when samples/corpus is. When several
+# rules match, the highest tier wins; a build for an audience leaves out every source above it.
+#
+# The restricted documents are the internal price study of a chantier and the company's margin
+# dashboard. With the layout of scopes.yaml their doc type is a folder of their path, so the path
+# rules make them restricted before classification (the sensitivity floor decides whether a
+# public build may skip a file without reading it); the doc-type rules cover the same documents
+# filed elsewhere, and any folder named restricted stays restricted.
 default: public
 rules:
   - {tier: restricted, path_glob: "**/restricted/**"}
+  - {tier: restricted, path_glob: "**/price-study/**"}
+  - {tier: restricted, path_glob: "**/margin-dashboard/**"}
   - {tier: restricted, doc_type: price-study}
+  - {tier: restricted, doc_type: margin-dashboard}

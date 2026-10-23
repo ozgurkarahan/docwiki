@@ -5,15 +5,53 @@
 # facts of the compiled wiki on entity pages (`en`); they also expand search queries. Matching
 # ignores case and accents (not the "œ" ligature: both spellings are listed) and needs whole
 # words. Window marks shorter than three characters (F1, F2) only match inside longer aliases.
+#
+# Since slice F (ADR 0011) the `chantier` type describes each scope value of scopes.yaml (its key
+# is the chantier code, its attributes feed the hub page); subcontractors and the maître d'œuvre
+# have their own types, apart from the other organisations (so Adatum's id is
+# sous-traitant:adatum-electricite). Work packages are the lots of the Moreau quote: their aliases
+# name the lot titles only, never a bare "lot N", which every chantier uses. The commercial
+# documents stay one type (contractual and purchasing documents together): splitting it would
+# change the ids of the existing entries.
 types:
-  - {key: organisation, title: Organisations, description: "The contractor, the client household and the third parties of the job."}
-  - {key: person, title: People, description: "People named in the job file, with their organisation and role."}
-  - {key: work-package, title: Work packages, description: "The lots of the quote, which structure prices, the schedule and who does the work."}
-  - {key: building-element, title: Building elements, description: "Parts of the building that the documents follow individually: openings, windows and the slab."}
-  - {key: material, title: Materials, description: "Articles supplied by the builders' merchant, with their article codes."}
-  - {key: commercial-document, title: Commercial documents, description: "The quote, the works contract and its amendment, the schedule, purchase orders, invoices and delivery notes, as other documents cite them."}
+  - {key: chantier, title: Chantiers, description: "The company's chantiers: client, contract type, phase, maître d'œuvre and conducteur de travaux of each one."}
+  - {key: organisation, title: Organisations, description: "The contractor, its clients and its suppliers."}
+  - {key: sous-traitant, title: Sous-traitants, description: "Subcontractors of the company, with the chantiers they work on."}
+  - {key: maitre-d-oeuvre, title: Maîtres d'œuvre, description: "Architects and designers who direct the works for a maître d'ouvrage."}
+  - {key: person, title: People, description: "People named in the company files, with their organisation and role."}
+  - {key: work-package, title: Work packages, description: "The lots of the Moreau quote, which structure its prices, its schedule and who does the work."}
+  - {key: building-element, title: Building elements, description: "Parts of the buildings that the documents follow individually: openings, windows, doors and the slab."}
+  - {key: material, title: Materials, description: "Articles supplied by the builders' merchant, with their article codes and framework prices."}
+  - {key: materiel, title: Matériel, description: "The company's equipment, with its assignment and its periodic inspections."}
+  - {key: reserve, title: Réserves, description: "The réserves recorded at a réception, with their lifting status."}
+  - {key: situation, title: Situations, description: "Progress payment applications (situations) of the chantiers and of the subcontractors."}
+  - {key: commercial-document, title: Commercial documents, description: "Quotes and DPGF, contracts, amendments and service orders, schedules, purchase orders, supplier and client invoices and delivery notes, as other documents cite them."}
 
 registry:
+  # --- chantiers (scopes.yaml) -----------------------------------------------------------------
+  - type: chantier
+    key: moreau
+    label: Chantier Moreau
+    aliases:
+      - {text: chantier Moreau, lang: fr}
+      - {text: Moreau site, lang: en}
+    attributes: {code: moreau, phase: "3", phase_title: exécution, contract_type: particulier, client: Famille Moreau, maitre_d_oeuvre: aucun, conducteur: Inès Roux, address: "12 chemin des Vergers, Valbrise", object: "Extension de plain-pied de 30 m² et rénovation de la cuisine"}
+  - type: chantier
+    key: nacrines
+    label: Chantier résidence Les Nacrines
+    aliases:
+      - {text: résidence Les Nacrines, lang: fr}
+      - {text: Les Nacrines, lang: fr}
+    attributes: {code: nacrines, phase: "4", phase_title: réception, contract_type: privé, client: Syndicat des copropriétaires de la résidence Les Nacrines (syndic Proseware Gestion), maitre_d_oeuvre: Atelier Fabrikam, conducteur: Yohan Delbreil, address: "8 avenue des Glycines, Valbrise", object: "Ravalement avec isolation thermique par l'extérieur et menuiseries des parties communes"}
+  - type: chantier
+    key: ecole-montferrine
+    label: Chantier école de Montferrine
+    aliases:
+      - {text: école élémentaire du Bourg, lang: fr}
+      - {text: école du Bourg, lang: fr}
+      - {text: école de Montferrine, lang: fr}
+    attributes: {code: ecole-montferrine, phase: "2", phase_title: préparation, contract_type: public, client: Commune de Montferrine, maitre_d_oeuvre: services techniques de la commune, conducteur: Inès Roux, address: "rue de l'École, Montferrine", object: "Rénovation énergétique de l'école élémentaire du Bourg"}
+
   # --- organisations ---------------------------------------------------------------------------
   - type: organisation
     key: lamna-batiment
@@ -42,11 +80,44 @@ registry:
       - {text: VanArsdel, lang: fr}
     attributes: {role: window maker}
   - type: organisation
+    key: proseware-gestion
+    label: Proseware Gestion
+    aliases:
+      - {text: Proseware, lang: fr}
+    attributes: {role: syndic de copropriété, chantiers: nacrines}
+  - type: organisation
+    key: syndicat-nacrines
+    label: Syndicat des copropriétaires de la résidence Les Nacrines
+    aliases:
+      - {text: syndicat des copropriétaires, lang: fr}
+    attributes: {role: maître d'ouvrage (copropriété), chantiers: nacrines}
+  - type: organisation
+    key: commune-montferrine
+    label: Commune de Montferrine
+    aliases:
+      - {text: commune de Montferrine, lang: fr}
+      - {text: Montferrine, lang: fr}
+    attributes: {role: maître d'ouvrage public, chantiers: ecole-montferrine}
+
+  # --- subcontractors and maître d'œuvre -------------------------------------------------------
+  - type: sous-traitant
     key: adatum-electricite
     label: Adatum Électricité
     aliases:
       - {text: Adatum, lang: fr}
-    attributes: {role: electrical subcontractor}
+    attributes: {role: electrical subcontractor, chantiers: "moreau, nacrines, ecole-montferrine"}
+  - type: sous-traitant
+    key: litware-plomberie
+    label: Litware Plomberie
+    aliases:
+      - {text: Litware, lang: fr}
+    attributes: {role: plumbing subcontractor, chantiers: ecole-montferrine}
+  - type: maitre-d-oeuvre
+    key: atelier-fabrikam
+    label: Atelier Fabrikam
+    aliases:
+      - {text: Fabrikam, lang: fr}
+    attributes: {role: "architecte, maître d'œuvre", chantiers: nacrines}
 
   # --- people ----------------------------------------------------------------------------------
   - type: person
@@ -106,73 +177,130 @@ registry:
       - {text: D. Pradère, lang: fr}
       - {text: M. Pradère, lang: fr}
     attributes: {organisation: adatum-electricite, role: électricien}
+  - type: person
+    key: yohan-delbreil
+    label: Yohan Delbreil
+    aliases:
+      - {text: Y. Delbreil, lang: fr}
+      - {text: M. Delbreil, lang: fr}
+    attributes: {organisation: lamna-batiment, role: conducteur de travaux}
+  - type: person
+    key: sebastien-quintard
+    label: Sébastien Quintard
+    aliases:
+      - {text: S. Quintard, lang: fr}
+      - {text: chef d'équipe façade, lang: fr}
+    attributes: {organisation: lamna-batiment, role: chef d'équipe façade}
+  - type: person
+    key: kevin-rabaste
+    label: Kévin Rabaste
+    aliases:
+      - {text: K. Rabaste, lang: fr}
+    attributes: {organisation: lamna-batiment, role: maçon}
+  - type: person
+    key: nordine-saadaoui
+    label: Nordine Saadaoui
+    aliases:
+      - {text: N. Saadaoui, lang: fr}
+    attributes: {organisation: lamna-batiment, role: façadier}
+  - type: person
+    key: anthony-lescoffier
+    label: Anthony Lescoffier
+    aliases:
+      - {text: A. Lescoffier, lang: fr}
+    attributes: {organisation: lamna-batiment, role: plaquiste}
+  - type: person
+    key: maelle-tournadre
+    label: Maëlle Tournadre
+    aliases:
+      - {text: M. Tournadre, lang: fr}
+    attributes: {organisation: lamna-batiment, role: assistante administrative et comptable}
+  - type: person
+    key: patrice-ollivro
+    label: Patrice Ollivro
+    aliases:
+      - {text: M. Ollivro, lang: fr}
+    attributes: {organisation: zava-materiaux, role: directeur d'agence}
+  - type: person
+    key: clarisse-monfreuil
+    label: Clarisse Monfreuil
+    aliases:
+      - {text: C. Monfreuil, lang: fr}
+      - {text: Mme Monfreuil, lang: fr}
+    attributes: {organisation: proseware-gestion, role: gestionnaire de copropriété}
+  - type: person
+    key: helene-vasseroux
+    label: Hélène Vasseroux
+    aliases:
+      - {text: H. Vasseroux, lang: fr}
+      - {text: Mme Vasseroux, lang: fr}
+    attributes: {organisation: atelier-fabrikam, role: architecte}
+  - type: person
+    key: agnes-vautrelle
+    label: Agnès Vautrelle
+    aliases:
+      - {text: A. Vautrelle, lang: fr}
+      - {text: Mme Vautrelle, lang: fr}
+    attributes: {organisation: commune-montferrine, role: directrice générale des services}
 
   # --- work packages (lots of the quote) -------------------------------------------------------
   - type: work-package
     key: lot-1-installation-de-chantier
     label: Lot 1 - Installation de chantier
     aliases:
-      - {text: lot 1, lang: fr}
       - {text: installation de chantier, lang: fr}
       - {text: site setup, lang: en}
-    attributes: {lot: 1}
+    attributes: {lot: 1, chantier: moreau}
   - type: work-package
     key: lot-2-terrassement-et-fondations
     label: Lot 2 - Terrassement et fondations
     aliases:
-      - {text: lot 2, lang: fr}
       - {text: terrassement et fondations, lang: fr}
       - {text: earthworks and foundations, lang: en}
-    attributes: {lot: 2}
+    attributes: {lot: 2, chantier: moreau}
   - type: work-package
     key: lot-3-gros-oeuvre
     label: Lot 3 - Gros œuvre
     aliases:
-      - {text: lot 3, lang: fr}
       - {text: gros œuvre, lang: fr}
       - {text: gros oeuvre, lang: fr}
       - {text: structural work, lang: en}
-    attributes: {lot: 3}
+    attributes: {lot: 3, chantier: moreau}
   - type: work-package
     key: lot-4-charpente-et-couverture
     label: Lot 4 - Charpente et couverture
     aliases:
-      - {text: lot 4, lang: fr}
       - {text: charpente et couverture, lang: fr}
       - {text: roof structure and roofing, lang: en}
-    attributes: {lot: 4}
+    attributes: {lot: 4, chantier: moreau}
   - type: work-package
     key: lot-5-menuiseries-exterieures
     label: Lot 5 - Menuiseries extérieures
     aliases:
-      - {text: lot 5, lang: fr}
       - {text: menuiseries extérieures, lang: fr}
       - {text: exterior joinery, lang: en}
-    attributes: {lot: 5}
+    attributes: {lot: 5, chantier: moreau}
   - type: work-package
     key: lot-6-electricite-extension
     label: Lot 6 - Électricité de l'extension
     aliases:
-      - {text: lot 6, lang: fr}
       - {text: électricité de l'extension, lang: fr}
       - {text: electrical work of the extension, lang: en}
-    attributes: {lot: 6}
+    attributes: {lot: 6, chantier: moreau}
   - type: work-package
     key: lot-7-second-oeuvre-extension
     label: Lot 7 - Second œuvre de l'extension
     aliases:
-      - {text: lot 7, lang: fr}
       - {text: second œuvre de l'extension, lang: fr}
       - {text: second oeuvre de l'extension, lang: fr}
       - {text: interior finishing of the extension, lang: en}
-    attributes: {lot: 7}
+    attributes: {lot: 7, chantier: moreau}
   - type: work-package
     key: lot-8-renovation-cuisine
     label: Lot 8 - Rénovation de la cuisine
     aliases:
-      - {text: lot 8, lang: fr}
       - {text: rénovation de la cuisine, lang: fr}
-    attributes: {lot: 8}
+    attributes: {lot: 8, chantier: moreau}
 
   # --- building elements -----------------------------------------------------------------------
   - type: building-element
@@ -220,6 +348,39 @@ registry:
       - {text: dalle, lang: fr}
       - {text: dallage, lang: fr}
       - {text: slab, lang: en}
+  - type: building-element
+    key: fenetres-cages-nacrines
+    label: Fenêtres aluminium des cages d'escalier C1 à C12 (résidence Les Nacrines)
+    aliases:
+      - {text: fenêtres aluminium des cages d'escalier, lang: fr}
+      - {text: C1 à C12, lang: fr}
+      - {text: stairwell windows, lang: en}
+    attributes: {marks: C1 à C12, chantier: nacrines, order: BC-2026-005}
+  - type: building-element
+    key: portes-halls-nacrines
+    label: Portes d'entrée aluminium des halls A et B (résidence Les Nacrines)
+    aliases:
+      - {text: portes d'entrée aluminium, lang: fr}
+      - {text: portes d'entrée des halls, lang: fr}
+      - {text: hall doors, lang: en}
+    attributes: {chantier: nacrines, order: BC-2026-005}
+  - type: building-element
+    key: nez-de-balcons-nacrines
+    label: Nez de balcons (résidence Les Nacrines)
+    aliases:
+      - {text: nez de balcons, lang: fr}
+      - {text: nez de balcon, lang: fr}
+      - {text: balcony noses, lang: en}
+    attributes: {chantier: nacrines, count: 18}
+  - type: building-element
+    key: fenetres-ecole
+    label: Fenêtres aluminium E1 à E16 (école élémentaire du Bourg)
+    aliases:
+      - {text: repères E1 à E16, lang: fr}
+      - {text: E1 à E16, lang: fr}
+      - {text: fenêtres aluminium double vitrage, lang: fr}
+      - {text: school windows, lang: en}
+    attributes: {marks: E1 à E16, chantier: ecole-montferrine, order: BC-2026-021}
 
   # --- materials (articles of the builders' merchant) -----------------------------------------
   - type: material
@@ -267,6 +428,200 @@ registry:
       - {text: fenêtre de toit 78 x 98, lang: fr}
       - {text: roof window 78 x 98, lang: en}
     attributes: {code: ZM-61078, sale_unit: u}
+  - type: material
+    key: zm-52140
+    label: Panneau isolant polystyrène expansé graphité ép. 140 mm (ZM-52140)
+    aliases:
+      - {text: ZM-52140, lang: fr}
+      - {text: panneau isolant polystyrène expansé, lang: fr}
+      - {text: insulation boards, lang: en}
+    attributes: {code: ZM-52140, sale_unit: m², framework_net_price_ht: "21,40"}
+  - type: material
+    key: zm-52610
+    label: Mortier-colle et sous-enduit pour isolant (ZM-52610)
+    aliases:
+      - {text: ZM-52610, lang: fr}
+      - {text: mortier-colle, lang: fr}
+    attributes: {code: ZM-52610, sale_unit: sac de 25 kg, framework_net_price_ht: "14,60"}
+  - type: material
+    key: zm-52730
+    label: Treillis d'armature en fibre de verre (ZM-52730)
+    aliases:
+      - {text: ZM-52730, lang: fr}
+      - {text: treillis d'armature, lang: fr}
+      - {text: reinforcing mesh, lang: en}
+    attributes: {code: ZM-52730, sale_unit: rouleau de 50 m², framework_net_price_ht: "68,00"}
+  - type: material
+    key: zm-52815
+    label: Cheville à frapper pour isolant (ZM-52815)
+    aliases:
+      - {text: ZM-52815, lang: fr}
+      - {text: cheville à frapper, lang: fr}
+    attributes: {code: ZM-52815, sale_unit: boîte de 200, framework_net_price_ht: "46,50"}
+  - type: material
+    key: zm-53220
+    label: Enduit de finition taloché (ZM-53220)
+    aliases:
+      - {text: ZM-53220, lang: fr}
+      - {text: enduit de finition taloché, lang: fr}
+    attributes: {code: ZM-53220, sale_unit: seau de 25 kg, framework_net_price_ht: "38,90"}
+  - type: material
+    key: zm-53410
+    label: Profilé de départ aluminium 140 mm (ZM-53410)
+    aliases:
+      - {text: ZM-53410, lang: fr}
+      - {text: profilé de départ, lang: fr}
+      - {text: starter track, lang: en}
+    attributes: {code: ZM-53410, sale_unit: "barre de 2,50 m", framework_net_price_ht: "18,20"}
+  - type: material
+    key: zm-55120
+    label: Plaque de plâtre standard 2,50 x 1,20 m (ZM-55120)
+    aliases:
+      - {text: ZM-55120, lang: fr}
+      - {text: plaque de plâtre standard, lang: fr}
+    attributes: {code: ZM-55120, sale_unit: u, framework_net_price_ht: "7,85"}
+  - type: material
+    key: zm-55310
+    label: Laine de verre en rouleau ép. 200 mm (ZM-55310)
+    aliases:
+      - {text: ZM-55310, lang: fr}
+      - {text: laine de verre en rouleau, lang: fr}
+    attributes: {code: ZM-55310, sale_unit: m², framework_net_price_ht: "6,40"}
+
+  # --- matériel (equipment register) -----------------------------------------------------------
+  - type: materiel
+    key: mat-01
+    label: Bétonnière électrique 350 l (MAT-01)
+    aliases:
+      - {text: MAT-01, lang: fr}
+      - {text: bétonnière, lang: fr}
+    attributes: {code: MAT-01, inspection: non soumis}
+  - type: materiel
+    key: mat-02
+    label: Mini-pelle 2,5 t (MAT-02)
+    aliases:
+      - {text: MAT-02, lang: fr}
+      - {text: mini-pelle, lang: fr}
+    attributes: {code: MAT-02, inspection: VGP annuelle, next_inspection: "2026-11-18"}
+  - type: materiel
+    key: mat-03
+    label: Échafaudage de façade multidirectionnel (MAT-03)
+    aliases:
+      - {text: MAT-03, lang: fr}
+      - {text: échafaudage de façade, lang: fr}
+    attributes: {code: MAT-03, inspection: trimestrielle, next_inspection: "2026-06-20"}
+  - type: materiel
+    key: mat-04
+    label: Nacelle élévatrice articulée 12 m (MAT-04)
+    aliases:
+      - {text: MAT-04, lang: fr}
+      - {text: nacelle élévatrice, lang: fr}
+      - {text: articulated boom lift, lang: en}
+    attributes: {code: MAT-04, inspection: VGP semestrielle, next_inspection: "2026-03-22"}
+  - type: materiel
+    key: mat-05
+    label: Monte-matériaux 200 kg (MAT-05)
+    aliases:
+      - {text: MAT-05, lang: fr}
+      - {text: monte-matériaux, lang: fr}
+    attributes: {code: MAT-05, inspection: VGP annuelle, next_inspection: "2026-12-03"}
+  - type: materiel
+    key: mat-06
+    label: Camion benne 3,5 t avec grue auxiliaire (MAT-06)
+    aliases:
+      - {text: MAT-06, lang: fr}
+      - {text: grue auxiliaire, lang: fr}
+    attributes: {code: MAT-06, inspection: VGP annuelle, next_inspection: "2026-10-14"}
+  - type: materiel
+    key: mat-07
+    label: Échafaudage roulant 6 m (MAT-07)
+    aliases:
+      - {text: MAT-07, lang: fr}
+      - {text: échafaudage roulant, lang: fr}
+    attributes: {code: MAT-07, inspection: trimestrielle, next_inspection: "2026-05-27"}
+  - type: materiel
+    key: mat-08
+    label: Scie de sol thermique (MAT-08)
+    aliases:
+      - {text: MAT-08, lang: fr}
+      - {text: scie de sol, lang: fr}
+    attributes: {code: MAT-08, inspection: non soumis}
+
+  # --- réserves of the résidence Les Nacrines ---------------------------------------------------
+  - type: reserve
+    key: nacrines-r01
+    label: Réserve R01 - Façade nord, faïençage de l'enduit (résidence Les Nacrines)
+    aliases:
+      - {text: R01, lang: fr}
+    attributes: {chantier: nacrines, status: levée, lifted: "2026-04-08"}
+  - type: reserve
+    key: nacrines-r02
+    label: Réserve R02 - Façade ouest, nez de balcon du 3e étage (résidence Les Nacrines)
+    aliases:
+      - {text: R02, lang: fr}
+    attributes: {chantier: nacrines, status: non levée}
+  - type: reserve
+    key: nacrines-r03
+    label: Réserve R03 - Façade ouest, profilé de départ déformé (résidence Les Nacrines)
+    aliases:
+      - {text: R03, lang: fr}
+    attributes: {chantier: nacrines, status: levée, lifted: "2026-04-09"}
+  - type: reserve
+    key: nacrines-r04
+    label: Réserve R04 - Façade sud, joint de fractionnement (résidence Les Nacrines)
+    aliases:
+      - {text: R04, lang: fr}
+    attributes: {chantier: nacrines, status: levée, lifted: "2026-04-14"}
+  - type: reserve
+    key: nacrines-r05
+    label: Réserve R05 - Hall A, platine d'interphone (résidence Les Nacrines)
+    aliases:
+      - {text: R05, lang: fr}
+    attributes: {chantier: nacrines, status: levée, lifted: "2026-04-10"}
+  - type: reserve
+    key: nacrines-r06
+    label: Réserve R06 - Halls A et B, portes d'entrée non posées (résidence Les Nacrines)
+    aliases:
+      - {text: R06, lang: fr}
+    attributes: {chantier: nacrines, status: non levée}
+  - type: reserve
+    key: nacrines-r07
+    label: Réserve R07 - Hall A, traces de peinture (résidence Les Nacrines)
+    aliases:
+      - {text: R07, lang: fr}
+    attributes: {chantier: nacrines, status: non levée}
+
+  # --- situations ------------------------------------------------------------------------------
+  - type: situation
+    key: nacrines-n1
+    label: Situation n°1 du 31/12/2025 (résidence Les Nacrines)
+    aliases:
+      - {text: situation n°1, lang: fr}
+    attributes: {chantier: nacrines, invoice: FC-2025-118}
+  - type: situation
+    key: nacrines-n2
+    label: Situation n°2 du 30/01/2026 (résidence Les Nacrines)
+    aliases:
+      - {text: situation n°2, lang: fr}
+    attributes: {chantier: nacrines, invoice: FC-2026-004}
+  - type: situation
+    key: nacrines-n3
+    label: Situation n°3 du 27/02/2026 (résidence Les Nacrines)
+    aliases:
+      - {text: situation n°3, lang: fr}
+    attributes: {chantier: nacrines, invoice: FC-2026-013}
+  - type: situation
+    key: nacrines-n4
+    label: Situation n°4 du 31/03/2026 (résidence Les Nacrines)
+    aliases:
+      - {text: situation n°4, lang: fr}
+    attributes: {chantier: nacrines, invoice: FC-2026-022}
+  - type: situation
+    key: adatum-nacrines-n2
+    label: Situation de sous-traitance n°2 d'Adatum Électricité du 31/03/2026 (résidence Les Nacrines)
+    aliases:
+      - {text: situation de sous-traitance n°2, lang: fr}
+    attributes: {chantier: nacrines, subcontractor: adatum-electricite}
 
   # --- commercial documents (as other documents cite them) -------------------------------------
   - type: commercial-document
@@ -352,3 +707,105 @@ registry:
     aliases:
       - {text: BL-2026-0391, lang: fr}
     attributes: {kind: delivery note}
+  # résidence Les Nacrines
+  - type: commercial-document
+    key: marche-nacrines
+    label: Marché de travaux du 20/11/2025 (résidence Les Nacrines)
+    aliases:
+      - {text: marché de travaux du 20/11/2025, lang: fr}
+    attributes: {kind: works contract, chantier: nacrines}
+  - type: commercial-document
+    key: os-n1-nacrines
+    label: Ordre de service n°1 (résidence Les Nacrines)
+    aliases:
+      - {text: OS n°1, lang: fr}
+      - {text: ordre de service n°1, lang: fr}
+      - {text: service order no. 1, lang: en}
+    attributes: {kind: service order, chantier: nacrines}
+  - type: commercial-document
+    key: bc-2026-004
+    label: Bon de commande BC-2026-004
+    aliases:
+      - {text: BC-2026-004, lang: fr}
+    attributes: {kind: purchase order, chantier: nacrines}
+  - type: commercial-document
+    key: bc-2026-005
+    label: Bon de commande BC-2026-005
+    aliases:
+      - {text: BC-2026-005, lang: fr}
+    attributes: {kind: purchase order, chantier: nacrines}
+  - type: commercial-document
+    key: fa-2026-0158
+    label: Facture FA-2026-0158
+    aliases:
+      - {text: FA-2026-0158, lang: fr}
+    attributes: {kind: supplier invoice, chantier: nacrines}
+  - type: commercial-document
+    key: bl-2026-0244
+    label: Bon de livraison BL-2026-0244
+    aliases:
+      - {text: BL-2026-0244, lang: fr}
+    attributes: {kind: delivery note, chantier: nacrines}
+  # école de Montferrine
+  - type: commercial-document
+    key: dev-2026-031
+    label: DPGF DEV-2026-031
+    aliases:
+      - {text: DEV-2026-031, lang: fr}
+    attributes: {kind: DPGF, chantier: ecole-montferrine}
+  - type: commercial-document
+    key: acte-d-engagement-ecole
+    label: Acte d'engagement (école élémentaire du Bourg)
+    aliases:
+      - {text: acte d'engagement, lang: fr}
+    attributes: {kind: acte d'engagement, chantier: ecole-montferrine}
+  - type: commercial-document
+    key: pln-2026-007
+    label: Planning PLN-2026-007
+    aliases:
+      - {text: PLN-2026-007, lang: fr}
+    attributes: {kind: schedule, chantier: ecole-montferrine}
+  - type: commercial-document
+    key: bc-2026-021
+    label: Bon de commande BC-2026-021
+    aliases:
+      - {text: BC-2026-021, lang: fr}
+    attributes: {kind: purchase order, chantier: ecole-montferrine}
+  # company
+  - type: commercial-document
+    key: contrat-cadre-zava
+    label: Contrat-cadre d'approvisionnement 2026 (Zava Matériaux)
+    aliases:
+      - {text: contrat-cadre, lang: fr}
+      - {text: framework contract, lang: en}
+    attributes: {kind: framework contract}
+  - type: commercial-document
+    key: fc-2025-118
+    label: Facture client FC-2025-118
+    aliases:
+      - {text: FC-2025-118, lang: fr}
+    attributes: {kind: client invoice, chantier: nacrines}
+  - type: commercial-document
+    key: fc-2026-004
+    label: Facture client FC-2026-004
+    aliases:
+      - {text: FC-2026-004, lang: fr}
+    attributes: {kind: client invoice, chantier: nacrines}
+  - type: commercial-document
+    key: fc-2026-009
+    label: Facture client FC-2026-009
+    aliases:
+      - {text: FC-2026-009, lang: fr}
+    attributes: {kind: client invoice, chantier: moreau}
+  - type: commercial-document
+    key: fc-2026-013
+    label: Facture client FC-2026-013
+    aliases:
+      - {text: FC-2026-013, lang: fr}
+    attributes: {kind: client invoice, chantier: nacrines}
+  - type: commercial-document
+    key: fc-2026-022
+    label: Facture client FC-2026-022
+    aliases:
+      - {text: FC-2026-022, lang: fr}
+    attributes: {kind: client invoice, chantier: nacrines}

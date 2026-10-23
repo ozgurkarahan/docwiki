@@ -1,94 +1,149 @@
-# Closed topic catalog of the batiment pack (7 topics). Topics are routed on the compiled
-# ENGLISH text: every keyword or alias occurrence scores 3 in the title, 2 in a heading and 1 in
-# the body (case- and accent-insensitive, whole words). French aliases count when the English
-# text keeps the French term, as the compile hints ask. A source feeds a topic from `min_score`
-# (default 3) and a topic needs `min_sources` feeding sources (default 2). Keywords avoid words
-# that every document uses (indice, lot, VAT) so that each topic keeps its own sources.
+# Closed topic catalog of the batiment pack (9 topics). Since slice F (ADR 0011) the topics are
+# generic: six per-chantier topics (`per_scope: true`, written once per chantier that has sources
+# for them, at topics/<chantier>/<slug>.md) and three company topics. Topics are routed on the
+# compiled text: every keyword or alias occurrence scores 3 in the title, 2 in a heading and 1 in
+# the body (case- and accent-insensitive, whole words). French aliases count when the text keeps
+# the French term, as the compile hints ask. A source feeds a topic from `min_score` (default 3)
+# and a topic needs `min_sources` feeding sources (default 2). Keywords avoid words that every
+# document uses (indice, lot, VAT) so that each topic keeps its own sources.
 topics:
-  - slug: quotes-contract-and-amendment
-    title: Quotes, contract and amendment
+  # --- per chantier ----------------------------------------------------------------------------
+  - slug: marche-et-avenants
+    title: Marché & avenants
+    per_scope: true
     description: >-
-      The quote and its revisions, the signed works contract and its amendment: scope of the
-      works, prices excluding and including VAT, and the total contract amount.
-    keywords: [quote, quotes, quotation, estimate, revised quote, works contract, contract price, contract amount, contract total, total price, amendment, amendments, amended, scope of works, fixed price, lump-sum price]
+      The contract of the chantier and what changed it: the quote or DPGF and its revisions, the
+      signed works contract or acte d'engagement and CCAP, the avenants and ordres de service
+      with the client's change requests, the penalties, and the total contract amount.
+    keywords: [quote, quotes, revised quote, works contract, contract price, contract amount, contract total, total price, amendment, amendments, amended, service order, change request, change requests, additional works, scope of works, fixed price, lump-sum price, tender, penalties, delay penalties]
     aliases:
       - {text: devis, lang: fr}
       - {text: contrat de travaux, lang: fr}
+      - {text: marché de travaux, lang: fr}
       - {text: avenant, lang: fr}
+      - {text: ordre de service, lang: fr}
+      - {text: acte d'engagement, lang: fr}
+      - {text: DPGF, lang: fr}
+      - {text: CCAP, lang: fr}
+      - {text: travaux supplémentaires, lang: fr}
       - {text: prix global et forfaitaire, lang: fr}
-  - slug: schedule-and-window-delivery
-    title: Schedule and window delivery
+  - slug: planning
+    title: Planning
+    per_scope: true
     description: >-
-      The works schedule, task dates and progress, the delivery date of the windows and its
-      postponement, and the planned completion and réception dates.
-    keywords: [schedule, scheduled, planning, rescheduled, delivery date, new delivery date, window delivery, delivery of the windows, windows delivery, windows, postponed, postponement, postpone, delay, delayed, shortage, new date, start date, completion date, planned completion, réception, réception date]
+      The schedule of the chantier: task dates and progress, deliveries and their
+      postponements, the planned completion and réception dates, and the contradictions between
+      a schedule and later information.
+    keywords: [schedule, scheduled, rescheduled, delivery date, new delivery date, window delivery, delivery of the windows, postponed, postponement, delay, delayed, shortage, new date, start date, completion date, planned completion, réception date, summer holidays]
     aliases:
+      - {text: planning, lang: fr}
       - {text: livraison des menuiseries, lang: fr}
       - {text: report de livraison, lang: fr}
       - {text: date de livraison, lang: fr}
       - {text: délai, lang: fr}
+      - {text: vacances scolaires, lang: fr}
     min_score: 2
-  - slug: materials-deliveries-and-invoices
-    title: Materials, deliveries and invoices
+  - slug: achats
+    title: Achats
+    per_scope: true
     description: >-
-      Materials ordered from the builders' merchant, purchase orders, deliveries and their
-      delivery notes, supplier invoices, the quantities billed and delivered, and the purchases
-      to date.
-    keywords: [invoice, invoices, invoiced, billed, delivery note, delivery notes, pallet, pallets, concrete block, concrete blocks, purchase order, purchase orders, purchases, materials, builders' merchant, mortar, lintel, missing]
+      Purchases for the chantier: purchase orders, deliveries and their delivery notes, supplier
+      invoices, the quantities billed and delivered, and the prices billed against the framework
+      prices.
+    keywords: [invoice, invoices, invoiced, billed, delivery note, delivery notes, pallet, pallets, purchase order, purchase orders, purchases, materials, builders' merchant, missing, unit price, framework price]
     aliases:
       - {text: facture, lang: fr}
       - {text: bon de livraison, lang: fr}
-      - {text: palette, lang: fr}
-      - {text: palettes, lang: fr}
       - {text: bon de commande, lang: fr}
+      - {text: palettes, lang: fr}
       - {text: suivi des achats, lang: fr}
-      - {text: réserves, lang: fr}
-  - slug: client-change-requests
-    title: Client change requests
-    description: >-
-      Changes to the works requested by the clients, how they were priced in a quote revision or
-      a contract amendment, and their effect on the works.
-    keywords: [change request, change requests, requested change, requested changes, changes requested, requested by the client, requested by the clients, client request, client's request, clients' request, additional work, modification, modifications, roof window, exterior socket, outdoor socket, exterior light, outdoor light, exterior lighting, outdoor lighting, floor tiling, widened]
-    aliases:
-      - {text: demande de modification, lang: fr}
-      - {text: fenêtre de toit, lang: fr}
-      - {text: travaux supplémentaires, lang: fr}
     min_score: 2
-  - slug: payments-deposit-and-retention
-    title: Payments, deposit and retention
+  - slug: situations-et-paiements
+    title: Situations & paiements
+    per_scope: true
     description: >-
-      The payment schedule of the works contract, the deposit, the instalments, the retention
-      and its release, the payment of the amendment, and the payment terms of supplier invoices.
-    keywords: [payment schedule, payment, payments, paid, payable, deposit, deposits, instalment, instalments, installment, installments, retention, down payment, due date, payment terms]
+      What the client pays and when: the payment schedule or the monthly situations, the acompte,
+      the retenue de garantie withheld and its release, the amounts billed and left to bill.
+    keywords: [payment schedule, payment, payments, paid, payable, deposit, instalment, instalments, retention, progress payment, progress claim, billed to date, left to bill, net to pay, due date, payment terms]
     aliases:
+      - {text: situation, lang: fr}
+      - {text: situations, lang: fr}
       - {text: échéancier, lang: fr}
       - {text: acompte, lang: fr}
       - {text: retenue de garantie, lang: fr}
       - {text: paiement, lang: fr}
-      - {text: règlement, lang: fr}
     min_score: 2
-  - slug: site-progress-and-meetings
-    title: Site progress and meetings
+  - slug: reception-et-reserves
+    title: Réception & réserves
+    per_scope: true
     description: >-
-      Progress of the works on site, site meetings with their attendees, decisions and actions,
-      and the site photos.
-    keywords: [progress, completed, site meeting, site meetings, meeting minutes, minutes, decision, decisions, action, actions, attendees, site photo, site photos, photo, photograph, poured, blockwork]
+      The réception of the works: the opérations préalables, the PV de réception, the réserves
+      and their lifting, the deadline to lift them, and the guarantees that start at réception.
+    keywords: [acceptance, pre-acceptance inspection, snagging, defects, lifted, open réserves, lifting deadline, guarantee, ten-year liability]
+    aliases:
+      - {text: réception, lang: fr}
+      - {text: PV de réception, lang: fr}
+      - {text: réserves, lang: fr}
+      - {text: levée des réserves, lang: fr}
+      - {text: opérations préalables à la réception, lang: fr}
+      - {text: décennale, lang: fr}
+    min_score: 2
+  - slug: suivi-de-chantier
+    title: Suivi de chantier
+    per_scope: true
+    description: >-
+      Progress on site: site and preparation meetings with their attendees, decisions and
+      actions, and the site photos.
+    keywords: [progress, completed, site meeting, site meetings, preparation meeting, meeting minutes, minutes, decision, decisions, action, actions, attendees, site photo, site photos, photo, poured, blockwork]
     aliases:
       - {text: compte rendu de chantier, lang: fr}
       - {text: réunion de chantier, lang: fr}
+      - {text: réunion de préparation, lang: fr}
       - {text: avancement, lang: fr}
       - {text: photo de chantier, lang: fr}
     min_score: 2
-  - slug: kitchen-renovation
-    title: Kitchen renovation
+  # --- company ---------------------------------------------------------------------------------
+  - slug: fournisseurs-et-contrat-cadre
+    title: Fournisseurs & contrat-cadre
     description: >-
-      The renovation of the existing kitchen: scope and price, VAT rate, schedule of the kitchen
-      works and the related site decisions.
-    keywords: [kitchen, kitchen renovation, kitchen units, kitchen furniture, splashback, wall tiles, plumbing, water supply, kitchen floor]
+      The suppliers shared by the chantiers: the framework contract with the builders' merchant,
+      its 2026 net price list, the gaps between the prices billed and the framework prices, and
+      the window maker's deliveries across chantiers.
+    keywords: [framework contract, framework agreement, price list, net price, public price, credit note, supplier, suppliers, builders' merchant, window maker, aluminium shortage]
     aliases:
-      - {text: cuisine, lang: fr}
-      - {text: rénovation de la cuisine, lang: fr}
-      - {text: crédence, lang: fr}
-      - {text: faïence, lang: fr}
-      - {text: meubles de cuisine, lang: fr}
+      - {text: contrat-cadre, lang: fr}
+      - {text: tarif, lang: fr}
+      - {text: prix net, lang: fr}
+      - {text: avoir, lang: fr}
+      - {text: rupture d'approvisionnement, lang: fr}
+    min_score: 2
+  - slug: equipes-et-materiel
+    title: Équipes & matériel
+    description: >-
+      The company's people and equipment: the organisation chart, the crew schedule and its
+      double bookings, the equipment register and the periodic inspections, and the health and
+      safety plan.
+    keywords: [crew, crews, crew schedule, team, double booking, booked, organisation chart, equipment, equipment register, periodic inspection, inspection due, overdue, lifting platform, scaffolding, health and safety plan]
+    aliases:
+      - {text: planning des équipes, lang: fr}
+      - {text: organigramme, lang: fr}
+      - {text: registre du matériel, lang: fr}
+      - {text: vérification générale périodique, lang: fr}
+      - {text: VGP, lang: fr}
+      - {text: PPSPS, lang: fr}
+    min_score: 2
+  - slug: sous-traitance-et-conformite
+    title: Sous-traitance & conformité
+    description: >-
+      The subcontractors and their paperwork: subcontracts, subcontracting declarations (DC4)
+      and direct payment, the attestations register and the validity of each attestation de
+      vigilance at the date of a payment.
+    keywords: [subcontract, subcontractor, subcontractors, subcontracting, subcontracting declaration, direct payment, compliance, attestation, attestations, vigilance certificate, expired, valid until, reverse charge]
+    aliases:
+      - {text: sous-traitance, lang: fr}
+      - {text: sous-traitant, lang: fr}
+      - {text: DC4, lang: fr}
+      - {text: attestation de vigilance, lang: fr}
+      - {text: registre des attestations, lang: fr}
+      - {text: paiement direct, lang: fr}
     min_score: 2

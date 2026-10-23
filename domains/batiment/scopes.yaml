@@ -1,0 +1,25 @@
+# Scope dimension of the batiment pack (v1.7, ADR 0011): the chantier, read from the raw path
+# only, never from a model. The company files its documents as
+#   chantiers/<code>/<phase>-<name>/<doc type>/<file>   (one folder per chantier)
+#   entreprise/<doc type>/<file>                         (company-wide documents)
+# where <code> is the key of a `chantier` entity of entities.yaml, <phase> one of the six phases
+# below and <doc type> a doc type key of taxonomy.yaml. The regexes accept a leading folder (the
+# sample corpus is built from samples/corpus/full or samples/corpus); the first one that matches
+# decides, and a path no regex matches belongs to the default scope (entreprise). File names
+# carry no lot, so the pack declares no lot regex.
+name: chantier
+title: Chantier
+plural: chantiers
+default: {key: entreprise, title: Entreprise}
+paths:
+  - regex: '(?:^|/)chantiers/(?P<scope>[a-z0-9-]+)/(?P<phase>[0-5])-[a-z]+/(?P<type>[a-z0-9-]+)/[^/]+$'
+  - regex: '(?:^|/)chantiers/(?P<scope>[a-z0-9-]+)/(?P<phase>[0-5])-[a-z]+/'
+  - regex: '(?:^|/)chantiers/(?P<scope>[a-z0-9-]+)/'
+  - regex: '(?:^|/)entreprise/(?P<type>[a-z0-9-]+)/[^/]+$'
+phases:
+  - {key: "0", title: Commercial}
+  - {key: "1", title: Marché}
+  - {key: "2", title: Préparation}
+  - {key: "3", title: Exécution}
+  - {key: "4", title: Réception}
+  - {key: "5", title: Garantie}
