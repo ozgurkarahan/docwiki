@@ -64,7 +64,7 @@ __all__ = [
 SYSTEMS = ("docwiki-researcher", "baseline-rag", "baseline-long-context")
 RAG_PROMPT_VERSION = "baseline-rag-v1"
 LONG_CONTEXT_PROMPT_VERSION = "baseline-long-context-v1"
-DEFAULT_MAX_OUTPUT_TOKENS = 2000
+DEFAULT_MAX_OUTPUT_TOKENS = 6000  # reasoning tokens count against it
 
 
 class SystemNotConfigured(RuntimeError):

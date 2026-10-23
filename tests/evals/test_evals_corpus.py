@@ -316,6 +316,31 @@ def test_restricted_fingerprint(corpus: CorpusContext) -> None:
     assert corpus.fingerprint == {"3324.26", "34518.74", "zm-61078"}
 
 
+def test_a_total_computable_from_public_tables_is_not_restricted() -> None:
+    from types import SimpleNamespace
+
+    from evals.corpus import _column_totals
+
+    from docwiki.contracts.extracted import TableRow
+
+    table = Table(
+        id="t01",
+        locator=XlsxRowsLocator(sheet="Marchés", row_start=1, row_end=4),
+        provenance="deterministic-table",
+        columns=["Chantier", "Montant HT"],
+        rows=[
+            TableRow(row_id="r0002", cells=["A", "39 783,00"]),
+            TableRow(row_id="r0003", cells=["B", "184490"]),
+            TableRow(row_id="r0004", cells=["C", "87 440,00 €"]),
+        ],
+        artifact="tables/t01.parquet",
+    )
+
+    totals = _column_totals(SimpleNamespace(tables=[table]))  # type: ignore[arg-type]
+    assert "311713" in totals  # every row
+    assert "224273" in totals  # without the last row (often a printed total)
+
+
 # ---------------------------------------------------------------------------- catalog io
 
 
