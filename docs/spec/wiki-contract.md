@@ -88,6 +88,20 @@ Source pages add: `source_id`, `source_path` (raw relative path), `source_hash`,
 
 Entity pages add: `entity_type`, `key`, `aliases` (with language tags), `sources` (list of source ids).
 
+Scoped entities (v1.7, ADR 0011): when the pack declares scopes, a registry entry whose
+attributes name a value for the scope dimension (`chantier: moreau`) belongs to that scope.
+A source of another scope (the default scope included) does not mention it, even when the
+model or the name matching reported it: its entity page counts only the sources of its scope
+(`sources`, facts, timeline), and the source pages of other scopes do not list it in
+`entities` (nor the `mentions` edges). It is autolinked only on the pages of its scope (source
+pages by their document's scope, per-scope topics and hubs by their `scope`) and on the
+entity pages bound to the same scope; a page of another scope, or a company-wide page without
+scope, never links it, so an alias shared by entities of two scopes links the one of the
+page's scope. A per-scope topic's `## Related` and a hub's `## Entities` never list it from
+another scope; a company-wide topic lists what each of its sources mentions. Entries without
+that attribute, and every entry of a pack without scopes, are company-wide. This is decided
+on the rendered pages (entities, links and hubs stages), never in the compiled artifacts.
+
 Hub pages (v1.7, ADR 0011) add: `scope_type` (the pack's scope name, e.g. `chantier`), `scope`
 (the scope value) and `sources` (the scope's sources). Source pages add `scope`, `phase` and `lot`
 when the pack declares scopes; per-scope topic pages add `scope` (their id is
@@ -149,7 +163,8 @@ Hub page (v1.7, ADR 0011), built by code, no model and no footnotes (it links to
 ## Documents             (### Phase <key> <title> in pack order, then ### No phase; each source
                           with its status: current, or superseded by <links>)
 ## Topics                (the scope's per-scope topics and the company topics citing its sources)
-## Entities              (entity pages mentioned by its sources)
+## Entities              (entity pages mentioned by its sources; never an entity bound to
+                          another scope)
 ## Computed views        (only when the pack has views: those with rows for this scope, with the
                           count)
 ## Open contradictions   (its distinct open contradictions, from its per-scope topics'
@@ -174,6 +189,16 @@ cited rows computed with exact decimals, per scope when `per_scope`, then all ro
 not numbers are counted and left out), `## Sources` (footnotes). Only tables parsed
 deterministically and located by rows (XLSX sheets, CSV files, DOCX tables) take part. The source
 pages a view reads list it under `## Related` (`Computed view: …`).
+
+Amounts in prose (v1.7), formatted by code after linking on every content page and its
+`summary`: thousands grouped with a narrow no-break space, comma decimals, a no-break space before
+`€` and before `HT` / `TTC` (`2 390,00 € HT`). An amount is a number followed by `€`
+("excluding/including VAT" becomes `HT` / `TTC`), or a number written straight before `HT` or
+`TTC` with or without `€` (`2390 HT`, `4386.5 HT` → `2 390,00 € HT`, `4 386,50 € HT`, always with
+two decimals). Not an amount: a year without decimals or `€` (`tarif 2026 HT`), a lot, indice or
+n° (`lot 5 HT`), a document number or a date (`BC-2026-009`, `2026-03-16`), a percentage, a number
+with a thousands comma (`2,390`). Left verbatim: blockquotes, tables, footnote markers and
+definitions, links, code and quoted text (`"…"`, `“…”`, `« … »`), i.e. the documents' own words.
 
 ## 5. Links, anchors and citations
 

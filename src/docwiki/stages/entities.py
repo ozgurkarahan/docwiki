@@ -1,9 +1,10 @@
 """Entity pages (pipeline.md §1 stage 5, wiki-contract §3–4).
 
 One page per registry entity (pack + overlay) mentioned by at least one compiled source that has
-a source page. Facts are aggregated deterministically: the verified key facts whose text names
-the entity (label, aliases or key, case- and accent-insensitive, on word boundaries), de-duplicated
-across sources and ordered current sources first (authority, then title). Dated facts feed the
+a source page; an entity bound to one scope (v1.7) counts only the sources of that scope. Facts
+are aggregated deterministically: the verified key facts whose text names the entity (label,
+aliases or key, case- and accent-insensitive, on word boundaries), de-duplicated across sources
+and ordered current sources first (authority, then title). Dated facts feed the
 timeline. The optional introduction is written by the ``fast`` model from those facts only; each
 sentence must cite fact ids, unknown ids are dropped and quantities must appear in the cited facts.
 When that call fails for its request only (content filter, output invalid or truncated, see
@@ -24,10 +25,16 @@ from datetime import date
 from docwiki.contracts.enums import max_sensitivity
 from docwiki.contracts.ids import entity_page_path, normalize_tags
 from docwiki.contracts.markdown import relative_link
-from docwiki.contracts.pages import Alias, DocwikiStamp, EntityFrontmatter, Page
+from docwiki.contracts.pages import (
+    Alias,
+    DocwikiStamp,
+    EntityFrontmatter,
+    Page,
+    SourceFrontmatter,
+)
 from docwiki.domain import DomainPack
 from docwiki.domain.models import RegistryEntry, locked_terms_note
-from docwiki.domain.rules import normalize_for_matching
+from docwiki.domain.rules import document_scope, entity_in_scope, normalize_for_matching
 from docwiki.engine_types import CitedLocator, CompiledResult, VerifiedCitation
 from docwiki.llm import LlmClient, LlmError
 from docwiki.stages.classify import data_nonce
@@ -56,7 +63,7 @@ __all__ = [
     "fact_date",
 ]
 
-STAGE_VERSION = "1"
+STAGE_VERSION = "2"
 PROMPT_VERSION = load_prompt("entity-summary").version
 SCHEMA_NAME = "entity_summary"
 MAX_SUMMARY_FACTS = 40
@@ -378,6 +385,16 @@ def _render(
     return page, footnotes.cited_locators()
 
 
+def _source_scopes(source_pages: Mapping[str, Page], pack: DomainPack) -> dict[str, str | None]:
+    """Source id → scope value of its document (``None`` without ``scopes.yaml``)."""
+    scopes: dict[str, str | None] = {}
+    for page in source_pages.values():
+        fm = page.frontmatter
+        if isinstance(fm, SourceFrontmatter):
+            scopes[fm.source_id] = document_scope(pack, fm.scope, fm.source_path)
+    return scopes
+
+
 async def build_entity_pages(
     results: Sequence[CompiledResult],
     source_pages: Mapping[str, Page],
@@ -386,17 +403,23 @@ async def build_entity_pages(
     *,
     stamp: DocwikiStamp,
 ) -> tuple[list[Page], list[CitedLocator]]:
-    """Entity pages for every registry entity mentioned by a compiled source with a page."""
+    """Entity pages for every registry entity mentioned by a compiled source with a page.
+
+    An entity bound to one scope (its registry attribute named after the pack's scope dimension)
+    counts only the sources of that scope: a document of another scope that shares its names does
+    not mention it (v1.7, ADR 0011)."""
     infos = source_infos(source_pages, results)
     by_source = {result.source_id: result for result in results if result.source_id in infos}
     records = {source_id: fact_records(result) for source_id, result in by_source.items()}
     type_titles = {entity_type.key: entity_type.title for entity_type in pack.entities.types}
+    scopes = _source_scopes(source_pages, pack)
     jobs: list[tuple[RegistryEntry, list[str], list[_EntityFact]]] = []
     for entry in pack.entities.registry:
         sources = [
             source_id
             for source_id, result in sorted(by_source.items())
-            if any(mention.entity_id == entry.id for mention in result.compiled.entity_mentions)
+            if entity_in_scope(pack, entry, scopes.get(source_id))
+            and any(mention.entity_id == entry.id for mention in result.compiled.entity_mentions)
         ]
         if not sources:
             continue

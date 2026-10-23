@@ -156,7 +156,10 @@ outside an allowlist (the repository URL and the site's own host), and the injec
   evidence sidecars') are stacked cards: one card per row, each cell under its column's label
   (`data-label`, set by the DocWiki transformer from the header row). Wider, a table that overflows
   its column says "Scroll sideways →" above it and shows a shadow on its hidden side; a computed
-  view's tables are named after the view's title (`data-caption`).
+  view's tables are named after the view's title (`data-caption`). The home page's dashboard
+  stays stacked up to 1000 px (its five columns do not fit beside the sidebar between 801 and
+  1000 px). An ISO date in a data table's cell (`(2026-04-21)`) never wraps at its hyphens
+  (`docwiki-nowrap`).
 
 ## 10. Accessibility
 
@@ -195,7 +198,8 @@ source page and a topic page with the drawer open, at 1280×800 and 390×844, li
 - **Targets.** Every visible link, button, summary and input is at least 24 × 24 px, except links
   inside a sentence (WCAG 2.5.8's inline exception): navigation lists (explorer, table of
   contents, backlinks, breadcrumbs, tags), a link alone in its list item, paragraph or cell (the
-  transformer marks it `docwiki-target`), Quartz's theme and reader-mode buttons, footnote
+  transformer marks it `docwiki-target`; in a cell it is also at least 24 px wide, its text
+  centred, for one-digit links such as the dashboard's open-contradiction counts), Quartz's theme and reader-mode buttons, footnote
   references and back links, the drawer's citation markers (inline padding, which does not move
   the lines) and source lists. Main actions are 44 px on the phone: the tabs, Sign in, the story
   cards, "Try: …", the floating button, the drawer's close and Ask buttons, the menu button.

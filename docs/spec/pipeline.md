@@ -8,9 +8,9 @@
 | 2 | `extract` | raw file | ExtractedDoc + tables + figures | only figure descriptions (`fast`) | Adapter per mode; failures → `quarantined` with reason. |
 | 3 | `classify` | ExtractedDoc | `{doc_type, category, authority, doc_number, revision, lang, confidence, rule_id}` | `fast`, only when no rule matches | Closed enums from the domain pack; structured output. |
 | 4 | `compile` | ExtractedDoc + classification + domain hints | `CompiledSource` (title, summary, key facts with citations, sections, entity mentions, glossary candidates, injection flags) | `smart` | Map-reduce above the size threshold; citations verified (evidence-contract §4). |
-| 5 | `entities` | all CompiledSource + registry | `EntityPage` per registry entity with ≥ 1 mention | `fast` for summaries only | Facts aggregated deterministically; unknown entities → proposals. |
+| 5 | `entities` | all CompiledSource + registry | `EntityPage` per registry entity with ≥ 1 mention | `fast` for summaries only | Facts aggregated deterministically; unknown entities → proposals. An entity bound to one scope (v1.7, domain-and-corpus.md §1) counts only the sources of that scope. |
 | 6 | `topics` | CompiledSource sections + topic catalog | `TopicPage` per topic meeting the evidence threshold | `smart` | Contradictions and supersession sections; never across sensitivity tiers above audience. |
-| 7 | `links` | all pages + relationship catalog | links inserted, backlinks blocks, `edges` | no | Deterministic autolinking from the registry (first mention per section). |
+| 7 | `links` | all pages + relationship catalog | links inserted, backlinks blocks, `edges` | no | Deterministic autolinking from the registry (first mention per section); an entity bound to one scope is listed and autolinked only on the pages of that scope and on its own page (v1.7). Prose amounts formatted after linking (wiki-contract.md §4). |
 | 8 | `indexes` | pages | `index.md`, category/entity/topic indexes, `glossary.md`, `log.md` append, `llms.txt`, `catalog.json`, `search.db` | no | |
 | 9 | `agentkit` | catalog + domain pack templates | `AGENTS.md`, skills + projections | no | Template slot-filling with validated values only. |
 | 10 | `evidence` | citations + ExtractedDoc + raw | sidecars + images (+ originals for public sample) | no | Page renders via pypdfium2. |

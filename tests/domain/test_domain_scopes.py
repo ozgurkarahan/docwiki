@@ -16,7 +16,14 @@ from docwiki.contracts.ids import (
     topic_page_path,
 )
 from docwiki.domain.loader import PackValidationError, load_pack
-from docwiki.domain.rules import ScopeAxes, scope_axes
+from docwiki.domain.models import RegistryEntry
+from docwiki.domain.rules import (
+    ScopeAxes,
+    document_scope,
+    entity_in_scope,
+    entity_scope,
+    scope_axes,
+)
 from docwiki.stages.discover import SupersessionRecord, resolve_supersession
 
 MINI = Path(__file__).resolve().parent / "fixtures" / "mini-pack"
@@ -108,3 +115,36 @@ def test_hub_and_scoped_topic_ids() -> None:
     assert topic_page_path(format_topic_id("procedures")) == "topics/procedures.md"
     with pytest.raises(ValueError):
         parse_topic_id("topic:a/b/c")
+
+
+def test_an_entity_with_the_scope_attribute_belongs_to_that_scope(pack_dir: Path) -> None:
+    pack = load_pack(pack_dir)
+    lot = RegistryEntry(
+        type="work-package", key="lot-5", label="Lot 5", attributes={"lot": 5, "chantier": "ecole"}
+    )
+    shared = RegistryEntry(type="organisation", key="atelier", label="Atelier")
+    plural = RegistryEntry(
+        type="organisation", key="sous-traitant", label="S", attributes={"chantiers": "ecole"}
+    )
+    named = RegistryEntry(
+        type="building-element", key="baie", label="Baie", attributes={"chantier": "Ecole "}
+    )
+    assert entity_scope(pack, lot) == "ecole" and entity_scope(pack, named) == "ecole"
+    assert entity_scope(pack, shared) is None and entity_scope(pack, plural) is None
+    assert entity_in_scope(pack, lot, "ecole")
+    # another scope, the default scope and a page without scope do not mention it
+    for scope in ("residence", "entreprise", None):
+        assert not entity_in_scope(pack, lot, scope)
+        assert entity_in_scope(pack, shared, scope) and entity_in_scope(pack, plural, scope)
+    # the document's scope: the recorded one, else the one of its raw path
+    assert document_scope(pack, None, "chantiers/ecole/notes.txt") == "ecole"
+    assert document_scope(pack, "residence", "chantiers/ecole/notes.txt") == "residence"
+    assert document_scope(pack, None, "anything/else.pdf") == "entreprise"
+
+
+def test_without_scopes_every_entity_is_company_wide() -> None:
+    pack = load_pack(MINI)
+    lot = RegistryEntry(type="work-package", key="lot-5", label="L", attributes={"chantier": "x"})
+    assert entity_scope(pack, lot) is None
+    assert entity_in_scope(pack, lot, None) and entity_in_scope(pack, lot, "y")
+    assert document_scope(pack, None, "chantiers/x/notes.txt") is None

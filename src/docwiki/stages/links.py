@@ -14,6 +14,12 @@ For the content pages of a release (source, entity, topic and query pages) this 
    content pages that link to the page, sorted by title;
 6. derives the catalog edges of CONTRACT.md §6.
 
+An entity bound to one scope (v1.7, ADR 0011: its registry attribute named after the pack's scope
+dimension, ``chantier: moreau``) belongs to that scope only: a source page of another scope does
+not list it, and a page of another scope (or a company-wide page without scope) neither autolinks
+nor lists it; its own page and the pages of its scope do. This is decided here, on the rendered
+pages, so the compiled artifacts stay valid and the cached topic pages are reused.
+
 Running the stage twice gives the same pages: generated sections are stripped before they are
 rebuilt and an entity already linked in a section is not linked again.
 
@@ -50,7 +56,8 @@ from docwiki.contracts.pages import (
     ViewFrontmatter,
 )
 from docwiki.contracts.safety import sanitize_markdown
-from docwiki.domain.models import DomainPack
+from docwiki.domain.models import DomainPack, RegistryEntry
+from docwiki.domain.rules import document_scope, entity_in_scope, entity_scope
 
 __all__ = [
     "BACKLINKS_HEADING",
@@ -71,12 +78,13 @@ __all__ = [
     "plural",
     "reconcile_references",
     "replace_frontmatter",
+    "scope_source_entities",
     "singular",
     "strip_generated_sections",
     "type_label",
 ]
 
-STAGE_VERSION = "1"
+STAGE_VERSION = "2"
 RELATED_HEADING = "Related"
 BACKLINKS_HEADING = "Referenced by"
 SOURCES_HEADING = "Sources"
@@ -339,6 +347,51 @@ def ensure_superseded_banner(page: Page, pages_by_id: Mapping[str, Page]) -> Pag
     return Page(path=page.path, frontmatter=fm, body=_tidy(new_body))
 
 
+# -- scopes (v1.7, ADR 0011) ----------------------------------------------------------------
+
+
+class _Scopes:
+    """Which registry entities a page of a given scope may mention (see the module docstring)."""
+
+    def __init__(self, pack: DomainPack) -> None:
+        self.pack = pack
+        self.registry: dict[str, RegistryEntry] = {
+            entry.id: entry for entry in pack.entities.registry
+        }
+
+    def page_scope(self, page: Page) -> str | None:
+        """Scope of a content page: a source's document scope, a topic's scope, the scope an
+        entity is bound to; ``None`` (company-wide) otherwise or without ``scopes.yaml``."""
+        fm = page.frontmatter
+        if isinstance(fm, SourceFrontmatter):
+            return document_scope(self.pack, fm.scope, fm.source_path)
+        if isinstance(fm, TopicFrontmatter):
+            return fm.scope
+        if isinstance(fm, EntityFrontmatter):
+            entry = self.registry.get(fm.id)
+            return entity_scope(self.pack, entry) if entry is not None else None
+        return None
+
+    def allows(self, entity_id: str, scope: str | None) -> bool:
+        entry = self.registry.get(entity_id)
+        return entry is None or entity_in_scope(self.pack, entry, scope)
+
+
+def scope_source_entities(pages: Sequence[Page], pack: DomainPack) -> list[Page]:
+    """Source pages without the entities bound to another scope than their document's."""
+    scopes = _Scopes(pack)
+    result: list[Page] = []
+    for page in pages:
+        fm = page.frontmatter
+        if isinstance(fm, SourceFrontmatter) and fm.entities:
+            scope = scopes.page_scope(page)
+            kept = [entity_id for entity_id in fm.entities if scopes.allows(entity_id, scope)]
+            if kept != list(fm.entities):
+                page = replace_frontmatter(page, entities=kept)
+        result.append(page)
+    return result
+
+
 # -- autolinking --------------------------------------------------------------------------
 
 _PROTECTED_RE = re.compile(
@@ -507,9 +560,14 @@ def _page_links(page: Page, label: str, targets: Sequence[Page]) -> list[str]:
 
 
 def _related_lines(
-    page: Page, by_id: Mapping[str, Page], pack: DomainPack, views: Sequence[Page] = ()
+    page: Page,
+    by_id: Mapping[str, Page],
+    pack: DomainPack,
+    views: Sequence[Page] = (),
+    scopes: _Scopes | None = None,
 ) -> list[str]:
     fm = page.frontmatter
+    scopes = scopes or _Scopes(pack)
     lines: list[str] = []
     if isinstance(fm, SourceFrontmatter):
         entities = [by_id[entity_id] for entity_id in fm.entities if entity_id in by_id]
@@ -532,6 +590,7 @@ def _related_lines(
             for other in by_id.values()
             if isinstance(other.frontmatter, TopicFrontmatter)
             and sources & set(other.frontmatter.sources)
+            and (other.frontmatter.scope is None or scopes.allows(fm.id, other.frontmatter.scope))
         ]
         lines += _page_links(page, "Topic", topics)
     elif isinstance(fm, TopicFrontmatter):
@@ -540,6 +599,9 @@ def _related_lines(
             source = by_id.get(source_id)
             if source is not None and isinstance(source.frontmatter, SourceFrontmatter):
                 entity_ids.update(source.frontmatter.entities)
+        if fm.scope is not None:
+            # a topic of one scope never lists an entity bound to another scope
+            entity_ids = {item for item in entity_ids if scopes.allows(item, fm.scope)}
         entities = [by_id[entity_id] for entity_id in sorted(entity_ids) if entity_id in by_id]
         lines += _entity_lines(page, entities, pack)
     return lines
@@ -622,7 +684,10 @@ def apply_links(pages: Sequence[Page], pack: DomainPack, *, autolink: bool = Tru
     content_positions = [
         index for index, page in enumerate(pages) if page.frontmatter.type in CONTENT_TYPES
     ]
-    content = reconcile_references([pages[index] for index in content_positions])
+    # reconciled first: the entity pages' own source lists cannot bring a foreign entity back
+    content = scope_source_entities(
+        reconcile_references([pages[index] for index in content_positions]), pack
+    )
     content = [
         Page(path=page.path, frontmatter=page.frontmatter, body=strip_generated_sections(page.body))
         for page in content
@@ -630,8 +695,9 @@ def apply_links(pages: Sequence[Page], pack: DomainPack, *, autolink: bool = Tru
     content = link_source_references(content)
     by_id = {page.frontmatter.id: page for page in content}
     content = [ensure_superseded_banner(page, by_id) for page in content]
+    scopes = _Scopes(pack)
     if autolink:
-        registry = {entry.id: entry for entry in pack.entities.registry}
+        registry = scopes.registry
         targets: dict[str, tuple[str, list[str]]] = {}
         for page in content:
             fm = page.frontmatter
@@ -642,9 +708,24 @@ def apply_links(pages: Sequence[Page], pack: DomainPack, *, autolink: bool = Tru
             if entry is not None:
                 names += [entry.label, *(alias.text for alias in entry.aliases)]
             targets[fm.id] = (page.path, list(dict.fromkeys(names)))
-        linker = _Autolinker(targets)
+        # one linker per page scope, over the entities that scope may mention (an alias shared
+        # by entities of two scopes then links the right one); a single one without scopes
+        linkers: dict[str | None, _Autolinker] = {}
+
+        def linker_for(page: Page) -> _Autolinker:
+            scope = scopes.page_scope(page)
+            if scope not in linkers:
+                linkers[scope] = _Autolinker(
+                    {
+                        entity_id: target
+                        for entity_id, target in targets.items()
+                        if scopes.allows(entity_id, scope)
+                    }
+                )
+            return linkers[scope]
+
         content = [
-            autolink_page(page, linker) if page.frontmatter.type != "query" else page
+            autolink_page(page, linker_for(page)) if page.frontmatter.type != "query" else page
             for page in content
         ]
     by_id = {page.frontmatter.id: page for page in content}
@@ -652,7 +733,7 @@ def apply_links(pages: Sequence[Page], pack: DomainPack, *, autolink: bool = Tru
     views = [page for page in pages if isinstance(page.frontmatter, ViewFrontmatter)]
     with_related: list[Page] = []
     for page in content:
-        lines = _related_lines(page, by_id, pack, views)
+        lines = _related_lines(page, by_id, pack, views, scopes)
         if lines and page.frontmatter.type != "query":
             block = "\n".join([f"## {RELATED_HEADING}", "", *lines])
             page = Page(

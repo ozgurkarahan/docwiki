@@ -2464,61 +2464,72 @@ article .table-container.docwiki-scrolls {
 
 // Up to 800 px the wiki's data tables (the dashboard, the views, the hubs' details) are stacked
 // cards: one card per row, each cell under its column's label (data-label, set by the DocWiki
-// transformer). Evidence tables keep their grid and scroll.
+// transformer). Evidence tables keep their grid and scroll. The home page's dashboard stacks up
+// to 1000 px: between 801 and 1000 px its five columns would not fit beside the sidebar.
+@mixin docwiki-stacked-cards {
+  display: block;
+  width: 100%;
+  margin: 0.25rem 0 1rem;
+  padding: 0;
+
+  // Visually hidden, still read: the cells carry their labels.
+  thead {
+    display: block;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  tbody,
+  tr,
+  td {
+    display: block;
+    width: auto;
+    min-width: 0;
+  }
+
+  tr {
+    margin: 0 0 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--dw-border);
+    border-radius: 6px;
+
+    &:last-child {
+      border-bottom: 1px solid var(--dw-border);
+    }
+  }
+
+  td {
+    padding: 0.2rem 0;
+    text-align: left !important;
+    overflow-wrap: anywhere;
+  }
+
+  td:empty {
+    display: none;
+  }
+
+  td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.8rem;
+    font-weight: $semiBoldWeight;
+    color: var(--darkgray);
+  }
+}
+
 @media all and (max-width: 800px) {
   article .table-container > table.docwiki-cards {
-    display: block;
-    width: 100%;
-    margin: 0.25rem 0 1rem;
-    padding: 0;
+    @include docwiki-stacked-cards;
+  }
+}
 
-    // Visually hidden, still read: the cells carry their labels.
-    thead {
-      display: block;
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
-    }
-
-    tbody,
-    tr,
-    td {
-      display: block;
-      width: auto;
-      min-width: 0;
-    }
-
-    tr {
-      margin: 0 0 0.75rem;
-      padding: 0.5rem 0.75rem;
-      border: 1px solid var(--dw-border);
-      border-radius: 6px;
-
-      &:last-child {
-        border-bottom: 1px solid var(--dw-border);
-      }
-    }
-
-    td {
-      padding: 0.2rem 0;
-      text-align: left !important;
-      overflow-wrap: anywhere;
-    }
-
-    td:empty {
-      display: none;
-    }
-
-    td[data-label]::before {
-      content: attr(data-label);
-      display: block;
-      font-size: 0.8rem;
-      font-weight: $semiBoldWeight;
-      color: var(--darkgray);
-    }
+@media all and (min-width: 801px) and (max-width: 1000px) {
+  body[data-slug="index"] article .table-container > table.docwiki-cards {
+    @include docwiki-stacked-cards;
   }
 }
 
@@ -2688,6 +2699,18 @@ li.section-li h3 > a,
 .docwiki-ask .docwiki-ask-sources > li > a,
 .docwiki-ask .docwiki-ask-open > a {
   @include docwiki-target;
+}
+
+// A link alone in a table cell is often one digit (the dashboard's open-contradiction counts):
+// at least 24 px wide as well, its text centred; stacked cards keep it at the start of the line.
+td > a.docwiki-target {
+  min-width: 24px;
+  justify-content: center;
+}
+
+// ISO days in the data tables' cells (the transformer wraps them) never break at their hyphens.
+.docwiki-nowrap {
+  white-space: nowrap;
 }
 
 .explorer .explorer-toggle,

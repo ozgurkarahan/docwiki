@@ -6,6 +6,7 @@ and the company's own documents; scope and phase come from the raw paths only.
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import pytest
@@ -170,3 +171,53 @@ async def test_the_same_number_in_two_scopes_never_supersedes(scoped_release):
         assert fm.supersedes == [] and fm.superseded_by == []
     assert reader.read_page(ALPHA_A).frontmatter.scope == "alpha"
     assert reader.read_page(BETA_B).frontmatter.phase == "1"
+
+
+SCOPED_LOTS = """
+  - type: work-package
+    key: lot-5-windows
+    label: Lot 5 - Windows
+    aliases:
+      - {text: window delivery, lang: en}
+    attributes: {lot: 5, chantier: alpha}
+"""
+
+
+async def test_an_entity_bound_to_one_scope_stays_in_it(make_harness, tmp_path: Path):
+    """A work package of the alpha quote (``chantier: alpha``) whose alias every chantier's
+    documents use: only alpha's documents mention it, on its page, the source pages and hubs."""
+    pack_dir = tmp_path / "scoped-pack"
+    shutil.copytree(SCOPED_PACK, pack_dir)
+    entities = pack_dir / "entities.yaml"
+    text = entities.read_text(encoding="utf-8").replace(
+        "types:\n", "types:\n  - key: work-package\n    title: Work packages\n", 1
+    )
+    entities.write_text(text.rstrip("\n") + "\n" + SCOPED_LOTS, encoding="utf-8")
+    corpus = write_scoped_corpus(tmp_path / "scoped-input")
+    engine = load_engine({"extract_source": extract_source, "build_evidence": build_evidence})
+    harness = make_harness(
+        engine=engine, llm=real_lane_llm(), pack=pack_dir, domain=str(pack_dir), input_dir=corpus
+    )
+    outcome = await harness.run()
+    assert outcome.status == "succeeded", outcome.errors
+    root = harness.current_release()
+    assert [
+        f"{v.gate} {v.code} {v.path}: {v.message}"
+        for v in validate_release(root, canaries=[CANARY], glossary_seeded=True)
+    ] == []
+    reader = ReleaseReader.open(harness.settings.work_dir)
+    lot = reader.read_page("work-package:lot-5-windows")
+    # the compiled mentions of the beta documents name it too (the alias is in their text)
+    assert lot.frontmatter.sources == sorted([ALPHA_A, ALPHA_NOTE])
+    assert "Chantier Beta" not in lot.body and "May 2026" not in lot.body
+    for source_id in (BETA_B, BETA_VISIT, WORKSHOP):
+        assert "work-package:lot-5-windows" not in reader.read_page(source_id).frontmatter.entities
+    assert "work-package:lot-5-windows" in reader.read_page(ALPHA_A).frontmatter.entities
+    # links: the beta pages and the company pages never link it; alpha's do
+    beta_topic = _page(root, "topics/beta/schedule-and-window-delivery.md")
+    alpha_topic = _page(root, "topics/alpha/schedule-and-window-delivery.md")
+    assert "lot-5-windows.md" not in beta_topic and "lot-5-windows.md" in alpha_topic
+    beta_hub = _page(root, "chantiers/beta.md")
+    assert "lot-5-windows.md" not in beta_hub and "Lot 5" not in beta_hub
+    assert "](../entities/work-package/lot-5-windows.md)" in _page(root, "chantiers/alpha.md")
+    assert "lot-5-windows.md" not in _page(root, "chantiers/entreprise.md")

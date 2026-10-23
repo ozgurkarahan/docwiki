@@ -20,6 +20,15 @@ arbitrate:
       A client's written constraint about its own building or premises is a request the crew
       schedule must take into account, not a claim it overrules: arbitrate the point with the
       client.
+  # The PPSPS is our own safety plan: it organises the works and their phasing on the client's
+  # premises, so a client's constraint against it is arbitrated too. Contracts, avenants and
+  # ordres de service are not paired: the client signs them.
+  - types: [client-email, ppsps]
+    reason: >-
+      A client's written constraint about its own building or premises (its occupation, access or
+      hours) is a request the PPSPS and its phasing must take into account, not a claim our own
+      safety plan overrules: arbitrate the point with the client and the coordonnateur SPS, then
+      update the PPSPS.
 notes: >-
   Signed acts that change or close a contract prevail: an amendment (avenant), an ordre de
   service or a PV de réception (authority 10) over the contract they relate to (works contract,
@@ -35,5 +44,5 @@ notes: >-
   have the same authority (4): the more recent statement prevails until a new schedule revision
   (indice) supersedes the old one. Client e-mails, price studies and margin dashboards (3) are
   requests or internal estimates; an amendment makes a request binding. A client's written
-  constraint (an e-mail) against our own schedule is never settled by the rule: it is arbitrated
-  with the client. Site photos and the organisation chart (2) never settle a quantity or a date.
+  constraint (an e-mail) against our own schedule, crew schedule or PPSPS is never settled by the
+  rule: it is arbitrated with the client. Site photos and the organisation chart (2) never settle a quantity or a date.
