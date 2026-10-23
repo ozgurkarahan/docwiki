@@ -69,6 +69,8 @@ def _rows(view: dict[str, Any]) -> dict[str, dict[str, Any]]:
         "manuel-pompe.pdf",
         "uploads/Compte rendu (1).pdf",
         "a/b/c/d.md",
+        "chantiers/moreau/3-execution/schedule/PLN-2026-003_indice-B.xlsx",
+        "a/b/c/d/e/f.md",
         "notes_v2+final.DOCX",
         "  padded.md  ",
     ],
@@ -82,7 +84,7 @@ def test_check_upload_path_accepts(path: str) -> None:
     [
         "",
         "   ",
-        "a/b/c/d/e.md",
+        "a/b/c/d/e/f/g.md",
         "/abs.md",
         "a//b.md",
         "a\\b.md",
@@ -621,7 +623,7 @@ def test_upload_size_limits(client: TestClient, storage: FolderStorage) -> None:
 
 
 def test_upload_bad_requests(client: TestClient) -> None:
-    for path in ("uploads/tool.exe", "a/b/c/d/e.md", "uploads/.hidden.md"):
+    for path in ("uploads/tool.exe", "a/b/c/d/e/f/g.md", "uploads/.hidden.md"):
         response = client.put(f"/api/owner/documents/{path}", content=b"x", headers=WRITE)
         assert response.status_code == 400, path
     empty = client.put("/api/owner/documents/uploads/e.md", content=b"", headers=WRITE)

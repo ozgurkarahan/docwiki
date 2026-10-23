@@ -93,7 +93,9 @@ JUST_PUBLISHED_S = 15 * 60
 """The header chip says "In the wiki → <document>" this long after the release that added it."""
 CACHE_TTL_S = 4.0
 MAX_PATH_CHARS = 200
-MAX_DEPTH = 4
+MAX_DEPTH = 6
+"""Segments of an upload path: room for a scoped layout such as
+``chantiers/<code>/<phase>/<type>/<file>`` under one more folder (ADR 0011)."""
 _SEGMENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._()+-]{0,99}$")
 _WIKI_PATH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_./-]{0,254}$")
 
@@ -125,7 +127,7 @@ class RebuildError(ValueError):
 def check_upload_path(path: str) -> str:
     """The normalised ``raw/``-relative path of an upload, or :class:`PathError`.
 
-    Accepts at most four segments of letters, digits, spaces and ``._()+-`` (no leading dot, so
+    Accepts at most six segments of letters, digits, spaces and ``._()+-`` (no leading dot, so
     no hidden files the pipeline would skip) and only the file types the pipeline extracts.
     """
     value = unicodedata.normalize("NFC", path or "").strip()
