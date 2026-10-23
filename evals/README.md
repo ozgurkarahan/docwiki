@@ -239,9 +239,9 @@ has them. `--check` exits 1 when one of these outputs is out of date.
 `.github/workflows/evals.yml` runs the evaluation on demand only (`workflow_dispatch`) on Linux
 with the `evals`, `extract` and `azure` extras, then uploads `results/` and `SCOREBOARD.md` as an
 artifact. It needs the repository secret `DOCWIKI_FOUNDRY_PROJECT_ENDPOINT`, the variable
-`DOCWIKI_SMART_DEPLOYMENT` and an Azure OIDC login step that is commented out with instructions
-(no credential is stored). Commit dev results and the regenerated scoreboard through a reviewed
-pull request.
+`DOCWIKI_SMART_DEPLOYMENT`, and signs in to Azure with OpenID Connect: a federated credential
+trusts only runs of `main` of this repository, and no password or key is stored. Commit dev
+results and the regenerated scoreboard through a reviewed pull request.
 
 ## Honesty rules
 
