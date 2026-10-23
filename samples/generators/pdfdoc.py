@@ -52,13 +52,17 @@ class Subtotal:
 class StampedPDF(FPDF):
     """A4 document whose header and footer both carry the fictional stamp."""
 
-    def __init__(self, meta: DocMeta, header_left: str, footer_left: str = "") -> None:
+    def __init__(
+        self, meta: DocMeta, header_left: str, footer_left: str = "", legal: str = ""
+    ) -> None:
         super().__init__(orientation="P", unit="mm", format="A4")
         for style, key in _STYLES.items():
             self.add_font(FAMILY, style, str(font_path(key)))
         self.meta = meta
         self.header_left = clean(header_left)
         self.footer_left = clean(footer_left)
+        # A fictional legal identity line printed under the footer of every page (optional).
+        self.legal = clean(legal)
         self.page_label = _PAGE_LABELS.get(meta.lang, _PAGE_LABELS["en"])
         self.set_margins(LEFT, 21, LEFT)
         self.set_auto_page_break(True, margin=22)
@@ -92,6 +96,10 @@ class StampedPDF(FPDF):
         self.cell(WIDTH * 0.30, 5, self.footer_left, align="L")
         self.cell(WIDTH * 0.48, 5, STAMP, align="C")
         self.cell(WIDTH * 0.22, 5, self.page_label.format(page=self.page_no()), align="R")
+        if self.legal:
+            self.set_xy(LEFT, -10)
+            self.set_font(FAMILY, "", 6.5)
+            self.cell(WIDTH, 4, self.legal, align="C")
         self.set_text_color(0, 0, 0)
 
     # -- layout helpers -------------------------------------------------------------------

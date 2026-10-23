@@ -98,6 +98,18 @@ registry:
       - {text: commune de Montferrine, lang: fr}
       - {text: Montferrine, lang: fr}
     attributes: {role: maître d'ouvrage public, chantiers: ecole-montferrine}
+  - type: organisation
+    key: trey-prevention
+    label: Trey Prévention
+    aliases:
+      - {text: Trey, lang: fr}
+    attributes: {role: coordonnateur SPS, chantiers: ecole-montferrine}
+  - type: organisation
+    key: humongous-assurances
+    label: Humongous Assurances
+    aliases:
+      - {text: Humongous, lang: fr}
+    attributes: {role: assureur de la responsabilité décennale}
 
   # --- subcontractors and maître d'œuvre -------------------------------------------------------
   - type: sous-traitant
@@ -242,6 +254,13 @@ registry:
       - {text: A. Vautrelle, lang: fr}
       - {text: Mme Vautrelle, lang: fr}
     attributes: {organisation: commune-montferrine, role: directrice générale des services}
+  - type: person
+    key: gaetan-ferlicot
+    label: Gaëtan Ferlicot
+    aliases:
+      - {text: G. Ferlicot, lang: fr}
+      - {text: M. Ferlicot, lang: fr}
+    attributes: {organisation: trey-prevention, role: coordonnateur SPS}
 
   # --- work packages (lots of the quote) -------------------------------------------------------
   - type: work-package
@@ -502,7 +521,7 @@ registry:
     aliases:
       - {text: MAT-02, lang: fr}
       - {text: mini-pelle, lang: fr}
-    attributes: {code: MAT-02, inspection: VGP annuelle, next_inspection: "2026-11-18"}
+    attributes: {code: MAT-02, inspection: non soumis à VGP}
   - type: materiel
     key: mat-03
     label: Échafaudage de façade multidirectionnel (MAT-03)

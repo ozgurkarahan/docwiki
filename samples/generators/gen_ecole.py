@@ -47,8 +47,11 @@ def ccap(w: World) -> bytes:
     pdf.label_para("Marché", _facts(w)["marche_title"])
     pdf.para(str(facts["procedure"]))
     for article in facts["articles"]:
-        pdf.h1(f"Article {article['n']} - {article['title']}")
-        pdf.para(str(article["text"]))
+        # Run-in headings keep the extract on one page.
+        pdf.label_para(f"Article {article['n']} - {article['title']}", str(article["text"]))
+        pdf.ln(1.2)
+    if pdf.page_no() != 1:
+        raise ValueError("the CCAP extract must stay on one page (PLANTED.md cites p0001)")
     return pdf.render()
 
 
@@ -121,6 +124,7 @@ def acte_engagement(w: World) -> bytes:
     pdf.para(f"{w.builder['name']}, {w.facts['site']['builder_address']}, représentée par "
              f"{w.name(signer)}, {w.role(signer).lower()}, s'engage à exécuter les travaux du "
              "marché aux conditions du CCAP et pour le prix ci-dessous.")
+    pdf.label_para("Identification du titulaire", str(w.data["world"]["legal_identity"]))
     pdf.h1("2. Prix")
     price = facts["price"]
     pdf.para(f"Prix global et forfaitaire, selon la {facts['basis']} :")
@@ -130,6 +134,7 @@ def acte_engagement(w: World) -> bytes:
     pdf.h1("3. Délais")
     pdf.para(f"Période de préparation : {facts['preparation']}. Exécution des travaux "
              f"{facts['works_period']}.")
+    pdf.para(str(facts["advance_text"]))
     pdf.h1("4. Sous-traitance déclarée (paiement direct)")
     pdf.grid(["Sous-traitant", "Prestations", "Montant HT"],
              [[w.org_name(sub["org"]), str(sub["item"]), eur(sub["amount_ht"])]
@@ -139,7 +144,7 @@ def acte_engagement(w: World) -> bytes:
         ("Le titulaire", [w.builder["name"], f"{w.name(signer)}, {w.role(signer).lower()}",
                           f"Signé le {fr_date(str(facts['date']))}"]),
         ("Le maître d'ouvrage", [f"Pour la commune de {commune['short']}, le maire",
-                                 "Offre acceptée",
+                                 f"Offre acceptée le {fr_date(str(facts['accepted']))}",
                                  f"Notifié le {fr_date(str(facts['notified']))}"]),
     ])
     return pdf.render()
@@ -155,7 +160,7 @@ def bon_de_commande(w: World) -> bytes:
     builder = w.builder
     number = str(facts["number"])
     pdf = StampedPDF(meta_for(doc, builder["name"]), f"{builder['name']} - Bon de commande "
-                     f"{number}", number)
+                     f"{number}", number, legal=w.legal_line(builder["key"]))
     pdf.add_page()
     bottom = _letterhead(pdf, w, builder["key"], w.facts["site"]["builder_address"],
                          str(facts["issuer"]))
@@ -290,11 +295,13 @@ def ppsps(w: World) -> bytes:
             [list(row) for row in facts["parties"]], widths=(3.8, 7.0, 1.8, 4.4))
     b.h1("3. Installations d'hygiène")
     b.para(str(facts["hygiene"]))
+    b.para(str(facts["asbestos"]))
     b.h1("4. Analyse des risques et mesures de prévention")
     b.table(["Risque", "Situation de travail", "Mesures"],
             [list(row) for row in facts["risks"]], widths=(3.4, 5.0, 8.6))
     b.h1("5. Secours")
     b.para(str(facts["first_aid"]))
+    b.table(["Secours", "Appel"], [list(row) for row in facts["emergency"]], widths=(8.0, 9.0))
     author = str(facts["author"])
     signature_table(b, [("Établi par", [w.builder["name"], f"{w.name(author)}, "
                                         f"{w.role(author).lower()}", f"Le {fr_date(day)}"])])

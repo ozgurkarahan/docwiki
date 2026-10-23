@@ -29,7 +29,7 @@ def _flat(text: str) -> str:
 class DocxBuilder:
     """Small wrapper over python-docx that never creates empty body paragraphs."""
 
-    def __init__(self, header: str, footer: str) -> None:
+    def __init__(self, header: str, footer: str, legal: str = "") -> None:
         self.doc = Document()
         section = self.doc.sections[0]
         section.page_width = Cm(21.0)
@@ -49,6 +49,12 @@ class DocxBuilder:
         foot = section.footer.paragraphs[0]
         foot.text = f"{STAMP}  |  {footer}"
         foot.runs[0].font.size = Pt(8)
+        if legal:
+            # Same paragraph as the stamp: every header and footer paragraph carries the stamp.
+            line = foot.add_run()
+            line.add_break()
+            line.add_text(legal)
+            line.font.size = Pt(7)
         foot.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     def title(self, text: str) -> None:
@@ -157,7 +163,8 @@ def contrat(w: World) -> bytes:
     builder = w.builder
     day = str(facts["date"])
     b = DocxBuilder(f"{builder['name']} - Contrat de travaux du {fr_date(day)}",
-                    f"Contrat de travaux - {site['short']}, {w.town}")
+                    f"Contrat de travaux - {site['short']}, {w.town}",
+                    legal=w.legal_line(builder["key"]))
     b.title(str(facts["title"]))
     _parties(b, w)
     article = _articles(w)
@@ -222,7 +229,8 @@ def avenant(w: World) -> bytes:
     builder = w.builder
     day = str(facts["date"])
     b = DocxBuilder(f"{builder['name']} - {facts['title']}",
-                    f"Avenant n°{facts['number']} - {site['short']}, {w.town}")
+                    f"Avenant n°{facts['number']} - {site['short']}, {w.town}",
+                    legal=w.legal_line(builder["key"]))
     b.title(str(facts["title"]))
     _parties(b, w)
     b.h1("Article 1 - Objet de l'avenant")

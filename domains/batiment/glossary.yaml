@@ -325,6 +325,14 @@ terms:
     definition: The builder's liability for ten years after the réception for defects that endanger the building or make it unfit for use, which must be insured.
     synonyms: {fr: [décennale, garantie décennale, responsabilité décennale, assurance décennale], en: [decennial liability, ten-year guarantee]}
     see_also: [topic:reception-et-reserves]
+  - term: building damage insurance
+    definition: The insurance the maître d'ouvrage takes out before the works, which pays for the repair of defects covered by the décennale without waiting for liability to be settled, then recovers the cost from the builders' insurers.
+    synonyms: {fr: [dommages-ouvrage, assurance dommages-ouvrage], en: [latent defects insurance]}
+    see_also: [topic:reception-et-reserves]
+  - term: completion guarantee
+    definition: The contractor's one-year obligation from the réception to put right the réserves and every defect reported during that year.
+    synonyms: {fr: [parfait achèvement, garantie de parfait achèvement], en: [defects liability period, one-year guarantee]}
+    see_also: [topic:reception-et-reserves]
   - term: framework contract
     definition: A yearly agreement with a supplier that fixes the prices and terms of all the orders of the year, whatever the job.
     synonyms: {fr: [contrat-cadre, contrat-cadre d'approvisionnement], en: [framework agreement, master supply agreement]}

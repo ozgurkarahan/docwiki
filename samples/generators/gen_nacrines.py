@@ -49,7 +49,7 @@ def marche(w: World) -> bytes:
     lines, sums = nacrines_marche(w)
     day = str(facts["date"])
     b = DocxBuilder(f"{w.builder['name']} - Marché de travaux du {fr_date(day)}",
-                    f"Marché de travaux - {SITE_LABEL}")
+                    f"Marché de travaux - {SITE_LABEL}", legal=w.legal_line("lamna-batiment"))
     b.title(str(facts["title"]))
     parties = facts["parties"]
     b.para("Entre les soussignés :", bold=True)
@@ -125,7 +125,8 @@ def sous_traitance(w: World) -> bytes:
     facts = _facts(w)["sous_traitance"]
     day = str(facts["date"])
     b = DocxBuilder(f"{w.builder['name']} - Contrat de sous-traitance du {fr_date(day)}",
-                    f"Sous-traitance du lot 5 - {SITE_LABEL}")
+                    f"Sous-traitance du lot 5 - {SITE_LABEL}",
+                    legal=w.legal_line("lamna-batiment", "adatum-electricite"))
     b.title(str(facts["title"]))
     b.para("Entre les soussignés :", bold=True)
     b.para(str(facts["parties"]["entreprise"]))
@@ -161,11 +162,12 @@ def dc4(w: World) -> bytes:
     doc = w.doc("nac-dc4")
     marche_facts = _facts(w)["marche"]
     pdf = StampedPDF(meta_for(doc, w.builder["name"]),
-                     "Déclaration de sous-traitance (modèle DC4)", SITE_LABEL)
+                     "Déclaration de sous-traitance (modèle DC4)", SITE_LABEL,
+                     legal=w.legal_line("lamna-batiment"))
     pdf.add_page()
     pdf.title_line("DÉCLARATION DE SOUS-TRAITANCE (DC4)", 15)
     pdf.para("Demande d'acceptation d'un sous-traitant et d'agrément de ses conditions de "
-             "paiement.")
+             f"paiement. {facts['model_note']}")
     sections = [
         ("A - Maître d'ouvrage", [
             f"{w.org_name('syndicat-nacrines')}, {_facts(w)['address']}",
@@ -177,14 +179,17 @@ def dc4(w: World) -> bytes:
         ("C - Entrepreneur principal", [
             f"{w.builder['name']}, {w.facts['site']['builder_address']}",
             f"Représenté par {w.name('bertrand-sauzede')}, "
-            f"{w.role('bertrand-sauzede').lower()}"]),
+            f"{w.role('bertrand-sauzede').lower()}",
+            str(w.data["world"]["legal_identity"])]),
         ("D - Sous-traitant", [
-            f"{w.org_name('adatum-electricite')}, représentée par {w.name('damien-pradere')}"]),
+            f"{w.org_name('adatum-electricite')}, représentée par {w.name('damien-pradere')}",
+            str(w.data["world"]["legal_identity"])]),
         ("E - Nature des prestations sous-traitées", [str(facts["nature"]),
                                                       f"Période : {facts['period']}"]),
         ("F - Montant maximum des prestations sous-traitées", [
             f"{eur(facts['amount_ht'])} HT ({facts['vat_text']})"]),
-        ("G - Conditions de paiement", [str(facts["payment_text"])]),
+        ("G - Conditions de paiement", [str(facts["payment_text"]),
+                                        str(facts["assignment_text"])]),
     ]
     for title, lines in sections:
         pdf.h1(title)
@@ -270,7 +275,7 @@ def facture(w: World) -> bytes:
     merchant = w.org(str(doc["organisation"]))
     number = str(facts["number"])
     pdf = StampedPDF(meta_for(doc, merchant["name"]), f"{merchant['name']} - Facture {number}",
-                     number)
+                     number, legal=w.legal_line(merchant["key"]))
     pdf.add_page()
     site = w.facts["site"]
     bottom = _letterhead(pdf, w, merchant["key"], site["merchant_address"], facts["contact"])
@@ -296,6 +301,8 @@ def facture(w: World) -> bytes:
                 ("Total TTC", eur(sums["ttc"]))])
     pdf.label_para("Conditions de paiement", str(facts["payment_terms"]))
     pdf.label_para("Date d'échéance", fr_date(str(facts["due_date"])))
+    pdf.label_para("Pénalités de retard", "trois fois le taux d'intérêt légal ; indemnité "
+                   "forfaitaire pour frais de recouvrement de 40,00 €.")
     return pdf.render()
 
 

@@ -68,7 +68,7 @@ def _devis(w: World, indice: str) -> bytes:
     builder = w.builder
     reference = f"{facts['number']} indice {revision}"
     pdf = StampedPDF(meta_for(doc, builder["name"]), f"{builder['name']} - Devis {reference}",
-                     reference)
+                     reference, legal=w.legal_line(builder["key"]))
     pdf.add_page()
     site = w.facts["site"]
     bottom = _letterhead(pdf, w, builder["key"], site["builder_address"], facts["issuer"])
@@ -131,7 +131,7 @@ def facture(w: World) -> bytes:
     merchant = w.org(str(doc["organisation"]))
     number = str(facts["number"])
     pdf = StampedPDF(meta_for(doc, merchant["name"]), f"{merchant['name']} - Facture {number}",
-                     number)
+                     number, legal=w.legal_line(merchant["key"]))
     pdf.add_page()
     site = w.facts["site"]
     bottom = _letterhead(pdf, w, merchant["key"], site["merchant_address"], facts["contact"])
@@ -163,4 +163,6 @@ def facture(w: World) -> bytes:
                 ("Total TTC", eur(ttc))])
     pdf.label_para("Conditions de paiement", str(facts["payment_terms"]))
     pdf.label_para("Date d'échéance", fr_date(str(facts["due_date"])))
+    pdf.label_para("Pénalités de retard", "trois fois le taux d'intérêt légal ; indemnité "
+                   "forfaitaire pour frais de recouvrement de 40,00 €.")
     return pdf.render()
