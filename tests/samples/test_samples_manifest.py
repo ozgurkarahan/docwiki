@@ -10,8 +10,13 @@ from typing import Any
 
 MAX_TOTAL_BYTES = 5_000_000
 MAX_FILE_BYTES = 1_000_000
-# Spec domain-and-corpus.md section 3.1: 12 public documents, 1 restricted, 1 held back.
-PUBLIC_FORMATS = {"pdf": 4, "docx": 3, "xlsx": 1, "eml": 2, "jpg": 2}
+# Slice F (ADR 0011): three chantiers and the company documents; 39 public documents under
+# full/, 2 restricted (the Moreau price study, the company margin dashboard), 1 held back.
+PUBLIC_FORMATS = {"pdf": 12, "docx": 10, "xlsx": 11, "eml": 4, "jpg": 2}
+RESTRICTED = {
+    "etude-prix": ["full", "chantiers", "moreau", "0-commercial", "price-study"],
+    "ent-marges": ["full", "entreprise", "margin-dashboard"],
+}
 
 
 def test_manifest_lists_every_file_with_matching_hash(
@@ -58,17 +63,16 @@ def test_corpus_composition(
     public = [e for e in full if e["sensitivity"] == "public"]
     restricted = [e for e in documents if e["sensitivity"] == "restricted"]
     held_back = [e for e in documents if e["held_back"]]
-    assert len(public) == 12 and len(full) == 13 and len(documents) == 14
+    assert len(public) == 39 and len(full) == 41 and len(documents) == 42
     assert Counter(e["format"] for e in public) == PUBLIC_FORMATS
-    assert [e["path"].split("/")[:2] for e in restricted] == [["full", "restricted"]]
-    assert [e["format"] for e in restricted] == ["xlsx"]
-    assert [e["path"].split("/")[0] for e in held_back] == ["held-back"]
+    assert {e["id"]: e["path"].split("/")[:-1] for e in restricted} == RESTRICTED
+    assert [e["format"] for e in restricted] == ["xlsx", "xlsx"]
+    assert [e["path"].split("/")[:3] for e in held_back] == [["held-back", "chantiers", "moreau"]]
     assert [e["format"] for e in held_back] == ["xlsx"]
-    assert not any(e["path"].startswith("full/restricted/") for e in public)
     assert {e["lang"] for e in documents} == {"fr"}
     assert manifest["totals"] == {
-        "files": 14,
-        "documents": 13,
+        "files": 42,
+        "documents": 41,
         "held_back": 1,
         "bytes": sum(e["bytes"] for e in documents),
         "by_format": dict(sorted(Counter(e["format"] for e in documents).items())),
@@ -81,7 +85,8 @@ def test_planning_workbooks_have_the_two_sheets(
     documents: list[dict[str, Any]], bible: dict[str, Any]
 ) -> None:
     names = list(bible["facts"]["planning"]["sheets"])
-    plannings = [e for e in documents if e["kind"] == "planning"]
+    number = bible["facts"]["planning"]["number"]
+    plannings = [e for e in documents if e["doc_number"] == number]
     assert len(plannings) == 2
     for entry in plannings:
         assert [sheet["name"] for sheet in entry["counts"]["sheets"]] == names
@@ -107,17 +112,20 @@ def test_photo_assets_match_their_provenance_record(
 def test_image_only_scan_has_no_text_layer(
     documents: list[dict[str, Any]], extracted, bible: dict[str, Any]
 ) -> None:
-    scans = [e for e in documents if e["format"] == "pdf" and e["stamp"] == "image"]
-    assert [e["id"] for e in scans] == ["bl-scan"]
-    scan = scans[0]
-    pages = extracted(scan["path"]).units
-    assert len(pages) == scan["counts"]["pages"] == bible["facts"]["zava_delivery"]["pages"] == 1
-    assert all(not text.strip() for _, text in pages)
+    scans = {e["id"]: e for e in documents if e["format"] == "pdf" and e["stamp"] == "image"}
+    facts = bible["facts"]
+    expected = {"bl-scan": facts["zava_delivery"]["pages"],
+                "nac-pv": facts["nacrines"]["pv_reception"]["pages"]}
+    assert set(scans) == set(expected)
+    for doc_id, scan in scans.items():
+        pages = extracted(scan["path"]).units
+        assert len(pages) == scan["counts"]["pages"] == expected[doc_id] == 1
+        assert all(not text.strip() for _, text in pages)
 
 
 def test_text_pdfs_have_a_text_layer(documents: list[dict[str, Any]], extracted) -> None:
     pdfs = [e for e in documents if e["format"] == "pdf" and e["stamp"] != "image"]
-    assert len(pdfs) == 3
+    assert len(pdfs) == 10
     for entry in pdfs:
         assert all(text.strip() for _, text in extracted(entry["path"]).units), entry["path"]
 
@@ -129,3 +137,24 @@ def test_manifest_counts_and_text_hashes_match_files(manifest: dict[str, Any], e
         content = extracted(entry["path"])
         assert content.counts == entry["counts"], entry["path"]
         assert text_digest(content) == entry["text_sha256"], entry["path"]
+
+
+def test_layout_follows_the_scopes_of_adr_0011(
+    documents: list[dict[str, Any]], bible: dict[str, Any]
+) -> None:
+    """chantiers/<code>/<phase>-<name>/<doc type>/<file> or entreprise/<doc type>/<file>."""
+    codes = {chantier["code"] for chantier in bible["chantiers"]}
+    phases = {"0-commercial", "1-marche", "2-preparation", "3-execution", "4-reception",
+              "5-garantie"}
+    seen: set[str] = set()
+    for entry in documents:
+        parts = entry["path"].split("/")
+        assert parts[0] in ("full", "held-back"), entry["path"]
+        if parts[1] == "chantiers":
+            assert len(parts) == 6, entry["path"]
+            assert parts[2] in codes and parts[3] in phases, entry["path"]
+            seen.add(parts[2])
+        else:
+            assert parts[1] == "entreprise" and len(parts) == 4, entry["path"]
+            seen.add("entreprise")
+    assert seen == codes | {"entreprise"}

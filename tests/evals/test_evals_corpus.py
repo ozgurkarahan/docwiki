@@ -83,12 +83,12 @@ def test_manifest_hashes_and_sensitivity(corpus: CorpusContext) -> None:
 def test_real_manifest_loads(repo_root: Path) -> None:
     manifest = CorpusManifest.load(repo_root / "samples" / "corpus")
     assert len(manifest.sha256) == 64
-    assert len(manifest.documents()) == 14
+    assert len(manifest.documents()) == 42
     full = manifest.select("full")
-    assert len(full) == 12 and all(entry.path.startswith("full/") for entry in full)
+    assert len(full) == 39 and all(entry.path.startswith("full/") for entry in full)
     restricted = [entry for entry in manifest.documents() if entry.sensitivity == "restricted"]
-    assert len(restricted) == 1 and not set(restricted) & set(full)
-    assert len(manifest.select("full", "restricted")) == 13
+    assert len(restricted) == 2 and not set(restricted) & set(full)
+    assert len(manifest.select("full", "restricted")) == 41
     held_back = [entry for entry in manifest.documents() if entry.held_back]
     assert len(held_back) == 1 and held_back[0].path.startswith("held-back/")
     assert {entry.path for entry in manifest.select("all")} == {
@@ -364,7 +364,9 @@ def test_mock_release_sources_map_to_the_corpus(repo_root: Path) -> None:
 def test_extraction_cache_extracts_once_and_reuses(tmp_path: Path, repo_root: Path) -> None:
     corpus_root = repo_root / "samples" / "corpus"
     manifest = CorpusManifest.load(corpus_root)
-    target = manifest.get(MAIL)
+    # The real corpus path of the window maker's e-mail (slice F layout, ADR 0011).
+    real_mail = "full/chantiers/moreau/3-execution/supplier-email/" + MAIL.rsplit("/", 1)[1]
+    target = manifest.get(real_mail)
     assert target is not None
     cache = ExtractionCache(corpus_root, tmp_path / "cache")
     docs = asyncio.run(cache.load([target]))

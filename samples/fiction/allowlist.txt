@@ -8,16 +8,26 @@ Actions
 Adaptation
 Adatum
 Adatum Électricité
+Administration
+ADR
 Adresse
+AE
 Agence
+Agnes Vautrelle
+Agnès Vautrelle
 Ajout
 Annexe
+Anthony Lescoffier
 Applique
 Approuvé
 Après
+Architecte
 Article
 Articles
+Assistante
+Assistante administrative et comptable
 Assurances
+Atelier Fabrikam
 Au
 Autorisation
 Aux
@@ -25,6 +35,7 @@ Avancement
 Avant
 Avec
 Avenant
+avenue des Glycines
 Aymeric Moreau
 Azure
 Baie
@@ -49,6 +60,7 @@ BTP
 CANARY-1EC861DF
 Carrelage
 Cc
+CCAP
 Ce
 Ces
 Cet
@@ -56,22 +68,30 @@ Cette
 Chantier
 Chantier Moreau
 chantier Moreau
+Chantiers
 Charpente
 Chef
+Chef d'équipe façade
 Chef d'équipe maçonnerie
 chemin des Vergers
+Cheville à frapper pour isolant
 Chevêtre
+Clarisse Monfreuil
 Client
 Cliente
 Clients
+Coactivité
 Code
 Commande
 Commandes
 Commandé
+Commune de Montferrine
 Compte
 Conditions
+Conducteur de travaux
 Conductrice
 Conductrice de travaux
+Conduite
 Confirmer
 Contrat
 Cordialement
@@ -86,15 +106,20 @@ Damien Pradere
 Damien Pradère
 Dans
 Date
+DC4
 De
 Demande
 Des
 DEV
 Devis
 Diffusion
+Directeur d'agence
+Direction
+Directrice générale des services
 docProps
 DocWiki
 Doublage
+DPGF
 Du
 Durée
 Déboursé
@@ -106,8 +131,10 @@ Délais
 Démarrage
 Dépose
 Désignation
+Effectif
 Elle
 En
+Enduit de finition taloché
 Ensemble
 Entreprise
 Erwan Gouzelin
@@ -115,18 +142,26 @@ EUR
 Excusé
 Excusés
 FA
+Fabrikam
+Facturation
 Facture
 Facturé
 Fait
 Famille Moreau
+Façadier
 Faïence
+FC
 Fenêtre
+Fenêtre aluminium de cage d'escalier
+Fenêtre aluminium double vitrage 1,80 x 1,50 m
 Fenêtre de toit 78 x 98 cm avec raccord d'étanchéité
 fenêtre de toit FT1
 fenêtre F2
 fenêtre F3
 Fenêtre PVC double vitrage
 Fenêtres
+fenêtres aluminium des cages d'escalier
+fenêtres aluminium E1 à E16
 Fermeture
 Fin
 Finitions
@@ -137,13 +172,17 @@ Fournisseur
 Fourniture
 Frais
 From
+Gestionnaire de copropriété
 Gros
 Gérant
 HA
+Helene Vasseroux
 Heure
 Heures
+Horaires
 HT
 Hypothèses
+Hélène Vasseroux
 IA
 Il
 Indice
@@ -152,108 +191,166 @@ Installation
 Intervenant
 Inès Roux
 Isolation
+ITE
 Je
+Kevin Rabaste
+Kévin Rabaste
 La
+Laine de verre en rouleau ép. 200 mm
 Lamna
 Lamna Bâtiment
 Le
+LED
 Les
+Les Nacrines
+Libellé
 Linteau
 Linteau béton préfabriqué 3,40 m
+Litware
+Litware Plomberie
 Livraison
 Livré
+Localisation
 Lot
 Lots
 Lu
 Madame
+Maelle Tournadre
 Main
+Manutention
 Marge
 Markdown
+MAT
 Mathis Ancelin
 Matériaux
+Maçon
+Maëlle Tournadre
 Menuiseries
 Merci
 Message
+Mini-pelle
 Mme
 Modifications
 Monsieur
 Montant
+Monte-matériaux
+Montferrine
 Moreau
 Mortier
 Mortier de montage
+Mortier-colle et sous-enduit pour isolant
 Motif
 Murs
 Nadia Ferrandon
 Nettoyage
+nez de balcons
 Nom
+Nordine Saadaoui
 Note
 Nous
 Nouveau
 Objet
 Observations
+OPR
+Organigramme
+OS
 Ouverture
 Paiement
 Palette
 Palettes
+Panneau isolant polystyrène expansé graphité ép. 140 mm
 Par
 Parties
+Patrice Ollivro
 Photo
+place de la Mairie
 Plafond
 Planning
+Plaque de plâtre standard 2,50 x 1,20 m
+Plaquiste
 PLN
 Plâtrerie
+Porte d'entrée aluminium de hall
+portes d'entrée aluminium des halls A et B
 Pose
+Poste
 Pour
 Pourcentage
+Poussières
+PPSPS
+Prestations
 Prise
 Prix
 Prochaine
+Profilé de départ aluminium 140 mm
+Proseware
+Proseware Gestion
 Présents
 PU
+PV
 PVC
 Python
+Pâques
 Qté
 Quantité
+Rattachement
 re:BC-\d{4}-\d{3}
 re:BL-\d{4}-\d{4}
+re:C\d{1,2}
 re:DEV-\d{4}-\d{3}
+re:E\d{1,2}
 re:FA-\d{4}-\d{4}
+re:FC-\d{4}-\d{3}
 re:FT?\d
+re:MAT-\d{2}
 re:PLN-\d{4}-\d{3}
+re:R\d{2}
 re:T\d{2}
 re:VIR-\d{5}
 re:ZM-\d{5}
 Rendu
+Renouvellement
 Report
 Reprise
 Responsable
 Responsable planification
 Retenue
 Reçu
+Rubrique
+rue de l'École
 rue des Artisans
 Règlement
+Récapitulatif
 Réception
 Réf
 Rénovation
 Réserves
+Résidence
+résidence Les Nacrines
 Réunion
 Sablières
 Sac
 Sacs
+Salarié
+Sebastien Quintard
 Second
 Selon
 Semelles
+Service
 Severine Moreau
 Si
 Signature
 Signé
 Sous-total
 Sous-traitance
+Sous-traitant
 Statut
 Subject
 Suite
 Suivi
 Sur
+Syndicat des copropriétaires de la résidence Les Nacrines
+Sébastien Quintard
 Séverine Moreau
 tableStyleId
 Taux
@@ -263,6 +360,7 @@ To
 Total
 Toute
 Travaux
+Treillis d'armature en fibre de verre
 TTC
 TVA
 Tâche
@@ -274,8 +372,11 @@ Validité
 VanArsdel
 VanArsdel Menuiseries
 Vente
+VGP
 VIR
 Vous
+Vu
+Yohan Delbreil
 Zava
 Zava Matériaux
 ZM
@@ -283,7 +384,10 @@ zone d'activités des Sablières
 À
 Échéance
 Échéancier
+école du Bourg
+école élémentaire du Bourg
 Électricien
 Électricité
 Élévation
+Émis
 Étude
