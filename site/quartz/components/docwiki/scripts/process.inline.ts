@@ -68,7 +68,7 @@ const RUNS_SHOWN = 10
 const QUEUE_PEEK_LIMIT = 32
 /** One upload path segment, as `check_upload_path` in docwiki.portal.process accepts it. */
 const SEGMENT_RE = /^[A-Za-z0-9][A-Za-z0-9 ._()+-]{0,99}$/
-const MAX_DEPTH = 4
+const MAX_DEPTH = 6
 const MAX_PATH_CHARS = 200
 const UNAVAILABLE = "Status unavailable, retrying…"
 const STATE_ORDER: readonly State[] = STATES
