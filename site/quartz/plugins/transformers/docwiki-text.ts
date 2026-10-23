@@ -1,6 +1,15 @@
 // Pure helpers of the DocWiki overlay (transformer, components and the "Ask this wiki" drawer).
-// No imports: unit-tested directly with Node (tests/site/test_overlay_text.py) and mirrored by
-// docwiki.contracts.markdown and docwiki.site.answers in Python.
+// Unit-tested directly with Node (tests/site/test_overlay_text.py) and mirrored by
+// docwiki.contracts.markdown and docwiki.site.answers in Python. Their only imports are the UI
+// string tables (import-free modules): the words come in the page's language (`t`, English by
+// default).
+import { en } from "../../components/docwiki/i18n/en.ts"
+import type { BadgeWords, Strings } from "../../components/docwiki/i18n/strings.ts"
+
+/** The table passed in, else English (an `Array.map` callback gets an index there). */
+function table(t: unknown): Strings {
+  return typeof t === "object" && t !== null && "ask" in t ? (t as Strings) : en
+}
 
 export const BACKLINKS_START = "<!-- docwiki:backlinks:start -->"
 export const BACKLINKS_END = "<!-- docwiki:backlinks:end -->"
@@ -88,6 +97,22 @@ export function badgeForText(text: string): Badge | undefined {
   return CITATION_BADGES.find((badge) => badge.text === text)
 }
 
+/**
+ * A badge as shown on a page in the language of `t`: the wiki's markers stay English in the
+ * Markdown (`✓ quote verified`), the reader sees its words and meaning in the page's language.
+ */
+export function shownBadge(badge: Badge, t: Strings = en): Badge {
+  const words = (table(t).badges.citation as Record<string, BadgeWords | undefined>)[badge.kind]
+  return words ? { kind: badge.kind, text: words.text, meaning: words.meaning } : badge
+}
+
+/** The provenance badge of an evidence sidecar (`native-text`, `ocr`…) in the language of `t`. */
+export function provenanceBadge(provenance: string, t: Strings = en): Badge | undefined {
+  const badge = PROVENANCE_BADGES[provenance]
+  const words = (table(t).badges.provenance as Record<string, BadgeWords | undefined>)[provenance]
+  return badge && words ? { kind: badge.kind, text: words.text, meaning: words.meaning } : badge
+}
+
 export interface BadgeSplit {
   before: string
   badge: Badge
@@ -144,9 +169,8 @@ export function plural(count: number, word: string): string {
 }
 
 /** "37 documents (1 superseded)" for the home page's provenance line. */
-export function documentsPhrase(current: number, superseded: number): string {
-  const total = plural(current + superseded, "document")
-  return superseded > 0 ? `${total} (${superseded} superseded)` : total
+export function documentsPhrase(current: number, superseded: number, t: Strings = en): string {
+  return table(t).words.documentsPhrase(current, superseded)
 }
 
 export interface QualityCounts {
@@ -159,14 +183,8 @@ export interface QualityCounts {
 }
 
 /** "15 passed", "12 passed, 3 skipped", "14 passed, 1 warning" or "1 blocking gate failed". */
-export function qualityPhrase(quality: QualityCounts): string {
-  if (quality.blockingFailed > 0) {
-    return `${plural(quality.blockingFailed, "blocking gate")} failed`
-  }
-  const parts = [`${quality.passed} passed`]
-  if (quality.warned > 0) parts.push(plural(quality.warned, "warning"))
-  if (quality.skipped > 0) parts.push(`${quality.skipped} skipped`)
-  return parts.join(", ")
+export function qualityPhrase(quality: QualityCounts, t: Strings = en): string {
+  return table(t).words.quality(quality)
 }
 
 const DOCUMENT_EXTENSION = /\.(pdf|docx?|xlsx?|pptx?|csv|eml|vtt|txt|zip)$/i
@@ -308,13 +326,17 @@ export interface AnswerGroup {
  * ("More questions"; "Questions" when none is about this page). The file order (newest first) is
  * kept inside each group.
  */
-export function groupAnswers(answers: readonly AskAnswer[], slug: string): AnswerGroup[] {
+export function groupAnswers(
+  answers: readonly AskAnswer[],
+  slug: string,
+  t: Strings = en,
+): AnswerGroup[] {
   const here = answers.filter((item) => item.pages.includes(slug))
   const more = answers.filter((item) => !item.pages.includes(slug))
   const groups: AnswerGroup[] = []
-  if (here.length > 0) groups.push({ title: "About this page", answers: here })
+  if (here.length > 0) groups.push({ title: table(t).ask.aboutPage, answers: here })
   if (more.length > 0) {
-    groups.push({ title: here.length > 0 ? "More questions" : "Questions", answers: more })
+    groups.push({ title: here.length > 0 ? table(t).ask.moreQuestions : table(t).ask.questions, answers: more })
   }
   return groups
 }
@@ -340,18 +362,21 @@ export function citationText(item: AskCitation): string {
 }
 
 /** "How the agent worked (3 steps)" */
-export function stepsLabel(count: number): string {
-  return `How the agent worked (${plural(count, "step")})`
+export function stepsLabel(count: number, t: Strings = en): string {
+  return table(t).ask.steps(count)
 }
 
 /**
  * The answer's provenance line: the note of "How this answer was produced" (its closing colon,
  * which introduces the tool steps on the page, becomes a full stop), else "Filed on <date>".
  */
-export function provenanceLine(item: Pick<AskAnswer, "provenance" | "date">): string {
+export function provenanceLine(
+  item: Pick<AskAnswer, "provenance" | "date">,
+  t: Strings = en,
+): string {
   const note = item.provenance.trim()
   if (note) return note.replace(/:$/, ".")
-  return item.date ? `Filed on ${item.date}` : ""
+  return item.date ? table(t).ask.filedOn(item.date) : ""
 }
 
 /** Drawer state kept in sessionStorage: Quartz's page navigation replaces the whole body. */
@@ -395,8 +420,8 @@ export function followLink(state: AskState, narrow: boolean, scroll: number): As
 }
 
 /** Label of the floating button: "Back to the answer" after the drawer collapsed for a link. */
-export function fabLabel(state: AskState): string {
-  return state.resume && state.answer ? "Back to the answer" : "Ask this wiki"
+export function fabLabel(state: AskState, t: Strings = en): string {
+  return state.resume && state.answer ? table(t).ask.backToAnswer : table(t).ask.title
 }
 
 export function parseAskState(raw: string | null | undefined): AskState {
@@ -429,7 +454,7 @@ export const LIVE_POLL_MS = 2000
 /** Live answers kept in the drawer for this page load. */
 export const LIVE_KEEP = 5
 /** Shown when the portal cannot be reached or answers in an unexpected way. */
-export const LIVE_FAILED = "The live agent could not be reached. Please try again later."
+export const LIVE_FAILED = en.ask.liveFailed
 
 const JOB_ID = /^[0-9a-f]{32}$/
 
@@ -439,12 +464,13 @@ export function parseLiveStatus(payload: unknown): boolean {
 }
 
 /** The visitor's text as a question (trimmed, 3 to 500 characters), or what to tell them. */
-export function liveQuestion(raw: string): { question: string } | { error: string } {
+export function liveQuestion(
+  raw: string,
+  t: Strings = en,
+): { question: string } | { error: string } {
   const question = raw.trim()
-  if (question.length < LIVE_QUESTION_MIN) return { error: "Please ask a complete question." }
-  if (question.length > LIVE_QUESTION_MAX) {
-    return { error: `Please keep the question under ${LIVE_QUESTION_MAX} characters.` }
-  }
+  if (question.length < LIVE_QUESTION_MIN) return { error: table(t).ask.tooShort }
+  if (question.length > LIVE_QUESTION_MAX) return { error: table(t).ask.tooLong(LIVE_QUESTION_MAX) }
   return { question }
 }
 
@@ -457,11 +483,11 @@ export function parseJobId(payload: unknown): string {
 }
 
 /** Message of a refused request (`{"message": …}`), else a generic one: never raw server text. */
-export function refusalMessage(payload: unknown): string {
+export function refusalMessage(payload: unknown, t: Strings = en): string {
   if (isRecord(payload) && typeof payload.message === "string" && payload.message.trim()) {
     return payload.message.trim().slice(0, 300)
   }
-  return LIVE_FAILED
+  return table(t).ask.liveFailed
 }
 
 export type LivePoll =
@@ -475,7 +501,7 @@ export type LivePoll =
  * links whatever the server sent, with the portal's message as an extra note. Throws when the
  * reply is not of this shape.
  */
-export function parseLivePoll(payload: unknown): LivePoll {
+export function parseLivePoll(payload: unknown, t: Strings = en): LivePoll {
   if (!isRecord(payload)) throw new Error("the live ask returned an unexpected reply")
   const message = typeof payload.message === "string" ? payload.message.trim().slice(0, 300) : ""
   const elapsed =
@@ -485,7 +511,7 @@ export function parseLivePoll(payload: unknown): LivePoll {
       return { state: "running", elapsed }
     case "error":
     case "busy":
-      return { state: "failed", status: payload.status, message: message || LIVE_FAILED }
+      return { state: "failed", status: payload.status, message: message || table(t).ask.liveFailed }
     case "done":
     case "unverified": {
       const parsed = answer(payload.answer)
@@ -515,8 +541,8 @@ export function parseLivePoll(payload: unknown): LivePoll {
 }
 
 /** "The Researcher is reading the wiki… 12 s" */
-export function waitingLabel(elapsedSeconds: number): string {
-  return `The Researcher is reading the wiki… ${Math.max(Math.floor(elapsedSeconds), 0)} s`
+export function waitingLabel(elapsedSeconds: number, t: Strings = en): string {
+  return table(t).ask.waiting(Math.max(Math.floor(elapsedSeconds), 0))
 }
 
 // ----- Drawer details: numbering, examples, the last live answers -----
@@ -563,11 +589,7 @@ export function isLiveNotice(banner: string): boolean {
 }
 
 /** Questions the sample corpus answers, offered when the drawer has no answer to show. */
-export const EXAMPLE_QUESTIONS: readonly string[] = [
-  "When are the windows of the extension delivered?",
-  "Which architect designed the extension of the Moreau house?",
-  "What is the current total contract price of the works, excluding and including VAT?",
-]
+export const EXAMPLE_QUESTIONS: readonly string[] = en.ask.examples
 
 function sameQuestion(a: string, b: string): boolean {
   const clean = (text: string) => text.trim().replace(/\s+/g, " ").toLowerCase()
@@ -589,9 +611,10 @@ export function filedAnswerFor(
 export function exampleQuestions(
   answers: readonly AskAnswer[] | null,
   live: boolean,
+  examples: readonly string[] = EXAMPLE_QUESTIONS,
 ): string[] {
-  if (live) return [...EXAMPLE_QUESTIONS]
-  return EXAMPLE_QUESTIONS.filter((question) => filedAnswerFor(answers ?? [], question))
+  if (live) return [...examples]
+  return examples.filter((question) => filedAnswerFor(answers ?? [], question))
 }
 
 /** sessionStorage key of the live answers of the session (they survive page navigation). */
@@ -647,11 +670,9 @@ export function shortDuration(seconds: number): string | null {
 }
 
 /** "$1.37": cost receipts are in USD (a missing currency reads as USD); else "EUR 1.37". */
-export function money(total: number, currency: string | null): string | null {
+export function money(total: number, currency: string | null, t: Strings = en): string | null {
   if (!Number.isFinite(total) || total < 0) return null
-  const tiny = total > 0 && total < 0.005
-  if (currency === null || currency === "USD") return tiny ? "<$0.01" : `$${total.toFixed(2)}`
-  return `${currency} ${tiny ? "<0.01" : total.toFixed(2)}`
+  return table(t).words.money(total, currency)
 }
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -670,7 +691,7 @@ function finite(value: unknown): number | null {
  * "last run 4 min · $1.37". `null` when the reply has no such run or says neither, so the card
  * keeps its build-time text. The reply is data: only numbers, dates and a currency code are read.
  */
-export function lastRunLine(payload: unknown): string | null {
+export function lastRunLine(payload: unknown, t: Strings = en): string | null {
   const runs = record(payload)?.runs
   const run = (Array.isArray(runs) ? runs : [])
     .map(record)
@@ -687,7 +708,7 @@ export function lastRunLine(payload: unknown): string | null {
   const total = finite(cost.total)
   const parts = [
     seconds === null ? null : shortDuration(seconds),
-    total === null ? null : money(total, currency),
+    total === null ? null : money(total, currency, t),
   ].filter((part): part is string => part !== null)
-  return parts.length > 0 ? `last run ${parts.join(" · ")}` : null
+  return parts.length > 0 ? table(t).words.lastRun(parts.join(" · ")) : null
 }
