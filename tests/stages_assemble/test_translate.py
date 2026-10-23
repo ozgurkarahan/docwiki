@@ -218,7 +218,7 @@ async def test_translation_and_mirror_page(batiment: DomainPack) -> None:
     result = await translate_plan(llm, plan, batiment)
     assert result.status == "translated" and result.calls == 1 == len(handler.calls)
     request = handler.calls[0]
-    assert request.tier == "fast" and request.prompt_version == "translate-v2"
+    assert request.tier == "fast" and request.prompt_version == "translate-v3"
     assert "from French (fr) into English (en)" in request.text
     # locked terms are placeholders now: the request names them per segment and lists the bans
     assert '"terms"' in request.text and "Never write:" in request.text
@@ -228,7 +228,7 @@ async def test_translation_and_mirror_page(batiment: DomainPack) -> None:
     assert fm.lang == "en" and fm.translation_of == fm.id == page.frontmatter.id
     assert fm.title == page.frontmatter.title and fm.summary.startswith("EN: Devis")
     # "lot" is a locked term: kept, and glossed by code on its first use on the page
-    assert "- EN: Le montant du lot [" in mirror.body and "] 5" in mirror.body
+    assert "- EN: Le montant du lot 5 [" in mirror.body  # after its reference
     assert "[^c1]" in mirror.body
     assert "### EN: Délais" in mirror.body
     # a JSON round trip of the cached result rebuilds the same page
@@ -321,7 +321,7 @@ async def test_a_page_whose_lots_are_written_as_words_is_translated(batiment: Do
     mirror = assemble_mirror(plan, result, batiment)
     gloss = next(term.gloss for term in batiment.terms.terms if term.term == "lot")
     # the placeholder is back: the canonical word, glossed by code once
-    assert f"Le montant du lot [{gloss}] 5" in mirror.body
+    assert f"Le montant du lot 5 [{gloss}]" in mirror.body
     assert mirror.frontmatter.summary == "EN: Devis de la menuiserie, lot 5."
 
 
@@ -426,3 +426,71 @@ def test_locked_terms_are_masked_for_the_model_and_glossed_once_by_code() -> Non
     # a second segment of the same page gets no gloss again
     again = _unmask(masked, tokens, terms, glosses, glossed)
     assert "[" + gloss not in again
+
+
+# -- gloss placement and the case of locked terms ------------------------------------------------
+
+
+def test_a_gloss_follows_the_whole_reference() -> None:
+    from docwiki.stages.translate import _unmask
+
+    glosses = {"OS": "works order", "lot": "work package", "DPGF": "priced breakdown"}
+    tokens = ("OS", "lot", "DPGF")
+    text = "The ⟦1⟧ n°3 moves ⟦2⟧ 5.2, then ⟦3⟧ DEV-2026-031 indice B of 13/03/2026."
+    out = _unmask(text, tokens, tokens, glosses, set())
+    assert out == (
+        "The OS n°3 [works order] moves lot 5.2 [work package], then "
+        "DPGF DEV-2026-031 indice B [priced breakdown] of 13/03/2026."
+    )
+    # no reference: the gloss follows the term itself
+    assert _unmask("The ⟦1⟧ is late.", ("lot",), ("lot",), glosses, set()) == (
+        "The lot [work package] is late."
+    )
+
+
+def test_a_locked_common_noun_takes_the_case_of_its_place() -> None:
+    from docwiki.stages.translate import _unmask
+
+    tokens = ("lot", "Lot", "OS")
+    terms = ("lot", "lot", "OS")
+    text = "⟦1⟧ 5 is late. The ⟦2⟧ 6 and the ⟦3⟧ are not."
+    assert _unmask(text, tokens, terms, recase=True) == (
+        "Lot 5 is late. The lot 6 and the OS are not."
+    )
+    # the canonical text of an untranslated page is never recased
+    assert _unmask(text, tokens, terms) == "lot 5 is late. The Lot 6 and the OS are not."
+
+
+def test_plurals_of_one_word_terms_are_locked_too(batiment: DomainPack) -> None:
+    from docwiki.stages.translate import _mask_terms
+
+    forms = Vocabulary.of(batiment).forms
+    masked, tokens, terms = _mask_terms("Les lots 02 et 03 et les situations n°1 à n°3.", forms)
+    assert "lots" not in masked and "situations" not in masked
+    assert dict(zip(tokens, terms, strict=True)) == {"lots": "lot", "situations": "situation"}
+    # acronyms are matched as written only
+    assert _mask_terms("Les OSs.", forms)[1] == ()
+
+
+async def test_glosses_never_go_in_a_heading_and_follow_terms_in_link_labels(
+    batiment: DomainPack,
+) -> None:
+    page = french_page()
+    body = page.body.replace("### Délais", "### Délais et OS").replace(
+        "La pose commence",
+        "Voir la [DPGF DEV-2026-031](../sources/dpgf.md) indice B du 13/03/2026. La pose commence",
+    )
+    page = page.model_copy(update={"body": body})
+    plan = plan_page(page, batiment, "en")
+    result = await translate_plan(FakeLlmClient({SCHEMA_NAME: echo()}), plan, batiment)
+    mirror = assemble_mirror(plan, result, batiment)
+    glosses = {term.term: term.gloss for term in batiment.terms.terms}
+    assert "### EN: Délais et OS\n" in mirror.body  # no gloss in the heading
+    # the gloss of a term inside a link label goes after the link and its reference
+    assert (
+        f"[DPGF DEV-2026-031](../sources/dpgf.md) indice B [{glosses['DPGF']}] du 13/03/2026"
+        in mirror.body
+    )
+    # the first use in the text gets the gloss the heading did not
+    assert f"l'OS n°3 [{glosses['OS']}]" in mirror.body
+    assert mirror.body.count(f"[{glosses['OS']}]") == 1

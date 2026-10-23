@@ -183,27 +183,87 @@ def _mask_terms(
     return masked, tuple(tokens), tuple(terms)
 
 
+_REFERENCE_RE = re.compile(
+    r"(?:[  ]+(?:n°[  ]?)?(?=[\w/-]*\d)[A-Za-z0-9](?:[\w/-]|[.,](?=\w))*)?"
+    r"(?:[  ]+indices?[  ]+[A-Z0-9]\b)?"
+)
+"""The reference that may follow a locked term (``lot 5``, ``OS n°3``, ``DPGF DEV-2026-031
+indice B``): its gloss goes after the reference, never between the term and its reference."""
+_LINK_LABEL_RE = re.compile(r"\[(?P<label>.*)\](?:\(|\[)", re.DOTALL)
+_SENTENCE_END = ".!?"
+_CLOSING = "\"'»”)"
+
+
+def _link_label(token: str) -> str:
+    """The label of a link token (``[DPGF DEV-2026-031](…)`` → ``DPGF DEV-2026-031``); empty
+    for an image, a footnote marker, code or an amount."""
+    match = _LINK_LABEL_RE.match(token)
+    return match.group("label") if match is not None else ""
+
+
+def _recased(original: str, term: str, sentence_start: bool) -> str:
+    """A locked common noun as the translated sentence places it: capitalised at the start of
+    a sentence, lower case inside one (an acronym or a name-like term is kept as written)."""
+    if not term[:1].islower() or not original[:1].isalpha():
+        return original
+    if sentence_start:
+        return original[:1].upper() + original[1:]
+    if original[1:] == original[1:].lower():
+        return original[:1].lower() + original[1:]
+    return original
+
+
 def _unmask(
     text: str,
     tokens: Sequence[str],
     terms: Sequence[str | None] = (),
     glosses: Mapping[str, str] | None = None,
     glossed: set[str] | None = None,
+    forms: Sequence[tuple[str, re.Pattern[str]]] = (),
+    recase: bool = False,
 ) -> str:
-    """``text`` with its placeholders restored. With ``glosses``, the first occurrence of each
-    locked term on the page (``glossed`` collects them) is followed by its gloss in brackets."""
+    """``text`` with its placeholders restored.
 
-    def restore(match: re.Match[str]) -> str:
+    With ``glosses``, the first occurrence of each locked term on the page (``glossed``
+    collects them) is followed by its gloss in brackets, after the reference that follows the
+    term (``lot 5 [gloss]``); a locked term in the label of a link (found with ``forms``) is
+    glossed after the link. With ``recase``, a locked common noun takes the case of its place
+    in the translated sentence.
+    """
+    out: list[str] = []
+    position = 0
+    for match in _PLACEHOLDER_RE.finditer(text):
+        out.append(text[position : match.start()])
+        position = match.end()
         index = int(match.group(1)) - 1
         original = tokens[index]
         term = terms[index] if index < len(terms) else None
-        if term is None or glosses is None or glossed is None or term in glossed:
-            return original
-        glossed.add(term)
-        gloss = glosses.get(term)
-        return f"{original} [{gloss}]" if gloss else original
-
-    return _PLACEHOLDER_RE.sub(restore, text)
+        if term is not None and recase:
+            before = "".join(out).rstrip().rstrip(_CLOSING)
+            start = not before or before[-1] in _SENTENCE_END
+            original = _recased(original, term, start)
+        out.append(original)
+        if glosses is None or glossed is None:
+            continue
+        if term is not None:
+            named = [term]
+        else:
+            named = [name for _, _, name in _locked_spans(_link_label(original), forms)]
+        owed: list[str] = []
+        for name in named:
+            if name in glossed:
+                continue
+            glossed.add(name)
+            if glosses.get(name):
+                owed.append(glosses[name])
+        if owed:
+            reference = _REFERENCE_RE.match(text, position)
+            if reference is not None:
+                out.append(reference.group(0))
+                position = reference.end()
+            out += [f" [{gloss}]" for gloss in owed]
+    out.append(text[position:])
+    return "".join(out)
 
 
 def _fixed_strings(source: Strings, target: Strings) -> tuple[dict[str, str], dict[str, str]]:
@@ -352,9 +412,17 @@ def _locked_counts(text: str, forms: Sequence[tuple[str, re.Pattern[str]]]) -> C
 
 
 def _whole_word(text: str) -> re.Pattern[str]:
+    """``text`` as whole words, any case; a one-word common noun (``lot``, ``situation``) also
+    matches its plural in ``s`` (``lots``, ``situations``), whichever forms the pack lists."""
     words = text.split()
     phrase = r"\s+".join(re.escape(word) for word in words)
-    return re.compile(rf"(?<!\w){phrase}(?!\w)", re.IGNORECASE)
+    plural = (
+        len(words) == 1
+        and text != text.upper()
+        and text[-1].isalpha()
+        and text[-1].lower() not in "sx"
+    )
+    return re.compile(rf"(?<!\w){phrase}{'s?' if plural else ''}(?!\w)", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -691,12 +759,25 @@ def assemble_mirror(plan: PagePlan, result: TranslationResult, pack: DomainPack)
         else None
     )
     glossed: set[str] = set()
+    forms = Vocabulary.of(pack).forms if glosses is not None else ()
+    recase = result.status == "translated"
     lines: list[str] = []
     for line in plan.lines:
         if isinstance(line, Segment):
             text = texts.get(line.id, line.text)
-            restored = _unmask(text, line.tokens, line.terms, glosses, glossed)
-            lines.append(plan.prefixes.get(line.id, "") + restored)
+            prefix = plan.prefixes.get(line.id, "")
+            # never a gloss in a heading: the first use in the text below gets it
+            in_heading = prefix.lstrip().startswith("#")
+            restored = _unmask(
+                text,
+                line.tokens,
+                line.terms,
+                None if in_heading else glosses,
+                glossed,
+                forms,
+                recase,
+            )
+            lines.append(prefix + restored)
         else:
             lines.append(line)
     if result.status != "translated":
@@ -711,7 +792,9 @@ def assemble_mirror(plan: PagePlan, result: TranslationResult, pack: DomainPack)
         segment = by_id.get(segment_id)
         if segment is None:
             return fallback
-        text = _unmask(texts.get(segment_id, segment.text), segment.tokens)
+        text = _unmask(
+            texts.get(segment_id, segment.text), segment.tokens, segment.terms, recase=recase
+        )
         return " ".join(text.split()) or fallback
 
     data["summary"] = text_of("summary", fm.summary)
