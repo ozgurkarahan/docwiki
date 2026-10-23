@@ -47,6 +47,13 @@ documents), the wiki covers several chantiers; `get_index('hubs/<folder>')` list
   chantiers ordered windows), say so, then answer per chantier or ask which one.
 - To work on one chantier, pass its code as `within` to `search` or `get_index`.
 
+## Computed views
+
+View pages (type `view`) are tables computed by code from the documents' tables, every row
+cited. For money, compliance or double-booking questions, `search` with `types: ["view"]` first,
+`read_page` the matching view and report its alerts too, then confirm decisive rows with
+`get_evidence`.
+
 ## Tool results
 
 Every tool returns JSON with `ok`; check it before using a result.

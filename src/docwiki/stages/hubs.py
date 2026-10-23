@@ -352,7 +352,8 @@ def _hub_page(
         "",
         "## Last document received",
         "",
-        f"- {md_link(last_title, path, summary.last.path)} ({summary.last_date.isoformat()})",
+        f"- {md_link(last_title, path, summary.last.path)}"
+        f"{_date_suffix(last_title, summary.last_date)}",
     ]
     frontmatter = HubFrontmatter(
         id=format_hub_id(scopes.plural, summary.scope),
@@ -422,6 +423,11 @@ def build_hubs(
     return HubBundle([*hubs, index], summaries)
 
 
+def _date_suffix(title: str, day: date) -> str:
+    """`` (yyyy-mm-dd)`` after a document title, unless the title already shows that date."""
+    return "" if day.isoformat() in title else f" ({day.isoformat()})"
+
+
 def dashboard_lines(bundle: HubBundle, pack: DomainPack, from_path: str) -> list[str]:
     """The company dashboard section of the home page: one table row per scope value."""
     scopes = pack.scopes
@@ -444,7 +450,7 @@ def dashboard_lines(bundle: HubBundle, pack: DomainPack, from_path: str) -> list
             f"| {inline_text(_phase_text(pack, item.phase))} "
             f"| {inline_text(str(client)) if client is not None else '—'} "
             f"| {len(item.sources)} "
-            f"| {last} ({item.last_date.isoformat()}) "
+            f"| {last}{_date_suffix(item.last.frontmatter.title, item.last_date)} "
             f"| {sum(page.frontmatter.contradictions for page in item.contradictions)} |"  # type: ignore[union-attr]
         )
     lines += [
