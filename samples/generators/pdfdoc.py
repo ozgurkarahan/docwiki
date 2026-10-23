@@ -146,6 +146,13 @@ class StampedPDF(FPDF):
         self.multi_cell(0, 6, clean(text), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.ln(1)
 
+    def title_line(self, text: str, size: float = 15.0, style: str = "B") -> None:
+        """A full-width title line (or lines) starting at the left margin."""
+        self.set_font(FAMILY, style, size)
+        self.multi_cell(0, size * 0.52, clean(text), align="L", new_x=XPos.LMARGIN,
+                        new_y=YPos.NEXT)
+        self.ln(1.5)
+
     def para(self, text: str, size: float = 9.5, style: str = "") -> None:
         self.set_font(FAMILY, style, size)
         self.multi_cell(0, size * 0.5, clean(text), align="L", new_x=XPos.LMARGIN,

@@ -1,9 +1,9 @@
 """The document contract of the sample corpus (spec domain-and-corpus.md section 3.4).
 
 Supersession, citation verification, containment and the evaluation rely on these properties
-of the generated files: upload-safe ASCII paths, document numbers and indices only in the quote
-and planning file names, amounts that parse as one number, the canary in a paragraph of its
-own, restricted-only values, and no architect anywhere.
+of the generated files: upload-safe ASCII paths, document numbers and indices only in the quote,
+DPGF and planning file names, amounts that parse as one number, the canary in a paragraph of its
+own, restricted-only values, and no architect on the chantier Moreau.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from docwiki.portal.process import check_upload_path
 from docwiki.stages.verify_citations import number_values, parse_number_spec
 
 SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._()+-]{0,99}$")
-REVISED_KINDS = {"devis": "DEV-", "planning": "PLN-"}
+REVISED_KINDS = {"devis": "DEV-", "dpgf": "DEV-", "planning": "PLN-"}
 PLANTED_AMOUNT = re.compile(r"(?<![\d,.])(\d+,\d{2}) ?€")
 GROUPED_AMOUNT = re.compile(r"(?<![\d,.])\d{1,3}(?:[ \u00a0\u202f.'’]\d{3})+,\d{2}(?!\d)")
 CANCELS = re.compile(r"annule et remplace (?:le |la )?(?:\w+ )?((?:DEV|PLN)-\d{4}-\d{3})")
@@ -77,9 +77,12 @@ def test_only_quotes_and_plannings_carry_numbers_and_indices(
         else:
             assert not name.upper().startswith(("DEV-", "PLN-")), name
             assert "indice" not in name.lower() and entry["revision"] is None, name
+    facts = bible["facts"]
     assert {number: sorted(found) for number, found in revisions.items()} == {
-        bible["facts"]["devis"]["number"]: [("A", "full"), ("B", "full")],
-        bible["facts"]["planning"]["number"]: [("A", "full"), ("B", "held-back")],
+        facts["devis"]["number"]: [("A", "full"), ("B", "full")],
+        facts["planning"]["number"]: [("A", "full"), ("B", "held-back")],
+        facts["ecole"]["dpgf"]["number"]: [("A", "full"), ("B", "full")],
+        facts["ecole"]["planning"]["number"]: [("A", "full")],
     }
 
 
@@ -106,7 +109,7 @@ def test_only_later_indices_cancel_and_replace_their_own_number(
             replacing.append(entry["id"])
         else:
             assert "annule et remplace" not in text.lower(), entry["path"]
-    assert sorted(replacing) == ["devis-b", "planning-b"]
+    assert sorted(replacing) == ["devis-b", "eco-dpgf-b", "planning-b"]
 
 
 def test_the_amendment_amends_and_never_replaces(
@@ -220,39 +223,58 @@ def test_the_canary_stands_in_a_paragraph_of_its_own(
 # ------------------------------------------------------------- rule 6: restricted values
 
 
+def _restricted_values(bible: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    facts = bible["facts"]
+    return {
+        "etude-prix": facts["etude_de_prix"]["restricted_only_values"],
+        "ent-marges": facts["entreprise"]["tableau_marges"]["restricted_only_values"],
+    }
+
+
 def test_restricted_only_values_appear_only_in_the_restricted_document(
     documents: list[dict[str, Any]], bible: dict[str, Any], extracted
 ) -> None:
-    values = bible["facts"]["etude_de_prix"]["restricted_only_values"]
+    by_id = _restricted_values(bible)
     restricted = [entry for entry in documents if entry["sensitivity"] == "restricted"]
     others = [entry for entry in documents if entry["sensitivity"] != "restricted"]
-    assert [entry["id"] for entry in restricted] == ["etude-prix"]
-    restricted_text = extracted(restricted[0]["path"]).text()
-    restricted_values = number_values(restricted_text)
+    assert sorted(entry["id"] for entry in restricted) == sorted(by_id)
     other_values: set[str] = set()
     for entry in others:
         other_values |= number_values(_full_text(entry, extracted))
-    assert len(values["long"]) >= 2
-    for raw in values["long"]:
-        assert sum(ch.isdigit() for ch in raw.split(",")[0]) >= 4, raw
-        value = _single_value(raw)
-        assert value in restricted_values, raw
-        assert value not in other_values, raw
     public = _flat(" ".join(_full_text(entry, extracted) for entry in others))
-    for raw in values["short"]:
-        assert raw in _flat(restricted_text), raw
-        assert raw not in public, raw
+    for entry in restricted:
+        values = by_id[entry["id"]]
+        restricted_text = extracted(entry["path"]).text()
+        restricted_values = number_values(restricted_text)
+        assert len(values["long"]) >= 2
+        for raw in values["long"]:
+            assert sum(ch.isdigit() for ch in raw.split(",")[0]) >= 4, raw
+            value = _single_value(raw)
+            assert value in restricted_values, raw
+            assert value not in other_values, raw
+        for raw in values["short"]:
+            assert raw in _flat(restricted_text), raw
+            assert raw not in public, raw
 
 
 # ------------------------------------------------------------------- abstain: no architect
 
 
-def test_no_document_mentions_an_architect(
+def test_no_document_of_the_chantier_moreau_mentions_an_architect(
     documents: list[dict[str, Any]], bible: dict[str, Any], extracted
 ) -> None:
-    terms = [_fold(term) for term in bible["facts"]["absent_from_corpus"]["terms"]]
+    """The abstain fact is scoped to one chantier: the résidence Les Nacrines has an architect
+    as maître d'œuvre, so the question must be answered per chantier."""
+    absent = bible["facts"]["absent_from_corpus"]
+    terms = [_fold(term) for term in absent["terms"]]
     assert {"architecte", "architect", "maitre d'oeuvre"} <= set(terms)
-    for entry in documents:
+    scope = f"/chantiers/{absent['chantier']}/"
+    moreau = [entry for entry in documents if scope in entry["path"]]
+    assert len(moreau) == 14
+    for entry in moreau:
         text = _fold(_full_text(entry, extracted))
         for term in terms:
             assert term not in text, (entry["path"], term)
+    elsewhere = _fold(" ".join(_full_text(entry, extracted) for entry in documents
+                               if "/chantiers/nacrines/" in entry["path"]))
+    assert "architecte" in elsewhere and "maitre d'oeuvre" in elsewhere

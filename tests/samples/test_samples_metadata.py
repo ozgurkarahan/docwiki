@@ -33,7 +33,7 @@ def test_office_metadata_is_neutral(
     organisations = {org["key"]: org["name"] for org in bible["organisations"]}
     catalog = {doc["path"]: doc for doc in bible["documents"]}
     office = [e for e in documents if e["format"] in ("docx", "xlsx")]
-    assert len(office) == 6
+    assert len(office) == 24
     for entry in office:
         doc = catalog[entry["path"]]
         with zipfile.ZipFile(corpus_root / entry["path"]) as package:
@@ -67,7 +67,7 @@ def test_python_libraries_metadata_is_gone(documents: list[dict[str, Any]], extr
 
 def test_pdf_metadata_is_neutral(documents: list[dict[str, Any]], extracted) -> None:
     pdfs = [e for e in documents if e["format"] == "pdf"]
-    assert len(pdfs) == 4
+    assert len(pdfs) == 12
     for entry in pdfs:
         metadata = extracted(entry["path"]).metadata
         for key in ("Author", "Creator", "Producer"):

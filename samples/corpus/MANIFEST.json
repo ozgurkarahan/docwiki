@@ -26,55 +26,33 @@
       }
     }
   },
-  "bible_sha256": "7aea1fa56093309cfd4358e545c6933d5d898d60f5e6950ec05a505e37417597",
+  "bible_sha256": "345b68ee780efb2b667f458d9838ac0f1a73cecc18f9c70625c9f41d03ab2a01",
   "totals": {
-    "files": 14,
-    "documents": 13,
+    "files": 42,
+    "documents": 41,
     "held_back": 1,
-    "bytes": 1215241,
+    "bytes": 2000669,
     "by_format": {
-      "docx": 3,
-      "eml": 2,
+      "docx": 10,
+      "eml": 4,
       "jpg": 2,
-      "pdf": 4,
-      "xlsx": 3
+      "pdf": 12,
+      "xlsx": 14
     }
   },
   "files": [
     {
-      "path": "full/achats/2026-03-13_bon-de-livraison-BL-2026-0391_scan.pdf",
-      "id": "bl-scan",
-      "sha256": "ff40780b2d0b630da3bf6ec922be96e98d2b36e98632710c4856f1220540abf5",
-      "bytes": 202781,
+      "path": "full/chantiers/ecole-montferrine/1-marche/acte-d-engagement/2026-03-20_acte-d-engagement-signe.pdf",
+      "id": "eco-ae",
+      "sha256": "92bba99e7ddd61850586cdb64bea5931be0aa84307bfd5d4cb0428f5b3763b61",
+      "bytes": 35217,
       "format": "pdf",
       "media_type": "application/pdf",
-      "kind": "achats",
-      "title": "Bon de livraison Zava Matériaux BL-2026-0391 (scan annoté)",
+      "kind": "ae",
+      "title": "Acte d'engagement - Rénovation énergétique de l'école élémentaire du Bourg (signé et notifié)",
       "lang": "fr",
-      "date": "2026-03-13",
-      "doc_number": "BL-2026-0391",
-      "revision": null,
-      "held_back": false,
-      "sensitivity": "public",
-      "procedure_like": false,
-      "stamp": "image",
-      "counts": {
-        "pages": 1
-      },
-      "text_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "path": "full/achats/2026-03-16_facture-FA-2026-0217_zava-materiaux.pdf",
-      "id": "facture",
-      "sha256": "0f49fd003663566ea57f86fd5f11b22ca2429670c6eca13e8958256d290249cc",
-      "bytes": 34932,
-      "format": "pdf",
-      "media_type": "application/pdf",
-      "kind": "achats",
-      "title": "Facture Zava Matériaux FA-2026-0217",
-      "lang": "fr",
-      "date": "2026-03-16",
-      "doc_number": "FA-2026-0217",
+      "date": "2026-03-20",
+      "doc_number": null,
       "revision": null,
       "held_back": false,
       "sensitivity": "public",
@@ -83,19 +61,122 @@
       "counts": {
         "pages": 1
       },
-      "text_sha256": "e71edb26d66b7f0b2200eec3ed9b0e5b4772a4241b9699ed53ad234b838d68db"
+      "text_sha256": "feb7f5df89c36e1211420ef6f3aec1a67b3b9f0973b4b3d32752490c3c87d0c6"
     },
     {
-      "path": "full/chantier/2026-03-24_compte-rendu-de-chantier-n3.docx",
-      "id": "cr3",
-      "sha256": "61e0653ce71b17f76d98d5a98187b9b3c449f4e35b070df6328d9876e2751b26",
-      "bytes": 35294,
+      "path": "full/chantiers/ecole-montferrine/1-marche/ccap/2026-01-26_ccap-extrait.pdf",
+      "id": "eco-ccap",
+      "sha256": "5b5b23f78bfdb2322815f3d2efba19844e17a2e2987f5d7e11ee4a8974cd0eb2",
+      "bytes": 35560,
+      "format": "pdf",
+      "media_type": "application/pdf",
+      "kind": "ccap",
+      "title": "CCAP (extrait) - Rénovation énergétique de l'école élémentaire du Bourg",
+      "lang": "fr",
+      "date": "2026-01-26",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "pages": 1
+      },
+      "text_sha256": "4b5c4d047c8ab4e7502b7764d4940a0ab0eff7920a079f0b587fbba51ca7e90a"
+    },
+    {
+      "path": "full/chantiers/ecole-montferrine/1-marche/dpgf/DEV-2026-031_indice-A_dpgf-ecole-du-bourg.xlsx",
+      "id": "eco-dpgf-a",
+      "sha256": "b74eccf6ec58c0bd3119b54f48b28d52d105b7480b9515dd5eba6e8c777b7e8b",
+      "bytes": 6476,
+      "format": "xlsx",
+      "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "kind": "dpgf",
+      "title": "DPGF DEV-2026-031 indice A - Rénovation énergétique de l'école élémentaire du Bourg",
+      "lang": "fr",
+      "date": "2026-02-13",
+      "doc_number": "DEV-2026-031",
+      "revision": "A",
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "sheets": [
+          {
+            "name": "DPGF",
+            "slug": "dpgf",
+            "rows": 17,
+            "columns": 6
+          }
+        ]
+      },
+      "text_sha256": "49c44dd0cb91de0e59da77f248bad755cfad3c847d06a669589ae2045ea1a264"
+    },
+    {
+      "path": "full/chantiers/ecole-montferrine/1-marche/dpgf/DEV-2026-031_indice-B_dpgf-ecole-du-bourg.xlsx",
+      "id": "eco-dpgf-b",
+      "sha256": "bfab9ec86218a1edc3ba54bf548d2145d8df9562a8abf76de39131bd89b773cb",
+      "bytes": 6748,
+      "format": "xlsx",
+      "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "kind": "dpgf",
+      "title": "DPGF DEV-2026-031 indice B - Rénovation énergétique de l'école élémentaire du Bourg",
+      "lang": "fr",
+      "date": "2026-03-13",
+      "doc_number": "DEV-2026-031",
+      "revision": "B",
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "sheets": [
+          {
+            "name": "DPGF",
+            "slug": "dpgf",
+            "rows": 20,
+            "columns": 6
+          }
+        ]
+      },
+      "text_sha256": "2539b7076b54b808faa96eb627a9b745f41c7a59b460741a9f76ca108c41054c"
+    },
+    {
+      "path": "full/chantiers/ecole-montferrine/2-preparation/client-email/2026-04-21_mail-client-mairie-accueil-de-loisirs.eml",
+      "id": "eco-mail-mairie",
+      "sha256": "c47649f36b65fd3047c39cdb8dd0221934afd4dc554165da806de948985b8d0f",
+      "bytes": 1301,
+      "format": "eml",
+      "media_type": "message/rfc822",
+      "kind": "correspondance",
+      "title": "Accueil de loisirs d'été à l'école du Bourg",
+      "lang": "fr",
+      "date": "2026-04-21",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "first-last-line",
+      "counts": {
+        "body_lines": 22,
+        "parts": 1
+      },
+      "text_sha256": "284de4e68d0f0bc7c30d7a1251eeb9b642981f001b524ce00ffdb82732177b56"
+    },
+    {
+      "path": "full/chantiers/ecole-montferrine/2-preparation/ppsps/2026-04-24_ppsps-lamna-batiment.docx",
+      "id": "eco-ppsps",
+      "sha256": "1dbc1243ba80bfe543959cab9164b8e50c82571a75b816f32baac715bb0db47c",
+      "bytes": 35477,
       "format": "docx",
       "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "kind": "chantier",
-      "title": "Compte rendu de chantier n°3 - réunion du 24/03/2026",
+      "kind": "ppsps",
+      "title": "PPSPS de Lamna Bâtiment - Rénovation énergétique de l'école élémentaire du Bourg",
       "lang": "fr",
-      "date": "2026-03-24",
+      "date": "2026-04-24",
       "doc_number": null,
       "revision": null,
       "held_back": false,
@@ -103,42 +184,168 @@
       "procedure_like": true,
       "stamp": "header-footer",
       "counts": {
-        "paragraphs": 19,
+        "paragraphs": 10,
         "tables": [
           8,
-          5
+          4,
+          7,
+          2
         ]
       },
-      "text_sha256": "777c6735c52a4f5ba3d4e59a79b37b21ef5ed91beb1e7aed349fd06f3c47bc38"
+      "text_sha256": "5afd18b26a9ff20d7597412d497dbb44d7154352d9bb9fa4a1138338a70ce7ff"
     },
     {
-      "path": "full/contrat/2026-02-10_contrat-de-travaux-signe.docx",
-      "id": "contrat",
-      "sha256": "039a85cfa6a9c020c386378c9e8ebd141e4d632e9c6d1fd7553f75db273951c2",
-      "bytes": 35443,
-      "format": "docx",
-      "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "kind": "contrat",
-      "title": "Contrat de travaux - Extension et rénovation de cuisine (signé)",
+      "path": "full/chantiers/ecole-montferrine/2-preparation/purchase-order/2026-04-02_bon-de-commande-BC-2026-021_vanarsdel-menuiseries.pdf",
+      "id": "eco-bc-vanarsdel",
+      "sha256": "5a5ef1bd1eee69f2ec5a38884c4bc3acbe4058d8ac034736ffc229ec104d2a72",
+      "bytes": 34727,
+      "format": "pdf",
+      "media_type": "application/pdf",
+      "kind": "commande",
+      "title": "Bon de commande BC-2026-021 - VanArsdel Menuiseries (école élémentaire du Bourg)",
       "lang": "fr",
-      "date": "2026-02-10",
-      "doc_number": null,
+      "date": "2026-04-02",
+      "doc_number": "BC-2026-021",
       "revision": null,
       "held_back": false,
       "sensitivity": "public",
       "procedure_like": false,
       "stamp": "header-footer",
       "counts": {
-        "paragraphs": 27,
-        "tables": [
-          7,
-          2
-        ]
+        "pages": 1
       },
-      "text_sha256": "a122c32c300038142f5670a7a8665b47c6c88518cfdf58c7eb90e663e3d0a019"
+      "text_sha256": "702a95b8ae572f49300bb15ede0c14b1f3c3493b8b8806c1014fe29a95447d80"
     },
     {
-      "path": "full/contrat/2026-03-10_avenant-n1-fenetre-de-toit.docx",
+      "path": "full/chantiers/ecole-montferrine/2-preparation/schedule/PLN-2026-007_indice-A_planning-travaux-ete.xlsx",
+      "id": "eco-planning",
+      "sha256": "667ebc8b8e308f5f79fe6ada963eadad3b4611df4c88011ce10cb6cf2af3b6b8",
+      "bytes": 6762,
+      "format": "xlsx",
+      "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "kind": "planning",
+      "title": "Planning des travaux d'été PLN-2026-007 indice A - École élémentaire du Bourg",
+      "lang": "fr",
+      "date": "2026-04-10",
+      "doc_number": "PLN-2026-007",
+      "revision": "A",
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": true,
+      "stamp": "header-footer",
+      "counts": {
+        "sheets": [
+          {
+            "name": "Planning",
+            "slug": "planning",
+            "rows": 20,
+            "columns": 8
+          }
+        ]
+      },
+      "text_sha256": "af45986e65f6df5d4debcaf96538350d1780e3691090890e11ac42c2e4872933"
+    },
+    {
+      "path": "full/chantiers/ecole-montferrine/2-preparation/site-meeting-minutes/2026-04-16_compte-rendu-de-reunion-de-preparation-n1.docx",
+      "id": "eco-cr-prep",
+      "sha256": "985672fe34d3ae1b6ea243cb8c4d60725415ba69879ba14f1e2566b2bf763b52",
+      "bytes": 35264,
+      "format": "docx",
+      "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "kind": "chantier",
+      "title": "Compte rendu de la réunion de préparation n°1 - École élémentaire du Bourg",
+      "lang": "fr",
+      "date": "2026-04-16",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": true,
+      "stamp": "header-footer",
+      "counts": {
+        "paragraphs": 18,
+        "tables": [
+          6,
+          4
+        ]
+      },
+      "text_sha256": "595920705146a0c65c497dc17a9827aa261b9445163315eeda89129802e5cf98"
+    },
+    {
+      "path": "full/chantiers/moreau/0-commercial/price-study/2026-02-02_etude-de-prix-interne.xlsx",
+      "id": "etude-prix",
+      "sha256": "9e43a71afd4073c4ccf344e3d81d72bbbb218313ed3947c081e1843a73db1b3b",
+      "bytes": 6819,
+      "format": "xlsx",
+      "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "kind": "restricted",
+      "title": "Étude de prix interne - devis DEV-2026-014 indice B (diffusion restreinte)",
+      "lang": "fr",
+      "date": "2026-02-02",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "restricted",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "sheets": [
+          {
+            "name": "Étude de prix",
+            "slug": "etude-de-prix",
+            "rows": 26,
+            "columns": 9
+          }
+        ]
+      },
+      "text_sha256": "75f11acd67d7190117179ab83ccc2fc38e46507c38910f151e1ee51f3f805622"
+    },
+    {
+      "path": "full/chantiers/moreau/0-commercial/quote/DEV-2026-014_indice-A_devis-extension-et-cuisine.pdf",
+      "id": "devis-a",
+      "sha256": "58eac824b6cda247323e29b52f0fdb420069b57adf51e5f3c765f934ca90ad4e",
+      "bytes": 41379,
+      "format": "pdf",
+      "media_type": "application/pdf",
+      "kind": "devis",
+      "title": "Devis DEV-2026-014 indice A - Extension et rénovation de cuisine",
+      "lang": "fr",
+      "date": "2026-01-20",
+      "doc_number": "DEV-2026-014",
+      "revision": "A",
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "pages": 2
+      },
+      "text_sha256": "e04a0dbdb8c238933aab05b8a734c5cadee9d095a2ed8d7f038cf467c102f1ff"
+    },
+    {
+      "path": "full/chantiers/moreau/0-commercial/quote/DEV-2026-014_indice-B_devis-extension-et-cuisine.pdf",
+      "id": "devis-b",
+      "sha256": "780b3b3ccc200f5987b94315327b5bc390d3be27978c2357f7429cd44c8c525a",
+      "bytes": 42241,
+      "format": "pdf",
+      "media_type": "application/pdf",
+      "kind": "devis",
+      "title": "Devis DEV-2026-014 indice B - Extension et rénovation de cuisine",
+      "lang": "fr",
+      "date": "2026-02-03",
+      "doc_number": "DEV-2026-014",
+      "revision": "B",
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "pages": 2
+      },
+      "text_sha256": "b12ea256c339b0dfc16394fedf41072264c4b0b899513a3f51691e249d727d22"
+    },
+    {
+      "path": "full/chantiers/moreau/1-marche/contract-amendment/2026-03-10_avenant-n1-fenetre-de-toit.docx",
       "id": "avenant",
       "sha256": "7f5d9eff447ff9308438b174c4581c6d8762dcebc05ae484fc7d9d8f278095d2",
       "bytes": 35304,
@@ -165,7 +372,33 @@
       "text_sha256": "a061e5dd67475103c94fc20ca4332ffdd279048928379be99949b8ec28204282"
     },
     {
-      "path": "full/correspondance/2026-03-04_mail-client-demande-de-modification.eml",
+      "path": "full/chantiers/moreau/1-marche/works-contract/2026-02-10_contrat-de-travaux-signe.docx",
+      "id": "contrat",
+      "sha256": "039a85cfa6a9c020c386378c9e8ebd141e4d632e9c6d1fd7553f75db273951c2",
+      "bytes": 35443,
+      "format": "docx",
+      "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "kind": "contrat",
+      "title": "Contrat de travaux - Extension et rénovation de cuisine (signé)",
+      "lang": "fr",
+      "date": "2026-02-10",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "paragraphs": 27,
+        "tables": [
+          7,
+          2
+        ]
+      },
+      "text_sha256": "a122c32c300038142f5670a7a8665b47c6c88518cfdf58c7eb90e663e3d0a019"
+    },
+    {
+      "path": "full/chantiers/moreau/3-execution/client-email/2026-03-04_mail-client-demande-de-modification.eml",
       "id": "mail-client",
       "sha256": "b63884ca102c73a5cf6a6b3d421724f175df6b51954cf9577b8e956216369b87",
       "bytes": 1209,
@@ -188,120 +421,29 @@
       "text_sha256": "08a28f37d7cca310a87e09c72b2cdc4c3f4de99bd0d1eb98779535ce6af2db45"
     },
     {
-      "path": "full/correspondance/2026-03-18_mail-vanarsdel-report-livraison-menuiseries.eml",
-      "id": "mail-fournisseur",
-      "sha256": "ae8a7e9ac20371fcd63730f4a28516222595fc584ce5a0557064dc69bbf52d9a",
-      "bytes": 1565,
-      "format": "eml",
-      "media_type": "message/rfc822",
-      "kind": "correspondance",
-      "title": "Report de livraison - commande BC-2026-009 (chantier Moreau, Valbrise)",
-      "lang": "fr",
-      "date": "2026-03-18",
-      "doc_number": null,
-      "revision": null,
-      "held_back": false,
-      "sensitivity": "public",
-      "procedure_like": false,
-      "stamp": "first-last-line",
-      "counts": {
-        "body_lines": 25,
-        "parts": 1
-      },
-      "text_sha256": "b4152b2e5a78a5abf894e26c2c427d3768c2edf97ebe2621d94cc9ba50c1cd8c"
-    },
-    {
-      "path": "full/devis/DEV-2026-014_indice-A_devis-extension-et-cuisine.pdf",
-      "id": "devis-a",
-      "sha256": "58eac824b6cda247323e29b52f0fdb420069b57adf51e5f3c765f934ca90ad4e",
-      "bytes": 41379,
+      "path": "full/chantiers/moreau/3-execution/delivery-note/2026-03-13_bon-de-livraison-BL-2026-0391_scan.pdf",
+      "id": "bl-scan",
+      "sha256": "ff40780b2d0b630da3bf6ec922be96e98d2b36e98632710c4856f1220540abf5",
+      "bytes": 202781,
       "format": "pdf",
       "media_type": "application/pdf",
-      "kind": "devis",
-      "title": "Devis DEV-2026-014 indice A - Extension et rénovation de cuisine",
-      "lang": "fr",
-      "date": "2026-01-20",
-      "doc_number": "DEV-2026-014",
-      "revision": "A",
-      "held_back": false,
-      "sensitivity": "public",
-      "procedure_like": false,
-      "stamp": "header-footer",
-      "counts": {
-        "pages": 2
-      },
-      "text_sha256": "e04a0dbdb8c238933aab05b8a734c5cadee9d095a2ed8d7f038cf467c102f1ff"
-    },
-    {
-      "path": "full/devis/DEV-2026-014_indice-B_devis-extension-et-cuisine.pdf",
-      "id": "devis-b",
-      "sha256": "780b3b3ccc200f5987b94315327b5bc390d3be27978c2357f7429cd44c8c525a",
-      "bytes": 42241,
-      "format": "pdf",
-      "media_type": "application/pdf",
-      "kind": "devis",
-      "title": "Devis DEV-2026-014 indice B - Extension et rénovation de cuisine",
-      "lang": "fr",
-      "date": "2026-02-03",
-      "doc_number": "DEV-2026-014",
-      "revision": "B",
-      "held_back": false,
-      "sensitivity": "public",
-      "procedure_like": false,
-      "stamp": "header-footer",
-      "counts": {
-        "pages": 2
-      },
-      "text_sha256": "b12ea256c339b0dfc16394fedf41072264c4b0b899513a3f51691e249d727d22"
-    },
-    {
-      "path": "full/photos/2026-03-12_photo-dalle-coulee.jpg",
-      "id": "photo-dalle",
-      "sha256": "c5a9ee9f0c687ad375eab89efe9c603148822d6c74f67e326b0e15f53ae2840f",
-      "bytes": 399882,
-      "format": "jpg",
-      "media_type": "image/jpeg",
-      "kind": "photos",
-      "title": "Photo de chantier - dalle de l'extension coulée (12/03/2026)",
-      "lang": "fr",
-      "date": "2026-03-12",
-      "doc_number": null,
-      "revision": null,
-      "held_back": false,
-      "sensitivity": "public",
-      "procedure_like": false,
-      "stamp": "image",
-      "counts": {
-        "width": 1536,
-        "height": 1024
-      },
-      "text_sha256": null
-    },
-    {
-      "path": "full/photos/2026-03-13_photo-palettes-livrees.jpg",
-      "id": "photo-palettes",
-      "sha256": "559fbd4ae598bf94227957b9ce76f5d712716d712ce5bedc584db43e49b4a9f4",
-      "bytes": 361601,
-      "format": "jpg",
-      "media_type": "image/jpeg",
-      "kind": "photos",
-      "title": "Photo de chantier - palettes de blocs béton livrées (13/03/2026)",
+      "kind": "achats",
+      "title": "Bon de livraison Zava Matériaux BL-2026-0391 (scan annoté)",
       "lang": "fr",
       "date": "2026-03-13",
-      "doc_number": null,
+      "doc_number": "BL-2026-0391",
       "revision": null,
       "held_back": false,
       "sensitivity": "public",
       "procedure_like": false,
       "stamp": "image",
       "counts": {
-        "width": 1536,
-        "height": 1024
+        "pages": 1
       },
-      "text_sha256": null
+      "text_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-      "path": "full/planning/PLN-2026-003_indice-A_planning-et-suivi-des-achats.xlsx",
+      "path": "full/chantiers/moreau/3-execution/schedule/PLN-2026-003_indice-A_planning-et-suivi-des-achats.xlsx",
       "id": "planning-a",
       "sha256": "92cce09e204930a4c0d374a5ae97d75329e56633c75c6de2fd7902c4ae051278",
       "bytes": 8270,
@@ -336,16 +478,564 @@
       "text_sha256": "379048801ac8e9c976c4c56ac6e3c7ef004bc998b5ece93da72e02e1c3d0e71d"
     },
     {
-      "path": "full/restricted/2026-02-02_etude-de-prix-interne.xlsx",
-      "id": "etude-prix",
-      "sha256": "9e43a71afd4073c4ccf344e3d81d72bbbb218313ed3947c081e1843a73db1b3b",
-      "bytes": 6819,
+      "path": "full/chantiers/moreau/3-execution/site-meeting-minutes/2026-03-24_compte-rendu-de-chantier-n3.docx",
+      "id": "cr3",
+      "sha256": "61e0653ce71b17f76d98d5a98187b9b3c449f4e35b070df6328d9876e2751b26",
+      "bytes": 35294,
+      "format": "docx",
+      "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "kind": "chantier",
+      "title": "Compte rendu de chantier n°3 - réunion du 24/03/2026",
+      "lang": "fr",
+      "date": "2026-03-24",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": true,
+      "stamp": "header-footer",
+      "counts": {
+        "paragraphs": 19,
+        "tables": [
+          8,
+          5
+        ]
+      },
+      "text_sha256": "777c6735c52a4f5ba3d4e59a79b37b21ef5ed91beb1e7aed349fd06f3c47bc38"
+    },
+    {
+      "path": "full/chantiers/moreau/3-execution/site-photo/2026-03-12_photo-dalle-coulee.jpg",
+      "id": "photo-dalle",
+      "sha256": "c5a9ee9f0c687ad375eab89efe9c603148822d6c74f67e326b0e15f53ae2840f",
+      "bytes": 399882,
+      "format": "jpg",
+      "media_type": "image/jpeg",
+      "kind": "photos",
+      "title": "Photo de chantier - dalle de l'extension coulée (12/03/2026)",
+      "lang": "fr",
+      "date": "2026-03-12",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "image",
+      "counts": {
+        "width": 1536,
+        "height": 1024
+      },
+      "text_sha256": null
+    },
+    {
+      "path": "full/chantiers/moreau/3-execution/site-photo/2026-03-13_photo-palettes-livrees.jpg",
+      "id": "photo-palettes",
+      "sha256": "559fbd4ae598bf94227957b9ce76f5d712716d712ce5bedc584db43e49b4a9f4",
+      "bytes": 361601,
+      "format": "jpg",
+      "media_type": "image/jpeg",
+      "kind": "photos",
+      "title": "Photo de chantier - palettes de blocs béton livrées (13/03/2026)",
+      "lang": "fr",
+      "date": "2026-03-13",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "image",
+      "counts": {
+        "width": 1536,
+        "height": 1024
+      },
+      "text_sha256": null
+    },
+    {
+      "path": "full/chantiers/moreau/3-execution/supplier-email/2026-03-18_mail-vanarsdel-report-livraison-menuiseries.eml",
+      "id": "mail-fournisseur",
+      "sha256": "ae8a7e9ac20371fcd63730f4a28516222595fc584ce5a0557064dc69bbf52d9a",
+      "bytes": 1565,
+      "format": "eml",
+      "media_type": "message/rfc822",
+      "kind": "correspondance",
+      "title": "Report de livraison - commande BC-2026-009 (chantier Moreau, Valbrise)",
+      "lang": "fr",
+      "date": "2026-03-18",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "first-last-line",
+      "counts": {
+        "body_lines": 25,
+        "parts": 1
+      },
+      "text_sha256": "b4152b2e5a78a5abf894e26c2c427d3768c2edf97ebe2621d94cc9ba50c1cd8c"
+    },
+    {
+      "path": "full/chantiers/moreau/3-execution/supplier-invoice/2026-03-16_facture-FA-2026-0217_zava-materiaux.pdf",
+      "id": "facture",
+      "sha256": "0f49fd003663566ea57f86fd5f11b22ca2429670c6eca13e8958256d290249cc",
+      "bytes": 34932,
+      "format": "pdf",
+      "media_type": "application/pdf",
+      "kind": "achats",
+      "title": "Facture Zava Matériaux FA-2026-0217",
+      "lang": "fr",
+      "date": "2026-03-16",
+      "doc_number": "FA-2026-0217",
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "pages": 1
+      },
+      "text_sha256": "e71edb26d66b7f0b2200eec3ed9b0e5b4772a4241b9699ed53ad234b838d68db"
+    },
+    {
+      "path": "full/chantiers/nacrines/1-marche/dc4/2026-01-08_declaration-de-sous-traitance-dc4-adatum.pdf",
+      "id": "nac-dc4",
+      "sha256": "e5039e73e33190c7100d3208dbe341783ef84ca0d515ba88adcd1d412ecf4584",
+      "bytes": 34709,
+      "format": "pdf",
+      "media_type": "application/pdf",
+      "kind": "dc4",
+      "title": "Déclaration de sous-traitance DC4 - Adatum Électricité (acceptée le 08/01/2026)",
+      "lang": "fr",
+      "date": "2026-01-08",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "pages": 1
+      },
+      "text_sha256": "f9f704dd7a7cc9ab4925b0b35bc43ba386daf9ea159d6b8681845a29c2a710bd"
+    },
+    {
+      "path": "full/chantiers/nacrines/1-marche/subcontract/2025-12-10_contrat-de-sous-traitance-adatum-electricite.docx",
+      "id": "nac-sous-traitance",
+      "sha256": "fec9ef22e5246d773a24de1a1f3c5f980ecb8d0c0adf92a24cfcfc2e1dac1631",
+      "bytes": 35088,
+      "format": "docx",
+      "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "kind": "sous-traitance",
+      "title": "Contrat de sous-traitance - Lot 5, résidence Les Nacrines (Adatum Électricité)",
+      "lang": "fr",
+      "date": "2025-12-10",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "paragraphs": 22,
+        "tables": [
+          2
+        ]
+      },
+      "text_sha256": "289c32efe90f86cf58d5829b78b8e8e64513522f229f5ac5a2ba5651a33d28b0"
+    },
+    {
+      "path": "full/chantiers/nacrines/1-marche/works-contract/2025-11-20_marche-de-travaux-signe.docx",
+      "id": "nac-marche",
+      "sha256": "3c4384713de283277d768e5457e27f1cc77b854e6ef03ac5eaf4bb8ccb996713",
+      "bytes": 36211,
+      "format": "docx",
+      "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "kind": "marche",
+      "title": "Marché de travaux - Résidence Les Nacrines, ravalement, isolation et menuiseries (signé)",
+      "lang": "fr",
+      "date": "2025-11-20",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "paragraphs": 31,
+        "tables": [
+          10,
+          2
+        ]
+      },
+      "text_sha256": "e261515305eb9cf1715885a82357fa01fe92a90b646a4eb2775f665d732a16f5"
+    },
+    {
+      "path": "full/chantiers/nacrines/3-execution/ordre-de-service/2026-02-16_ordre-de-service-n1-nez-de-balcons.docx",
+      "id": "nac-os1",
+      "sha256": "5c7cd4c734b1c931457580c7cbdef0e5974e9e75a04cac832ca7024187333df9",
+      "bytes": 35042,
+      "format": "docx",
+      "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "kind": "ordre-de-service",
+      "title": "Ordre de service n°1 - Reprise des nez de balcons, résidence Les Nacrines",
+      "lang": "fr",
+      "date": "2026-02-16",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "paragraphs": 13,
+        "tables": [
+          5,
+          2
+        ]
+      },
+      "text_sha256": "79104b0097faef00bdeaa978624e31ef6dcb36fc973ee846ad201e1b8992997a"
+    },
+    {
+      "path": "full/chantiers/nacrines/3-execution/site-meeting-minutes/2026-03-26_compte-rendu-de-chantier-n12.docx",
+      "id": "nac-cr12",
+      "sha256": "017a98393307df9890817c2309ae3ff8d85ca0a1467270ea5d839b32479905da",
+      "bytes": 35413,
+      "format": "docx",
+      "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "kind": "chantier",
+      "title": "Compte rendu de chantier n°12 - réunion du 26/03/2026, résidence Les Nacrines",
+      "lang": "fr",
+      "date": "2026-03-26",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": true,
+      "stamp": "header-footer",
+      "counts": {
+        "paragraphs": 19,
+        "tables": [
+          7,
+          4
+        ]
+      },
+      "text_sha256": "61232dab5b35c871888677842710c939739c7a7790b2261f94ae721c5e66918f"
+    },
+    {
+      "path": "full/chantiers/nacrines/3-execution/situation/2026-03-31_situation-n4.xlsx",
+      "id": "nac-situation4",
+      "sha256": "e581e203392dd2e71b70254eb32100dd06c48bd7f6ddcedc36b087f49458c4f4",
+      "bytes": 8750,
+      "format": "xlsx",
+      "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "kind": "situation",
+      "title": "Situation n°4 au 31/03/2026 - Résidence Les Nacrines",
+      "lang": "fr",
+      "date": "2026-03-31",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "sheets": [
+          {
+            "name": "Situation",
+            "slug": "situation",
+            "rows": 9,
+            "columns": 5
+          },
+          {
+            "name": "Récapitulatif",
+            "slug": "recapitulatif",
+            "rows": 18,
+            "columns": 2
+          },
+          {
+            "name": "Sous-traitance",
+            "slug": "sous-traitance",
+            "rows": 2,
+            "columns": 8
+          }
+        ]
+      },
+      "text_sha256": "136818016260f919f3e01f12eb33ce168522aee68a04457c9b22a5067dd54ae6"
+    },
+    {
+      "path": "full/chantiers/nacrines/3-execution/supplier-invoice/2026-02-12_facture-FA-2026-0158_zava-materiaux.pdf",
+      "id": "nac-facture",
+      "sha256": "699bd249d72f8cb5f149d3e668e4d5c363770f680553f76a6f1d20efd5496a18",
+      "bytes": 35915,
+      "format": "pdf",
+      "media_type": "application/pdf",
+      "kind": "achats",
+      "title": "Facture Zava Matériaux FA-2026-0158",
+      "lang": "fr",
+      "date": "2026-02-12",
+      "doc_number": "FA-2026-0158",
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "pages": 1
+      },
+      "text_sha256": "ba45047602eda811c25b80b3e81d97a6a282e9384b8484093d1288a857f37bcb"
+    },
+    {
+      "path": "full/chantiers/nacrines/4-reception/liste-des-reserves/2026-04-14_liste-des-reserves-etat-de-levee.xlsx",
+      "id": "nac-reserves",
+      "sha256": "511bd1aa8a85f8f2a9a5461ae637d74be88d2e57ef4d8ade718ad549b17eabe8",
+      "bytes": 6542,
+      "format": "xlsx",
+      "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "kind": "reserves",
+      "title": "Liste des réserves et état de levée au 14/04/2026 - Résidence Les Nacrines",
+      "lang": "fr",
+      "date": "2026-04-14",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "sheets": [
+          {
+            "name": "Réserves",
+            "slug": "reserves",
+            "rows": 14,
+            "columns": 8
+          }
+        ]
+      },
+      "text_sha256": "e2e17d3cd04a28aafd2726ca7884aba88021a63dafa66f8325722a0ffd5ba1e2"
+    },
+    {
+      "path": "full/chantiers/nacrines/4-reception/pv-de-reception/2026-04-03_pv-de-reception-avec-reserves_scan.pdf",
+      "id": "nac-pv",
+      "sha256": "48110394d4ed56a225c75cfb19458a5e904af9de2a3b118ff057a350d01badbb",
+      "bytes": 222226,
+      "format": "pdf",
+      "media_type": "application/pdf",
+      "kind": "reception",
+      "title": "Procès-verbal de réception des travaux - Résidence Les Nacrines (scan signé)",
+      "lang": "fr",
+      "date": "2026-04-03",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "image",
+      "counts": {
+        "pages": 1
+      },
+      "text_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "full/chantiers/nacrines/4-reception/supplier-email/2026-04-08_mail-vanarsdel-report-livraison-portes.eml",
+      "id": "nac-mail-vanarsdel",
+      "sha256": "27b0537fab7d7cbe9f3bd5c53bf7df02494760ed2f2ae3d17e47cc654155e8db",
+      "bytes": 1423,
+      "format": "eml",
+      "media_type": "message/rfc822",
+      "kind": "correspondance",
+      "title": "Report de livraison - commande BC-2026-005 (résidence Les Nacrines, Valbrise)",
+      "lang": "fr",
+      "date": "2026-04-08",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "first-last-line",
+      "counts": {
+        "body_lines": 23,
+        "parts": 1
+      },
+      "text_sha256": "aabdf6175606cdb6861f18b461c1c0ba2ecbfff5829f8492c0937b8c87f3f6c1"
+    },
+    {
+      "path": "full/entreprise/billing-register/2026-04-10_suivi-de-facturation-clients.xlsx",
+      "id": "ent-suivi-facturation",
+      "sha256": "767d8a2a0418b18d6836c9fbae3e1676f2dbe2a50dfd89cc2209ffb02f800cb1",
+      "bytes": 7593,
+      "format": "xlsx",
+      "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "kind": "facturation",
+      "title": "Suivi de facturation clients au 10/04/2026 - Lamna Bâtiment",
+      "lang": "fr",
+      "date": "2026-04-10",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "sheets": [
+          {
+            "name": "Marchés",
+            "slug": "marches",
+            "rows": 4,
+            "columns": 10
+          },
+          {
+            "name": "Factures",
+            "slug": "factures",
+            "rows": 9,
+            "columns": 10
+          }
+        ]
+      },
+      "text_sha256": "c7c4192ea9e65b19e915dbff9d229b812943fe767dfc41185753a62c66f785dc"
+    },
+    {
+      "path": "full/entreprise/compliance-register/2026-04-10_registre-des-attestations-sous-traitants.xlsx",
+      "id": "ent-registre-attestations",
+      "sha256": "0b7402bb1bdf475c602bf19dfe598628704cb749eaedf0e720c119f8f88be8af",
+      "bytes": 6232,
+      "format": "xlsx",
+      "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "kind": "attestations",
+      "title": "Registre des attestations des sous-traitants au 10/04/2026",
+      "lang": "fr",
+      "date": "2026-04-10",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "sheets": [
+          {
+            "name": "Attestations",
+            "slug": "attestations",
+            "rows": 13,
+            "columns": 7
+          }
+        ]
+      },
+      "text_sha256": "c2f07fede73893d6fbc091f942ebbc8b53d021ec299a29d1f73a9cc97559f7b8"
+    },
+    {
+      "path": "full/entreprise/crew-schedule/2026-04-03_planning-des-equipes-s15-s17.xlsx",
+      "id": "ent-planning-equipes",
+      "sha256": "6e798e112e1e93f4575d4c7a1a9b8840948c87816ef6073289e9739cb3ab0d74",
+      "bytes": 6722,
+      "format": "xlsx",
+      "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "kind": "equipes",
+      "title": "Planning des équipes - semaines 15 à 17 (2026)",
+      "lang": "fr",
+      "date": "2026-04-03",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": true,
+      "stamp": "header-footer",
+      "counts": {
+        "sheets": [
+          {
+            "name": "Équipes",
+            "slug": "equipes",
+            "rows": 21,
+            "columns": 8
+          }
+        ]
+      },
+      "text_sha256": "6ef448f30778f8eb7a5dd500fb383fb1eef58ea021f7aa990e58f2eb61476cd6"
+    },
+    {
+      "path": "full/entreprise/equipment-register/2026-04-10_registre-du-materiel.xlsx",
+      "id": "ent-registre-materiel",
+      "sha256": "bb62491a5419bcf631f5359259c3cbcb56d9b0e804af2ff0d0f137bb8af8ba74",
+      "bytes": 6461,
+      "format": "xlsx",
+      "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "kind": "materiel",
+      "title": "Registre du matériel au 10/04/2026 - Lamna Bâtiment",
+      "lang": "fr",
+      "date": "2026-04-10",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": true,
+      "stamp": "header-footer",
+      "counts": {
+        "sheets": [
+          {
+            "name": "Matériel",
+            "slug": "materiel",
+            "rows": 12,
+            "columns": 8
+          }
+        ]
+      },
+      "text_sha256": "97e4c80b189556006e731410548be5b10ca16a835b43ef88dd4d9317f03769ae"
+    },
+    {
+      "path": "full/entreprise/framework-agreement/2026-01-08_contrat-cadre-zava-materiaux.docx",
+      "id": "ent-contrat-cadre",
+      "sha256": "107c94a2fcabe0e87cc99be525639cd6755f2bf72dddb9277e91918795de476f",
+      "bytes": 34951,
+      "format": "docx",
+      "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "kind": "contrat-cadre",
+      "title": "Contrat-cadre d'approvisionnement 2026 - Zava Matériaux et Lamna Bâtiment",
+      "lang": "fr",
+      "date": "2026-01-08",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "paragraphs": 21,
+        "tables": [
+          2
+        ]
+      },
+      "text_sha256": "18fe6bba310563127a22328044969156b15e80c217f028066f7307502d55b8e9"
+    },
+    {
+      "path": "full/entreprise/general-terms/2026-01-05_conditions-generales-2026.pdf",
+      "id": "ent-cgv",
+      "sha256": "332e06fb057e269a53d7ae64b2962d2a971502cb4cf11659190a9689d57806ab",
+      "bytes": 31704,
+      "format": "pdf",
+      "media_type": "application/pdf",
+      "kind": "cgv",
+      "title": "Conditions générales 2026 - Lamna Bâtiment",
+      "lang": "fr",
+      "date": "2026-01-05",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "pages": 1
+      },
+      "text_sha256": "28c9ea3ea7fe3384f2c268cbc22e3ac622f4b06ceb1b5821af00939b94ad9995"
+    },
+    {
+      "path": "full/entreprise/margin-dashboard/2026-04-10_tableau-de-bord-des-marges.xlsx",
+      "id": "ent-marges",
+      "sha256": "2c20187dfa2d7ffaa4567fe241aa52b1c2262470003205c7548970880bd8bd82",
+      "bytes": 6174,
       "format": "xlsx",
       "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "kind": "restricted",
-      "title": "Étude de prix interne - devis DEV-2026-014 indice B (diffusion restreinte)",
+      "title": "Tableau de bord des marges au 31/03/2026 (diffusion restreinte)",
       "lang": "fr",
-      "date": "2026-02-02",
+      "date": "2026-04-10",
       "doc_number": null,
       "revision": null,
       "held_back": false,
@@ -355,17 +1045,68 @@
       "counts": {
         "sheets": [
           {
-            "name": "Étude de prix",
-            "slug": "etude-de-prix",
-            "rows": 26,
+            "name": "Marges",
+            "slug": "marges",
+            "rows": 9,
             "columns": 9
           }
         ]
       },
-      "text_sha256": "75f11acd67d7190117179ab83ccc2fc38e46507c38910f151e1ee51f3f805622"
+      "text_sha256": "9469e7ba07d49bef38de5ec315f09ef864e2c8ca53bf3d5f3a390424a96ec57f"
     },
     {
-      "path": "held-back/planning/PLN-2026-003_indice-B_planning-et-suivi-des-achats.xlsx",
+      "path": "full/entreprise/organisation-chart/2026-01-05_organigramme.pdf",
+      "id": "ent-organigramme",
+      "sha256": "3cf83e0aba4f4a0787c262b8254d6580f177c6671c3ff852480cde948570c9db",
+      "bytes": 30090,
+      "format": "pdf",
+      "media_type": "application/pdf",
+      "kind": "organigramme",
+      "title": "Organigramme 2026 - Lamna Bâtiment",
+      "lang": "fr",
+      "date": "2026-01-05",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "pages": 1
+      },
+      "text_sha256": "4c16034da7f5daab1badca1200c851ce6eb693e6b9a4801688e889a61e8ab8f0"
+    },
+    {
+      "path": "full/entreprise/price-list/2026-01-08_tarif-2026-zava-materiaux.xlsx",
+      "id": "ent-tarif",
+      "sha256": "9f839ad248fa0b28cb3f32c4753370aa793770ca9fc31f445fddaf36bfd4948c",
+      "bytes": 6650,
+      "format": "xlsx",
+      "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "kind": "tarif",
+      "title": "Tarif 2026 contrat-cadre - Zava Matériaux",
+      "lang": "fr",
+      "date": "2026-01-08",
+      "doc_number": null,
+      "revision": null,
+      "held_back": false,
+      "sensitivity": "public",
+      "procedure_like": false,
+      "stamp": "header-footer",
+      "counts": {
+        "sheets": [
+          {
+            "name": "Tarif 2026",
+            "slug": "tarif-2026",
+            "rows": 19,
+            "columns": 5
+          }
+        ]
+      },
+      "text_sha256": "ac1effabefb4d973af292113e03363131690c4b48ff87bff053342366d1c6c49"
+    },
+    {
+      "path": "held-back/chantiers/moreau/3-execution/schedule/PLN-2026-003_indice-B_planning-et-suivi-des-achats.xlsx",
       "id": "planning-b",
       "sha256": "52ac3399494bf0970c88cfa9cd557c15bcf195bee67b559f8780bf8345a56bfd",
       "bytes": 8521,

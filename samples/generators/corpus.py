@@ -8,15 +8,27 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
 
-from . import gen_docx, gen_eml, gen_images, gen_pdf, gen_scan, gen_xlsx
+from . import (
+    gen_docx,
+    gen_ecole,
+    gen_eml,
+    gen_entreprise,
+    gen_images,
+    gen_nacrines,
+    gen_pdf,
+    gen_scan,
+    gen_xlsx,
+)
 from .common import write_bytes, write_text
 from .datasets import check_world
+from .datasets_f import check_world_f
 from .manifest import MANIFEST_NAME, build_manifest
 from .world import World, load_world
 
 Generator = Callable[[World], bytes | str]
 
 GENERATORS: dict[str, Generator] = {
+    # chantier Moreau
     "devis-a": gen_pdf.devis_a,
     "devis-b": gen_pdf.devis_b,
     "contrat": gen_docx.contrat,
@@ -31,6 +43,37 @@ GENERATORS: dict[str, Generator] = {
     "photo-palettes": gen_images.photo_palettes,
     "etude-prix": gen_xlsx.etude_prix,
     "planning-b": gen_xlsx.planning_b,
+    # chantier résidence Les Nacrines
+    "nac-marche": gen_nacrines.marche,
+    "nac-sous-traitance": gen_nacrines.sous_traitance,
+    "nac-dc4": gen_nacrines.dc4,
+    "nac-os1": gen_nacrines.os1,
+    "nac-facture": gen_nacrines.facture,
+    "nac-situation4": gen_nacrines.situation4,
+    "nac-cr12": gen_nacrines.compte_rendu,
+    "nac-pv": gen_nacrines.pv_scan,
+    "nac-reserves": gen_nacrines.reserves,
+    "nac-mail-vanarsdel": gen_nacrines.mail_vanarsdel,
+    # chantier école de Montferrine
+    "eco-ccap": gen_ecole.ccap,
+    "eco-dpgf-a": gen_ecole.dpgf_a,
+    "eco-dpgf-b": gen_ecole.dpgf_b,
+    "eco-ae": gen_ecole.acte_engagement,
+    "eco-bc-vanarsdel": gen_ecole.bon_de_commande,
+    "eco-planning": gen_ecole.planning,
+    "eco-cr-prep": gen_ecole.compte_rendu,
+    "eco-mail-mairie": gen_ecole.mail_mairie,
+    "eco-ppsps": gen_ecole.ppsps,
+    # entreprise
+    "ent-cgv": gen_entreprise.conditions_generales,
+    "ent-organigramme": gen_entreprise.organigramme,
+    "ent-contrat-cadre": gen_entreprise.contrat_cadre,
+    "ent-tarif": gen_entreprise.tarif,
+    "ent-planning-equipes": gen_entreprise.planning_equipes,
+    "ent-registre-materiel": gen_entreprise.registre_materiel,
+    "ent-registre-attestations": gen_entreprise.registre_attestations,
+    "ent-suivi-facturation": gen_entreprise.suivi_facturation,
+    "ent-marges": gen_entreprise.tableau_marges,
 }
 
 # Top-level folders of the corpus; a full build replaces them.
@@ -43,6 +86,7 @@ def build_corpus(
     """Generate the corpus into ``out``; a full build first removes the generated sub-folders."""
     world = load_world()
     check_world(world)
+    check_world_f(world)
     ids = [str(doc["id"]) for doc in world.documents]
     missing = sorted(set(ids) - GENERATORS.keys())
     unknown = sorted(GENERATORS.keys() - set(ids))

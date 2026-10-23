@@ -62,7 +62,7 @@ def test_stamps_are_present(documents: list[dict[str, Any]], extracted, corpus_r
                 assert fmt == "jpg", path
                 _assert_caption(entry, corpus_root)
         checked += 1
-    assert checked == len(documents) == 14
+    assert checked == len(documents) == 42
 
 
 def _assert_caption(entry: dict[str, Any], corpus_root: Path) -> None:
