@@ -32,6 +32,7 @@ __all__ = [
     "EntityType",
     "GlossaryFile",
     "GlossaryTerm",
+    "LockedTerm",
     "PackInfo",
     "RegistryEntry",
     "ResolutionFile",
@@ -39,8 +40,10 @@ __all__ = [
     "SensitivityRule",
     "SupersessionFile",
     "TaxonomyFile",
+    "TermsFile",
     "TopicDef",
     "TopicsFile",
+    "locked_terms_note",
 ]
 
 Scalar = str | int | float | bool | None
@@ -229,6 +232,24 @@ class GlossaryFile(ContractModel):
         return self
 
 
+class LockedTerm(ContractModel):
+    """A trade term the wiki keeps in the documents' language (v1.7, ADR 0012): never translated
+    or paraphrased; the English gloss is given once, on first use; the banned renderings are the
+    translations that change its meaning (verify gate G16)."""
+
+    term: NonEmptyStr
+    forms: list[NonEmptyStr] = []
+    """Other written forms of the same term (feminine, plural, abbreviation)."""
+    gloss: NonEmptyStr
+    banned: list[NonEmptyStr] = []
+
+
+class TermsFile(ContractModel):
+    """``terms.yaml``: the locked trade vocabulary."""
+
+    terms: list[LockedTerm] = []
+
+
 class SensitivityRule(ContractModel):
     tier: Sensitivity
     path_glob: str | None = None
@@ -295,6 +316,7 @@ class DomainPack(ContractModel):
     entities: EntitiesFile
     topics: TopicsFile
     glossary: GlossaryFile
+    terms: TermsFile = Field(default_factory=TermsFile)
     sensitivity: SensitivityFile
     supersession: SupersessionFile | None = None
     resolution: ResolutionFile = Field(default_factory=ResolutionFile)
@@ -347,3 +369,19 @@ class DomainPack(ContractModel):
     @property
     def topic_ids(self) -> list[str]:
         return [f"topic:{topic.slug}" for topic in self.topics.topics]
+
+
+def locked_terms_note(pack: DomainPack) -> str:
+    """The locked trade vocabulary as an instruction for the prompts (empty without terms)."""
+    terms = pack.terms.terms
+    if not terms:
+        return ""
+    lines = [
+        "Locked trade terms (keep them in French, exactly as written; give the English gloss in "
+        "brackets the first time each appears on a page, never translate or paraphrase them):",
+    ]
+    for term in terms:
+        forms = f" (also {', '.join(term.forms)})" if term.forms else ""
+        banned = f"; never write {', '.join(repr(b) for b in term.banned)}" if term.banned else ""
+        lines.append(f"- {term.term}{forms}: {term.gloss}{banned}")
+    return "\n".join(lines)

@@ -26,7 +26,7 @@ from docwiki.contracts.ids import entity_page_path, normalize_tags
 from docwiki.contracts.markdown import relative_link
 from docwiki.contracts.pages import Alias, DocwikiStamp, EntityFrontmatter, Page
 from docwiki.domain import DomainPack
-from docwiki.domain.models import RegistryEntry
+from docwiki.domain.models import RegistryEntry, locked_terms_note
 from docwiki.domain.rules import normalize_for_matching
 from docwiki.engine_types import CitedLocator, CompiledResult, VerifiedCitation
 from docwiki.llm import LlmClient, LlmError
@@ -199,6 +199,7 @@ def _summary_request(
     type_title: str,
     facts: Sequence[_EntityFact],
     infos: Mapping[str, SourceInfo],
+    locked: str = "",
 ) -> str:
     lines = [
         "# Task",
@@ -218,6 +219,8 @@ def _summary_request(
         source = infos[fact.sources[0]]
         status = "superseded" if fact.superseded else "current"
         fact_lines.append(f"[F{number}] ({source.title}, {status}) {fact.text}")
+    if locked:
+        lines += ["", "# Vocabulary (reviewed domain pack)", locked]
     body = "\n".join(fact_lines)
     nonce = data_nonce(body)
     lines += ["", "# Facts", f"BEGIN FACTS {nonce}", body, f"END FACTS {nonce}"]
@@ -230,6 +233,7 @@ async def _summarize(
     type_title: str,
     facts: Sequence[_EntityFact],
     infos: Mapping[str, SourceInfo],
+    locked: str = "",
 ) -> EntitySummaryOutput | None:
     """The model's introduction, or None without facts or when the call fails for this entity."""
     if not facts:
@@ -238,7 +242,7 @@ async def _summarize(
         result = await llm.structured(
             tier="fast",
             system=load_prompt("entity-summary").text,
-            user=_summary_request(entry, type_title, facts, infos),
+            user=_summary_request(entry, type_title, facts, infos, locked),
             output=EntitySummaryOutput,
             schema_name=SCHEMA_NAME,
             prompt_version=PROMPT_VERSION,
@@ -400,7 +404,14 @@ async def build_entity_pages(
         jobs.append((entry, sources, _aggregate(entry, ordered, records, infos)))
     outputs = await asyncio.gather(
         *(
-            _summarize(llm, entry, type_titles.get(entry.type, entry.type), facts, infos)
+            _summarize(
+                llm,
+                entry,
+                type_titles.get(entry.type, entry.type),
+                facts,
+                infos,
+                locked_terms_note(pack),
+            )
             for entry, _, facts in jobs
         )
     )

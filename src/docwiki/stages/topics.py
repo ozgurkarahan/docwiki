@@ -34,7 +34,7 @@ from docwiki.contracts.markdown import relative_link
 from docwiki.contracts.pages import DocwikiStamp, Page, TopicFrontmatter
 from docwiki.contracts.state import SourceState
 from docwiki.domain import DomainPack, route_topics, score_topic
-from docwiki.domain.models import TopicDef
+from docwiki.domain.models import TopicDef, locked_terms_note
 from docwiki.domain.rules import DEFAULT_MIN_SOURCES
 from docwiki.engine_types import CitedLocator, Classification, CompiledResult, TopicSkip
 from docwiki.llm import LlmClient, LlmError
@@ -239,6 +239,9 @@ def _request(
     ]
     if pack.resolution.notes:
         lines.append(pack.resolution.notes.strip())
+    locked = locked_terms_note(pack)
+    if locked:
+        lines += ["", "# Vocabulary (reviewed domain pack)", locked]
     lines += ["", "# Sources"]
     for source_id in sources:
         info = infos[source_id]
