@@ -12,5 +12,6 @@
 | [0008](0008-one-experience-live-agent-in-the-wiki.md) | One experience: the live agent in the wiki |
 | [0009](0009-one-site.md) | One site: the process, the uploads and the agent in the wiki |
 | [0010](0010-the-story-site.md) | The story site: documents, pipeline, wiki |
+| [0012](0012-french-canonical-and-locked-vocabulary.md) | French canonical with an English mirror; a locked trade vocabulary |
 
 The full decision log with rationale is in [`docs/spec/README.md`](../spec/README.md#4-decision-log-v1).
