@@ -800,7 +800,13 @@ class Pipeline:
     async def extract_one(self, source_id: str) -> None:
         work = self.work[source_id]
         item = work.item
-        key = self._key("extract", [item.state.content_hash, self.extract_digest], tier="fast")
+        # The path is part of the key: the extraction carries the source's id and path, so a file
+        # moved with the same bytes must not reuse the old path's extraction (and its source id).
+        key = self._key(
+            "extract",
+            [item.state.content_hash, f"path:{item.raw_path}", self.extract_digest],
+            tier="fast",
+        )
         with stage_span("extract", run_id=self.run_id, source_id=source_id):
             artifact = self.artifacts.load("extract", key)
             if artifact is not None:

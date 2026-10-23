@@ -111,6 +111,26 @@ async def test_deleted_raw_file_becomes_a_tombstone_and_a_withdraw_entry(harness
     assert len(harness.llm.requests) > calls, "entity and topic pages are rebuilt"
 
 
+async def test_a_moved_file_with_the_same_bytes_is_extracted_again_for_its_new_source(
+    harness, corpus
+):
+    first = await harness.run()
+    assert first.status == "succeeded", first.errors
+    (corpus / "archive").mkdir()
+    shutil.move(corpus / "notes" / "supplier-note.txt", corpus / "archive" / "supplier-note.txt")
+
+    second = await harness.run()
+    assert second.status == "succeeded", second.errors
+    assert second.report.counts.quarantined == 0, second.errors
+    reader = ReleaseReader.open(harness.settings.work_dir)
+    paths = {
+        reader.read_page(page.path).frontmatter.source_path for page in reader.list_pages("source")
+    }
+    assert "archive/supplier-note.txt" in paths
+    assert "notes/supplier-note.txt" not in paths
+    assert _valid(harness.current_release()) == []
+
+
 async def test_recompile_with_operator_hints_forces_one_source(harness):
     first = await harness.run()
     assert first.status == "succeeded", first.errors
