@@ -141,7 +141,13 @@ def test_bm25_retrieval_finds_most_required_evidence(
         if value is not None:
             recalls.append(value)
     assert sum(recalls) / len(recalls) > 0.5
-    assert not any("restricted/" in chunk.path for chunk in rag.chunks)
+    # Since slice F, restricted documents sit in their chantier's folders (ADR 0011).
+    restricted = {
+        entry.path
+        for entry in real_corpus.manifest.documents()
+        if entry.sensitivity == "restricted"
+    }
+    assert restricted and not any(chunk.path in restricted for chunk in rag.chunks)
 
 
 def test_cli_end_to_end_with_a_fake_model(
@@ -186,7 +192,8 @@ def test_cli_end_to_end_with_a_fake_model(
     assert data["versions"]["system"]["prompt_version"] == systems.RAG_PROMPT_VERSION
     assert data["versions"]["extraction"].startswith("local-")
     assert data["cost"]["input_tokens"] > 0
-    assert "baseline-rag · dev · 3/16 questions" in capsys.readouterr().out
+    total = len(golden.questions)
+    assert f"baseline-rag · dev · 3/{total} questions" in capsys.readouterr().out
 
 
 def test_cli_long_context_baseline_reads_the_public_documents_of_full(
@@ -229,12 +236,17 @@ def test_cli_long_context_baseline_reads_the_public_documents_of_full(
         )
     )
     assert data["status"] == "ok" and data["config"]["scope"] == "full"
-    assert data["config"]["system"]["documents"] == 12  # the public documents of full/
+    assert data["config"]["system"]["documents"] == 39  # the public documents of full/
     assert data["versions"]["system"]["prompt_version"] == systems.LONG_CONTEXT_PROMPT_VERSION
     context = seen[0]
-    for path in ("contrat/2026-02-10_contrat-de-travaux-signe.docx", "devis/DEV-2026-014_indice-A"):
+    for path in (
+        "chantiers/moreau/1-marche/works-contract/2026-02-10_contrat-de-travaux-signe.docx",
+        "chantiers/moreau/0-commercial/quote/DEV-2026-014_indice-A",
+        "entreprise/billing-register/2026-04-10_suivi-de-facturation-clients.xlsx",
+    ):
         assert f'source="full/{path}' in context
     assert "etude-de-prix-interne" not in context  # restricted: not a public document
+    assert "tableau-de-bord-des-marges" not in context  # restricted as well
     assert "held-back" not in context  # the held-back revision is not in the full scope
 
 

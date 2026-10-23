@@ -635,7 +635,7 @@ def test_the_result_records_the_scope_of_the_baselines(
 
 def test_golden_dev_set_loads_and_is_sealed(repo_root: Path) -> None:
     questions = load_questions(repo_root / "evals" / "golden" / "dev.jsonl")
-    assert 12 <= questions.total == len(questions.questions) <= 20
+    assert 12 <= questions.total == len(questions.questions) <= 40  # spec CHANGELOG v1.7
     assert runner._seal(repo_root / "evals" / "golden" / "dev.jsonl", questions)["matches"] is True
     categories = {question.category for question in questions.questions}
     assert {"numeric", "table", "injection", "restricted", "abstain"} <= categories
