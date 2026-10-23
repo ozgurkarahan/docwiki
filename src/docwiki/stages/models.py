@@ -37,7 +37,7 @@ class _Output(BaseModel):
 
 class RepairedFact(_Output):
     fact_number: int = Field(description="Number of the rejected fact that this item repairs.")
-    text: str = Field(description="The fact in English.")
+    text: str = Field(description="The fact, in the wiki language.")
     citations: list[Citation] = Field(description="At least one citation.")
     numbers: list[str] = Field(
         description="Quantities stated in the fact, exactly as written in the cited text."
@@ -51,7 +51,7 @@ class FactRepairOutput(_Output):
 
 
 class SummarySentence(_Output):
-    text: str = Field(description="One English sentence.")
+    text: str = Field(description="One sentence in the wiki language.")
     fact_ids: list[str] = Field(description="Ids of the facts supporting the sentence, e.g. F3.")
 
 
@@ -62,12 +62,12 @@ class EntitySummaryOutput(_Output):
 
 
 class TopicClaimOut(_Output):
-    text: str = Field(description="One English claim.")
+    text: str = Field(description="One claim in the wiki language.")
     fact_ids: list[str] = Field(description="Ids of the facts supporting the claim, e.g. F3.")
 
 
 class TopicSectionOut(_Output):
-    heading: str = Field(description="Short English heading.")
+    heading: str = Field(description="Short heading in the wiki language.")
     claims: list[TopicClaimOut]
 
 

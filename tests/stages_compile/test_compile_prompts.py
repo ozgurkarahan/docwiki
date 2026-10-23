@@ -8,14 +8,14 @@ import pytest
 
 from docwiki.contracts.strict_schema import check_strict_schema
 from docwiki.llm import to_strict_json_schema
-from docwiki.stages import classify, compile, entities, topics
+from docwiki.stages import classify, compile, entities, topics, translate
 from docwiki.stages.models import EntitySummaryOutput, FactRepairOutput, TopicSynthesisOutput
 from docwiki.stages.prompts import combine_prompts, load_prompt, prompt_names
 
 # Bump the prompt's version (frontmatter) whenever its text changes, then update this table.
 PINNED = {
     "classify": ("classify-v1", "55d8cd3c3f30891601a52150c95289d748ba7c4207c9ba57ecd602fbd3228d04"),
-    "compile": ("compile-v2", "41f1b4fa1af9dfc139859cc97ec02e2e4b536a7b3d091bbee14c5a0b7ee0c4eb"),
+    "compile": ("compile-v3", "ff9818f24ad36488f2a281156251aa909837969abf764186e5736a5507a32b08"),
     "compile-map": (
         "compile-map-v2",
         "16e0c036b11b71447211911c0057f69ed2b4b9eb17f64066db630a925363e67c",
@@ -25,16 +25,20 @@ PINNED = {
         "8d703e59837ab46b0ed9dd876cbaac5de2bb2abef07f6e96167f424a82abac9d",
     ),
     "compile-repair": (
-        "compile-repair-v1",
-        "ef6a732306d229ed315eea6949e4e8e5ca0baa993a1dd573e380dc7ee1fd2b18",
+        "compile-repair-v2",
+        "f8edf07ba7e64dbb07c997f48ff61472c4a6ffc596339c5d10fa687a631bd344",
     ),
     "entity-summary": (
-        "entity-summary-v1",
-        "52fe765a6ecdeb6f8abdeca84f665de879847943b704a31b7eb1af1cfcd57994",
+        "entity-summary-v2",
+        "5b1c5bd39881aea62e044e77e95b949562f6dc0701a56321f4c344ce578897b6",
     ),
     "topic-synthesis": (
-        "topic-synthesis-v1",
-        "e7705df253e848bffd25fd9234eb8d43a13150118705cd13ed050323b2b2a066",
+        "topic-synthesis-v2",
+        "28fcc06474b1197a516aeef9b9a39116d67e887aaa5e7f64924a108b8927289b",
+    ),
+    "translate": (
+        "translate-v1",
+        "17102eddba109cca23099ab7c367ab5c02baf681a28f809f8272c0ee29a4b308",
     ),
 }
 
@@ -55,13 +59,14 @@ def test_prompt_text_matches_its_version(name: str) -> None:
 def test_stage_prompt_versions() -> None:
     assert classify.PROMPT_VERSION == "classify-v1"
     assert compile.PROMPT_VERSION == (
-        "compile-v2+compile-map-v2+compile-reduce-v2+compile-repair-v1"
+        "compile-v3+compile-map-v2+compile-reduce-v2+compile-repair-v2"
     )
-    assert compile.STAGE_VERSION == "4"
-    assert entities.PROMPT_VERSION == "entity-summary-v1"
-    assert topics.PROMPT_VERSION == "topic-synthesis-v1"
+    assert compile.STAGE_VERSION == "5"
+    assert entities.PROMPT_VERSION == "entity-summary-v2"
+    assert topics.PROMPT_VERSION == "topic-synthesis-v2"
+    assert translate.PROMPT_VERSION == "translate-v1"
     text, version = combine_prompts("compile", "compile-map")
-    assert version == "compile-v2+compile-map-v2"
+    assert version == "compile-v3+compile-map-v2"
     assert text.startswith(load_prompt("compile").text)
 
 
@@ -80,7 +85,7 @@ def test_compile_prompt_rules() -> None:
         "[[cite:b0042]]",
         "table_refs",
         "t03:r0012",
-        "Write in English",
+        "Write in the wiki language",
     ):
         assert needle in text
 

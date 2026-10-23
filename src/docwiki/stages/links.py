@@ -37,6 +37,7 @@ from typing import Any
 
 from docwiki.contracts.catalog import CatalogEdge
 from docwiki.contracts.fences import FenceTracker
+from docwiki.contracts.i18n import Strings, core_strings, heading_variants
 from docwiki.contracts.markdown import (
     BACKLINKS_END,
     BACKLINKS_START,
@@ -61,9 +62,12 @@ from docwiki.domain.rules import document_scope, entity_in_scope, entity_scope
 
 __all__ = [
     "BACKLINKS_HEADING",
+    "BACKLINKS_HEADINGS",
     "CONTENT_TYPES",
     "RELATED_HEADING",
+    "RELATED_HEADINGS",
     "SOURCES_HEADING",
+    "SOURCES_HEADINGS",
     "STAGE_VERSION",
     "LinkResult",
     "apply_links",
@@ -84,10 +88,14 @@ __all__ = [
     "type_label",
 ]
 
-STAGE_VERSION = "2"
+STAGE_VERSION = "3"
 RELATED_HEADING = "Related"
 BACKLINKS_HEADING = "Referenced by"
 SOURCES_HEADING = "Sources"
+RELATED_HEADINGS = heading_variants("related")
+"""``## Related`` in every core wiki language (v1.7: the canonical wiki may be French)."""
+BACKLINKS_HEADINGS = heading_variants("referenced_by")
+SOURCES_HEADINGS = heading_variants("sources")
 CONTENT_TYPES = ("source", "entity", "topic", "query")
 MIN_ALIAS_LENGTH = 3
 
@@ -186,7 +194,7 @@ def strip_generated_sections(body: str) -> str:
         heading = None if in_code else _heading(line)
         if heading is not None:
             level, title = heading
-            if level == 2 and title == RELATED_HEADING:
+            if level == 2 and title in RELATED_HEADINGS:
                 skipping = True
                 continue
             if skipping and level <= 2:
@@ -214,7 +222,7 @@ def _insert_before_sources(body: str, block: str) -> str:
     index = None
     for position, (line, in_code) in enumerate(zip(lines, mask, strict=True)):
         heading = None if in_code else _heading(line)
-        if heading == (2, SOURCES_HEADING):
+        if heading is not None and heading[0] == 2 and heading[1] in SOURCES_HEADINGS:
             index = position
     chunk = block.strip("\n").split("\n")
     if index is None:
@@ -313,7 +321,9 @@ def link_source_references(pages: Sequence[Page]) -> list[Page]:
     return [link_source_refs(page, sources) for page in pages]
 
 
-def ensure_superseded_banner(page: Page, pages_by_id: Mapping[str, Page]) -> Page:
+def ensure_superseded_banner(
+    page: Page, pages_by_id: Mapping[str, Page], strings: Strings | None = None
+) -> Page:
     """Superseded sources must link their replacement before the first ``##`` section."""
     fm = page.frontmatter
     if not isinstance(fm, SourceFrontmatter) or fm.status != "superseded":
@@ -330,7 +340,7 @@ def ensure_superseded_banner(page: Page, pages_by_id: Mapping[str, Page]) -> Pag
         md_link(item.frontmatter.title, page.path, item.path)
         for item in sorted(newer, key=lambda item: (item.frontmatter.title, item.path))
     )
-    banner = f"> **Superseded** by {links}. Use the current revision."
+    banner = (strings or core_strings())("render.superseded_banner", links=links)
     lines = page.body.split("\n")
     position = 0
     for index, line in enumerate(lines):
@@ -401,7 +411,7 @@ _PROTECTED_RE = re.compile(
     r"|(?P<angle><[^>\n]*>)"
     r"|(?P<escaped>\\.)"
 )
-_SKIPPED_SECTIONS = {RELATED_HEADING, BACKLINKS_HEADING, SOURCES_HEADING}
+_SKIPPED_SECTIONS = RELATED_HEADINGS | BACKLINKS_HEADINGS | SOURCES_HEADINGS
 
 
 @dataclass(frozen=True)
@@ -551,12 +561,14 @@ def _entity_lines(page: Page, entity_pages: Sequence[Page], pack: DomainPack) ->
     return lines
 
 
-def _page_links(page: Page, label: str, targets: Sequence[Page]) -> list[str]:
+def _page_links(page: Page, label: str, targets: Sequence[Page], strings: Strings) -> list[str]:
+    """``- <label>: <links>``; ``label`` is a string key with ``.one`` / ``.other`` forms."""
     if not targets:
         return []
     ordered = sorted(targets, key=lambda p: (p.frontmatter.title.casefold(), p.path))
     links = ", ".join(md_link(item.frontmatter.title, page.path, item.path) for item in ordered)
-    return [f"- {plural(label, len(ordered))}: {links}"]
+    name = strings(f"{label}.{'one' if len(ordered) == 1 else 'other'}")
+    return [f"- {name}: {links}"]
 
 
 def _related_lines(
@@ -568,14 +580,19 @@ def _related_lines(
 ) -> list[str]:
     fm = page.frontmatter
     scopes = scopes or _Scopes(pack)
+    t = pack.strings()
     lines: list[str] = []
     if isinstance(fm, SourceFrontmatter):
         entities = [by_id[entity_id] for entity_id in fm.entities if entity_id in by_id]
         lines += _entity_lines(page, entities, pack)
-        lines += _page_links(page, "Topic", [by_id[t] for t in fm.topics if t in by_id])
+        topics = [by_id[topic] for topic in fm.topics if topic in by_id]
+        lines += _page_links(page, "links.topic", topics, t)
         reading = [view for view in views if fm.id in getattr(view.frontmatter, "sources", [])]
-        lines += _page_links(page, "Computed view", reading)
-        for label, ids in (("Supersedes", fm.supersedes), ("Superseded by", fm.superseded_by)):
+        lines += _page_links(page, "links.view", reading, t)
+        for label, ids in (
+            (t("links.supersedes"), fm.supersedes),
+            (t("links.superseded_by"), fm.superseded_by),
+        ):
             targets = sorted(
                 (by_id[source_id] for source_id in ids if source_id in by_id),
                 key=lambda p: (p.frontmatter.title.casefold(), p.path),
@@ -592,7 +609,7 @@ def _related_lines(
             and sources & set(other.frontmatter.sources)
             and (other.frontmatter.scope is None or scopes.allows(fm.id, other.frontmatter.scope))
         ]
-        lines += _page_links(page, "Topic", topics)
+        lines += _page_links(page, "links.topic", topics, t)
     elif isinstance(fm, TopicFrontmatter):
         entity_ids: set[str] = set()
         for source_id in fm.sources:
@@ -616,13 +633,13 @@ def _content_links(page: Page) -> set[str]:
     return targets
 
 
-def _backlinks_block(page: Page, sources: Sequence[Page]) -> str:
-    lines = [BACKLINKS_START, f"## {BACKLINKS_HEADING}", ""]
+def _backlinks_block(page: Page, sources: Sequence[Page], strings: Strings) -> str:
+    lines = [BACKLINKS_START, f"## {strings.heading('referenced_by')}", ""]
     if sources:
         ordered = sorted(sources, key=lambda p: (p.frontmatter.title.casefold(), p.path))
         lines += [f"- {md_link(item.frontmatter.title, page.path, item.path)}" for item in ordered]
     else:
-        lines.append("No other page links here yet.")
+        lines.append(strings("links.no_backlinks"))
     lines += ["", BACKLINKS_END]
     return "\n".join(lines)
 
@@ -658,7 +675,7 @@ def build_edges(pages: Sequence[Page]) -> list[CatalogEdge]:
                     edges.add((fm.id, parts[1], "cites"))
     for page in pages:
         for section in split_sections(page.body):
-            if section.heading != RELATED_HEADING:
+            if section.heading not in RELATED_HEADINGS:
                 continue
             for link in extract_links(section.markdown):
                 target = by_path.get(resolve_href(page.path, link.href).path or "")
@@ -694,7 +711,8 @@ def apply_links(pages: Sequence[Page], pack: DomainPack, *, autolink: bool = Tru
     ]
     content = link_source_references(content)
     by_id = {page.frontmatter.id: page for page in content}
-    content = [ensure_superseded_banner(page, by_id) for page in content]
+    strings = pack.strings()
+    content = [ensure_superseded_banner(page, by_id, strings) for page in content]
     scopes = _Scopes(pack)
     if autolink:
         registry = scopes.registry
@@ -735,7 +753,7 @@ def apply_links(pages: Sequence[Page], pack: DomainPack, *, autolink: bool = Tru
     for page in content:
         lines = _related_lines(page, by_id, pack, views, scopes)
         if lines and page.frontmatter.type != "query":
-            block = "\n".join([f"## {RELATED_HEADING}", "", *lines])
+            block = "\n".join([f"## {strings.heading('related')}", "", *lines])
             page = Page(
                 path=page.path,
                 frontmatter=page.frontmatter,
@@ -753,7 +771,7 @@ def apply_links(pages: Sequence[Page], pack: DomainPack, *, autolink: bool = Tru
             path=page.path,
             frontmatter=page.frontmatter,
             body=_insert_before_sources(
-                page.body, _backlinks_block(page, inbound.get(page.path, []))
+                page.body, _backlinks_block(page, inbound.get(page.path, []), strings)
             ),
         )
         for page in with_related

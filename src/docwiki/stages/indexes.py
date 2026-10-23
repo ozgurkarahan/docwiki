@@ -24,6 +24,7 @@ from docwiki.contracts.catalog import (
 )
 from docwiki.contracts.enums import LogAction
 from docwiki.contracts.frontmatter import FrontmatterError, read_frontmatter
+from docwiki.contracts.i18n import Strings, core_strings
 from docwiki.contracts.layout import WikiFiles
 from docwiki.contracts.markdown import extract_headings, relative_link, resolve_href
 from docwiki.contracts.pages import (
@@ -57,18 +58,14 @@ __all__ = [
     "run_page_path",
 ]
 
-STAGE_VERSION = "1"
+STAGE_VERSION = "2"
 META_RUNS_DIR = WikiFiles.RUNS_DIR
 RECENT_CHANGES = 10
 _LOG_HEADING_RE = re.compile(
     r"^## \[(?P<day>\d{4}-\d{2}-\d{2})\] (?P<action>[a-z]+) \| (?P<title>.+)$"
 )
 _INLINE_LINK_RE = re.compile(r"(?<!!)\[(?P<text>(?:[^\[\]\\]|\\.)*)\]\((?P<href>[^)\s]+)\)")
-_SKIP_REASONS = {
-    "insufficient_evidence": "not enough sources yet",
-    "audience": "its sources are above the audience of this build",
-    "no_current_sources": "no current source covers it",
-}
+_SKIP_REASONS = ("insufficient_evidence", "audience", "no_current_sources")
 
 
 def run_page_path(run_id: str) -> str:
@@ -108,11 +105,13 @@ def _index_page(
     stamp: DocwikiStamp,
     updated: date,
     sensitivity: str,
+    lang: str = "en",
 ) -> Page:
     frontmatter = IndexFrontmatter(
         id=f"index:{scope}",
         title=title,
         summary=summary,
+        lang=lang,
         sensitivity=sensitivity,  # type: ignore[arg-type]
         updated=updated,
         docwiki=stamp,
@@ -168,6 +167,7 @@ def changes_since(
     day: date,
     removed: Mapping[str, str] | None = None,
     removed_queries: Mapping[str, str] | None = None,
+    strings: Strings | None = None,
 ) -> list[LogEntry]:
     """Log entries for this release compared with the previous release's catalog.
 
@@ -175,9 +175,12 @@ def changes_since(
     the default reason is a deleted raw file. ``removed_queries`` explains why research answers
     are left out of this release (page id → reason text): those the previous release published
     get a ``withdraw`` entry. Answers left out for the audience are not passed (no mention).
+    ``strings`` is the language of the entries (default English); the previous release's pages
+    of that language are compared (its canonical pages when it had no such mirror).
     """
+    t = strings or core_strings()
     prev_sources = {source.source_id: source for source in (previous.sources if previous else [])}
-    prev_pages = {page.id: page for page in (previous.pages if previous else [])}
+    prev_pages = previous.page_by_id(t.lang) if previous else {}
     by_id = {page.frontmatter.id: page for page in pages}
     sources = _by_title(p for p in pages if isinstance(p.frontmatter, SourceFrontmatter))
     entries: list[LogEntry] = []
@@ -200,14 +203,23 @@ def changes_since(
         if fm.status == "superseded" and (before is None or before.status != "superseded"):
             newer = [by_id[s] for s in fm.superseded_by if s in by_id]
             replacement = ", ".join(link(item) for item in _by_title(newer))
-            bullet = f"{link(page)} is superseded by {replacement}" if replacement else link(page)
+            bullet = (
+                t("index.log.superseded", page=link(page), replacement=replacement)
+                if replacement
+                else link(page)
+            )
             entries.append(LogEntry(day, "supersede", fm.title, (bullet,)))
     current_ids = {page.frontmatter.id for page in sources}
     for source_id in sorted(set(prev_sources) - current_ids):
         title = prev_pages[source_id].title if source_id in prev_pages else source_id
-        reason = (removed or {}).get(source_id, "the raw file was deleted")
+        reason = (removed or {}).get(source_id, t("index.log.raw_deleted"))
         entries.append(
-            LogEntry(day, "withdraw", title, (f"Source page removed: {inline_text(reason)}.",))
+            LogEntry(
+                day,
+                "withdraw",
+                title,
+                (t("index.log.source_removed", reason=inline_text(reason)),),
+            )
         )
     for page in _by_title(p for p in pages if isinstance(p.frontmatter, TopicFrontmatter)):
         fm = page.frontmatter
@@ -234,7 +246,12 @@ def changes_since(
     for before_page in sorted(gone, key=lambda item: (item.title.casefold(), item.path)):
         reason = inline_text(queries_removed[before_page.id])
         entries.append(
-            LogEntry(day, "withdraw", before_page.title, (f"Research answer removed: {reason}.",))
+            LogEntry(
+                day,
+                "withdraw",
+                before_page.title,
+                (t("index.log.query_removed", reason=reason),),
+            )
         )
     return entries
 
@@ -289,28 +306,31 @@ def parse_log_entries(body: str) -> list[ParsedLogEntry]:
     return entries
 
 
-def _log_body(previous_log: str | None, entries: Sequence[LogEntry], existing: set[str]) -> str:
+def _log_body(
+    previous_log: str | None,
+    entries: Sequence[LogEntry],
+    existing: set[str],
+    t: Strings | None = None,
+) -> str:
+    t = t or core_strings()
     old = _unlink_dead(_previous_entries(previous_log), existing)
     blocks = [block for block in [old, *(entry.render() for entry in entries)] if block]
-    text = "\n\n".join(blocks) if blocks else "No changes recorded yet."
-    return f"# Log\n\n{text}\n"
+    text = "\n\n".join(blocks) if blocks else t("index.log.empty")
+    return f"# {t('index.log.title')}\n\n{text}\n"
 
 
 # -- glossary ----------------------------------------------------------------------------
 
 
 def _glossary(
-    pack: DomainPack, by_id: Mapping[str, Page]
+    pack: DomainPack, by_id: Mapping[str, Page], t: Strings
 ) -> tuple[str, list[tuple[str, dict[str, list[str]]]]]:
     terms = sorted(pack.glossary.terms, key=lambda term: (term.term.casefold(), term.term))
-    lines = ["# Glossary", ""]
+    lines = [f"# {t('index.glossary.title')}", ""]
     if not terms:
-        lines.append("No glossary terms are defined for this wiki yet.")
+        lines.append(t("index.glossary.empty"))
         return "\n".join(lines) + "\n", []
-    lines += [
-        "Terms of the domain with definitions, synonyms in other languages and related pages.",
-        "",
-    ]
+    lines += [t("index.glossary.intro"), ""]
     catalog_terms: list[tuple[str, dict[str, list[str]]]] = []
     for term in terms:
         lines += [f"## {inline_text(term.term)}", "", inline_text(term.definition), ""]
@@ -320,13 +340,13 @@ def _glossary(
                 f"{lang}: {', '.join(inline_text(value) for value in values)}"
                 for lang, values in synonyms.items()
             )
-            lines.append(f"- Synonyms: {rendered}")
+            lines.append(t("index.glossary.synonyms", synonyms=rendered))
         related = [by_id[ref] for ref in term.see_also if ref in by_id]
         if related:
             links = ", ".join(
                 md_link(page.frontmatter.title, WikiFiles.GLOSSARY, page.path) for page in related
             )
-            lines.append(f"- See also: {links}")
+            lines.append(t("index.glossary.see_also", links=links))
         if lines[-1]:
             lines.append("")
         catalog_terms.append((term.term, synonyms))
@@ -359,15 +379,18 @@ def build_indexes(
     topic_skips: Sequence[TopicSkip] = (),
     extra_paths: Iterable[str] = (),
     hubs: HubBundle | None = None,
+    lang: str | None = None,
 ) -> IndexBundle:
     """Home page, source/entity/topic/query indexes, glossary, log and ``llms.txt``.
 
     ``pages`` are the content pages after the ``links`` stage; ``extra_paths`` lists other wiki
     pages of the release (``AGENTS.md``, ``_meta/…``) so that log links to them stay live.
     ``hubs`` (v1.7, ADR 0011, only when the pack declares scopes) adds the company dashboard to
-    the home page; its pages are written by the caller.
+    the home page; its pages are written by the caller. ``lang`` is the language of the generated
+    text (default: the pack's canonical language; a mirror language for the translate stage).
     """
-    common = {"stamp": stamp, "updated": updated, "sensitivity": sensitivity}
+    t = pack.strings(lang)
+    common = {"stamp": stamp, "updated": updated, "sensitivity": sensitivity, "lang": t.lang}
     sources = [p for p in pages if isinstance(p.frontmatter, SourceFrontmatter)]
     entities = [p for p in pages if isinstance(p.frontmatter, EntityFrontmatter)]
     topics = [p for p in pages if isinstance(p.frontmatter, TopicFrontmatter)]
@@ -384,16 +407,12 @@ def build_indexes(
         fm = page.frontmatter
         assert isinstance(fm, SourceFrontmatter)
         grouped.setdefault(fm.category, []).append(page)
-    body = ["# Sources", ""]
+    body = [f"# {t('index.sources.title')}", ""]
     category_lines: list[tuple[str, str, int, int]] = []
     if not sources:
-        body.append("No sources have been compiled yet.")
+        body.append(t("index.sources.empty"))
     else:
-        body += [
-            f"{len(sources)} {plural('source', len(sources))} grouped by category, with their "
-            "status and sensitivity.",
-            "",
-        ]
+        body += [t.count("index.sources.intro", len(sources)), ""]
     for key in sorted(grouped, key=lambda item: (order.get(item, 10**6), item)):
         title = categories.get(key, key)
         members = sorted(
@@ -412,11 +431,14 @@ def build_indexes(
             if fm.status == "superseded":
                 superseded += 1
                 newer = [by_id[s] for s in fm.superseded_by if s in by_id]
-                status = "superseded by " + ", ".join(
-                    md_link(item.frontmatter.title, path, item.path) for item in newer
+                status = t(
+                    "index.sources.superseded_by",
+                    links=", ".join(
+                        md_link(item.frontmatter.title, path, item.path) for item in newer
+                    ),
                 )
             else:
-                status = fm.status
+                status = t.status(fm.status)
             body.append(f"- {md_link(fm.title, path, page.path)}: {status} · {fm.sensitivity}")
         body.append("")
         category_lines.append((key, title, len(members), superseded))
@@ -425,8 +447,8 @@ def build_indexes(
         _index_page(
             "sources",
             path,
-            "Sources",
-            "All sources grouped by category, with status and sensitivity.",
+            t("index.sources.title"),
+            t("index.sources.summary"),
             sources_body,
             **common,
         )
@@ -441,15 +463,15 @@ def build_indexes(
         fm = page.frontmatter
         assert isinstance(fm, EntityFrontmatter)
         by_type.setdefault(fm.entity_type, []).append(page)
-    body = ["# Entities", ""]
+    body = [f"# {t('index.entities.title')}", ""]
     if not entities:
-        body.append("No entity of the domain registry is mentioned by the sources yet.")
+        body.append(t("index.entities.empty"))
     for entity_type in sorted(by_type, key=lambda key: (type_order.get(key, 10**6), key)):
         members = _by_title(by_type[entity_type])
         definition = type_titles.get(entity_type)
         title = definition.title if definition else plural(entity_type, 2)
         type_path = f"entities/{entity_type}/index.md"
-        count = f"{len(members)} {plural('page', len(members))}"
+        count = t.count("index.entities.pages", len(members))
         body.append(f"- {md_link(title, WikiFiles.ENTITIES_INDEX, type_path)}: {count}")
         type_body = [f"# {inline_text(title)}", ""]
         if definition and definition.description:
@@ -462,7 +484,7 @@ def build_indexes(
                 title,
                 one_line(definition.description)
                 if definition and definition.description
-                else f"Entity pages of type {entity_type}.",
+                else t("index.entities.type_summary", entity_type=entity_type),
                 "\n".join(type_body) + "\n",
                 **common,
             )
@@ -471,15 +493,15 @@ def build_indexes(
         _index_page(
             "entities",
             WikiFiles.ENTITIES_INDEX,
-            "Entities",
-            "Entity types of this wiki and their pages.",
+            t("index.entities.title"),
+            t("index.entities.summary"),
             "\n".join(body) + "\n",
             **common,
         )
     )
 
     # topics/index.md (v1.7: per-scope topics under their scope)
-    body = ["# Topics", ""]
+    body = [f"# {t('index.topics.title')}", ""]
     company = [page for page in topics if getattr(page.frontmatter, "scope", None) is None]
     scoped: dict[str, list[Page]] = {}
     for page in topics:
@@ -489,7 +511,7 @@ def build_indexes(
     if company:
         body += [_item(page, WikiFiles.TOPICS_INDEX) for page in _by_title(company)]
     elif not topics:
-        body.append("No topic has enough evidence for a synthesis yet.")
+        body.append(t("index.topics.empty"))
     labels = {scope: scope_label(pack, scope) for scope in scoped}
     for scope in sorted(scoped, key=lambda key: (labels[key].casefold(), key)):
         if body[-1]:
@@ -499,16 +521,20 @@ def build_indexes(
     pack_topics = {topic.slug: topic for topic in pack.topics.topics}
     skipped = [skip for skip in topic_skips if skip.topic_slug in pack_topics]
     if skipped:
-        body += ["", "## Not synthesised yet", ""]
+        body += ["", f"## {t.heading('not_synthesised')}", ""]
         for skip in sorted(skipped, key=lambda item: item.topic_slug):
-            reason = _SKIP_REASONS.get(skip.reason, skip.reason.replace("_", " "))
+            reason = (
+                t(f"index.skip.{skip.reason}")
+                if skip.reason in _SKIP_REASONS
+                else skip.reason.replace("_", " ")
+            )
             body.append(f"- {inline_text(pack_topics[skip.topic_slug].title)}: {reason}")
     generated.append(
         _index_page(
             "topics",
             WikiFiles.TOPICS_INDEX,
-            "Topics",
-            "Curated multi-source syntheses.",
+            t("index.topics.title"),
+            t("index.topics.summary"),
             "\n".join(body) + "\n",
             **common,
         )
@@ -516,27 +542,28 @@ def build_indexes(
 
     # queries/index.md (only when research answers were filed)
     if queries:
-        body = ["# Research answers", ""]
+        body = [f"# {t('index.queries.title')}", ""]
         body += [_item(page, WikiFiles.QUERIES_INDEX) for page in _by_title(queries)]
         generated.append(
             _index_page(
                 "queries",
                 WikiFiles.QUERIES_INDEX,
-                "Research answers",
-                "Research answers filed back into the wiki after approval.",
+                t("index.queries.title"),
+                t("index.queries.summary"),
                 "\n".join(body) + "\n",
                 **common,
             )
         )
 
     # glossary.md
-    glossary_body, glossary_terms = _glossary(pack, by_id)
+    glossary_body, glossary_terms = _glossary(pack, by_id, t)
     generated.append(
         Page(
             path=WikiFiles.GLOSSARY,
             frontmatter=GlossaryFrontmatter(
-                title="Glossary",
-                summary="Terms with definitions, multilingual synonyms and links.",
+                title=t("index.glossary.title"),
+                summary=t("index.glossary.summary"),
+                lang=t.lang,
                 sensitivity=sensitivity,  # type: ignore[arg-type]
                 updated=updated,
                 docwiki=stamp,
@@ -556,13 +583,14 @@ def build_indexes(
     existing |= {page.path for page in (hubs.pages if hubs else [])}
     existing |= {WikiFiles.INDEX, WikiFiles.LOG, WikiFiles.AGENTS, WikiFiles.QUALITY}
     existing |= {run_page_path(run_id), *extra_paths}
-    log_body = _log_body(previous_log, new_entries, existing)
+    log_body = _log_body(previous_log, new_entries, existing, t)
     generated.append(
         Page(
             path=WikiFiles.LOG,
             frontmatter=LogFrontmatter(
-                title="Log",
-                summary="Append-only change log of this wiki.",
+                title=t("index.log.title"),
+                summary=t("index.log.summary"),
+                lang=t.lang,
                 sensitivity=sensitivity,  # type: ignore[arg-type]
                 updated=updated,
                 docwiki=stamp,
@@ -582,42 +610,41 @@ def build_indexes(
     body += [
         inline_text(description),
         "",
-        "Every fact in this wiki is cited: footnotes link to evidence sidecars that show the "
-        "exact page, paragraph, slide or table rows of the original document.",
+        t("index.home.cited"),
         "",
-        "## How to navigate",
+        f"## {t.heading('how_to_navigate')}",
         "",
-        f"1. Start with the [topics]({relative_link(path, WikiFiles.TOPICS_INDEX)}) for "
-        "syntheses across documents.",
-        f"2. Browse the [entities]({relative_link(path, WikiFiles.ENTITIES_INDEX)}) of the "
-        "domain registry.",
-        f"3. Read the [sources]({relative_link(path, WikiFiles.SOURCES_INDEX)}): one page per "
-        "document, grouped by category, with its status and sensitivity.",
-        f"4. Use the [glossary]({relative_link(path, WikiFiles.GLOSSARY)}) for acronyms and "
-        "multilingual synonyms.",
-        f"5. Check the [log]({relative_link(path, WikiFiles.LOG)}) for recent changes and the "
-        f"[quality report]({relative_link(path, WikiFiles.QUALITY)}) for gate results.",
+        t("index.home.nav1", href=relative_link(path, WikiFiles.TOPICS_INDEX)),
+        t("index.home.nav2", href=relative_link(path, WikiFiles.ENTITIES_INDEX)),
+        t("index.home.nav3", href=relative_link(path, WikiFiles.SOURCES_INDEX)),
+        t("index.home.nav4", href=relative_link(path, WikiFiles.GLOSSARY)),
+        t(
+            "index.home.nav5",
+            log=relative_link(path, WikiFiles.LOG),
+            quality=relative_link(path, WikiFiles.QUALITY),
+        ),
         "",
-        f"Agents start with the [agent guide]({relative_link(path, WikiFiles.AGENTS)}); "
-        "`llms.txt` and `catalog.json` index every page.",
+        t("index.home.agents", href=relative_link(path, WikiFiles.AGENTS)),
         "",
     ]
-    dashboard = dashboard_lines(hubs, pack, path) if hubs else []
+    dashboard = dashboard_lines(hubs, pack, path, t.lang) if hubs else []
     if dashboard:
         # The company dashboard (v1.7, ADR 0011) comes first, before "How to navigate".
-        position = body.index("## How to navigate")
+        position = body.index(f"## {t.heading('how_to_navigate')}")
         body[position:position] = dashboard
     if category_lines:
-        body += ["## Categories", ""]
+        body += [f"## {t.heading('categories')}", ""]
         for (_, title, count, superseded), anchor in zip(category_lines, anchors, strict=True):
             target = f"{WikiFiles.SOURCES_INDEX}#{anchor}"
-            text = f"{count} {plural('source', count)}"
+            text = t.count("index.home.category", count)
             if superseded:
-                text += f" ({superseded} superseded)"
+                text += t("index.home.category_superseded", count=superseded)
             body.append(f"- [{inline_text(title)}]({relative_link(path, target)}): {text}")
         body.append("")
-    body += ["## Topics", ""]
-    body += [_item(page, path) for page in _by_title(topics)] if topics else ["No topics yet."]
+    body += [f"## {t.heading('topics')}", ""]
+    body += (
+        [_item(page, path) for page in _by_title(topics)] if topics else [t("index.home.no_topics")]
+    )
     current = sum(
         1
         for page in sources
@@ -625,22 +652,30 @@ def build_indexes(
     )
     body += [
         "",
-        "## Stats",
+        f"## {t.heading('stats')}",
         "",
-        f"- Sources: {len(sources)} ({current} current, {len(sources) - current} superseded)",
-        f"- Entities: {len(entities)}",
-        f"- Topics: {len(topics)}",
-        f"- Glossary terms: {len(glossary_entries)}",
+        t(
+            "index.home.stat_sources",
+            total=len(sources),
+            current=current,
+            superseded=len(sources) - current,
+        ),
+        t("index.home.stat_entities", count=len(entities)),
+        t("index.home.stat_topics", count=len(topics)),
+        t("index.home.stat_glossary", count=len(glossary_entries)),
     ]
     if queries:
         body.append(
-            f"- Filed research answers: [{len(queries)}]"
-            f"({relative_link(path, WikiFiles.QUERIES_INDEX)})"
+            t(
+                "index.home.stat_queries",
+                count=len(queries),
+                href=relative_link(path, WikiFiles.QUERIES_INDEX),
+            )
         )
-    body += ["", "## Recent changes", ""]
+    body += ["", f"## {t.heading('recent_changes')}", ""]
     recent = list(reversed(log_entries))[:RECENT_CHANGES]
     if not recent:
-        body.append("No changes recorded yet.")
+        body.append(t("index.log.empty"))
     for entry in recent:
         title = entry.title
         if entry.link and entry.link in existing:
@@ -651,19 +686,17 @@ def build_indexes(
             body.append(f"- {entry.day} {entry.action}: {title}")
     body += [
         "",
-        "## Quality",
+        f"## {t.heading('quality')}",
         "",
-        f"- [Quality report]({relative_link(path, WikiFiles.QUALITY)}): gate results of this "
-        "release",
-        f"- [Run receipt]({relative_link(path, run_page_path(run_id))}): durations, tokens, "
-        "costs and versions of the run that built it",
+        t("index.home.quality_report", href=relative_link(path, WikiFiles.QUALITY)),
+        t("index.home.run_receipt", href=relative_link(path, run_page_path(run_id))),
     ]
     generated.append(
         _index_page(
             "home",
             path,
             info.wiki_title,
-            "Home: purpose, how to navigate, categories, topics, stats and recent changes.",
+            t("index.home.summary"),
             "\n".join(body) + "\n",
             **common,
         )
@@ -727,9 +760,11 @@ def build_catalog(
     audience: str,
     generated_at: datetime,
     glossary: Sequence[CatalogGlossaryEntry],
+    wiki_languages: Sequence[str] = ("en",),
 ) -> Catalog:
-    """``catalog.json`` from the final pages (single source of truth: their frontmatter)."""
-    sources = [p for p in pages if isinstance(p.frontmatter, SourceFrontmatter)]
+    """``catalog.json`` from the final pages (single source of truth: their frontmatter); mirror
+    pages are listed with their language, the sources once (from the canonical pages)."""
+    sources = [p for p in pages if isinstance(p.frontmatter, SourceFrontmatter) and not p.is_mirror]
     return Catalog(
         release_id=release_id,
         audience=audience,  # type: ignore[arg-type]
@@ -739,6 +774,7 @@ def build_catalog(
             key=lambda entry: entry.path,
         ),
         edges=list(edges),
+        wiki_languages=list(wiki_languages),
         sources=sorted(
             (catalog_source_for(page.frontmatter) for page in sources),  # type: ignore[arg-type]
             key=lambda entry: entry.source_id,

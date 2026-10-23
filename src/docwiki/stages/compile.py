@@ -52,6 +52,7 @@ from docwiki.contracts.compiled import (
     UnknownEntity,
 )
 from docwiki.contracts.extracted import Block, ExtractedDoc, Figure, Table
+from docwiki.contracts.i18n import language_name
 from docwiki.contracts.ids import is_entity_id, parse_entity_id, slugify_ascii
 from docwiki.contracts.locators import locator_label
 from docwiki.contracts.proposals import (
@@ -99,7 +100,7 @@ __all__ = [
     "detect_mentions",
 ]
 
-STAGE_VERSION = "4"
+STAGE_VERSION = "5"
 CHARS_PER_TOKEN = 4
 SINGLE_PASS_MAX_TOKENS = 24_000
 MAP_CHUNK_MAX_TOKENS = 12_000
@@ -354,6 +355,8 @@ def _context(
         "",
         f"# Domain context (reviewed domain pack {pack.name})",
         pack.info.title + (f": {_flat(pack.info.description)}" if pack.info.description else ""),
+        f"Wiki language: {language_name(pack.canonical_lang)}; write every text in it (quotes "
+        "stay in the document's language).",
         "Entity registry (use only these ids in entity_mentions):",
     ]
     for entry in registry:

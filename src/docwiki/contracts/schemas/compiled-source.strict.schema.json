@@ -8,7 +8,7 @@
       "type": "string"
     },
     "summary": {
-      "description": "One or two sentences in English.",
+      "description": "One or two sentences in the wiki language.",
       "type": "string"
     },
     "key_facts": {
@@ -16,7 +16,7 @@
         "additionalProperties": false,
         "properties": {
           "text": {
-            "description": "One fact in English.",
+            "description": "One fact, in the wiki language.",
             "type": "string"
           },
           "citations": {

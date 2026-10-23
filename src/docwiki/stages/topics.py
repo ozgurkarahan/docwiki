@@ -37,6 +37,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 
 from docwiki.contracts.enums import Sensitivity, allowed_for_audience, max_sensitivity
+from docwiki.contracts.i18n import Strings, core_strings, language_name
 from docwiki.contracts.ids import format_topic_id, normalize_tags, topic_page_path
 from docwiki.contracts.markdown import relative_link
 from docwiki.contracts.pages import ContradictionPair, DocwikiStamp, Page, TopicFrontmatter
@@ -85,7 +86,7 @@ __all__ = [
     "route_sources",
 ]
 
-STAGE_VERSION = "2"
+STAGE_VERSION = "3"
 PROMPT_VERSION = load_prompt("topic-synthesis").version
 SCHEMA_NAME = "topic_synthesis"
 MAX_FACT_TOKENS = 16_000
@@ -202,11 +203,9 @@ def _amended_review(
     ]
     if not links:
         return None
-    where = f" of {scope.label}" if scope.label else ""
-    return (
-        f"the terms of {winner.title} may have been changed by the amending documents{where}: "
-        f"{', '.join(links)}; check them before relying on either statement."
-    )
+    t = pack.strings()
+    where = t("resolution.where", label=scope.label) if scope.label else ""
+    return t("resolution.amended_review", winner=winner.title, where=where, links=", ".join(links))
 
 
 def resolution_statement(
@@ -221,21 +220,25 @@ def resolution_statement(
     say. ``context`` maps source ids to their scope's amending documents (v1.7): a winner of an
     amended type whose scope has some is stated as to review, with their links.
     """
+    t = pack.strings()
     criteria = list(pack.resolution.order)
-    rule = ", then ".join(criteria)
-    head = f"Resolution rule ({rule}): "
+    rule = t("resolution.then").join(t(f"resolution.{criterion}") for criterion in criteria)
+    head = t("resolution.head", rule=rule)
     pair = pack.resolution.arbitration(first.doc_type, second.doc_type)
     if pair is not None:
-        return (
-            f"{head}to arbitrate; the rule does not decide between {first.title} and "
-            f"{second.title}. {_sentence(pair.reason)}"
+        return t(
+            "resolution.arbitrate",
+            head=head,
+            first=first.title,
+            second=second.title,
+            reason=_sentence(pair.reason),
         )
     for criterion in criteria:
         if criterion == "authority" and first.authority != second.authority:
             winner, loser = (
                 (first, second) if first.authority > second.authority else (second, first)
             )
-            why = f"authority {winner.authority} vs {loser.authority}"
+            why = t("resolution.why_authority", winner=winner.authority, loser=loser.authority)
         elif (
             criterion == "recency"
             and first.date is not None
@@ -243,17 +246,18 @@ def resolution_statement(
             and first.date != second.date
         ):
             winner, loser = (first, second) if first.date > second.date else (second, first)
-            why = f"dated {winner.date.isoformat()} vs {loser.date.isoformat()}"  # type: ignore[union-attr]
+            why = t(
+                "resolution.why_dated",
+                winner=winner.date.isoformat(),  # type: ignore[union-attr]
+                loser=loser.date.isoformat(),  # type: ignore[union-attr]
+            )
         else:
             continue
         review = _amended_review(pack, winner, {first.source_id, second.source_id}, context)
         if review is not None:
-            return f"{head}to review; the rule would favour {winner.title} ({why}), but {review}"
-        return f"{head}{winner.title} prevails ({why})."
-    return (
-        f"{head}the rule does not decide between them (same authority and no usable dates); "
-        "review both sources."
-    )
+            return t("resolution.review", head=head, winner=winner.title, why=why, review=review)
+        return t("resolution.prevails", head=head, winner=winner.title, why=why)
+    return t("resolution.undecided", head=head)
 
 
 def _select_facts(
@@ -304,6 +308,7 @@ def _request(
     lines = [
         "# Task",
         "Write the synthesis of the topic below from the verified facts.",
+        f"Wiki language: {language_name(pack.canonical_lang)}.",
         "",
         "# Topic (reviewed topic catalog)",
         f"- slug: {topic.slug}",
@@ -524,7 +529,8 @@ def _render(
 ) -> tuple[Page, list[CitedLocator]]:
     topic_id = format_topic_id(topic.slug, scope)
     path = topic_page_path(topic_id)
-    footnotes = Footnotes(path, {sid: info.title for sid, info in infos.items()})
+    t = pack.strings()
+    footnotes = Footnotes(path, {sid: info.title for sid, info in infos.items()}, t)
     sensitivity = max_sensitivity(*(tiers[sid] for sid in sources))
     context = _contexts(pack, sources, infos, tiers, sensitivity, path, scope_of, amending)
     title = topic.title if scope is None else f"{topic.title} — {scope_label(pack, scope)}"
@@ -535,9 +541,9 @@ def _render(
     summary = (
         synthesis.summary
         or clean_inline(topic.description)
-        or (f"Synthesis of {len(sources)} sources about {title.lower()}.")
+        or t("topic.summary", count=len(sources), title=title.lower())
     )
-    lines += [summary, "", "## Overview", ""]
+    lines += [summary, "", f"## {t.heading('overview')}", ""]
     if synthesis.overview:
         lines.append(
             " ".join(
@@ -546,39 +552,52 @@ def _render(
             )
         )
     else:
-        lines.append("No overview claim could be verified against current sources.")
+        lines.append(t("topic.no_overview"))
     for heading, claims in synthesis.sections:
         lines += ["", f"## {heading}", ""]
         lines += [f"- {attach_refs(claim.text, _claim_refs(claim, footnotes))}" for claim in claims]
-    lines += ["", "## Contradictions", ""]
+    lines += ["", f"## {t.heading('contradictions')}", ""]
     if synthesis.contradictions:
         for item in synthesis.contradictions:
             first = infos[item.side_a[0].record.source_id]
             second = infos[item.side_b[0].record.source_id]
             lines.append(
-                f"- **{item.subject}.** {_source_link(first, path)} states: "
-                f"{_fact_texts(item.side_a, footnotes)} ({_meta(first)}). "
-                f"{_source_link(second, path)} states: {_fact_texts(item.side_b, footnotes)} "
-                f"({_meta(second)}). {resolution_statement(pack, first, second, context)}"
+                t(
+                    "topic.contradiction",
+                    subject=item.subject,
+                    first=_source_link(first, path),
+                    first_facts=_fact_texts(item.side_a, footnotes),
+                    first_meta=_meta(first, t),
+                    second=_source_link(second, path),
+                    second_facts=_fact_texts(item.side_b, footnotes),
+                    second_meta=_meta(second, t),
+                    resolution=resolution_statement(pack, first, second, context),
+                )
             )
     else:
-        lines.append("No contradictions were found between current sources.")
+        lines.append(t("topic.no_contradictions"))
     if synthesis.changes:
-        lines += ["", "Changed by an amending document (changes of terms, not contradictions):", ""]
+        lines += ["", t("topic.changes_intro"), ""]
         for item in synthesis.changes:
             amended = infos[item.side_a[0].record.source_id]
             amending_doc = infos[item.side_b[0].record.source_id]
             lines.append(
-                f"- **{item.subject}.** {_source_link(amended, path)} states: "
-                f"{_fact_texts(item.side_a, footnotes)} ({_meta(amended)}). Changed by "
-                f"{_source_link(amending_doc, path)}: {_fact_texts(item.side_b, footnotes)} "
-                f"({_meta(amending_doc)})."
+                t(
+                    "topic.change",
+                    subject=item.subject,
+                    amended=_source_link(amended, path),
+                    amended_facts=_fact_texts(item.side_a, footnotes),
+                    amended_meta=_meta(amended, t),
+                    amending=_source_link(amending_doc, path),
+                    amending_facts=_fact_texts(item.side_b, footnotes),
+                    amending_meta=_meta(amending_doc, t),
+                )
             )
     if synthesis.contradictions or synthesis.changes:
         notes = clean_inline(pack.resolution.notes)
         if notes:
-            lines += ["", f"Resolution policy: {notes}"]
-    lines += ["", "## Superseded information", ""]
+            lines += ["", t("topic.policy", notes=notes)]
+    lines += ["", f"## {t.heading('superseded')}", ""]
     if synthesis.superseded:
         for entry in synthesis.superseded:
             old_source = infos[entry.old[0].record.source_id]
@@ -588,25 +607,31 @@ def _render(
             replacement = (
                 _fact_texts(entry.replacement, footnotes)
                 if entry.replacement
-                else "no current source restates it."
+                else t("topic.no_restatement")
             )
             lines.append(
-                f"- **{entry.subject}.** {_source_link(old_source, path)} stated: "
-                f"{old_text} Replacement: {replacement} "
-                f"Superseding source: {_source_link(infos[entry.superseding], path)}."
+                t(
+                    "topic.superseded_item",
+                    subject=entry.subject,
+                    old=_source_link(old_source, path),
+                    old_text=old_text,
+                    replacement=replacement,
+                    superseding=_source_link(infos[entry.superseding], path),
+                )
             )
     else:
-        lines.append("No superseded information.")
-    lines += ["", "## Sources consulted", ""]
+        lines.append(t("topic.no_superseded"))
+    lines += ["", f"## {t.heading('sources_consulted')}", ""]
     for source_id in sources:
         info = infos[source_id]
-        lines.append(f"- {_source_link(info, path)}: {_meta(info, with_status=True)}")
+        lines.append(t("topic.consulted", link=_source_link(info, path), meta=_meta(info, t, True)))
     lines += ["", *footnotes.sources_section()]
     current = sum(1 for sid in sources if infos[sid].status == "current")
     frontmatter = TopicFrontmatter(
         id=topic_id,
         title=title,
         summary=summary,
+        lang=pack.canonical_lang,
         sensitivity=sensitivity,  # type: ignore[arg-type]
         updated=release_date(stamp),
         tags=normalize_tags([topic.slug]),
@@ -660,10 +685,13 @@ def _claim_refs(claim: _Claim, footnotes: Footnotes) -> str:
     return footnotes.cite_all(c for fact in claim.facts for c in fact.record.citations)
 
 
-def _meta(info: SourceInfo, *, with_status: bool = False) -> str:
-    parts = [info.status] if with_status else []
-    parts.append(f"authority {info.authority}")
-    parts.append(f"dated {info.date.isoformat()}" if info.date else "date unknown")
+def _meta(info: SourceInfo, t: Strings | None = None, with_status: bool = False) -> str:
+    t = t or core_strings()
+    parts = [t.status(info.status)] if with_status else []
+    parts.append(t("topic.meta_authority", authority=info.authority))
+    parts.append(
+        t("topic.meta_dated", date=info.date.isoformat()) if info.date else t("topic.meta_undated")
+    )
     return ", ".join(parts)
 
 

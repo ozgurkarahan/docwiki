@@ -31,7 +31,7 @@ class Citation(ContractModel):
 
 
 class KeyFact(ContractModel):
-    text: str = Field(description="One fact in English.")
+    text: str = Field(description="One fact, in the wiki language.")
     citations: list[Citation] = Field(description="At least one citation.")
     numbers: list[str] = Field(description="Numbers with units stated in the fact, e.g. '12 Nm'.")
 
@@ -70,7 +70,7 @@ class CompiledSource(ContractModel):
     """Compilation result for one source; ids are validated later against the ExtractedDoc."""
 
     title: str
-    summary: str = Field(description="One or two sentences in English.")
+    summary: str = Field(description="One or two sentences in the wiki language.")
     key_facts: list[KeyFact]
     sections: list[CompiledSection]
     entity_mentions: list[EntityMention]

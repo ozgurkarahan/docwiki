@@ -30,6 +30,7 @@ from typing import Any
 
 from docwiki.contracts.enums import max_sensitivity
 from docwiki.contracts.extracted import ExtractedDoc, Table
+from docwiki.contracts.i18n import Strings, core_strings
 from docwiki.contracts.ids import (
     format_hub_id,
     format_view_id,
@@ -360,14 +361,15 @@ def _header(view: ViewDef, name: str) -> str:
     return _cell_text(column_label(view, name))
 
 
-def _value(value: Any, unit: str | None = None) -> str:
+def _value(value: Any, unit: str | None = None, t: Strings | None = None) -> str:
     """A result cell as one safe table cell: document text verbatim (escaped), computed numbers
     the French way, dates in ISO form. An amount column (``unit``) writes every number with two
     decimals and its unit (``184 490,00 € HT``); a cell that is not a number stays as it is."""
     if value is None:
         return ""
     if isinstance(value, bool):
-        return "yes" if value else "no"
+        t = t or core_strings()
+        return t("view.yes") if value else t("view.no")
     if unit is not None:
         number = parse_amount(value)
         if number is not None:
@@ -411,11 +413,13 @@ def _render(
     *,
     stamp: DocwikiStamp,
     hubs: frozenset[str] = frozenset(),
+    t: Strings | None = None,
 ) -> tuple[Page, list[CitedLocator]]:
+    t = t or pack.strings()
     view = result.view
     path = view_page_path(format_view_id(view.slug))
     titles = {sid: source.title for sid, source in sources.items()}
-    notes = Footnotes(path, titles)
+    notes = Footnotes(path, titles, t)
     names = _Scopes(pack, hubs, path)
     with_scope = pack.scopes is not None
     scope_title = _cell_text(pack.scopes.title) if pack.scopes is not None else ""
@@ -428,18 +432,16 @@ def _render(
         lines += [description, ""]
     cited_sources = sorted({row.source_id for row in result.rows})
     lines += [
-        f"These figures were computed by code, not by a language model, from {len(result.rows)} "
-        f"cited table row(s) of {len(cited_sources)} document(s); every row links to the "
-        "evidence of exactly that row, and the totals are sums of the cited rows.",
+        t("view.computed", rows=len(result.rows), documents=len(cited_sources)),
         "",
-        "## Rows",
+        f"## {t.heading('rows')}",
         "",
     ]
     if result.rows:
         # The scope and the cited document first: on a narrow screen they stay in view.
         header = [
             *([scope_title] if with_scope else []),
-            "Document",
+            t("view.document"),
             *(_header(view, name) for name in result.columns),
         ]
         units = [amount_unit(view, name) for name in result.columns]
@@ -460,31 +462,30 @@ def _render(
                 *([names.cell(row.scope)] if with_scope else []),
                 f"{link}{ref}",
                 *(
-                    names.cell(value) if is_scope else _value(value, unit)
+                    names.cell(value) if is_scope else _value(value, unit, t)
                     for value, unit, is_scope in zip(row.values, units, scoped, strict=True)
                 ),
             ]
             lines.append("| " + " | ".join(cells) + " |")
         lines.append("")
         if result.truncated:
-            lines += [f"Only the first {MAX_VIEW_ROWS} rows are shown and summed.", ""]
+            lines += [t("view.truncated", count=MAX_VIEW_ROWS), ""]
     else:
-        lines += ["No row of the documents matches this view.", ""]
+        lines += [t("view.no_rows"), ""]
     if result.totals:
-        lines += _totals_section(pack, result, names)
+        lines += _totals_section(pack, result, names, t)
     lines += notes.sources_section()
     sensitivity = (
         max_sensitivity(*(sources[sid].sensitivity for sid in result.sources))
         if (result.sources)
         else "public"
     )
-    summary = description or (
-        f"{len(result.rows)} rows computed by code from the documents' tables, cited row by row."
-    )
+    summary = description or t("view.summary", count=len(result.rows))
     frontmatter = ViewFrontmatter(
         id=format_view_id(view.slug),
         title=clean_inline(view.title) or view.slug,
         summary=summary,
+        lang=t.lang,
         sensitivity=sensitivity,  # type: ignore[arg-type]
         updated=release_date(stamp),
         docwiki=stamp,
@@ -495,26 +496,25 @@ def _render(
     return Page(path=path, frontmatter=frontmatter, body="\n".join(lines)), notes.cited_locators()
 
 
-def _totals_section(pack: DomainPack, result: ViewResult, names: _Scopes) -> list[str]:
+def _totals_section(pack: DomainPack, result: ViewResult, names: _Scopes, t: Strings) -> list[str]:
     view = result.view
-    scope_title = _cell_text(pack.scopes.title) if pack.scopes is not None else "Scope"
+    scope_title = _cell_text(pack.scopes.title) if pack.scopes is not None else t("view.scope")
     header = [
         *([scope_title] if view.per_scope else []),
-        "Rows",
+        t("view.rows"),
         *(_header(view, name) for name in view.totals),
     ]
+    per = t("view.totals_per", scope=scope_title.lower()) if view.per_scope else ""
     lines = [
-        "## Totals",
+        f"## {t.heading('totals')}",
         "",
-        "Sums computed by code from the cited rows above"
-        + (", per " + scope_title.lower() if view.per_scope else "")
-        + ".",
+        t("view.totals_intro", per=per),
         "",
         "| " + " | ".join(header) + " |",
         "| " + " | ".join("---" for _ in header) + " |",
     ]
     for total in result.totals:
-        name = "**All**" if total.scope is None else names.cell(total.scope)
+        name = t("view.all") if total.scope is None else names.cell(total.scope)
         cells = [
             *([name] if view.per_scope else []),
             str(total.rows),
@@ -525,9 +525,10 @@ def _totals_section(pack: DomainPack, result: ViewResult, names: _Scopes) -> lis
     skipped = result.totals[-1].skipped
     if skipped:
         parts = [
-            f"{count} cell(s) of {_header(view, name)}" for name, count in sorted(skipped.items())
+            t("view.not_summed_part", count=count, column=_header(view, name))
+            for name, count in sorted(skipped.items())
         ]
-        lines += [f"Not summed because they are not numbers: {', '.join(parts)}.", ""]
+        lines += [t("view.not_summed", parts=", ".join(parts)), ""]
     return lines
 
 
@@ -564,12 +565,14 @@ def build_view_pages(
     *,
     stamp: DocwikiStamp,
     hub_scopes: Iterable[str] = (),
+    lang: str | None = None,
 ) -> ViewBuild:
     """The page of every view of the pack (none without ``views.yaml``), their cited row
     locators (for the evidence stage), the computed results and the run warnings.
 
     ``hub_scopes`` are the scope values that have a hub page in this release: the view pages
-    name every scope by its label and link the ones listed here to their hub."""
+    name every scope by its label and link the ones listed here to their hub. ``lang`` is the
+    language of the generated text (default: the pack's canonical language)."""
     build = ViewBuild(pages=[], cited=[], results=[], warnings=[])
     if pack.views is None:
         return build
@@ -577,7 +580,7 @@ def build_view_pages(
     hubs = frozenset(hub_scopes)
     for view in pack.views.views:
         result = compute_view(view, sources)
-        page, cited = _render(pack, result, by_id, stamp=stamp, hubs=hubs)
+        page, cited = _render(pack, result, by_id, stamp=stamp, hubs=hubs, t=pack.strings(lang))
         build.pages.append(page)
         build.cited.extend(cited)
         build.results.append(result)
@@ -586,7 +589,11 @@ def build_view_pages(
 
 
 def build_views_index(
-    view_pages: Sequence[Page], *, stamp: DocwikiStamp, updated: date
+    view_pages: Sequence[Page],
+    *,
+    stamp: DocwikiStamp,
+    updated: date,
+    strings: Strings | None = None,
 ) -> Page | None:
     """``views/index.md`` (``index:views``): one line per computed view with its row count;
     ``None`` without views."""
@@ -596,27 +603,23 @@ def build_views_index(
     )
     if not pages:
         return None
+    t = strings or core_strings()
     path = index_page_path("views")
-    body = [
-        "# Computed views",
-        "",
-        "Figures computed by code, not by a language model, from the tables of the documents; "
-        "every row is cited to the row of the document it comes from.",
-        "",
-    ]
+    body = [f"# {t('views.title')}", "", t("views.intro"), ""]
     for page in pages:
         fm = page.frontmatter
         assert isinstance(fm, ViewFrontmatter)
         link = f"[{clean_inline(fm.title)}]({relative_link(path, page.path)})"
-        line = f"- {link}: {fm.rows} {'row' if fm.rows == 1 else 'rows'}"
+        line = "- " + t.count("views.rows", fm.rows, link=link)
         summary = clean_inline(fm.summary)
         body.append(f"{line}. {summary}" if summary else line)
     return Page(
         path=path,
         frontmatter=IndexFrontmatter(
             id="index:views",
-            title="Computed views",
-            summary="Every computed view: figures computed by code, every row cited.",
+            title=t("views.title"),
+            summary=t("views.summary"),
+            lang=t.lang,
             sensitivity=max_sensitivity(  # type: ignore[arg-type]
                 *(page.frontmatter.sensitivity for page in pages)
             ),

@@ -13,6 +13,9 @@ description: >-
   attestation registers, billing register, general terms). The documents are in French.
 default_audience: public
 languages: [fr, en]
+# The wiki is compiled in French (canonical) and mirrored in English by the translate stage
+# (v1.7, ADR 0012); the locked trade terms of terms.yaml stay in French in both.
+wiki_languages: [fr, en]
 wiki_title: Lamna Bâtiment
 fictional: true
 banner: >-

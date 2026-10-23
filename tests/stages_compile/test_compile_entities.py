@@ -74,7 +74,7 @@ async def test_pages_for_mentioned_registry_entities(corpus: Corpus, pack: Domai
         "building-element:baie-f1",
         "building-element:fenetre-f2",
     ], "no summary call without facts"
-    assert all(r.tier == "fast" and r.prompt_version == "entity-summary-v1" for r in llm.requests)
+    assert all(r.tier == "fast" and r.prompt_version == "entity-summary-v2" for r in llm.requests)
     for page in pages.values():
         assert find_violations(page.body) == []
         assert Page.parse(page.render(), page.path) == page

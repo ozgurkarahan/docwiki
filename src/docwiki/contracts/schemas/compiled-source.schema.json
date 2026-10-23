@@ -132,7 +132,7 @@
       "additionalProperties": false,
       "properties": {
         "text": {
-          "description": "One fact in English.",
+          "description": "One fact, in the wiki language.",
           "title": "Text",
           "type": "string"
         },
@@ -204,7 +204,7 @@
       "type": "string"
     },
     "summary": {
-      "description": "One or two sentences in English.",
+      "description": "One or two sentences in the wiki language.",
       "title": "Summary",
       "type": "string"
     },
