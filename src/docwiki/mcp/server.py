@@ -317,9 +317,11 @@ def _read_tools(reads: ReadTools, config: McpConfig) -> list[Tool]:
         topic: Annotated[str | None, Field(max_length=140), _desc("topic")] = None,
         limit: Annotated[int, Field(ge=1, le=50), _desc("limit")] = 10,
         offset: Annotated[int, Field(ge=0, le=1000), _desc("offset")] = 0,
+        within: Annotated[str | None, Field(max_length=64), _desc("within")] = None,
     ) -> CallToolResult:
         return _result(
-            "search", lambda: reads.search(query, kinds, types, entity, topic, limit, offset)
+            "search",
+            lambda: reads.search(query, kinds, types, entity, topic, limit, offset, within),
         )
 
     def read_page(
@@ -332,8 +334,9 @@ def _read_tools(reads: ReadTools, config: McpConfig) -> list[Tool]:
     def get_index(
         scope: Annotated[str, Field(min_length=1, max_length=100), _desc("scope")] = "home",
         offset: Annotated[int, Field(ge=0), _desc("text_offset")] = 0,
+        within: Annotated[str | None, Field(max_length=64), _desc("within_index")] = None,
     ) -> CallToolResult:
-        return _result("get_index", lambda: reads.get_index(scope, offset))
+        return _result("get_index", lambda: reads.get_index(scope, offset, within))
 
     def get_links(
         page: Annotated[str, Field(min_length=1, max_length=300), _desc("page")],

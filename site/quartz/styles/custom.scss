@@ -2313,6 +2313,23 @@ a.docwiki-sign-in {
   font-size: 0.9rem;
 }
 
+// Grouped register (v1.7, ADR 0011): scope (the hub's title), then phase, then type.
+.docwiki-documents-scope-count {
+  color: var(--gray);
+  font-size: 0.9rem;
+  font-weight: normal;
+}
+
+.docwiki-documents-phase-title {
+  margin-bottom: 0.25rem;
+}
+
+.docwiki-documents-type-title {
+  margin: 0.75rem 0 0;
+  color: var(--darkgray);
+  font-size: 0.95rem;
+}
+
 .docwiki-documents-list {
   margin: 0.5rem 0 1.5rem;
   padding: 0;

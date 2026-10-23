@@ -23,6 +23,7 @@ from site_testkit import (
     PLAN_B,
     PLAN_B_PAGE,
     make_portable,
+    make_scoped,
 )
 
 from docwiki.site import (
@@ -241,3 +242,45 @@ def test_portable_folder_builds_the_same_site(built_site: Path, built_portable_s
     assert html(built_portable_site, f"{PLAN_B_PAGE}.html") == html(
         built_site, f"{PLAN_B_PAGE}.html"
     )
+
+
+def _explorer_fns(page: str) -> dict[str, str]:
+    found = re.search(r'data-data-fns="([^"]*)"', page)
+    assert found, "explorer functions"
+    return json.loads(found.group(1).replace("&quot;", '"').replace("&amp;", "&"))
+
+
+def test_register_and_explorer_without_scopes(built_site: Path) -> None:
+    documents = html(built_site, "documents.html")
+    assert "docwiki-documents-list" in documents and "docwiki-documents-scope" not in documents
+    fns = _explorer_fns(documents)
+    assert "const hubs = []" in fns["sortFn"] and "const entitiesTitle = null" in fns["mapFn"]
+
+
+@pytest.fixture(scope="module")
+def built_scoped_site(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    root = tmp_path_factory.mktemp("scoped")
+    release = make_scoped(root / "release")
+    out = root / "public"
+    started = time.monotonic()
+    build_site(release, out, base_url=BASE_URL, log=print)
+    print(f"\nscoped site build: {time.monotonic() - started:.1f} s")
+    return out
+
+
+def test_scoped_register_and_explorer(built_scoped_site: Path) -> None:
+    """v1.7 (ADR 0011): the register by chantier, phase and type; hubs first in the explorer."""
+    documents = html(built_scoped_site, "documents.html")
+    scopes = re.findall(r'<h2 class="docwiki-documents-scope-title">(.*?)</h2>', documents)
+    assert len(scopes) == 2
+    assert 'href="./chantiers/moreau"' in scopes[0] and "Chantier Moreau" in scopes[0]
+    assert "2 documents" in scopes[0]
+    assert scopes[1].startswith("Entreprise") and "1 document" in scopes[1]
+    assert '<h3 class="docwiki-documents-phase-title">Phase 3</h3>' in documents
+    assert '<h4 class="docwiki-documents-type-title">Schedule</h4>' in documents
+    assert documents.index("indice A") < documents.index("indice B")
+    fns = _explorer_fns(documents)
+    assert 'const hubs = ["chantiers"]' in fns["sortFn"]
+    assert 'const entitiesTitle = "Entreprise"' in fns["mapFn"]
+    assert (built_scoped_site / "chantiers" / "moreau.html").is_file()
+    assert check_links(built_scoped_site).ok

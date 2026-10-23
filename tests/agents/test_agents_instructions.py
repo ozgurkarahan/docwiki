@@ -75,6 +75,12 @@ RESEARCHER_REQUIREMENTS: dict[str, list[str]] = {
         r"Answer in the language of the question",
         r"Keep quotations in their original language",
     ],
+    "scopes: name the chantier, ambiguity, within, as-of date (ADR 0011)": [
+        r"Name the chantier in every answer",
+        r"answer per chantier or ask which one",
+        r"pass its code as `within` to `search` or `get_index`",
+        r"Date the answer \"as of\" the most recent current source you cite",
+    ],
     "tool results: check ok, follow the error, retry only when retryable": [
         r"Every tool returns JSON with `ok`; check it before using a result",
         r"`\"ok\": false`: the call failed and is not evidence",

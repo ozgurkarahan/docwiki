@@ -39,8 +39,10 @@ TOOLS: dict[str, str] = {
         "'wiki' = a compiled wiki section (cite the footnotes it carries, not the wiki); "
         "'source' = text extracted from an original document, with source_id, locator_key, "
         "locator_label and, when an evidence sidecar exists, evidence_path and provenance "
-        "(confirm with get_evidence). status 'superseded' marks an outdated document revision. "
-        "Narrow with kinds, types (page types), entity or topic; page with offset."
+        "(confirm with get_evidence). status 'superseded' marks an outdated document revision; "
+        "scope, when present, names the scope value (for example a chantier) the page belongs "
+        "to. Narrow with kinds, types (page types), entity, topic or within (one scope value); "
+        "page with offset."
     ),
     "read_page": (
         "Read one wiki page by page id (for example 'topic:<slug>', '<entity-type>:<key>', "
@@ -57,10 +59,11 @@ TOOLS: dict[str, str] = {
     "get_index": (
         "Get an index page of the wiki as Markdown: 'home' (purpose, categories, topics, stats, "
         "recent changes), 'sources' (every document with category and status), 'entities', "
-        "'entities/<type>', 'topics', 'queries' (filed research answers), 'hubs/<folder>' (the "
-        "hub pages of a company-wide wiki, one per scope such as a project), 'glossary' or 'log'. "
-        "Use it to browse when search terms are unknown or to list everything of one kind. "
-        "Paged with offset."
+        "'entities/<type>', 'topics', 'queries' (filed research answers), 'glossary', 'log' or, "
+        "when the wiki has scopes (for example chantiers), 'hubs/<folder>' (one hub page per "
+        "scope value, for example 'hubs/chantiers'). Use it to browse when search terms are "
+        "unknown or to list everything of one kind; within keeps only the entries of one scope "
+        "value. Paged with offset."
     ),
     "get_links": (
         "Typed relations of a page from the release catalog, as outgoing links and backlinks "
@@ -190,8 +193,20 @@ PARAMS: dict[str, str] = {
     "page": "Page id (for example 'topic:<slug>' or 'src-<12 hex>') or wiki path ('topics/x.md').",
     "section": "Heading text or anchor of one section to read (subsections included).",
     "scope": (
-        "Index to read: home, sources, entities, entities/<type>, topics, queries, "
-        "hubs/<folder>, glossary, log."
+        "Index to read: home, sources, entities, entities/<type>, topics, queries, glossary, log, "
+        "or hubs/<folder> when the wiki has scopes."
+    ),
+    "within": (
+        "Only pages of one scope value of the wiki, for example a chantier code or the default "
+        "scope for company documents: its source pages and their extracted text, its topics and "
+        "its hub. Company-wide pages (entities, company topics, indexes) carry no scope and are "
+        "left out. List the scope values with get_index(scope='hubs/<folder>'). Kebab-case."
+    ),
+    "within_index": (
+        "Keep only the index entries of one scope value of the wiki (for example a chantier "
+        "code; list them with get_index(scope='hubs/<folder>')): pages of that scope, and "
+        "company pages (entities, company topics, filed answers) built from its sources. Links "
+        "to other indexes are kept. Kebab-case."
     ),
     "term": "Term, acronym or synonym to look up (any language). Omit to list the glossary.",
     "source_id": "Source id: 'src-' followed by 12 hex digits.",

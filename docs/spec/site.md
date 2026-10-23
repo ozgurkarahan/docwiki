@@ -124,3 +124,25 @@ outside an allowlist (the repository URL and the site's own host), and the injec
   they are, so focus, open journeys and scroll stay. Only real changes (a new document, a new
   state, a new phase) are announced, in the one polite region of the page, never on the first
   render. The pure parts are in `scripts/pipeline.ts`, tested with Node.
+
+## 9. Documents register and explorer with scopes
+
+(v1.7, [ADR 0011](../adr/0011-company-wide-wiki.md).)
+
+- `docwiki-site.json` gives each source its `scope`, `phase` and `lot` (from the source
+  frontmatter; `null` when the pack declares no scopes), `scopes` (every scope value with its
+  title: the title of its hub page and the hub's slug, or the value capitalised for a scope
+  without a hub such as the default `entreprise`), `register` and `explorer`.
+- **Register.** When at least one source has a scope, the ① Documents register is grouped by
+  scope, then phase, then type (`register`, computed by `docwiki.site.register`): scopes with a
+  hub first, by title, each heading linking to its hub, then the scopes without a hub, then
+  documents without a scope ("Other documents"); phases by key ("Phase 3", "No phase" last);
+  types alphabetically (untyped last); inside a type, by n° and indice, then date. Entries show
+  the lot when there is one. Without scopes `register` is `null` and the register stays one flat
+  list.
+- **Explorer.** Top-level groups in this order: the hub folders (`explorer.hubFolders`, from
+  the `index:hubs/<folder>` pages, e.g. "Chantiers"), `entities`, `sources`, `topics`, then the
+  rest (folders before files, by name). When the wiki has scopes, the `entities` folder is shown
+  under the title of the one scope without a hub (`explorer.entitiesTitle`, "Entreprise"); its
+  pages keep their paths. Tags, evidence, documents and pipeline stay hidden. Quartz runs the
+  explorer functions in the browser from their source text, so these values are written into it.

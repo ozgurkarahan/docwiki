@@ -15,7 +15,7 @@ import shutil
 import sys
 import time
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import ModuleType
@@ -27,14 +27,14 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from jwt import PyJWKClient
 from jwt.algorithms import RSAAlgorithm
 
-from docwiki.contracts.catalog import Catalog
+from docwiki.contracts.catalog import Catalog, catalog_page_for
 from docwiki.contracts.extracted import Block, ExtractedDoc, ExtractionInfo
 from docwiki.contracts.gates import gate_results
 from docwiki.contracts.ids import source_id_for
 from docwiki.contracts.layout import SKILL_PROJECTIONS, proposal_key, run_report_key
 from docwiki.contracts.locators import PdfPageLocator
 from docwiki.contracts.manifest import ReleaseInputs
-from docwiki.contracts.pages import EvidencePage, Page
+from docwiki.contracts.pages import EvidencePage, Page, SourceFrontmatter, parse_frontmatter
 from docwiki.contracts.proposals import (
     EntityProposalPayload,
     GlossaryProposalPayload,
@@ -81,9 +81,19 @@ def copy_fixture(target: Path) -> Path:
 
 
 def stage_release(
-    staging: Path, *, created_at: datetime, topic_note: str | None = None
+    staging: Path,
+    *,
+    created_at: datetime,
+    topic_note: str | None = None,
+    scopes: dict[str, str] | None = None,
+    extra_pages: Sequence[tuple[str, dict[str, Any], str]] = (),
 ) -> StagedRelease:
-    """Rebuild the mock release with a new identity (optionally adding a line to the topic)."""
+    """Rebuild the mock release with a new identity (optionally adding a line to the topic).
+
+    ``scopes`` gives source pages a scope value (``{source_id: scope}``, v1.7); ``extra_pages``
+    adds pages as ``(path, frontmatter without docwiki stamp, body)``. With either, the catalog
+    pages and sources are derived again from the frontmatter.
+    """
     builder = load_builder()
     source = FIXTURE_ROOT / "releases" / RELEASE_ID
     inputs = ReleaseInputs.from_json(
@@ -114,6 +124,11 @@ def stage_release(
             update: dict[str, Any] = {
                 "frontmatter": page.frontmatter.model_copy(update={"docwiki": writer.stamp})
             }
+            fm = page.frontmatter
+            if scopes and isinstance(fm, SourceFrontmatter) and fm.source_id in scopes:
+                update["frontmatter"] = update["frontmatter"].model_copy(
+                    update={"scope": scopes[fm.source_id]}
+                )
             if topic_note and rel == "topics/schedule-and-window-delivery.md":
                 update["body"] = page.body.replace(
                     "## Overview\n", f"## Overview\n\n{topic_note}\n", 1
@@ -123,6 +138,16 @@ def stage_release(
             pages.append(page)
         else:
             writer.write_wiki_file(rel, file.read_text(encoding="utf-8"))
+    for path, data, body in extra_pages:
+        page = Page(
+            path=path,
+            frontmatter=parse_frontmatter(
+                {**data, "docwiki": writer.stamp.model_dump(by_alias=True)}
+            ),
+            body=body,
+        )
+        writer.write_page(page)
+        pages.append(page)
     for file in sorted((source / "evidence").rglob("*")):
         rel = file.relative_to(source).as_posix()
         if file.suffix == ".md":
@@ -130,6 +155,16 @@ def stage_release(
         elif file.is_file():
             writer.copy_file(rel, file)
     catalog = Catalog.from_json((source / "catalog.json").read_bytes())
+    if scopes or extra_pages:
+        derived = sorted(
+            (catalog_page_for(page.frontmatter, page.path) for page in pages),
+            key=lambda entry: entry.path,
+        )
+        sources = [
+            item.model_copy(update={"scope": (scopes or {}).get(item.source_id)})
+            for item in catalog.sources
+        ]
+        catalog = catalog.model_copy(update={"pages": derived, "sources": sources})
     writer.write_catalog(catalog.model_copy(update={"release_id": writer.release_id}))
     writer.write_tables(builder.PLAN_B, builder.PLAN_TABLES, "public")
     titles = {

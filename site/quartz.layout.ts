@@ -2,6 +2,7 @@
 import { PageLayout, SharedLayout } from "./quartz/cfg"
 import * as Component from "./quartz/components"
 import * as DocWiki from "./quartz/components/docwiki"
+import { settings } from "./quartz/components/docwiki/settings"
 
 // No graph on the Documents and Pipeline tabs (ADR 0010), nor on the home page: it has nothing
 // useful to show there (newcomers read it as broken).
@@ -14,6 +15,14 @@ const graph = Component.ConditionalRender({
     fileData.slug !== "documents" && fileData.slug !== "pipeline" && fileData.slug !== "index",
 })
 
+type ExplorerOptions = NonNullable<Parameters<typeof Component.Explorer>[0]>
+
+// Quartz runs the explorer's functions in the browser from their source text (toString()), so a
+// value they need is written into that text: the hub folders (v1.7, ADR 0011) and the name of
+// the `entities` folder when the wiki has scopes ("Entreprise").
+const hubFolders = JSON.stringify(settings.explorer?.hubFolders ?? [])
+const entitiesTitle = JSON.stringify(settings.explorer?.entitiesTitle ?? null)
+
 const explorer = Component.Explorer({
   title: "Browse",
   // Evidence sidecars are reached from footnotes; tag pages from the tag list; Documents and
@@ -21,12 +30,38 @@ const explorer = Component.Explorer({
   filterFn: (node) =>
     !["tags", "evidence", "documents", "pipeline"].includes(node.slugSegment ?? ""),
   // Folders without an index page show their path segment: `_meta` → "Meta", `queries` → "Queries".
-  mapFn: (node) => {
-    if (node.isFolder && node.data === null) {
+  // With scopes, `entities` shows as the default scope ("Entreprise"); its pages keep their paths.
+  mapFn: new Function(
+    "node",
+    `if (node.isFolder && node.data === null) {
       const name = node.displayName.replace(/^_+/, "")
       node.displayName = name.charAt(0).toUpperCase() + name.slice(1)
     }
-  },
+    const entitiesTitle = ${entitiesTitle}
+    if (entitiesTitle && node.isFolder && node.slug === "entities/index") {
+      node.displayName = entitiesTitle
+    }`,
+  ) as ExplorerOptions["mapFn"],
+  // Top level: the hub folders ("Chantiers"), entities, sources, topics, then the rest (folders
+  // before files, by name).
+  sortFn: new Function(
+    "a",
+    "b",
+    `const hubs = ${hubFolders}
+    const rank = (node) => {
+      if (!node.isFolder || node.slug.split("/").length !== 2) return 4
+      if (hubs.includes(node.slugSegment)) return 0
+      const fixed = ["entities", "sources", "topics"].indexOf(node.slugSegment)
+      return fixed === -1 ? 4 : fixed + 1
+    }
+    const order = rank(a) - rank(b)
+    if (order !== 0) return order
+    if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1
+    return a.displayName.localeCompare(b.displayName, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    })`,
+  ) as ExplorerOptions["sortFn"],
 })
 
 const toolbar = Component.Flex({

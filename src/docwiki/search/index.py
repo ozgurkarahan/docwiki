@@ -1,8 +1,11 @@
 """``search.db`` (pipeline §6): build with SQLite FTS5, query with FTS5 or a BM25 fallback.
 
 Schema = the frozen DDL of pipeline §6 plus two additive tables used for filtering:
-``pages(page_id, type, path, title)`` and ``page_refs(page_id, ref_kind, ref_id)`` where
-``ref_kind`` is ``entity`` or ``topic``.
+``pages(page_id, type, path, title, scope)`` and ``page_refs(page_id, ref_kind, ref_id)`` where
+``ref_kind`` is ``entity`` or ``topic``. Schema 2 (v1.7, ADR 0011) adds the nullable ``scope``
+column to ``docs`` and ``pages``: the scope value of a source page (and its blocks), a scoped
+topic or a hub, ``NULL`` for company pages. Schema 1 databases are still read (no page has a
+scope there).
 """
 
 from __future__ import annotations
@@ -30,6 +33,7 @@ from docwiki.search.text import token_spans, tokenize
 
 __all__ = [
     "COLUMN_WEIGHTS",
+    "READABLE_SCHEMAS",
     "SCHEMA_VERSION",
     "TOKENIZER",
     "SearchBlock",
@@ -40,9 +44,12 @@ __all__ = [
     "build_search_db",
     "fts5_available",
     "make_snippet",
+    "page_scope",
 ]
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
+READABLE_SCHEMAS = frozenset({"1", SCHEMA_VERSION})
+"""Schemas :class:`SearchIndex` and the release validator accept."""
 TOKENIZER = "unicode61 remove_diacritics 2"
 COLUMN_WEIGHTS = (3.0, 2.0, 1.0)
 """bm25 weights for (title, section, text)."""
@@ -50,11 +57,11 @@ COLUMN_WEIGHTS = (3.0, 2.0, 1.0)
 _DDL = """
 CREATE TABLE docs(rowid INTEGER PRIMARY KEY, kind TEXT, page_id TEXT, path TEXT, title TEXT,
                   section TEXT, anchor TEXT, source_id TEXT, locator_key TEXT, sensitivity TEXT,
-                  status TEXT, lang TEXT, text TEXT);
+                  status TEXT, lang TEXT, text TEXT, scope TEXT);
 CREATE TABLE synonyms(term TEXT, synonym TEXT, lang TEXT);
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE pages(page_id TEXT PRIMARY KEY, type TEXT NOT NULL, path TEXT NOT NULL,
-                   title TEXT NOT NULL);
+                   title TEXT NOT NULL, scope TEXT);
 CREATE TABLE page_refs(page_id TEXT NOT NULL, ref_kind TEXT NOT NULL, ref_id TEXT NOT NULL,
                        PRIMARY KEY(page_id, ref_kind, ref_id));
 """
@@ -146,10 +153,18 @@ def blocks_from_extracted(
     return rows
 
 
+def page_scope(page: Page) -> str | None:
+    """The scope value a page belongs to: from the frontmatter ``scope`` of source pages, scoped
+    topics and hubs; ``None`` for company pages (entities, company topics, indexes...)."""
+    scope = getattr(page.frontmatter, "scope", None)
+    return scope if isinstance(scope, str) and scope else None
+
+
 def _page_rows(page: Page) -> list[tuple[object, ...]]:
     fm = page.frontmatter
     source_id = fm.source_id if isinstance(fm, SourceFrontmatter) else None
     status = fm.status if isinstance(fm, SourceFrontmatter) else None
+    scope = page_scope(page)
     rows: list[tuple[object, ...]] = []
     for section in split_sections(strip_backlinks_block(page.body)):
         text = markdown_to_text(section.markdown).strip()
@@ -170,6 +185,7 @@ def _page_rows(page: Page) -> list[tuple[object, ...]]:
                 status,
                 fm.lang,
                 text,
+                scope,
             )
         )
     return rows
@@ -215,11 +231,19 @@ def build_search_db(
         if fts:
             conn.execute(_FTS_DDL)
         rows: list[tuple[object, ...]] = []
+        scopes: dict[str, str | None] = {}
         for page in page_list:
             rows.extend(_page_rows(page))
+            scopes[page.frontmatter.id] = page_scope(page)
             conn.execute(
-                "INSERT INTO pages(page_id, type, path, title) VALUES (?, ?, ?, ?)",
-                (page.frontmatter.id, page.frontmatter.type, page.path, page.frontmatter.title),
+                "INSERT INTO pages(page_id, type, path, title, scope) VALUES (?, ?, ?, ?, ?)",
+                (
+                    page.frontmatter.id,
+                    page.frontmatter.type,
+                    page.path,
+                    page.frontmatter.title,
+                    scopes[page.frontmatter.id],
+                ),
             )
             conn.executemany(
                 "INSERT OR IGNORE INTO page_refs(page_id, ref_kind, ref_id) VALUES (?, ?, ?)",
@@ -240,11 +264,13 @@ def build_search_db(
                     block.status,
                     block.lang,
                     block.text,
+                    scopes.get(block.page_id),
                 )
             )
         conn.executemany(
             "INSERT INTO docs(kind, page_id, path, title, section, anchor, source_id, locator_key, "
-            "sensitivity, status, lang, text) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "sensitivity, status, lang, text, scope) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             rows,
         )
         conn.executemany(
@@ -291,6 +317,9 @@ class SearchIndex:
         self._lock = threading.Lock()
         self.backend = backend
         self.meta = dict(conn.execute("SELECT key, value FROM meta").fetchall())
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(docs)")}
+        self.has_scopes = "scope" in columns
+        """False for a schema 1 database: no row has a scope, ``within`` matches nothing."""
         self._synonym_groups = self._load_synonyms()
         self._corpus: Bm25Corpus | None = None
         self._rows: dict[int, _Row] | None = None
@@ -365,6 +394,7 @@ class SearchIndex:
         types: Sequence[str] | None,
         entity: str | None,
         topic: str | None,
+        within: str | None = None,
     ) -> tuple[str, list[object]]:
         clauses: list[str] = []
         params: list[object] = []
@@ -384,6 +414,12 @@ class SearchIndex:
                     "WHERE ref_kind = ? AND ref_id = ?))"
                 )
                 params.extend([ref_id, ref_kind, ref_id])
+        if within:
+            if self.has_scopes:
+                clauses.append("d.scope = ?")
+                params.append(within)
+            else:
+                clauses.append("0 = 1")
         return (" AND " + " AND ".join(clauses)) if clauses else "", params
 
     def search(
@@ -394,8 +430,12 @@ class SearchIndex:
         entity: str | None = None,
         topic: str | None = None,
         limit: int = 10,
+        within: str | None = None,
     ) -> list[SearchHit]:
         """Ranked hits: synonym-expanded phrases, OR semantics, BM25 (title 3, section 2, text 1).
+
+        ``within`` keeps only rows of that scope value (pages carrying it and the blocks of its
+        source pages); company pages have no scope.
 
         The FTS5 backend selects candidate rows with ``MATCH``; the BM25 backend matches in
         memory. Both rank with the same scorer, so results are identical.
@@ -405,7 +445,7 @@ class SearchIndex:
         phrases = self.expand(query)
         if not phrases:
             return []
-        where, params = self._filters(kinds, types, entity, topic)
+        where, params = self._filters(kinds, types, entity, topic, within)
         with self._lock:
             corpus, rows = self._load_corpus()
             if self.backend == "fts5":
@@ -418,6 +458,16 @@ class SearchIndex:
             scores = corpus.score(phrases, candidates)
         ranked = sorted(scores.items(), key=lambda item: (-item[1], item[0]))[:limit]
         return [self._hit(rows[rowid], score, phrases) for rowid, score in ranked]
+
+    def scopes(self) -> list[str]:
+        """The scope values recorded in this index (empty for a schema 1 database)."""
+        if not self.has_scopes:
+            return []
+        with self._lock:
+            found = self._conn.execute(
+                "SELECT DISTINCT scope FROM docs WHERE scope IS NOT NULL ORDER BY scope"
+            ).fetchall()
+        return [value for (value,) in found]
 
     def _fts_candidates(
         self, phrases: list[tuple[str, ...]], where: str, params: list[object]

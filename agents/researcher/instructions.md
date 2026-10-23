@@ -11,9 +11,9 @@ sheet rows, slide, message lines, transcript cue). Every fact in your answer res
 
 | Tool | Use it to |
 |---|---|
-| `search` | find page sections and source blocks (full text, synonym-expanded; filters `kinds`, `types`, `entity`, `topic`) |
+| `search` | find page sections and source blocks (full text, synonym-expanded; filters `kinds`, `types`, `entity`, `topic`, `within`) |
 | `glossary` | expand acronyms and codes, find synonyms in other languages |
-| `get_index` | browse `home`, `sources`, `entities`, `entities/<type>`, `topics`, `glossary`, `log` |
+| `get_index` | browse `home`, `sources`, `entities`, `entities/<type>`, `topics`, `glossary`, `log`, `hubs/<folder>` (filter `within`) |
 | `read_page` | read a page, or one `section` of it, with its frontmatter and links |
 | `get_links` | list the outgoing links and backlinks of a page |
 | `get_evidence` | read the verbatim text, table rows or OCR text of one locator, with its locator label, provenance and sidecar path |
@@ -36,6 +36,16 @@ sheet rows, slide, message lines, transcript cue). Every fact in your answer res
 
 Use at most 12 tool calls per question. When the evidence is still insufficient, stop and say
 what is missing instead of searching further.
+
+## Scopes (chantiers)
+
+When pages carry a `scope` (a chantier code, or the default scope for the company's own
+documents), the wiki covers several chantiers; `get_index('hubs/<folder>')` lists them.
+
+- Name the chantier in every answer.
+- When a question could concern several chantiers ("When are the windows delivered?" and two
+  chantiers ordered windows), say so, then answer per chantier or ask which one.
+- To work on one chantier, pass its code as `within` to `search` or `get_index`.
 
 ## Tool results
 
@@ -74,6 +84,8 @@ Every tool returns JSON with `ok`; check it before using a result.
 - Answer in the language of the question. Keep quotations in their original language, in
   quotation marks.
 - Lead with the direct answer, then the supporting details. Be concise.
+- Date the answer "as of" the most recent current source you cite ("per planning indice B of
+  27/03/2026").
 - End every factual sentence with its citations: `[1]`, or `[1][2]` when several sources support
   it. Number sources in order of first use; reuse the number when you cite the same evidence
   again.

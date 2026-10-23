@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 from site_testkit import (
+    HUB_PAGE,
+    MINUTES,
     MOCK_RELEASE,
     MOCK_RELEASE_DIR,
     MOCK_RELEASE_ID,
@@ -17,6 +19,7 @@ from site_testkit import (
     PLAN_B,
     PLAN_B_PAGE,
     FakeTools,
+    make_scoped,
     write_site,
 )
 
@@ -35,6 +38,7 @@ from docwiki.site import (
     site_settings,
 )
 from docwiki.site import build as build_module
+from docwiki.site.register import register_groups
 
 
 def test_pinned_quartz_version() -> None:
@@ -187,11 +191,17 @@ def test_site_settings_from_the_mock_release() -> None:
         "format": "xlsx",
         "supersededBy": None,
         "supersededByRevision": None,
+        "scope": None,
+        "phase": None,
+        "lot": None,
     }
     plan_a = next(item for item in settings["sources"].values() if item["revision"] == "A")
     assert plan_a["supersededBy"] == "Planning and purchase tracking, indice B"
     assert plan_a["supersededByRevision"] == "B"
     assert len(settings["sources"]) == 3
+    # no scopes: the flat register, the explorer without hubs and with "Entities"
+    assert settings["scopes"] == {} and settings["register"] is None
+    assert settings["explorer"] == {"hubFolders": [], "entitiesTitle": None}
     assert settings["answers"] == 1  # queries/2026-03-31-window-delivery-date.md
     custom = site_settings(
         release,
@@ -347,3 +357,72 @@ def test_failed_commands_raise_site_build_errors(tmp_path: Path) -> None:
         )
     with pytest.raises(SiteBuildError, match="cannot run"):
         build_module.subprocess_runner([str(tmp_path / "no-such-tool")], cwd=tmp_path)
+
+
+def test_site_settings_of_a_scoped_release(tmp_path: Path) -> None:
+    """v1.7 (ADR 0011): scope, phase and lot per source, scope titles, the grouped register."""
+    settings = site_settings(
+        open_release(make_scoped(tmp_path / "scoped")),
+        base_url=None,
+        page_title=None,
+        banner=None,
+        repo_url="https://github.com/ozgurkarahan/docwiki",
+        quartz_version="v4.5.2",
+    )
+    plan_b = settings["sources"][PLAN_B]
+    assert (plan_b["scope"], plan_b["phase"], plan_b["lot"]) == ("moreau", "3", None)
+    assert settings["sources"][MINUTES]["scope"] == "entreprise"
+    assert settings["scopes"] == {
+        "entreprise": {"title": "Entreprise", "hub": None},
+        "moreau": {"title": "Chantier Moreau", "hub": HUB_PAGE},
+    }
+    assert settings["explorer"] == {"hubFolders": ["chantiers"], "entitiesTitle": "Entreprise"}
+    register = settings["register"]
+    assert [(group["scope"], group["title"], group["count"]) for group in register] == [
+        ("moreau", "Chantier Moreau", 2),
+        ("entreprise", "Entreprise", 1),
+    ]
+    assert register[0]["hub"] == HUB_PAGE
+    (phase,) = register[0]["phases"]
+    assert (phase["phase"], phase["title"]) == ("3", "Phase 3")
+    assert phase["types"] == [
+        {"type": "schedule", "title": "Schedule", "sources": [PLAN_A, PLAN_B]},
+    ]
+    assert register[1]["phases"][0]["title"] == "No phase"
+
+
+def test_register_groups_order() -> None:
+    def source(scope: str | None, phase: str | None, doc_type: str | None, **extra: str) -> dict:
+        return {"scope": scope, "phase": phase, "docType": doc_type, "title": "x", **extra}
+
+    sources = {
+        "s1": source("zeta", "3", "quote", docNumber="DEV-2", revision="A"),
+        "s2": source("alpha", None, None),
+        "s3": source("entreprise", "1", "invoice"),
+        "s4": source("zeta", "1", "quote", docNumber="DEV-1"),
+        "s5": source("zeta", "3", "quote", docNumber="DEV-1", revision="B"),
+        "s6": source("zeta", "3", None),
+        "s7": source(None, None, "photo"),
+        "s8": source("zeta", "3", "minutes"),
+    }
+    scopes = {
+        "alpha": {"title": "Chantier Alpha", "hub": "chantiers/alpha"},
+        "zeta": {"title": "Chantier Zeta", "hub": "chantiers/zeta"},
+        "entreprise": {"title": "Entreprise", "hub": None},
+    }
+    groups = register_groups(sources, scopes)
+    assert groups is not None
+    assert [group["title"] for group in groups] == [
+        "Chantier Alpha",
+        "Chantier Zeta",
+        "Entreprise",
+        "Other documents",
+    ]
+    zeta = groups[1]
+    assert [phase["phase"] for phase in zeta["phases"]] == ["1", "3"]
+    types = zeta["phases"][1]["types"]
+    assert [item["type"] for item in types] == ["minutes", "quote", None]
+    assert types[1]["sources"] == ["s5", "s1"], "by n° then indice"
+    assert types[2]["title"] == "Other documents"
+    assert groups[0]["phases"][0]["title"] == "No phase"
+    assert register_groups({"s": source(None, "3", "quote")}, scopes) is None

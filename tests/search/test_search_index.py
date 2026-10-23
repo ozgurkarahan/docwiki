@@ -141,7 +141,7 @@ def index(request: pytest.FixtureRequest, tmp_path: Path) -> SearchIndex:
 
 
 def test_meta_and_rows(index: SearchIndex) -> None:
-    assert index.meta["schema"] == "1"
+    assert index.meta["schema"] == "2"
     assert index.meta["release_id"] == RELEASE
     assert index.meta["audience"] == "public"
     assert index.meta["tokenizer"] == "unicode61 remove_diacritics 2"
@@ -254,3 +254,48 @@ def test_tokenize_and_snippets() -> None:
     assert snippet.startswith("…") and snippet.endswith("…") and "target phrase" in snippet
     assert make_snippet("short text", [("missing",)]) == "short text"
     assert len(make_snippet("x " * 500, [("x",)])) <= 241
+
+
+def _scoped_pages() -> list[Page]:
+    """The quote belongs to the chantier ``moreau``, the minutes to the default scope."""
+    scopes = {SRC_QUOTE: "moreau", SRC_MINUTES: "entreprise"}
+    pages: list[Page] = []
+    for item in PAGES:
+        scope = scopes.get(item.frontmatter.id)
+        if scope:
+            fm = item.frontmatter.model_copy(update={"scope": scope})
+            item = item.model_copy(update={"frontmatter": fm})
+        pages.append(item)
+    return pages
+
+
+@pytest.mark.parametrize("use_fts", [True, False])
+def test_within_keeps_one_scope(tmp_path: Path, use_fts: bool) -> None:
+    if use_fts and not fts5_available():
+        pytest.skip("SQLite without FTS5")
+    path = tmp_path / "search.db"
+    build_search_db(_scoped_pages(), BLOCKS, SYNONYMS, path, use_fts5=use_fts)
+    with SearchIndex.open(path) as index:
+        assert index.has_scopes and index.scopes() == ["entreprise", "moreau"]
+        query = "baie window réception"
+        moreau = index.search(query, within="moreau", limit=50)
+        assert moreau and {hit.page_id for hit in moreau} == {SRC_QUOTE}
+        assert any(hit.kind == "source-block" for hit in moreau), "blocks take their page scope"
+        company = index.search(query, within="entreprise", limit=50)
+        assert {hit.page_id for hit in company} == {SRC_MINUTES}
+        everything = {hit.page_id for hit in index.search(query, limit=50)}
+        assert {BAIE, TOPIC} <= everything, "company pages have no scope"
+        assert index.search("baie", within="valbrise") == []
+        scoped = dict(index._conn.execute("SELECT page_id, scope FROM pages"))
+        assert scoped[SRC_QUOTE] == "moreau" and scoped[BAIE] is None
+
+
+def test_schema_1_databases_are_still_read() -> None:
+    """The committed mock release predates the scope column (schema 1)."""
+    release = Path(__file__).resolve().parents[2] / "samples" / "fixtures" / "mock-release"
+    fixture = release / "releases" / "20260401T090000Z-7ce99a3f" / "search.db"
+    with SearchIndex.open(fixture) as index:
+        assert index.meta["schema"] == "1" and not index.has_scopes
+        assert index.scopes() == []
+        assert index.search("menuiseries")
+        assert index.search("menuiseries", within="moreau") == []
