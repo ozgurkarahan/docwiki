@@ -633,16 +633,37 @@ class DomainPack(ContractModel):
 
 
 def locked_terms_note(pack: DomainPack) -> str:
-    """The locked trade vocabulary as an instruction for the prompts (empty without terms)."""
+    """The locked trade vocabulary as an instruction for the prompts that write the canonical
+    pages (empty without terms).
+
+    In English the terms keep their gloss in brackets on first use. In another language (the
+    documents' own, ADR 0012) they are simply kept as written: no English gloss, and the English
+    renderings are banned in a separate list, never next to the term, so that a model copying the
+    note cannot paste the ban into a page.
+    """
     terms = pack.terms.terms
     if not terms:
         return ""
-    lines = [
-        "Locked trade terms (keep them in French, exactly as written; give the English gloss in "
-        "brackets the first time each appears on a page, never translate or paraphrase them):",
-    ]
+    english = pack.canonical_lang == "en"
+    if english:
+        lines = [
+            "Locked trade terms (keep them in French, exactly as written; give the English gloss "
+            "in brackets the first time each appears on a page, never translate or paraphrase "
+            "them):",
+        ]
+    else:
+        lines = [
+            "Locked trade terms (write them exactly as below; never translate, paraphrase or "
+            "gloss them, and add no bracketed explanation after them):",
+        ]
     for term in terms:
         forms = f" (also {', '.join(term.forms)})" if term.forms else ""
-        banned = f"; never write {', '.join(repr(b) for b in term.banned)}" if term.banned else ""
-        lines.append(f"- {term.term}{forms}: {term.gloss}{banned}")
+        lines.append(f"- {term.term}{forms}: {term.gloss}" if english else f"- {term.term}{forms}")
+    banned = sorted({rendering for term in terms for rendering in term.banned})
+    if banned:
+        lines.append(
+            "Banned English renderings (never use these words in a page): "
+            + ", ".join(repr(rendering) for rendering in banned)
+            + "."
+        )
     return "\n".join(lines)

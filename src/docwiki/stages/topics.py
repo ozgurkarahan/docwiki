@@ -86,7 +86,7 @@ __all__ = [
     "route_sources",
 ]
 
-STAGE_VERSION = "3"
+STAGE_VERSION = "4"
 PROMPT_VERSION = load_prompt("topic-synthesis").version
 SCHEMA_NAME = "topic_synthesis"
 MAX_FACT_TOKENS = 16_000

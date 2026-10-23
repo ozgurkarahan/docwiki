@@ -64,7 +64,7 @@ __all__ = [
     "fact_date",
 ]
 
-STAGE_VERSION = "3"
+STAGE_VERSION = "4"
 PROMPT_VERSION = load_prompt("entity-summary").version
 SCHEMA_NAME = "entity_summary"
 MAX_SUMMARY_FACTS = 40
