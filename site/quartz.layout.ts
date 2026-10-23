@@ -63,7 +63,9 @@ export const defaultContentPageLayout: PageLayout = {
     contentMeta,
     // The pipeline page only: the owner's sign-in and upload form, before the text.
     DocWiki.OwnerBox(),
-    // Home page only: how the release was built, then a collapsible "About DocWiki".
+    // Home page only: the story (the pattern in one sentence, documents → pipeline → cited
+    // wiki, a question to try), then how the release was built and a collapsible "About DocWiki".
+    DocWiki.Story(),
     DocWiki.About(),
     DocWiki.EvidenceHeader(),
     // Source pages: type, n°, indice, date, current or replaced, the document and the original.

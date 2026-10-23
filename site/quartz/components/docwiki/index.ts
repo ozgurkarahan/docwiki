@@ -9,6 +9,7 @@ import Head from "./Head"
 import OwnerBox from "./OwnerBox"
 import Process from "./Process"
 import SourceHeader from "./SourceHeader"
+import Story from "./Story"
 import Tabs from "./Tabs"
 
 export {
@@ -23,5 +24,6 @@ export {
   OwnerBox,
   Process,
   SourceHeader,
+  Story,
   Tabs,
 }

@@ -161,6 +161,8 @@ def test_site_settings_from_the_mock_release() -> None:
     assert settings["releaseId"] == MOCK_RELEASE_ID
     assert settings["releaseDate"] == "2026-04-01"
     assert settings["documents"] == {"current": 2, "superseded": 1}
+    # 3 entities, 3 sources, 1 topic and 1 filed query cite sources; indexes, meta, log don't
+    assert settings["citedPages"] == 8
     assert settings["runId"] == "run-20260401-090000-0a1b2c3d"
     assert settings["runPage"] is None  # the mock wiki has no run receipt page
     assert settings["qualityPage"] == "_meta/quality"

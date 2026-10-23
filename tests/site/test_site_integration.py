@@ -122,6 +122,14 @@ def test_pages_render_the_docwiki_overlay(built_site: Path) -> None:
     assert 'class="docwiki-about"' in home and "Compiled by" in home
     assert "quality gates: 12 passed, 3 skipped" in home and "quality report" in home
     assert home.index('class="docwiki-about"') < home.index('id="how-to-navigate"')
+    # the story first: the pattern, documents → pipeline → cited pages, a question to try
+    assert 'class="docwiki-story"' in home and "docwiki-story" not in source
+    assert home.index('class="docwiki-story"') < home.index('class="docwiki-about"')
+    assert "3 documents" in home and "13-step pipeline" in home and "8 cited pages" in home
+    assert 'href="./documents"' in home and 'href="./pipeline"' in home
+    assert 'href="#docwiki-wiki"' in home and 'id="docwiki-wiki"' in home
+    assert 'data-question="When are the windows of the extension delivered?"' in home
+    assert home.index('id="docwiki-wiki"') < home.index('id="how-to-navigate"')
 
 
 def test_evidence_microscope_pages(built_site: Path) -> None:

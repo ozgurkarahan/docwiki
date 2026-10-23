@@ -44,6 +44,8 @@ export interface DocwikiSettings {
   quartzVersion: string
   /** Sources of this build by status (withdrawn sources have no page). */
   documents: { current: number; superseded: number }
+  /** Wiki pages that cite at least one source (the story home's third card). */
+  citedPages?: number
   runId: string | null
   /** Content slugs of the run receipt and the quality report, when the release has them. */
   runPage: string | null
