@@ -23,7 +23,7 @@ FIELDS = ["id", "split", "category", "question", "lang", "expected_answer", "mus
           "required_citations", "forbidden", "abstain", "notes"]
 CATEGORIES = {"single-hop", "multi-hop", "numeric", "table", "contradiction", "supersession",
               "multilingual", "ocr", "abstain", "injection", "restricted", "skill"}
-DEV_SIZE = (12, 20)  # docs/spec/domain-and-corpus.md §5 (v1.2)
+DEV_SIZE = (12, 40)  # docs/spec/domain-and-corpus.md §5, widened in spec CHANGELOG v1.7
 LOCATOR_KINDS = {
     "pdf": {"pdf-page"},
     "docx": {"docx-paragraph", "docx-table"},
@@ -305,7 +305,9 @@ def test_file_check_reports_ids_and_error_codes_only(
     def variant(qid: str, **changes: Any) -> dict[str, Any]:
         return {**base, "id": qid, "split": "holdout", **changes}
 
-    restricted = "full/restricted/2026-02-02_etude-de-prix-interne.xlsx"
+    restricted = (
+        "full/chantiers/moreau/0-commercial/price-study/2026-02-02_etude-de-prix-interne.xlsx"
+    )
     private = [
         variant("h001"),
         variant("h002", question=secrets[0], expected_answer=secrets[1], must_include=["facture"]),
