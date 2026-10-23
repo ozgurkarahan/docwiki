@@ -377,6 +377,8 @@ def site_settings(
             "current": statuses["current"],
             "superseded": statuses["superseded"],
         },
+        # The story home's third card (ADR 0010): the wiki pages that cite at least one source.
+        "citedPages": sum(1 for page in release.catalog.pages if page.sources),
         "runId": run_id,
         "runPage": _content_slug(release, f"{WikiFiles.RUNS_DIR}/{run_id}.md") if run_id else None,
         "qualityPage": _content_slug(release, WikiFiles.QUALITY),

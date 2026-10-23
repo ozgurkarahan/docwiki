@@ -3,9 +3,11 @@
 // Quartz's page navigation morphs the whole body on every internal link, so the drawer is rebuilt
 // on each `nav` event from sessionStorage (open, selected answer, scroll) and from answers.json,
 // fetched once per page load. Answers are data: they are rendered with DOM nodes and textContent
-// only, and their links are content slugs made relative to the current page.
+// only, and their links are content slugs made relative to the current page. Other parts of a
+// page open the drawer on a question with the `ASK_EVENT` ("docwiki:ask") hook of docwiki-text.
 import type { AskAnswer, AskCitation, AskState } from "../../../plugins/transformers/docwiki-text"
 import {
+  ASK_EVENT,
   ASK_STATE_KEY,
   LIVE_ASK_PATH,
   LIVE_FAILED,
@@ -16,6 +18,7 @@ import {
   LIVE_STORE_KEY,
   NARROW_QUERY,
   PHONE_QUERY,
+  askEventQuestion,
   badgeForText,
   citationText,
   exampleQuestions,
@@ -346,6 +349,41 @@ function useExample(question: string) {
   }
   const filed = answers ? filedAnswerFor(answers, question) : undefined
   if (filed) select(filed.id)
+}
+
+/**
+ * A question from elsewhere on the page (`ASK_EVENT`, "docwiki:ask"; the story home's "Try: …"
+ * button): the drawer opens and treats it like one of its example buttons. Live: the question is
+ * put in the form and asked (unless another one is in flight). Otherwise its filed answer opens,
+ * or the question list when there is none.
+ */
+async function askFromPage(question: string) {
+  const slug = currentSlug()
+  await checkLive(slug)
+  if (liveEnabled) {
+    writeState({ ...readState(), open: true, resume: false, answer: null, scroll: 0 })
+    if (liveRun) {
+      paint("live-status")
+    } else {
+      liveDraft = question
+      void startLive()
+    }
+    return
+  }
+  const list = await loadAnswers(slug).catch(() => null)
+  const filed = list ? filedAnswerFor(list, question) : undefined
+  update(
+    { open: true, resume: false, answer: filed ? filed.id : null, scroll: 0 },
+    filed ? "answer" : "title",
+  )
+}
+
+function onAskEvent(event: Event) {
+  const question = askEventQuestion(event instanceof CustomEvent ? event.detail : null)
+  const found = elements()
+  if (question === null || !found || found.fab.hidden) return
+  resumeFocus = null
+  void askFromPage(question)
 }
 
 function waiting() {
@@ -780,12 +818,14 @@ document.addEventListener("nav", () => {
   panel.addEventListener("scroll", onPanelScroll, { capture: true, passive: true })
   document.addEventListener("keydown", onKeydown, true)
   document.addEventListener("prenav", onPrenav)
+  document.addEventListener(ASK_EVENT, onAskEvent)
   window.addCleanup(() => {
     fab.removeEventListener("click", onFabClick)
     panel.removeEventListener("click", onPanelClick)
     panel.removeEventListener("scroll", onPanelScroll, { capture: true })
     document.removeEventListener("keydown", onKeydown, true)
     document.removeEventListener("prenav", onPrenav)
+    document.removeEventListener(ASK_EVENT, onAskEvent)
   })
   // The button shows when there are filed answers or a live agent; the portal says which (a
   // static host has no /api/ask/status, so a build without answers shows nothing there).

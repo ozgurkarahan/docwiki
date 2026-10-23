@@ -589,3 +589,53 @@ def test_drawer_phone_state_examples_and_stored_live_answers() -> None:
     assert result["match"] == "f"
     assert result["stored"] == [[LIVE_ANSWER["id"], True], ["b", True]]
     assert result["bad"] == [[], [], []]
+
+
+def test_story_home_last_run_line_and_ask_hook() -> None:
+    result = run_helpers(
+        """
+        const run = (extra) => ({run_id: "r1", is_current: false, cost: {}, ...extra})
+        const current = (cost, extra = {}) => run({is_current: true, cost, ...extra})
+        const payload = {runs: [
+          run({cost: {currency: "USD", total: 9.99, duration_s: 30}}),
+          current({currency: "USD", total: 1.374, duration_s: 252}),
+          current({currency: "USD", total: 5, duration_s: 9}),
+        ]}
+        console.log(JSON.stringify({
+          event: m.ASK_EVENT,
+          line: m.lastRunLine(payload),
+          dates: m.lastRunLine({runs: [current({}, {
+            started_at: "2026-04-01T09:00:00Z", finished_at: "2026-04-01T10:05:00Z"})]}),
+          costOnly: m.lastRunLine({runs: [current({total: 0.001})]}),
+          euro: m.lastRunLine({runs: [current({currency: "EUR", total: 2})]}),
+          odd: m.lastRunLine({runs: [current({currency: "<b>", total: "1", duration_s: -3})]}),
+          none: [
+            m.lastRunLine(null), m.lastRunLine({runs: "x"}), m.lastRunLine({runs: [null, 3]}),
+            m.lastRunLine({runs: [run({cost: {total: 1}})]}),
+            m.lastRunLine({runs: [current(null)]}),
+          ],
+          durations: [0.2, 42, 59.4, 59.6, 252, 3600, 3900].map(m.shortDuration),
+          badDuration: [m.shortDuration(-1), m.shortDuration(Number.NaN)],
+          questions: [
+            m.askEventQuestion({question: "  When are\\n the windows delivered? "}),
+            m.askEventQuestion({question: ""}), m.askEventQuestion({question: 3}),
+            m.askEventQuestion("text"), m.askEventQuestion(null),
+            m.askEventQuestion({question: "x".repeat(501)}),
+          ],
+          plural: [m.plural(1, "cited page"), m.plural(8, "cited page")],
+        }))
+        """
+    )
+    assert result == {
+        "event": "docwiki:ask",
+        "line": "last run 4 min · $1.37",  # the first current run; 252 s rounds to 4 min
+        "dates": "last run 1 h 5 min",  # no receipt duration: from its start to its end
+        "costOnly": "last run <$0.01",
+        "euro": "last run EUR 2.00",
+        "odd": None,
+        "none": [None, None, None, None, None],
+        "durations": ["1 s", "42 s", "59 s", "1 min", "4 min", "1 h", "1 h 5 min"],
+        "badDuration": [None, None],
+        "questions": ["When are the windows delivered?", None, None, None, None, None],
+        "plural": ["1 cited page", "8 cited pages"],
+    }

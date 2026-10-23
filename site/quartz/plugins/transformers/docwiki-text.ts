@@ -139,7 +139,7 @@ export function dropsSiteNotice(
   return siteBanner && slug === "index" && kind === "fictional"
 }
 
-function plural(count: number, word: string): string {
+export function plural(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? "" : "s"}`
 }
 
@@ -615,4 +615,79 @@ export function parseStoredLive(raw: string | null | undefined): AskAnswer[] {
     .filter((item): item is AskAnswer => item !== undefined)
     .map((item) => ({ ...item, live: true }))
   return kept.slice(-LIVE_KEEP)
+}
+
+// ----- The story home (Story.tsx, ADR 0010): the three cards and the question to try -----
+
+/**
+ * Page-level hook of the "Ask this wiki" drawer: any part of a page opens the drawer on a question
+ * with `document.dispatchEvent(new CustomEvent(ASK_EVENT, { detail: { question } }))`. The drawer
+ * treats it like its own example buttons: asked live when the agent is enabled, else the filed
+ * answer to that question is opened (the question list when there is none). The event is ignored
+ * while the drawer has nothing to show (its button is hidden) or is not on the page.
+ */
+export const ASK_EVENT = "docwiki:ask"
+
+/** The question of an `ASK_EVENT` detail (`{ question }`), whitespace collapsed, or `null`. */
+export function askEventQuestion(detail: unknown): string | null {
+  const value = record(detail)?.question
+  if (typeof value !== "string") return null
+  const question = value.trim().replace(/\s+/g, " ")
+  return question.length > 0 && question.length <= LIVE_QUESTION_MAX ? question : null
+}
+
+/** "42 s", "4 min", "1 h 5 min": a run's length on the story strip, in whole units. */
+export function shortDuration(seconds: number): string | null {
+  if (!Number.isFinite(seconds) || seconds < 0) return null
+  if (seconds < 59.5) return `${Math.max(1, Math.round(seconds))} s`
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) return `${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  return minutes % 60 === 0 ? `${hours} h` : `${hours} h ${minutes % 60} min`
+}
+
+/** "$1.37": cost receipts are in USD (a missing currency reads as USD); else "EUR 1.37". */
+export function money(total: number, currency: string | null): string | null {
+  if (!Number.isFinite(total) || total < 0) return null
+  const tiny = total > 0 && total < 0.005
+  if (currency === null || currency === "USD") return tiny ? "<$0.01" : `$${total.toFixed(2)}`
+  return `${currency} ${tiny ? "<0.01" : total.toFixed(2)}`
+}
+
+function record(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null
+}
+
+function finite(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null
+}
+
+/**
+ * The pipeline card's live line from the portal's `GET /api/process`: the length and cost of the
+ * run that built the published release (the first `runs` entry with `is_current`), as
+ * "last run 4 min · $1.37". `null` when the reply has no such run or says neither, so the card
+ * keeps its build-time text. The reply is data: only numbers, dates and a currency code are read.
+ */
+export function lastRunLine(payload: unknown): string | null {
+  const runs = record(payload)?.runs
+  const run = (Array.isArray(runs) ? runs : [])
+    .map(record)
+    .find((item) => item !== null && item.is_current === true)
+  if (!run) return null
+  const cost = record(run.cost) ?? {}
+  const { started_at: started, finished_at: finished } = run
+  let seconds = finite(cost.duration_s)
+  if (seconds === null && typeof started === "string" && typeof finished === "string") {
+    seconds = finite((Date.parse(finished) - Date.parse(started)) / 1000)
+  }
+  const code = cost.currency
+  const currency = typeof code === "string" && /^[A-Z]{3}$/.test(code) ? code : null
+  const total = finite(cost.total)
+  const parts = [
+    seconds === null ? null : shortDuration(seconds),
+    total === null ? null : money(total, currency),
+  ].filter((part): part is string => part !== null)
+  return parts.length > 0 ? `last run ${parts.join(" · ")}` : null
 }
