@@ -619,6 +619,7 @@ def render_source_page(
         source_hash=doc.source_hash,
         media_type=doc.media_type,
         doc_type=classification.doc_type,
+        doc_type_label=_doc_type_label(pack, classification.doc_type),
         category=classification.category,
         doc_number=classification.doc_number,
         revision=classification.revision,
@@ -708,6 +709,14 @@ def source_infos(
             superseded_by=tuple(fm.superseded_by),
         )
     return infos
+
+
+def _doc_type_label(pack: DomainPack, doc_type: str) -> str | None:
+    """The pack's display label of a doc type (``PV de réception``), never its key."""
+    try:
+        return pack.doc_type(doc_type).display_label
+    except KeyError:
+        return None
 
 
 def fact_records(result: CompiledResult) -> list[FactRecord]:

@@ -112,8 +112,19 @@ def test_hubs_documents_topics_and_open_contradictions():
     rows = dashboard_lines(hubs, scoped, "index.md")
     assert rows[0] == "## Chantiers"
     alpha_row = next(line for line in rows if "[Chantier Alpha]" in line)
-    assert alpha_row.startswith("| [Chantier Alpha](chantiers/alpha.md) | 3 exécution |")
-    assert alpha_row.endswith("| 2 |")
+    # chantier · phase · open contradictions (to the hub's section) · documents · last document
+    assert rows[2] == (
+        "| Chantier | Phase | Open contradictions | Documents | Last document (dated) |"
+    )
+    assert alpha_row == (
+        "| [Chantier Alpha](chantiers/alpha.md) | 3 exécution "
+        "| [2](chantiers/alpha.md#open-contradictions) | 2 "
+        "| [Indice A](sources/indice-a.md) (2026-01-05) |"
+    )
+    assert "Client" not in rows[2]
+    # a pack without views.yaml: no views section on the hubs and no views line on the dashboard
+    assert "## Computed views" not in body
+    assert not any("Computed views" in line for line in rows)
 
 
 def test_a_scope_named_index_is_refused():
@@ -175,4 +186,52 @@ def test_open_contradictions_are_counted_once_per_pair_of_sources():
         "- [Old — Alpha](../topics/alpha/old.md): 2 contradictions",
     ]
     rows = dashboard_lines(hubs, scoped, "index.md")
-    assert next(line for line in rows if "[Chantier Alpha]" in line).endswith("| 4 |")
+    row = next(line for line in rows if "[Chantier Alpha]" in line)
+    assert "| [4](chantiers/alpha.md#open-contradictions) |" in row
+
+
+BATIMENT = Path(__file__).resolve().parents[2] / "domains" / "batiment"
+
+
+def test_the_details_take_their_labels_from_the_pack_never_from_the_keys():
+    batiment = load_pack(BATIMENT)
+    raw = "chantiers/moreau/3-execution/quote/DEV-2026-014 indice B.txt"
+    content = [source_page(raw, "Devis", "# Devis\n", slug="devis")]
+    hubs = build_hubs(content, batiment, stamp=STAMP, updated=DAY)
+    moreau = next(page for page in hubs.pages if page.path == "chantiers/moreau.md").body
+    details = moreau.split("## Details", 1)[1].split("## Documents", 1)[0]
+    assert "| Maître d'œuvre | aucun |" in details
+    assert "| Conducteur de travaux | Inès Roux |" in details
+    # the phase shows its title from scopes.yaml, once
+    assert "| Phase | 3 Exécution |" in details
+    assert "Phase title" not in details and "Maitre d oeuvre" not in details
+    labels = [line.split("|")[1].strip() for line in details.split("\n") if line.startswith("| ")]
+    assert labels[1:] == [
+        "Code",
+        "Phase",
+        "Contract type",
+        "Client",
+        "Maître d'œuvre",
+        "Conducteur de travaux",
+        "Address",
+        "Works",
+    ]
+    # the batiment pack has views: the hub says when none has rows for it
+    assert "No computed view has rows for this chantier." in moreau
+
+
+def test_the_dashboard_shortens_long_titles_and_says_when_a_date_is_not_the_documents():
+    from docwiki.stages.hubs import _short_title
+
+    assert _short_title("Short title") == "Short title"
+    long = "Planning et suivi des achats du chantier Moreau, indice B, révisé"
+    short = _short_title(long)
+    assert len(short) <= 40 and short.endswith("…") and long.startswith(short[:-1])
+    scoped = load_pack(SCOPED)
+    content = apply_links(
+        [source_page("chantiers/beta/1-marche/quote/x.txt", "Undated", "# U\n", slug="u")],
+        scoped,
+    ).pages
+    hubs = build_hubs(content, scoped, stamp=STAMP, updated=DAY)
+    row = next(line for line in dashboard_lines(hubs, scoped, "index.md") if "Beta" in line)
+    assert row.endswith(f"| [Undated](sources/u.md) (received {DAY.isoformat()}) |")

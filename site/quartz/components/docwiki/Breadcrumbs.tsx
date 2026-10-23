@@ -3,6 +3,7 @@ import { FullSlug, resolveRelative, simplifySlug } from "../../util/path"
 import { classNames } from "../../util/lang"
 import { trieFromAllFiles } from "../../util/ctx"
 import { QuartzComponent, QuartzComponentConstructor, QuartzComponentProps } from "../types"
+import { settings } from "./settings"
 
 interface Options {
   rootName: string
@@ -42,6 +43,13 @@ export default ((userOpts?: Partial<Options>) => {
         { name: "Documents", href: resolveRelative(slug, "documents" as FullSlug) },
         ...crumbs.slice(2),
       ]
+    }
+    // A per-scope topic (topics/<scope>/<topic>): its folder has no page of its own, so the crumb
+    // goes to the scope's hub, under the scope's name (v1.7, ADR 0011).
+    const parts = slug.split("/")
+    const scope = parts[0] === "topics" && parts.length >= 3 ? settings.scopes?.[parts[1]] : null
+    if (scope?.hub && crumbs.length >= 3) {
+      crumbs[2] = { name: scope.title, href: resolveRelative(slug, scope.hub as FullSlug) }
     }
     const current = crumbs.pop()!
 

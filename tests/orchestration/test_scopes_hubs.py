@@ -110,17 +110,20 @@ async def test_the_home_page_starts_with_the_company_dashboard(scoped_release):
     assert first == "## Chantiers"
     table = body.split("## Chantiers", 1)[1].split("## How to navigate", 1)[0]
     assert (
-        "| Chantier | Phase | Client | Documents | Last document received | Open contradictions |"
+        "| Chantier | Phase | Open contradictions | Documents | Last document (dated) |"
     ) in table
     alpha = next(line for line in table.split("\n") if "[Chantier Alpha]" in line)
     assert alpha.startswith(
-        "| [Chantier Alpha](chantiers/alpha.md) | 3 exécution | Famille Moreau |"
+        "| [Chantier Alpha](chantiers/alpha.md) | 3 exécution "
+        "| [0](chantiers/alpha.md#open-contradictions) | 2 |"
     )
-    assert "| 2 |" in alpha and "2026-03-02" in alpha and alpha.endswith("| 0 |")
+    # the client is on the hub, not on the dashboard; the dated title shows its date once
+    assert "Famille Moreau" not in table
+    assert "2026-03-02" in alpha and "(2026-03-02)" not in alpha
     beta = next(line for line in table.split("\n") if "[Chantier Beta]" in line)
-    assert "| 1 marché | Zava Matériaux | 2 |" in beta
+    assert "| 1 marché | [0](chantiers/beta.md#open-contradictions) | 2 |" in beta
     entreprise = next(line for line in table.split("\n") if "[Entreprise]" in line)
-    assert "| — | — | 1 |" in entreprise
+    assert "| — | [0](chantiers/entreprise.md#open-contradictions) | 1 |" in entreprise
     assert "[all chantiers](chantiers/index.md)" in table
     # the other sections are still there, in their order
     order = ["## How to navigate", "## Categories", "## Topics", "## Stats", "## Recent changes"]

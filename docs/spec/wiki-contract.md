@@ -29,6 +29,7 @@ wiki/
     index.md               # the list of the hubs (id index:hubs/<scope-folder>)
     <scope>.md             # one hub per scope value (id hub:<scope-folder>/<scope>), built by code
   views/                   # v1.7 (ADR 0011), only when the pack has views.yaml
+    index.md               # every view with its row count (id index:views)
     <view-slug>.md         # one computed view (id view:<slug>): rows selected by code, cited row by row
   queries/                 # research answers filed back after approval
     <yyyy-mm-dd>-<slug>.md
@@ -79,7 +80,8 @@ Common fields (all pages):
 | `docwiki` | map | `{schema: 1, release: <release_id>}` |
 
 Source pages add: `source_id`, `source_path` (raw relative path), `source_hash`, `media_type`,
-`doc_type`, `category`, `doc_number` (if any), `revision` (if any), `status`
+`doc_type`, `doc_type_label` (v1.7: the pack's display label of the type, e.g. `PV de réception`),
+`category`, `doc_number` (if any), `revision` (if any), `status`
 (`current|superseded|withdrawn`), `supersedes` (list of source ids), `superseded_by` (list),
 `original_lang`, `pages` (count, if paged), `entities` (list of entity ids), `topics` (list of topic ids),
 `authority` (1–10 from the domain pack), `extraction` (`{adapter, version, provenance_mix}`).
@@ -141,11 +143,15 @@ Hub page (v1.7, ADR 0011), built by code, no model and no footnotes (it links to
                           its label; the default scope: its title; else the scope value)
 > FICTIONAL sample notice (only in the public sample domain)
 <n documents, last received YYYY-MM-DD.>
-## Details               (the registry entry's attributes: | Attribute | Value |)
+## Details               (the registry entry's attributes: | Attribute | Value |; with the type's
+                          attribute_labels, the labelled ones under their labels, phase with its
+                          title)
 ## Documents             (### Phase <key> <title> in pack order, then ### No phase; each source
                           with its status: current, or superseded by <links>)
 ## Topics                (the scope's per-scope topics and the company topics citing its sources)
 ## Entities              (entity pages mentioned by its sources)
+## Computed views        (only when the pack has views: those with rows for this scope, with the
+                          count)
 ## Open contradictions   (its distinct open contradictions, from its per-scope topics'
                           contradiction_pairs, one line per unordered pair of sources: both
                           source links in title order, up to 3 subjects (then "and N more"),
@@ -160,9 +166,10 @@ value with at least one source in the release has a hub, the default scope inclu
 
 View page (v1.7, ADR 0011), built by code from the pack's `views.yaml`, never by a model: the
 title, the pack banner, the view's description, a sentence saying the figures were computed by
-code from the cited rows, `## Rows` (a table of the result rows, the scope first when the pack
-declares scopes; each row ends with a link to its source page and one footnote to the evidence
-sidecar of exactly that row, badge `table`), `## Totals` when the view asks for them (sums of the
+code from the cited rows, `## Rows` (a table of the result rows: the scope first when the pack
+declares scopes, by label and linked to its hub page, then the link to the row's source page with
+one footnote to the evidence sidecar of exactly that row, badge `table`, then the result columns
+under the view's `labels`, amounts written `184 490,00 € HT`), `## Totals` when the view asks for them (sums of the
 cited rows computed with exact decimals, per scope when `per_scope`, then all rows; cells that are
 not numbers are counted and left out), `## Sources` (footnotes). Only tables parsed
 deterministically and located by rows (XLSX sheets, CSV files, DOCX tables) take part. The source
@@ -191,12 +198,14 @@ pages a view reads list it under `## Related` (`Computed view: …`).
 - `index.md`: what this wiki is, how to navigate (start here → categories → topics → entities →
   glossary → log), counts, list of topics, recent changes (last 10 log entries). When the pack
   declares scopes (v1.7), its first section is the **company dashboard**, titled with the plural
-  of `scopes.title` (`## Chantiers`): a table `| <scope title> | Phase | Client | Documents |
-  Last document received | Open contradictions |` with one row per hub (link), the highest phase
-  of its sources (pack order, `<key> <title>`), the registry attribute `client`, the number of
-  sources, the last document received (link and date) and the number of distinct open
-  contradictions (the lines of the hub's `## Open contradictions`, a topic without pairs counting
-  with its `contradictions`), followed by a link to `<plural>/index.md`; the other sections are unchanged.
+  of `scopes.title` (`## Chantiers`): a table `| <scope title> | Phase | Open contradictions |
+  Documents | Last document (dated) |` with one row per hub (link), the highest phase of its
+  sources (pack order, `<key> <title>`), the number of distinct open contradictions (the lines of
+  the hub's `## Open contradictions`, a topic without pairs counting with its `contradictions`;
+  linked to the hub's `#open-contradictions`), the number of sources and the last document (a
+  title of at most 40 characters and the document's own date once, or `received <date>` without
+  one), followed by a link to `<plural>/index.md` and, when the pack has views, a line linking
+  every view with its row count and `views/index.md`; the other sections are unchanged.
 - `<plural>/index.md` (v1.7): one line per hub. `topics/index.md` lists the company topics, then
   the per-scope topics under one `## <scope label>` heading per scope.
 - `log.md`: append-only. One entry per change:

@@ -11,6 +11,11 @@
 #
 # Fixed dates are those of the documents, never "today": the registers are kept at 10/04/2026.
 #
+# `labels` give the column headers of the pages, in the trade's French ("Marché HT"); `amounts`
+# mark the result columns that are amounts in euros with their basis (HT, TTC, or € for
+# neither), written "184 490,00 € HT" in cells and totals; `scope_columns` mark the result
+# columns whose values are chantier codes, shown with the chantier's name and linked to its hub.
+#
 # Not a view: Zava Matériaux's invoices against the framework price list. The invoices are PDFs;
 # their lines are text on a page, not a table located row by row, so no view can cite them line
 # by line (a view only reads tables whose rows can be cited one by one).
@@ -59,6 +64,20 @@ views:
       ORDER BY chantier, est_marche DESC, _source_id, _row_id
     per_scope: true
     totals: [marche_ht, marche_ttc, facture_ttc, retenue_ttc, reste_a_facturer_ttc]
+    labels:
+      piece: Pièce
+      objet: Objet
+      marche_ht: Marché HT
+      marche_ttc: Marché TTC
+      facture_ttc: Facturé TTC
+      retenue_ttc: Retenue de garantie TTC
+      reste_a_facturer_ttc: Reste à facturer TTC
+    amounts:
+      marche_ht: HT
+      marche_ttc: TTC
+      facture_ttc: TTC
+      retenue_ttc: TTC
+      reste_a_facturer_ttc: TTC
 
   # P48. The equipment register is kept at 10/04/2026: an inspection due before that date is
   # overdue. Equipment not subject to inspection has no due date and never matches.
@@ -83,6 +102,14 @@ views:
       FROM rows
       WHERE parse_date(prochaine_echeance) < DATE '2026-04-10'
       ORDER BY parse_date(prochaine_echeance), code
+    labels:
+      code: Code
+      designation: Désignation
+      verification: Vérification périodique
+      derniere_verification: Dernière vérification
+      prochaine_echeance: Prochaine échéance
+      affectation: Affectation au 10/04/2026
+      jours_de_retard: Jours de retard
 
   # P29, P31, S17. A subcontractor's situation must be covered by a valid attestation de
   # vigilance. For each situation of a subcontractor (sheet "Sous-traitance" of the chantiers'
@@ -142,6 +169,15 @@ views:
         WHERE v_source_id IS NOT NULL
       )
       ORDER BY sous_traitant, situation_du, date_piece, _source_id, _row_id
+    labels:
+      sous_traitant: Sous-traitant
+      piece: Pièce
+      date_piece: Date de la pièce
+      attestation_du: Attestation du
+      valable_jusqu_au: "Valable jusqu'au"
+      situation_du: Situation du
+      renouvelee_le: Renouvelée le
+      jours_apres_expiration: Jours après expiration
 
   # P42, S15. A self-join on the crew schedule: the same person booked on two chantiers on
   # overlapping days of the same schedule. Each booking of a clash is listed (and cited) with
@@ -173,3 +209,13 @@ views:
        AND parse_date(a.debut) <= parse_date(b.fin)
        AND parse_date(b.debut) <= parse_date(a.fin)
       ORDER BY conflit_du, a.salarie, a.chantier, a._row_id
+    labels:
+      salarie: Salarié
+      semaine: Semaine
+      debut: Début
+      fin: Fin
+      tache: Tâche
+      autre_chantier: Autre chantier
+      conflit_du: Conflit du
+      conflit_au: Conflit au
+    scope_columns: [autre_chantier]

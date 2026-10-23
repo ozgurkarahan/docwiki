@@ -103,3 +103,45 @@ export function cycleFocus(count: number, index: number, backwards: boolean): nu
   if (backwards) return index === 0 ? count - 1 : -1
   return index === count - 1 ? 0 : -1
 }
+
+/** Page types whose tables are document text (evidence): they keep their grid and scroll. */
+const GRID_TABLE_PAGES = new Set(["evidence", "evidence-index"])
+
+/**
+ * Whether the wiki's data tables of a page become stacked cards on narrow screens (up to 800 px):
+ * every page but the evidence sidecars, whose tables are the document's own rows.
+ */
+export function stacksTables(pageType: unknown): boolean {
+  return !(typeof pageType === "string" && GRID_TABLE_PAGES.has(pageType))
+}
+
+/**
+ * The column label of each cell of a row (the `data-label` a stacked card shows before the
+ * cell): the header text of the same column; `null` past the last header or for a blank one.
+ */
+export function cellLabels(headers: readonly string[], cells: number): (string | null)[] {
+  const labels: (string | null)[] = []
+  for (let index = 0; index < cells; index++) {
+    const header = (headers[index] ?? "").replace(/\s+/g, " ").trim()
+    labels.push(header || null)
+  }
+  return labels
+}
+
+/**
+ * The accessible name of a table's scroll box on a computed view: the view's title for its first
+ * table (the rows), the title and the section for the others ("…, totals"). Elsewhere `null`: the
+ * box takes the heading before it.
+ */
+export function tableCaption(
+  pageType: unknown,
+  pageTitle: unknown,
+  heading: string,
+  index: number,
+): string | null {
+  if (pageType !== "view" || typeof pageTitle !== "string" || !pageTitle.trim()) return null
+  const title = pageTitle.trim()
+  const section = heading.replace(/\s+/g, " ").trim()
+  if (index === 0 || !section) return title
+  return `${title}, ${section.toLowerCase()}`
+}

@@ -4,7 +4,7 @@
 import { FullSlug, resolveRelative } from "../../util/path"
 import { classNames } from "../../util/lang"
 import { QuartzComponent, QuartzComponentConstructor, QuartzComponentProps } from "../types"
-import { humanDate, revisionStatus, settings } from "./settings"
+import { docTypeName, humanDate, revisionStatus, settings } from "./settings"
 
 function text(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null
@@ -19,10 +19,13 @@ export default (() => {
     const link = (target: string) => resolveRelative(slug, target as FullSlug)
     const sourceId = text(frontmatter.source_id) ?? ""
     const source = settings.sources[sourceId]
-    const kind = (text(frontmatter.doc_type) ?? source?.docType ?? null)?.replace(/-/g, " ")
+    const kind = docTypeName(
+      text(frontmatter.doc_type) ?? source?.docType,
+      text(frontmatter.doc_type_label) ?? source?.docTypeLabel,
+    )
     const dated = humanDate(source?.date)
     const facts = [
-      kind ? kind.charAt(0).toUpperCase() + kind.slice(1) : null,
+      kind,
       source?.docNumber ? `n° ${source.docNumber}` : null,
       source?.revision ? `indice ${source.revision}` : null,
       dated ? `dated ${dated}` : null,

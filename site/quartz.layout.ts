@@ -22,6 +22,8 @@ type ExplorerOptions = NonNullable<Parameters<typeof Component.Explorer>[0]>
 // the `entities` folder when the wiki has scopes ("Entreprise").
 const hubFolders = JSON.stringify(settings.explorer?.hubFolders ?? [])
 const entitiesTitle = JSON.stringify(settings.explorer?.entitiesTitle ?? null)
+// Per-scope topic folders show the scope's name ("topics/moreau" → "Chantier Moreau").
+const folderTitles = JSON.stringify(settings.explorer?.folderTitles ?? {})
 
 const explorer = Component.Explorer({
   title: "Browse",
@@ -40,6 +42,11 @@ const explorer = Component.Explorer({
     const entitiesTitle = ${entitiesTitle}
     if (entitiesTitle && node.isFolder && node.slug === "entities/index") {
       node.displayName = entitiesTitle
+    }
+    const folderTitles = ${folderTitles}
+    const folder = node.isFolder ? node.slug.replace(/\\/index$/, "") : null
+    if (folder && Object.prototype.hasOwnProperty.call(folderTitles, folder)) {
+      node.displayName = folderTitles[folder]
     }`,
   ) as ExplorerOptions["mapFn"],
   // Top level: the hub folders ("Chantiers"), entities, sources, topics, then the rest (folders

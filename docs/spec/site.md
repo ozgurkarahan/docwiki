@@ -139,13 +139,24 @@ outside an allowlist (the repository URL and the site's own host), and the injec
   documents without a scope ("Other documents"); phases by key ("Phase 3", "No phase" last);
   types alphabetically (untyped last); inside a type, by n° and indice, then date. Entries show
   the lot when there is one. Without scopes `register` is `null` and the register stays one flat
-  list.
+  list. Types show the pack's label (`docTypeLabel`, from the source page's `doc_type_label`:
+  "PV de réception", "DC4"), in the register and the source page header; only a release built
+  before the labels shows the key in words.
 - **Explorer.** Top-level groups in this order: the hub folders (`explorer.hubFolders`, from
   the `index:hubs/<folder>` pages, e.g. "Chantiers"), `entities`, `sources`, `topics`, then the
   rest (folders before files, by name). When the wiki has scopes, the `entities` folder is shown
   under the title of the one scope without a hub (`explorer.entitiesTitle`, "Entreprise"); its
-  pages keep their paths. Tags, evidence, documents and pipeline stay hidden. Quartz runs the
-  explorer functions in the browser from their source text, so these values are written into it.
+  pages keep their paths. Per-scope topic folders show their scope's title
+  (`explorer.folderTitles`: `topics/moreau` → "Chantier Moreau"). Tags, evidence, documents and
+  pipeline stay hidden. Quartz runs the explorer functions in the browser from their source text,
+  so these values are written into it.
+- **Breadcrumbs.** A per-scope topic (`topics/<scope>/<slug>`) shows Home / Topics / <scope
+  title>, the scope's crumb going to its hub page (the folder has no page of its own).
+- **Data tables.** Up to 800 px the wiki's tables (the dashboard, the views, the hubs; not the
+  evidence sidecars') are stacked cards: one card per row, each cell under its column's label
+  (`data-label`, set by the DocWiki transformer from the header row). Wider, a table that overflows
+  its column says "Scroll sideways →" above it and shows a shadow on its hidden side; a computed
+  view's tables are named after the view's title (`data-caption`).
 
 ## 10. Accessibility
 
@@ -175,7 +186,8 @@ source page and a topic page with the drawer open, at 1280×800 and 390×844, li
   stage cards, the documents table and the link pills use `--dw-border` (`#85837a` light,
   `#767a70` dark: at least 3:1 on the page and the highlight tint); provenance badge and notice
   borders at least 3:1 against the page and their own fill; stage cards mark their state with the
-  status colours. `--lightgray` stays for decorative separators only.
+  status colours. `--lightgray` stays for decorative separators only. The dates of folder
+  listings are `--darkgray` at full opacity (Quartz fades them to 0.6).
 - **Motion.** Under `prefers-reduced-motion: reduce` nothing animates, fades or scrolls smoothly:
   transitions and animations (Quartz's popovers, explorer, table of contents, progress bar; the
   drawer's sheet) end at once, `scroll-behavior` is `auto`, and scripted smooth scrolling

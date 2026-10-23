@@ -192,18 +192,50 @@ document.addEventListener("visibilitychange", () => {
   else void poll()
 })
 
-/** A table wider than the page scrolls in its own box: make that box reachable by keyboard. */
+const SCROLL_CUE = "docwiki-scroll-cue"
+
+/**
+ * A table wider than the page scrolls in its own box: make that box reachable by keyboard, name
+ * it (a computed view's title, else the heading before it) and say that it scrolls ("Scroll
+ * sideways →", with a shadow on the side that hides columns). Stacked cards never scroll.
+ */
 function scrollableTables(): void {
   for (const box of document.querySelectorAll<HTMLElement>("article .table-container")) {
-    if (box.scrollWidth <= box.clientWidth + 1) continue
+    const cue = box.previousElementSibling?.classList.contains(SCROLL_CUE)
+      ? (box.previousElementSibling as HTMLElement)
+      : null
+    const scrolls = box.scrollWidth > box.clientWidth + 1
+    box.classList.toggle("docwiki-scrolls", scrolls)
+    if (!scrolls) {
+      cue?.remove()
+      if (box.getAttribute("role") === "region") {
+        box.removeAttribute("tabindex")
+        box.removeAttribute("role")
+        box.removeAttribute("aria-label")
+      }
+      continue
+    }
     box.tabIndex = 0
     box.setAttribute("role", "region")
-    const heading = box.closest("article")
-      ? (box.previousElementSibling?.textContent ?? "").trim().slice(0, 60)
-      : ""
-    box.setAttribute("aria-label", heading ? `Table: ${heading}` : "Table")
+    const caption = box.querySelector("table")?.dataset.caption
+    const before = cue ? cue.previousElementSibling : box.previousElementSibling
+    const heading = (caption ?? before?.textContent ?? "").trim().slice(0, 80)
+    box.setAttribute("aria-label", caption ? caption : heading ? `Table: ${heading}` : "Table")
+    if (!cue) {
+      const hint = document.createElement("p")
+      hint.className = SCROLL_CUE
+      hint.setAttribute("aria-hidden", "true")
+      hint.textContent = "Scroll sideways →"
+      box.before(hint)
+    }
   }
 }
+
+let resizeTimer = 0
+window.addEventListener("resize", () => {
+  window.clearTimeout(resizeTimer)
+  resizeTimer = window.setTimeout(scrollableTables, 150)
+})
 
 document.addEventListener("nav", () => {
   render()

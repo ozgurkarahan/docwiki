@@ -44,17 +44,28 @@ def hub_folders(catalog: Catalog) -> list[str]:
 
 
 def explorer_settings(catalog: Catalog) -> dict[str, Any]:
-    """What the explorer needs: the hub folders to show first and, when the wiki has scopes, the
-    name the ``entities`` folder takes there (the default scope's title, ``Entreprise``)."""
+    """What the explorer needs: the hub folders to show first, when the wiki has scopes the
+    name the ``entities`` folder takes there (the default scope's title, ``Entreprise``), and the
+    title of each per-scope topics folder (``topics/moreau`` → ``Chantier Moreau``)."""
     info = scope_info(catalog)
     unhubbed = [value for value, item in info.items() if not item["hub"]]
+    topic_paths = [page.path for page in catalog.pages if page.type == "topic"]
     return {
         "hubFolders": hub_folders(catalog),
         "entitiesTitle": info[unhubbed[0]]["title"] if len(unhubbed) == 1 else None,
+        "folderTitles": {
+            f"topics/{value}": item["title"]
+            for value, item in info.items()
+            if any(path.startswith(f"topics/{value}/") for path in topic_paths)
+        },
     }
 
 
-def _type_title(doc_type: str | None) -> str:
+def _type_title(doc_type: str | None, label: str | None = None) -> str:
+    """The pack's label of a doc type (``docTypeLabel``); a release built before the labels
+    shows its key in words."""
+    if label:
+        return label
     if not doc_type:
         return "Other documents"
     text = doc_type.replace("-", " ")
@@ -110,6 +121,10 @@ def register_groups(
     ]
 
 
+def _type_label(items: Iterable[tuple[str, Mapping[str, Any]]]) -> str | None:
+    return next((str(item["docTypeLabel"]) for _, item in items if item.get("docTypeLabel")), None)
+
+
 def _phases(items: Iterable[tuple[str, Mapping[str, Any]]]) -> list[dict[str, Any]]:
     by_phase: dict[str | None, list[tuple[str, Mapping[str, Any]]]] = {}
     for item in items:
@@ -126,7 +141,7 @@ def _phases(items: Iterable[tuple[str, Mapping[str, Any]]]) -> list[dict[str, An
                 "types": [
                     {
                         "type": doc_type,
-                        "title": _type_title(doc_type),
+                        "title": _type_title(doc_type, _type_label(by_type[doc_type])),
                         "sources": [
                             source_id for source_id, _ in sorted(by_type[doc_type], key=_source_key)
                         ],

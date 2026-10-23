@@ -8,17 +8,19 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-from assemble_helpers import STAMP
+from assemble_helpers import DAY, STAMP, source_page
 
 from docwiki.contracts.extracted import Table, TableRow
 from docwiki.contracts.locators import CsvRowsLocator, PdfPageLocator, XlsxRowsLocator, locator_key
 from docwiki.domain.loader import PackValidationError, load_pack
 from docwiki.release.tables import TableQueryError, parse_amount, parse_date, rows_query_columns
-from docwiki.stages.amounts import format_number
+from docwiki.stages.amounts import NBSP, THIN, format_number
+from docwiki.stages.hubs import build_hubs, dashboard_lines
 from docwiki.stages.views import (
     ViewError,
     ViewSource,
     build_view_pages,
+    build_views_index,
     compute_view,
     normalize_header,
 )
@@ -184,7 +186,9 @@ def test_view_rows_keep_their_row_and_totals_are_summed_by_code(tmp_path: Path) 
     body = page.body
     assert "computed by code, not by a language model" in body
     link = "[Situation 1 école](../sources/situation-1-ecole.md)"
-    assert f"| 1 | Installation | 1 000,50 € | {link}[^c1] |" in body
+    # the cited document comes first, before the figures
+    assert "| Document | lot | designation | montant ht |" in body
+    assert f"| {link}[^c1] | 1 | Installation | 1 000,50 € |" in body
     assert (
         '[^c2]: [Situation 1 Moreau — sheet "Situation n°1", row 2]'
         "(../evidence/src-aaaaaaaaaaa1/sheet-situation-n1-r0002-r0002.md) · table" in body
@@ -256,6 +260,18 @@ SQL = """SELECT lot, designation, montant_ht, _source_id, _table_id, _row_id, _s
         (("SELECT lot,", "SELECT prix,"), "prix"),
         (("totals: [montant_ht]", "totals: [lot_total]"), "not a column of the query result"),
         (("doc_types: [situation]", "doc_types: [invoice]"), "unknown doc type 'invoice'"),
+        (
+            ("totals: [montant_ht]", "totals: [montant_ht]\n    labels: {prix: Prix}"),
+            "'prix' is not a displayed column",
+        ),
+        (
+            ("totals: [montant_ht]", "totals: [montant_ht]\n    amounts: {_scope: HT}"),
+            r"views\[0\]\.amounts\._scope",
+        ),
+        (
+            ("totals: [montant_ht]", "totals: [montant_ht]\n    amounts: {lot: HTT}"),
+            "Input should be 'HT'",
+        ),
     ],
 )
 def test_bad_views_fail_the_pack_load(
@@ -279,3 +295,97 @@ def test_a_pack_without_views_yaml_is_unchanged(tmp_path: Path) -> None:
     assert pack.views is None
     build = build_view_pages(pack, _sources(), stamp=STAMP)
     assert (build.pages, build.cited, build.results, build.warnings) == ([], [], [], [])
+
+
+SCOPED = Path(__file__).resolve().parents[1] / "orchestration" / "fixtures" / "scoped-pack"
+
+SCOPED_VIEWS = """
+views:
+  - slug: situations
+    title: Situations par chantier
+    doc_types: [situation]
+    columns:
+      lot: [Lot]
+      designation: ["Désignation", "Libellé"]
+      montant_ht: ["Montant HT"]
+    sql: >-
+      SELECT lot, designation, montant_ht,
+        CASE WHEN _scope = 'alpha' THEN 'beta' ELSE 'zeta' END AS autre_chantier,
+        _source_id, _table_id, _row_id, _scope
+      FROM rows ORDER BY _scope, _source_id, _row_id
+    per_scope: true
+    totals: [montant_ht]
+    labels: {lot: Lot, designation: Désignation, montant_ht: Montant HT,
+             autre_chantier: Autre chantier}
+    amounts: {montant_ht: HT}
+    scope_columns: [autre_chantier]
+"""
+
+
+def _scoped_pack(tmp_path: Path):
+    target = tmp_path / "scoped"
+    shutil.copytree(SCOPED, target)
+    taxonomy = target / "taxonomy.yaml"
+    situation = (
+        "\n  - key: situation\n    title: Situation de travaux\n"
+        "    category: contract-documents\n    authority: 7\n"
+    )
+    taxonomy.write_text(taxonomy.read_text(encoding="utf-8") + situation, encoding="utf-8")
+    (target / "views.yaml").write_text(SCOPED_VIEWS, encoding="utf-8")
+    pack = load_pack(target)
+    sources = [
+        ViewSource(**{**source.__dict__, "scope": scope})
+        for source, scope in zip(_sources()[:2], ["alpha", "beta"], strict=True)
+    ]
+    return pack, sources
+
+
+def test_a_view_names_its_chantiers_labels_its_columns_and_writes_amounts(
+    tmp_path: Path,
+) -> None:
+    pack, sources = _scoped_pack(tmp_path)
+    # only alpha has a hub page in this release: beta is named, not linked
+    build = build_view_pages(pack, sources, stamp=STAMP, hub_scopes={"alpha"})
+    body = build.pages[0].body
+    euros = f"€{NBSP}HT"
+    assert "| Chantier | Document | Lot | Désignation | Montant HT | Autre chantier |" in body
+    alpha = "[Chantier Alpha](../chantiers/alpha.md)"
+    moreau = "[Situation 1 Moreau](../sources/situation-1-moreau.md)"
+    amount = format_number(Decimal("2390.00"), unit=euros)
+    assert amount == f"2{THIN}390,00{NBSP}€{NBSP}HT"
+    assert f"| {alpha} | {moreau}[^c2] | 2 | Maçonnerie | {amount} | Chantier Beta |" in body
+    # the document's own text "1 350,00 €" is read as the amount it is
+    first = format_number(Decimal("1350.00"), unit=euros)
+    assert f"| Installation de chantier | {first} |" in body
+    # a value that is no chantier stays as it is
+    assert f"| Installation | {format_number(Decimal('1000.50'), unit=euros)} | zeta |" in body
+    totals = body.split("## Totals", 1)[1]
+    assert "| Chantier | Rows | Montant HT |" in totals
+    assert f"| {alpha} | 2 | {format_number(Decimal('3740.00'), unit=euros)} |" in totals
+    assert f"| Chantier Beta | 1 | {format_number(Decimal('1000.50'), unit=euros)} |" in totals
+
+
+def test_hubs_and_the_dashboard_link_the_views(tmp_path: Path) -> None:
+    pack, sources = _scoped_pack(tmp_path)
+    build = build_view_pages(pack, sources, stamp=STAMP, hub_scopes={"alpha", "beta"})
+    content = [
+        source_page("chantiers/alpha/3-execution/situation/s1.txt", "S1", "# S1\n", slug="s1"),
+        source_page("chantiers/beta/3-execution/situation/s2.txt", "S2", "# S2\n", slug="s2"),
+        *build.pages,
+    ]
+    hubs = build_hubs(content, pack, stamp=STAMP, updated=DAY, views=build.results)
+    alpha = next(page for page in hubs.pages if page.path == "chantiers/alpha.md").body
+    section = alpha.split("## Computed views", 1)[1].split("##", 1)[0]
+    assert "- [Situations par chantier](../views/situations.md): 2 rows for this chantier" in (
+        section
+    )
+    rows = dashboard_lines(hubs, pack, "index.md")
+    line = next(line for line in rows if line.startswith("Computed views"))
+    assert "[Situations par chantier](views/situations.md) (3 rows)" in line
+    assert "[all computed views](views/index.md)" in line
+
+    index = build_views_index(build.pages, stamp=STAMP, updated=DAY)
+    assert index is not None and index.path == "views/index.md"
+    assert index.frontmatter.id == "index:views"
+    assert "- [Situations par chantier](situations.md): 3 rows." in index.body
+    assert build_views_index([], stamp=STAMP, updated=DAY) is None

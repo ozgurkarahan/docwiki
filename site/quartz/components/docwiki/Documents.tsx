@@ -11,6 +11,7 @@ import { QuartzComponent, QuartzComponentConstructor, QuartzComponentProps } fro
 import {
   DocwikiRegisterGroup,
   DocwikiSource,
+  docTypeName,
   humanDate,
   revisionStatus,
   settings,
@@ -35,9 +36,9 @@ const FORMATS: Record<string, string> = {
 }
 
 function typeLabel(source: DocwikiSource): string | null {
-  const kind = source.docType ? source.docType.replace(/-/g, " ") : null
+  const kind = docTypeName(source.docType, source.docTypeLabel)
   const format = source.format ? (FORMATS[source.format] ?? source.format.toUpperCase()) : null
-  if (kind && format) return `${kind.charAt(0).toUpperCase()}${kind.slice(1)} · ${format}`
+  if (kind && format) return `${kind} · ${format}`
   return kind ?? format
 }
 

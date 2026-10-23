@@ -24,9 +24,16 @@ import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
+from typing import TYPE_CHECKING
 
 from docwiki.contracts.enums import max_sensitivity
-from docwiki.contracts.ids import format_hub_id, hub_page_path, index_page_path
+from docwiki.contracts.ids import (
+    format_hub_id,
+    format_view_id,
+    hub_page_path,
+    index_page_path,
+    view_page_path,
+)
 from docwiki.contracts.markdown import relative_link
 from docwiki.contracts.pages import (
     DocwikiStamp,
@@ -41,6 +48,9 @@ from docwiki.domain.models import DomainPack, RegistryEntry
 from docwiki.domain.rules import scope_axes
 from docwiki.engine_types import CompiledResult
 from docwiki.stages.links import inline_text, md_link, one_line, plural
+
+if TYPE_CHECKING:
+    from docwiki.stages.views import ViewResult
 
 __all__ = [
     "STAGE_VERSION",
@@ -128,6 +138,25 @@ def _attribute_name(key: str) -> str:
     return text[:1].upper() + text[1:] if text else key
 
 
+def _attributes(entry: RegistryEntry | None, pack: DomainPack) -> list[tuple[str, str]]:
+    """``(label, value)`` rows of a hub's Details table. With the type's ``attribute_labels``
+    (the pack's own words, ``Maître d'œuvre``): the labelled attributes in that order; without
+    them, every attribute under its key in words. The scope entry's ``phase`` shows its title
+    from ``scopes.yaml`` (``3 Exécution``)."""
+    if entry is None:
+        return []
+    entity_type = next((item for item in pack.entities.types if item.key == entry.type), None)
+    labels = entity_type.attribute_labels if entity_type is not None else {}
+    keys = [key for key in labels if key in entry.attributes] if labels else list(entry.attributes)
+    rows: list[tuple[str, str]] = []
+    for key in keys:
+        value = str(entry.attributes[key])
+        if pack.scopes is not None and entry.type == pack.scopes.name and key == "phase":
+            value = _phase_text(pack, value)
+        rows.append((labels.get(key) or _attribute_name(key), value))
+    return rows
+
+
 @dataclass
 class OpenContradiction:
     """One distinct open contradiction of a scope (v1.7): two sources that disagree, the
@@ -174,7 +203,11 @@ class ScopeSummary:
     """The highest phase (pack order) among the scope's sources."""
     last: Page
     last_date: date
+    last_dated: bool = True
+    """``last_date`` is the document's own date (or one in its file name), not the release date."""
     topics: list[Page] = field(default_factory=list)
+    views: list[tuple[str, str, int]] = field(default_factory=list)
+    """``(title, path, rows)`` of the computed views that have rows for this scope."""
     entities: list[Page] = field(default_factory=list)
     contradictions: list[OpenContradiction] = field(default_factory=list)
     """The scope's distinct open contradictions, from its own topics."""
@@ -191,6 +224,8 @@ class HubBundle:
 
     pages: list[Page]
     summaries: list[ScopeSummary]
+    views: list[tuple[str, str, int]] = field(default_factory=list)
+    """``(title, path, rows)`` of every computed view, for the dashboard."""
 
 
 def _by_title(pages: Iterable[Page]) -> list[Page]:
@@ -252,6 +287,7 @@ def _summaries(
                 phase=phase,
                 last=last,
                 last_date=received(last)[1],
+                last_dated=received(last)[0],
                 topics=_by_title([*own_topics, *company_topics]),
                 entities=_by_title(
                     page
@@ -380,7 +416,7 @@ def _hub_page(
         "## Details",
         "",
     ]
-    attributes = summary.entry.attributes if summary.entry is not None else {}
+    attributes = _attributes(summary.entry, pack)
     if attributes:
         lines += [
             "From the domain pack's registry (reviewed, not read from the documents).",
@@ -388,10 +424,7 @@ def _hub_page(
             "| Attribute | Value |",
             "|---|---|",
         ]
-        lines += [
-            f"| {inline_text(_attribute_name(key))} | {inline_text(str(value))} |"
-            for key, value in attributes.items()
-        ]
+        lines += [f"| {inline_text(label)} | {inline_text(value)} |" for label, value in attributes]
     else:
         lines.append(f"The domain pack's registry has no entry for {inline_text(summary.label)}.")
     lines.append("")
@@ -411,6 +444,15 @@ def _hub_page(
         ]
     else:
         lines.append("No registry entity is mentioned by these documents yet.")
+    if pack.views is not None and pack.views.views:
+        lines += ["", "## Computed views", ""]
+        if summary.views:
+            lines += [
+                f"- {md_link(title, path, view_path)}: {rows} {plural('row', rows)} for this {noun}"
+                for title, view_path, rows in summary.views
+            ]
+        else:
+            lines.append(f"No computed view has rows for this {noun}.")
     lines += ["", "## Open contradictions", ""]
     if summary.contradictions:
         lines += _contradiction_lines(summary.contradictions, path, by_id)
@@ -440,6 +482,26 @@ def _hub_page(
     return Page(path=path, frontmatter=frontmatter, body="\n".join(lines) + "\n")
 
 
+def _view_links(
+    views: Sequence[ViewResult], summaries: Sequence[ScopeSummary]
+) -> list[tuple[str, str, int]]:
+    """``(title, path, rows)`` of every view; each summary gets the views with rows for it."""
+    links: list[tuple[str, str, int]] = []
+    by_scope = {summary.scope: summary for summary in summaries}
+    for result in views:
+        view = result.view
+        path = view_page_path(format_view_id(view.slug))
+        links.append((view.title, path, len(result.rows)))
+        counts: dict[str, int] = {}
+        for row in result.rows:
+            if row.scope:
+                counts[row.scope] = counts.get(row.scope, 0) + 1
+        for scope, count in counts.items():
+            if scope in by_scope:
+                by_scope[scope].views.append((view.title, path, count))
+    return links
+
+
 def build_hubs(
     pages: Sequence[Page],
     pack: DomainPack,
@@ -447,11 +509,14 @@ def build_hubs(
     stamp: DocwikiStamp,
     updated: date,
     dates: Mapping[str, date] | None = None,
+    views: Sequence[ViewResult] = (),
 ) -> HubBundle:
     """Hub pages and the hubs index from the content pages after the ``links`` stage.
 
     ``dates`` maps source ids to the documents' own dates (see :func:`doc_dates`); without one,
     a ``YYYY-MM-DD`` in the file name, else the source page's ``updated`` date, is used.
+    ``views`` are the computed views of the release: each hub lists those with rows for its
+    scope, and the dashboard links every one.
     """
     scopes = pack.scopes
     if scopes is None:
@@ -460,6 +525,7 @@ def build_hubs(
     summaries = _summaries(pages, pack, known)
     if not summaries:
         return HubBundle([], [])
+    view_links = _view_links(views, summaries)
     by_id = {page.frontmatter.id: page for page in pages}
     hubs = [_hub_page(summary, pack, by_id, stamp=stamp, updated=updated) for summary in summaries]
     index_path = index_page_path(f"hubs/{scopes.plural}")
@@ -488,7 +554,7 @@ def build_hubs(
         ),
         body="\n".join(body) + "\n",
     )
-    return HubBundle([*hubs, index], summaries)
+    return HubBundle([*hubs, index], summaries, view_links)
 
 
 def _date_suffix(title: str, day: date) -> str:
@@ -496,8 +562,32 @@ def _date_suffix(title: str, day: date) -> str:
     return "" if day.isoformat() in title else f" ({day.isoformat()})"
 
 
+SHORT_TITLE = 40
+"""Longest document title the dashboard shows whole; longer ones are cut at a word."""
+CONTRADICTIONS_ANCHOR = "open-contradictions"
+"""Anchor of a hub's ``## Open contradictions`` section."""
+
+
+def _short_title(title: str, limit: int = SHORT_TITLE) -> str:
+    if len(title) <= limit:
+        return title
+    cut = title[: limit - 1].rsplit(" ", 1)[0].rstrip(" ,;:-—")
+    return f"{cut or title[: limit - 1]}…"
+
+
+def _last_document(item: ScopeSummary, from_path: str) -> str:
+    """A short title of the scope's last document and its date, once: the document's own date,
+    or ``received <date>`` when the document has none."""
+    short = _short_title(item.last.frontmatter.title)
+    link = md_link(short, from_path, item.last.path)
+    if not item.last_dated:
+        return f"{link} (received {item.last_date.isoformat()})"
+    return f"{link}{_date_suffix(short, item.last_date)}"
+
+
 def dashboard_lines(bundle: HubBundle, pack: DomainPack, from_path: str) -> list[str]:
-    """The company dashboard section of the home page: one table row per scope value."""
+    """The company dashboard section of the home page: one table row per scope value (the
+    client is on the hub), then a line linking every computed view."""
     scopes = pack.scopes
     if scopes is None or not bundle.summaries:
         return []
@@ -506,20 +596,18 @@ def dashboard_lines(bundle: HubBundle, pack: DomainPack, from_path: str) -> list
     lines = [
         f"## {inline_text(title)}",
         "",
-        f"| {inline_text(scopes.title)} | Phase | Client | Documents | Last document received "
-        "| Open contradictions |",
-        "|---|---|---|---:|---|---:|",
+        f"| {inline_text(scopes.title)} | Phase | Open contradictions | Documents "
+        "| Last document (dated) |",
+        "|---|---|---:|---:|---|",
     ]
     for item in bundle.summaries:
-        client = item.entry.attributes.get("client") if item.entry is not None else None
-        last = md_link(item.last.frontmatter.title, from_path, item.last.path)
+        hub = relative_link(from_path, item.path)
         lines.append(
             f"| {md_link(item.label, from_path, item.path)} "
             f"| {inline_text(_phase_text(pack, item.phase))} "
-            f"| {inline_text(str(client)) if client is not None else '—'} "
+            f"| [{item.open_count}]({hub}#{CONTRADICTIONS_ANCHOR}) "
             f"| {len(item.sources)} "
-            f"| {last}{_date_suffix(item.last.frontmatter.title, item.last_date)} "
-            f"| {item.open_count} |"
+            f"| {_last_document(item, from_path)} |"
         )
     lines += [
         "",
@@ -527,4 +615,15 @@ def dashboard_lines(bundle: HubBundle, pack: DomainPack, from_path: str) -> list
         f"[all {inline_text(title.lower())}]({relative_link(from_path, index_path)}).",
         "",
     ]
+    if bundle.views:
+        views = " · ".join(
+            f"{md_link(name, from_path, path)} ({rows} {plural('row', rows)})"
+            for name, path, rows in bundle.views
+        )
+        index = relative_link(from_path, index_page_path("views"))
+        lines += [
+            f"Computed views, figures computed by code with every row cited: {views} "
+            f"([all computed views]({index})).",
+            "",
+        ]
     return lines

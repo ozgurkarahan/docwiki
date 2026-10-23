@@ -153,6 +153,20 @@ ul.toc-content.overflow > li > a {
   color: var(--gray);
 }
 
+// Folder listings (chantiers, sources, topics, views): Quartz fades the date with opacity 0.6
+// (2.45:1). The date takes the dark grey at full opacity, in both themes; --gray stays for borders.
+ul.section-ul li.section-li .section .meta,
+ul.section-ul li.section-li .section .meta time {
+  opacity: 1;
+  color: var(--darkgray);
+}
+
+:root[saved-theme="dark"] ul.section-ul li.section-li .section .meta,
+:root[saved-theme="dark"] ul.section-ul li.section-li .section .meta time {
+  opacity: 1;
+  color: var(--darkgray);
+}
+
 // ----- Site-wide fictional sample banner -----
 
 header:has(.docwiki-banner) {
@@ -2426,6 +2440,86 @@ body[data-slug^="evidence/"] .page-listing {
 article .table-container[tabindex]:focus-visible {
   outline: 2px solid var(--secondary);
   outline-offset: 2px;
+}
+
+// A table wider than its column (tabs.inline.ts): a cue above it and a shadow on the side that
+// hides columns. The covers (--light) scroll with the content and hide the shadow at each end.
+.docwiki-scroll-cue {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--darkgray);
+}
+
+article .table-container.docwiki-scrolls {
+  background:
+    linear-gradient(to right, var(--light) 30%, transparent) left center / 2.5rem 100% no-repeat
+      local,
+    linear-gradient(to left, var(--light) 30%, transparent) right center / 2.5rem 100% no-repeat
+      local,
+    radial-gradient(farthest-side at 0 50%, var(--dw-shadow), transparent) left center / 0.9rem
+      100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, var(--dw-shadow), transparent) right center /
+      0.9rem 100% no-repeat scroll;
+}
+
+// Up to 800 px the wiki's data tables (the dashboard, the views, the hubs' details) are stacked
+// cards: one card per row, each cell under its column's label (data-label, set by the DocWiki
+// transformer). Evidence tables keep their grid and scroll.
+@media all and (max-width: 800px) {
+  article .table-container > table.docwiki-cards {
+    display: block;
+    width: 100%;
+    margin: 0.25rem 0 1rem;
+    padding: 0;
+
+    // Visually hidden, still read: the cells carry their labels.
+    thead {
+      display: block;
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    tbody,
+    tr,
+    td {
+      display: block;
+      width: auto;
+      min-width: 0;
+    }
+
+    tr {
+      margin: 0 0 0.75rem;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--dw-border);
+      border-radius: 6px;
+
+      &:last-child {
+        border-bottom: 1px solid var(--dw-border);
+      }
+    }
+
+    td {
+      padding: 0.2rem 0;
+      text-align: left !important;
+      overflow-wrap: anywhere;
+    }
+
+    td:empty {
+      display: none;
+    }
+
+    td[data-label]::before {
+      content: attr(data-label);
+      display: block;
+      font-size: 0.8rem;
+      font-weight: $semiBoldWeight;
+      color: var(--darkgray);
+    }
+  }
 }
 
 // ----- Source page header card (SourceHeader.tsx) -----

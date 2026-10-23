@@ -17,7 +17,14 @@ import {
   splitTrailingBadge,
   stripBacklinksBlock,
 } from "./docwiki-text"
-import { foreignLang, loneElementIndex, splitQuoted } from "./docwiki-a11y"
+import {
+  cellLabels,
+  foreignLang,
+  loneElementIndex,
+  splitQuoted,
+  stacksTables,
+  tableCaption,
+} from "./docwiki-a11y"
 
 export interface Options {
   /** Release date (YYYY-MM-DD) used for pages without an `updated` date (evidence sidecars). */
@@ -303,6 +310,45 @@ function markLoneLinks(tree: HtmlRoot) {
   })
 }
 
+function childElements(node: Element, tagName: string): Element[] {
+  return node.children.filter(
+    (child): child is Element => child.type === "element" && child.tagName === tagName,
+  )
+}
+
+/**
+ * The wiki's data tables: each body cell gets its column's header as `data-label`, which the
+ * stacked cards show on narrow screens (`docwiki-cards`, not on evidence sidecars); a computed
+ * view's tables get `data-caption` (the view's title), the name of their scroll box.
+ */
+function decorateTables(tree: HtmlRoot, type: string | undefined, title: unknown) {
+  let heading = ""
+  let index = 0
+  for (const node of tree.children) {
+    if (node.type !== "element") continue
+    if (/^h[1-6]$/.test(node.tagName)) {
+      heading = hastToString(node)
+      continue
+    }
+    if (node.tagName !== "table") continue
+    const head = childElements(node, "thead")[0]
+    const headerRow = head ? childElements(head, "tr")[0] : undefined
+    const headers = headerRow ? childElements(headerRow, "th").map((th) => hastToString(th)) : []
+    for (const body of childElements(node, "tbody")) {
+      for (const row of childElements(body, "tr")) {
+        const cells = childElements(row, "td")
+        cellLabels(headers, cells.length).forEach((label, position) => {
+          if (label) cells[position].properties = { ...cells[position].properties, dataLabel: label }
+        })
+      }
+    }
+    if (headers.length > 0 && stacksTables(type)) addClass(node, "docwiki-cards")
+    const caption = tableCaption(type, title, heading, index)
+    if (caption) node.properties = { ...node.properties, dataCaption: caption }
+    index += 1
+  }
+}
+
 export const DocWiki: QuartzTransformerPlugin<Partial<Options>> = (userOpts) => {
   const opts = { ...defaultOptions, ...userOpts }
   return {
@@ -351,6 +397,7 @@ export const DocWiki: QuartzTransformerPlugin<Partial<Options>> = (userOpts) => 
             markLoneLinks(tree)
             const frontmatter = file.data.frontmatter
             const type = typeof frontmatter?.type === "string" ? frontmatter.type : undefined
+            decorateTables(tree, type, frontmatter?.title)
             const sourceId = frontmatter?.source_id
             const lang = foreignLang(
               type === "source"
