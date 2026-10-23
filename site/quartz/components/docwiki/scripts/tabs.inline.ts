@@ -94,7 +94,7 @@ function chipText(value: Status): { words: string; state: "processing" | "in_wik
   if (value.state === "published" && value.document) {
     return { words: "In the wiki → new page", state: "in_wiki" }
   }
-  return { words: "Idle", state: "idle" }
+  return { words: "Pipeline idle", state: "idle" }
 }
 
 function render(): void {

@@ -70,7 +70,15 @@ document.addEventListener("nav", () => {
     document.dispatchEvent(new CustomEvent(ASK_EVENT, { detail: { question } }))
   }
   tryButton.addEventListener("click", onTry)
+  // On a phone the floating "Ask this wiki" button would cover the question to try, which opens
+  // the same drawer: it steps aside while the question is on screen (custom.scss).
+  const seen = new IntersectionObserver((entries) => {
+    document.body.classList.toggle("docwiki-try-visible", entries.some((e) => e.isIntersecting))
+  })
+  seen.observe(tryButton)
   window.addCleanup(() => {
+    seen.disconnect()
+    document.body.classList.remove("docwiki-try-visible")
     observer.disconnect()
     tryButton.removeEventListener("click", onTry)
     wiki?.removeEventListener("click", onWiki)

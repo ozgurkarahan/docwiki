@@ -3,13 +3,15 @@ import { PageLayout, SharedLayout } from "./quartz/cfg"
 import * as Component from "./quartz/components"
 import * as DocWiki from "./quartz/components/docwiki"
 
-// No graph on the Documents and Pipeline tabs (ADR 0010): it has nothing to show there.
+// No graph on the Documents and Pipeline tabs (ADR 0010), nor on the home page: it has nothing
+// useful to show there (newcomers read it as broken).
 const graph = Component.ConditionalRender({
   component: Component.Graph({
     localGraph: { showTags: false, depth: 1 },
     globalGraph: { showTags: false },
   }),
-  condition: ({ fileData }) => fileData.slug !== "documents" && fileData.slug !== "pipeline",
+  condition: ({ fileData }) =>
+    fileData.slug !== "documents" && fileData.slug !== "pipeline" && fileData.slug !== "index",
 })
 
 const explorer = Component.Explorer({

@@ -35,12 +35,18 @@ export default (() => {
           An LLM compiles ordinary business documents into a wiki where every fact is cited, and an
           agent answers from it.
         </p>
+        <p class="docwiki-story-poc">
+          A public proof of concept on Azure, run on the invented documents of a building
+          contractor. The code is <a href={settings.repoUrl}>open source</a>; the three tabs above
+          follow the same three steps.
+        </p>
         <ol class="docwiki-story-strip">
           <li class="docwiki-story-step">
             <a class="docwiki-story-card" href={link("documents")}>
               <span class="docwiki-story-number" aria-hidden="true">
                 ①
               </span>
+              <span class="docwiki-story-tab">Documents</span>
               <span class="docwiki-story-value">{plural(current + superseded, "document")}</span>
               <span class="docwiki-story-detail">
                 {superseded > 0 ? `${current} current · ${superseded} superseded` : "the originals"}
@@ -56,6 +62,7 @@ export default (() => {
               <span class="docwiki-story-number" aria-hidden="true">
                 ②
               </span>
+              <span class="docwiki-story-tab">Pipeline</span>
               <span class="docwiki-story-value">{steps}-step pipeline</span>
               <span class="docwiki-story-detail docwiki-story-run">
                 read · write · check · publish
@@ -71,6 +78,7 @@ export default (() => {
               <span class="docwiki-story-number" aria-hidden="true">
                 ③
               </span>
+              <span class="docwiki-story-tab">Wiki</span>
               <span class="docwiki-story-value">
                 {plural(settings.citedPages ?? 0, "cited page")}
               </span>

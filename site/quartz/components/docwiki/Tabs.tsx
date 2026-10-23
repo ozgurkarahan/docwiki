@@ -50,7 +50,7 @@ export default (() => {
           <span class="docwiki-status-shape" aria-hidden="true">
             ●
           </span>
-          <span class="docwiki-status-word">Idle</span>
+          <span class="docwiki-status-word">Pipeline idle</span>
         </a>
         {/* The pipeline page has the owner's box with its own sign-in. */}
         {slug !== "pipeline" && (
