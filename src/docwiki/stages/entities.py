@@ -40,6 +40,7 @@ from docwiki.engine_types import CitedLocator, CompiledResult, VerifiedCitation
 from docwiki.llm import LlmClient, LlmError
 from docwiki.stages.classify import data_nonce
 from docwiki.stages.compile import entity_patterns
+from docwiki.stages.hubs import scope_label
 from docwiki.stages.llm_failures import describe_failure, is_systemic
 from docwiki.stages.models import EntitySummaryOutput, FactRecord, SourceInfo
 from docwiki.stages.prompts import load_prompt
@@ -62,9 +63,10 @@ __all__ = [
     "STAGE_VERSION",
     "build_entity_pages",
     "fact_date",
+    "unsupported_validity",
 ]
 
-STAGE_VERSION = "4"
+STAGE_VERSION = "5"
 PROMPT_VERSION = load_prompt("entity-summary").version
 SCHEMA_NAME = "entity_summary"
 MAX_SUMMARY_FACTS = 40
@@ -209,6 +211,7 @@ def _summary_request(
     infos: Mapping[str, SourceInfo],
     locked: str = "",
     lang: str = "en",
+    scopes: Mapping[str, str] | None = None,
 ) -> str:
     lines = [
         "# Task",
@@ -227,8 +230,12 @@ def _summary_request(
     fact_lines: list[str] = []
     for number, fact in enumerate(facts[:MAX_SUMMARY_FACTS], start=1):
         source = infos[fact.sources[0]]
-        status = "superseded" if fact.superseded else "current"
-        fact_lines.append(f"[F{number}] ({source.title}, {status}) {fact.text}")
+        parts = [source.title, "superseded" if fact.superseded else "current"]
+        parts.append(f"dated {source.date.isoformat()}" if source.date else "undated")
+        scope = (scopes or {}).get(source.source_id)
+        if scope:
+            parts.append(f"scope: {scope}")
+        fact_lines.append(f"[F{number}] ({', '.join(parts)}) {fact.text}")
     if locked:
         lines += ["", "# Vocabulary (reviewed domain pack)", locked]
     body = "\n".join(fact_lines)
@@ -245,6 +252,7 @@ async def _summarize(
     infos: Mapping[str, SourceInfo],
     locked: str = "",
     lang: str = "en",
+    scopes: Mapping[str, str] | None = None,
 ) -> EntitySummaryOutput | None:
     """The model's introduction, or None without facts or when the call fails for this entity."""
     if not facts:
@@ -253,7 +261,7 @@ async def _summarize(
         result = await llm.structured(
             tier="fast",
             system=load_prompt("entity-summary").text,
-            user=_summary_request(entry, type_title, facts, infos, locked, lang),
+            user=_summary_request(entry, type_title, facts, infos, locked, lang, scopes),
             output=EntitySummaryOutput,
             schema_name=SCHEMA_NAME,
             prompt_version=PROMPT_VERSION,
@@ -297,12 +305,25 @@ def _summary_sentences(
             for piece in split_sentences(text)
             if not unsupported_quantities(piece, support)
         ]
-        text = " ".join(piece for piece in kept if piece)
+        text = " ".join(piece for piece in kept if piece and not unsupported_validity(piece))
         if text:
             sentences.append((text, cited))
         if len(sentences) == MAX_SUMMARY_SENTENCES:
             break
     return sentences
+
+
+_VALIDITY_RE = re.compile(
+    r"\b(?:valables?|valides?|en cours de validité|en règle|valid|in force|up to date)\b",
+    re.IGNORECASE,
+)
+
+
+def unsupported_validity(sentence: str) -> bool:
+    """A model sentence that calls documents valid without a single date or duration (v1.7,
+    slice G): "ses attestations sont valables" hides an expiry the facts may show, so it is
+    dropped; "valable jusqu'au 31/12/2026" stays."""
+    return bool(_VALIDITY_RE.search(sentence)) and not re.search(r"\d", sentence)
 
 
 def _numbers(fact: _EntityFact) -> list[str]:
@@ -416,6 +437,9 @@ async def build_entity_pages(
     records = {source_id: fact_records(result) for source_id, result in by_source.items()}
     type_titles = {entity_type.key: entity_type.title for entity_type in pack.entities.types}
     scopes = _source_scopes(source_pages, pack)
+    scope_labels = {
+        sid: scope_label(pack, value) for sid, value in scopes.items() if value is not None
+    }
     jobs: list[tuple[RegistryEntry, list[str], list[_EntityFact]]] = []
     for entry in pack.entities.registry:
         sources = [
@@ -438,6 +462,7 @@ async def build_entity_pages(
                 infos,
                 locked_terms_note(pack),
                 pack.canonical_lang,
+                scope_labels,
             )
             for entry, _, facts in jobs
         )

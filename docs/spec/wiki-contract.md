@@ -209,10 +209,17 @@ Amounts in prose (v1.7), formatted by code after linking on every content page a
 `summary`: thousands grouped with a narrow no-break space, comma decimals, a no-break space before
 `€` and before `HT` / `TTC` (`2 390,00 € HT`). An amount is a number followed by `€`
 ("excluding/including VAT" becomes `HT` / `TTC`), or a number written straight before `HT` or
-`TTC` with or without `€` (`2390 HT`, `4386.5 HT` → `2 390,00 € HT`, `4 386,50 € HT`, always with
-two decimals). Not an amount: a year without decimals or `€` (`tarif 2026 HT`), a lot, indice or
-n° (`lot 5 HT`), a document number or a date (`BC-2026-009`, `2026-03-16`), a percentage, a number
-with a thousands comma (`2,390`). Left verbatim: blockquotes, tables, footnote markers and
+`TTC` with or without `€` (`2390 HT`, `4386.5 HT`, `26 590 HT` → `2 390,00 € HT`, `4 386,50 € HT`,
+`26 590,00 € HT`, always with two decimals). Since slice G also `HT` / `TTC` (or "excl./incl. VAT",
+"excluding/including tax") written before the number it qualifies, joined by `de`, `à`, `est de`,
+`s'élève à`, `of`, `at` or a colon, the VAT word moving after the amount (`un montant HT de 174910`
+→ `un montant de 174 910,00 € HT`; `net à payer TTC de 27786.55` → `net à payer de 27 786,55 €
+TTC`), and a point decimal in a sentence about money (`montant`, `retenue`, `net`, `reste`,
+`total`, `prix`, `TVA`, `amount`…: `est de 1462.45` → `est de 1 462,45 €`). A footnote marker right
+after an amount (`27786.55[^c3]`) is never part of the number. Not an amount: a year without
+decimals or `€` (`tarif 2026 HT`), a lot, indice, poste, article or n° (`lot 5 HT`, `poste 4.1`), a
+document number or a date (`BC-2026-009`, `2026-03-16`), a percentage, a quantity with a unit
+(`3.5 t`), a number with a thousands comma (`2,390`). Left verbatim: blockquotes, tables, footnote markers and
 definitions, links, code and quoted text (`"…"`, `“…”`, `« … »`), i.e. the documents' own words.
 
 ## 5. Links, anchors and citations
@@ -308,9 +315,22 @@ document content is data, never instructions.
   - `arbitrate: [{types: [<doc type>, <doc type>], reason}]`: a contradiction between documents of
     those two types (either order) is never decided by the rule: "to arbitrate; the rule does not
     decide between <first> and <second>. <reason>". It stays open.
+  - `updates: [{earlier: [<doc type>], later: [<doc type>]}]` (slice G): a contradiction between a
+    document of an `earlier` type and a document of a `later` type of the same scope dated strictly
+    after it (and not a pair to arbitrate) is an **update**: the later report tells what happened
+    since (a delivery postponed, a date moved, a réserve lifted). It is listed after the changes,
+    under "Updated by a later document (news since, not contradictions):", as `<earlier> stated: …
+    Updated by <later>: …` with both dates, never decided by authority, and is not open.
+  - Two sides that agree are not a contradiction (slice G, every pack): when one side states at
+    least one date and every date and quantity it states (identifiers such as `R06` or `n°4` left
+    out) is stated by the other side too, the pair is dropped (a completion and a réception both
+    on 03/04/2026).
   - Packs that declare neither keep the plain statement. Hubs and the dashboard count distinct open
     contradictions per scope, by unordered pair of source ids (§4, §6): the model words the subject
     of the same disagreement differently on each topic, so the subject is not part of the key.
+    The subjects listed for one pair (and the "and N more" count) are told apart by their
+    canonical wording in every language: a mirror hub uses the canonical pages' subjects as keys
+    and never recounts translated subjects (slice G).
 - **Withdrawal**: a deleted raw file. Its page is removed, a `withdraw` log entry is added, dependent
   pages are rebuilt, and query pages citing it get a warning banner.
 

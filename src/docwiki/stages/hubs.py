@@ -11,7 +11,10 @@ Open contradictions are counted once per pair of sources (v1.7): the same disagr
 two documents is often stated by several topics of a scope, under subjects the model words
 differently, so the topics' ``contradiction_pairs`` are merged by their unordered pair of source
 ids; changes by an amending document are not open and never recorded there. A topic page written
-before v1.7 has no pairs and counts with its ``contradictions`` number.
+before v1.7 has no pairs and counts with its ``contradictions`` number. The subjects of one pair are
+told apart by their canonical wording (slice G): the mirror language passes the canonical keys
+(:func:`subject_keys`), so "and 11 more" in English never disagrees with "et 12 autres" in French
+when two French subjects translate to the same English words.
 ``<plural>/index.md`` (``index:hubs/<plural>``) lists the hubs and the home page shows one
 dashboard row per scope (:func:`dashboard_lines`).
 
@@ -65,9 +68,10 @@ __all__ = [
     "open_contradictions",
     "scope_label",
     "source_scope",
+    "subject_keys",
 ]
 
-STAGE_VERSION = "4"
+STAGE_VERSION = "5"
 NO_PHASE = "No phase"
 MAX_SUBJECTS = 3
 """Subjects shown per open contradiction on a hub; the others are counted."""
@@ -169,9 +173,25 @@ class OpenContradiction:
     count: int = 1
 
 
-def open_contradictions(topics: Sequence[Page]) -> list[OpenContradiction]:
-    """The distinct open contradictions of topic pages (sorted by title), merged by source pair."""
+def subject_keys(pages: Iterable[Page]) -> dict[str, list[str]]:
+    """Topic id → one key per ``contradiction_pairs`` item: the canonical subject, casefolded.
+    Two subjects of a pair with the same key are one subject, in every language (slice G)."""
+    return {
+        fm.id: [pair.subject.casefold() for pair in fm.contradiction_pairs]
+        for fm in (page.frontmatter for page in pages)
+        if isinstance(fm, TopicFrontmatter)
+    }
+
+
+def open_contradictions(
+    topics: Sequence[Page], keys: Mapping[str, Sequence[str]] | None = None
+) -> list[OpenContradiction]:
+    """The distinct open contradictions of topic pages (sorted by title), merged by source pair.
+
+    ``keys`` (see :func:`subject_keys`) tells the subjects apart by their canonical wording: a
+    mirror page passes its canonical page's keys, so both languages count the same subjects."""
     pairs: dict[tuple[str, ...], OpenContradiction] = {}
+    seen: dict[tuple[str, ...], set[str]] = {}
     legacy: list[OpenContradiction] = []
     for page in topics:
         fm = page.frontmatter
@@ -180,10 +200,15 @@ def open_contradictions(topics: Sequence[Page]) -> list[OpenContradiction]:
             if fm.contradictions:
                 legacy.append(OpenContradiction((), [], [page], fm.contradictions))
             continue
-        for pair in fm.contradiction_pairs:
+        own = (keys or {}).get(fm.id)
+        if own is None or len(own) != len(fm.contradiction_pairs):
+            own = [pair.subject.casefold() for pair in fm.contradiction_pairs]
+        for pair, subject_key in zip(fm.contradiction_pairs, own, strict=True):
             key = tuple(pair.sources)
             item = pairs.setdefault(key, OpenContradiction(key))
-            if pair.subject.casefold() not in {subject.casefold() for subject in item.subjects}:
+            known = seen.setdefault(key, set())
+            if subject_key not in known:
+                known.add(subject_key)
                 item.subjects.append(pair.subject)
             if all(topic.path != page.path for topic in item.topics):
                 item.topics.append(page)
@@ -233,7 +258,10 @@ def _by_title(pages: Iterable[Page]) -> list[Page]:
 
 
 def _summaries(
-    pages: Sequence[Page], pack: DomainPack, dates: Mapping[str, date]
+    pages: Sequence[Page],
+    pack: DomainPack,
+    dates: Mapping[str, date],
+    subjects: Mapping[str, Sequence[str]] | None = None,
 ) -> list[ScopeSummary]:
     scopes = pack.scopes
     assert scopes is not None
@@ -302,7 +330,7 @@ def _summaries(
                     if ids & set(page.frontmatter.sources)  # type: ignore[union-attr]
                     and fits(page, scope)
                 ),
-                contradictions=open_contradictions(_by_title(own_topics)),
+                contradictions=open_contradictions(_by_title(own_topics), subjects),
             )
         )
     default = scopes.default.key
@@ -526,6 +554,7 @@ def build_hubs(
     dates: Mapping[str, date] | None = None,
     views: Sequence[ViewResult] = (),
     lang: str | None = None,
+    keys: Mapping[str, Sequence[str]] | None = None,
 ) -> HubBundle:
     """Hub pages and the hubs index from the content pages after the ``links`` stage.
 
@@ -534,13 +563,15 @@ def build_hubs(
     ``views`` are the computed views of the release: each hub lists those with rows for its
     scope, and the dashboard links every one. ``lang`` is the language of the generated text
     (default: the pack's canonical language; a mirror language for the translate stage).
+    ``keys`` are the canonical pages' :func:`subject_keys`: a mirror passes them so that its
+    hubs count the same contradiction subjects as the canonical hubs (slice G).
     """
     t = pack.strings(lang)
     scopes = pack.scopes
     if scopes is None:
         return HubBundle([], [])
     known = dict(dates or {})
-    summaries = _summaries(pages, pack, known)
+    summaries = _summaries(pages, pack, known, subjects=keys)
     if not summaries:
         return HubBundle([], [])
     view_links = _view_links(views, summaries)

@@ -148,7 +148,7 @@ async def test_topic_pages_and_skips(corpus: Corpus, pack: DomainPack) -> None:
     pages, cited, skips, llm = await build(corpus, pack)
     assert sorted(pages) == ["topic:cold-weather-works", "topic:schedule-and-window-delivery"]
     assert skips == [TopicSkip("kitchen-renovation", "insufficient_evidence", ())]
-    assert all(r.tier == "smart" and r.prompt_version == "topic-synthesis-v2" for r in llm.requests)
+    assert all(r.tier == "smart" and r.prompt_version == "topic-synthesis-v3" for r in llm.requests)
     request = next(r for r in llm.requests if "- slug: schedule-and-window-delivery" in r.text)
     assert "Internal price study" not in request.text and "supplied at cost" not in request.text, (
         "sources above the audience never reach the synthesis"
@@ -572,3 +572,90 @@ def test_a_winning_amended_document_is_to_review(pack: DomainPack) -> None:
     # an amending document and its own contract: a change, never "to review"
     assert is_change(rules, contract, order) and not is_change(rules, contract, early)
     assert not is_change(rules, order, contract) and not is_change(pack, contract, order)
+
+
+# v1.7 slice G: later reports are updates; sides that state the same dates agree.
+
+
+async def test_a_later_report_is_an_update_not_a_contradiction(
+    corpus: Corpus, pack: DomainPack
+) -> None:
+    # The schedule (2026-03-17) reports news on the earlier quote (2026-02-03): an update, shown
+    # with both dates and never decided by authority (the quote would win, 8 vs 4).
+    updated = _with_resolution(pack, updates=[{"earlier": ["quote"], "later": ["schedule"]}])
+    fm, section = await _window_page(corpus, updated)
+    assert (fm.contradictions, fm.contradiction_pairs) == (0, [])
+    assert section.startswith("No contradictions were found between current sources.\n\n")
+    assert (
+        "Updated by a later document (news since, not contradictions):\n\n"
+        "- **Width of the bay window F1.** [Quote DEV-2026-014 indice B]"
+        "(../sources/dev-2026-014-indice-b.md) stated: The bay window F1 is widened to 3,00 m."
+        "[^c1] (authority 8, dated 2026-02-03). Updated by [Schedule and purchase tracking]"
+        "(../sources/planning-et-suivi-des-achats.md): The bay window F1 is ordered at 2,40 m for "
+        "delivery on 2026-03-30.[^c2] (authority 4, dated 2026-03-17)."
+    ) in section
+    assert "prevails" not in section and "Resolution policy:" in section
+
+
+async def test_an_earlier_report_or_an_arbitrated_pair_is_no_update(
+    corpus: Corpus, pack: DomainPack
+) -> None:
+    # the quote is older than the schedule: it cannot report news on it
+    backwards = _with_resolution(pack, updates=[{"earlier": ["schedule"], "later": ["quote"]}])
+    fm, section = await _window_page(corpus, backwards)
+    assert fm.contradictions == 1 and "Updated by" not in section
+    arbitrated = _with_resolution(
+        pack,
+        updates=[{"earlier": ["quote"], "later": ["schedule"]}],
+        arbitrate=[{"types": ["quote", "schedule"], "reason": "arbitrated with the client"}],
+    )
+    fm, section = await _window_page(corpus, arbitrated)
+    assert fm.contradictions == 1 and "to arbitrate" in section
+
+
+def _side(*texts: str) -> list:
+    from docwiki.stages.models import FactRecord
+    from docwiki.stages.topics import _Fact
+
+    return [
+        _Fact(f"F{n}", FactRecord("src-00000000000a", f"kf{n}", text, (), ()), True)
+        for n, text in enumerate(texts, start=1)
+    ]
+
+
+def test_sides_that_state_the_same_dates_agree() -> None:
+    from docwiki.stages.topics import agree
+
+    os1 = _side(
+        "Le délai d'exécution est prolongé de 7 jours calendaires et l'achèvement des travaux "
+        "est reporté du 27/03/2026 au 03/04/2026."
+    )
+    pv = _side(
+        "La date d'effet de la réception est le 03/04/2026.",
+        "La réserve R06 concerne les portes d'entrée aluminium non posées des Halls A et B.",
+    )
+    assert agree(os1, pv) and agree(pv, os1)
+    # a different date or value on the other side is a disagreement
+    assert not agree(os1, _side("La réception est prononcée le 10/04/2026."))
+    assert not agree(_side("Murs à 70 % au 2026-03-24."), _side("Murs à 100 % au 2026-03-24."))
+    # without any date, nothing is decided by this rule
+    assert not agree(_side("Les portes sont posées."), _side("Les portes ne sont pas posées."))
+
+
+def test_the_batiment_policy_updates_supplier_news_and_is_french() -> None:
+    from pathlib import Path
+
+    from docwiki.domain.loader import load_pack
+    from docwiki.stages.topics import is_update
+
+    batiment = load_pack(Path(__file__).resolve().parents[2] / "domains" / "batiment")
+    os1 = typed("src-00000000000a", "OS n°1", "ordre-de-service", 10, "2026-02-16")
+    mail = typed("src-00000000000b", "E-mail VanArsdel", "supplier-email", 4, "2026-04-08")
+    cr12 = typed("src-00000000000c", "CR n°12", "site-meeting-minutes", 7, "2026-04-07")
+    later = typed("src-00000000000d", "Liste des réserves", "liste-des-reserves", 7, "2026-04-14")
+    assert is_update(batiment, os1, mail) and not is_update(batiment, mail, os1)
+    assert is_update(batiment, cr12, later)
+    assert " ".join(batiment.resolution.notes.split()).startswith(
+        "Les actes signés qui modifient ou clôturent le marché l'emportent : avenant, ordre de "
+        "service ou PV de réception (rang 10) sur le marché auquel ils se rapportent"
+    )

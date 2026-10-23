@@ -190,6 +190,41 @@ def test_open_contradictions_are_counted_once_per_pair_of_sources():
     assert "| [4](chantiers/alpha.md#open-contradictions) |" in row
 
 
+def test_a_mirror_counts_the_subjects_of_its_canonical_pages():
+    """Slice G: two French subjects that translate to the same English words stay two subjects
+    in the English hub ("and 1 more" in both languages, never "et 1 autres" vs nothing)."""
+    from docwiki.stages.hubs import subject_keys
+
+    scoped = load_pack(SCOPED)
+    a, b = source_id_for(ALPHA_A), source_id_for(ALPHA_B)
+
+    def stating(subjects: list[str]) -> Page:
+        page = _scoped_topic("windows", "alpha", "Windows — Alpha", [a, b], len(subjects))
+        data = page.frontmatter.model_dump()
+        data["contradiction_pairs"] = [
+            ContradictionPair(sources=sorted([a, b]), subject=subject) for subject in subjects
+        ]
+        return Page(path=page.path, frontmatter=TopicFrontmatter(**data), body=page.body)
+
+    sources = [
+        source_page(ALPHA_A, "Indice A", "# Indice A\n", slug="indice-a"),
+        source_page(ALPHA_B, "Indice B", "# Indice B\n", slug="indice-b"),
+    ]
+    french = ["Délai", "Date de livraison", "Échéance de livraison", "Prix", "Total"]
+    english = ["Deadline", "Delivery date", "Delivery date", "Price", "Total"]
+    canonical = apply_links([*sources, stating(french)], scoped).pages
+    mirror = apply_links([*sources, stating(english)], scoped).pages
+
+    def subjects_line(pages: list[Page], **kwargs: object) -> str:
+        hubs = build_hubs(pages, scoped, stamp=STAMP, updated=DAY, **kwargs)  # type: ignore[arg-type]
+        alpha = next(page for page in hubs.pages if page.path == "chantiers/alpha.md").body
+        return alpha.split("## Open contradictions\n\n", 1)[1].split("\n", 1)[0]
+
+    assert "; and 2 more (in" in subjects_line(canonical)
+    assert "; and 1 more (in" in subjects_line(mirror), "recounted from the translated words"
+    assert "; and 2 more (in" in subjects_line(mirror, keys=subject_keys(canonical))
+
+
 BATIMENT = Path(__file__).resolve().parents[2] / "domains" / "batiment"
 
 

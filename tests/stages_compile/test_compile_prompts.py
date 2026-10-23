@@ -15,7 +15,7 @@ from docwiki.stages.prompts import combine_prompts, load_prompt, prompt_names
 # Bump the prompt's version (frontmatter) whenever its text changes, then update this table.
 PINNED = {
     "classify": ("classify-v1", "55d8cd3c3f30891601a52150c95289d748ba7c4207c9ba57ecd602fbd3228d04"),
-    "compile": ("compile-v3", "ff9818f24ad36488f2a281156251aa909837969abf764186e5736a5507a32b08"),
+    "compile": ("compile-v4", "ff28cfb45a1bb10f5dfa61b0e0759c61b467fe1b6840f5b4a39334075798ec40"),
     "compile-map": (
         "compile-map-v2",
         "16e0c036b11b71447211911c0057f69ed2b4b9eb17f64066db630a925363e67c",
@@ -29,12 +29,12 @@ PINNED = {
         "f8edf07ba7e64dbb07c997f48ff61472c4a6ffc596339c5d10fa687a631bd344",
     ),
     "entity-summary": (
-        "entity-summary-v2",
-        "5b1c5bd39881aea62e044e77e95b949562f6dc0701a56321f4c344ce578897b6",
+        "entity-summary-v3",
+        "019caceadc574f6e4c5926f9b366225f3d716f64b423d2b6d49c958327fe7897",
     ),
     "topic-synthesis": (
-        "topic-synthesis-v2",
-        "28fcc06474b1197a516aeef9b9a39116d67e887aaa5e7f64924a108b8927289b",
+        "topic-synthesis-v3",
+        "fc7f34a122adc0fe628ed95380f3459049df49c5538212a6da38bebbc532160d",
     ),
     "translate": (
         "translate-v3",
@@ -59,14 +59,14 @@ def test_prompt_text_matches_its_version(name: str) -> None:
 def test_stage_prompt_versions() -> None:
     assert classify.PROMPT_VERSION == "classify-v1"
     assert compile.PROMPT_VERSION == (
-        "compile-v3+compile-map-v2+compile-reduce-v2+compile-repair-v2"
+        "compile-v4+compile-map-v2+compile-reduce-v2+compile-repair-v2"
     )
-    assert compile.STAGE_VERSION == "6"
-    assert entities.PROMPT_VERSION == "entity-summary-v2"
-    assert topics.PROMPT_VERSION == "topic-synthesis-v2"
+    assert compile.STAGE_VERSION == "7"
+    assert entities.PROMPT_VERSION == "entity-summary-v3"
+    assert topics.PROMPT_VERSION == "topic-synthesis-v3"
     assert translate.PROMPT_VERSION == "translate-v3"
     text, version = combine_prompts("compile", "compile-map")
-    assert version == "compile-v3+compile-map-v2"
+    assert version == "compile-v4+compile-map-v2"
     assert text.startswith(load_prompt("compile").text)
 
 

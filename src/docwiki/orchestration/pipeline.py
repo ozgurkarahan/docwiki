@@ -170,7 +170,7 @@ from docwiki.stages.discover import (
     resolve_supersession,
     revalidate_state,
 )
-from docwiki.stages.hubs import build_hubs, doc_dates, source_scope
+from docwiki.stages.hubs import build_hubs, doc_dates, source_scope, subject_keys
 from docwiki.stages.indexes import build_catalog, build_indexes, changes_since, run_page_path
 from docwiki.stages.links import apply_links, build_edges, md_link, replace_frontmatter
 from docwiki.stages.publish import finalize_and_publish, run_receipt_page
@@ -1683,6 +1683,8 @@ class Pipeline:
             dates=doc_dates(results),
             views=views.results,
             lang=lang,
+            # the subjects are counted by their canonical wording in every language
+            keys=subject_keys(content),
         )
         views_index = build_views_index(view_pages, stamp=stamp, updated=day, strings=strings)
         entries = changes_since(

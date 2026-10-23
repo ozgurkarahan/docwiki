@@ -1,5 +1,7 @@
 # Contradiction resolution policy, stated on topic pages next to both claims (never applied
 # silently). Authorities are those of taxonomy.yaml; the doc type keys below are its keys.
+# The reasons and the notes are shown on the pages: they are written in the wiki's canonical
+# language (French); the translate stage gives the English mirror its translation.
 order: [authority, recency]
 # An amendment (avenant) or an ordre de service changes the terms of the contract of its
 # chantier: a disagreement between them is a change, shown as "changed by", not a contradiction;
@@ -8,41 +10,64 @@ order: [authority, recency]
 amendments:
   - amending: [contract-amendment, ordre-de-service]
     amended: [works-contract, acte-d-engagement, ccap]
+# A later report of the same chantier tells what happened since an earlier document (a delivery
+# postponed, a date moved, a réserve recorded or lifted): a disagreement between them is an
+# update shown with both dates, never a contest of authority (an older OS does not outrank the
+# supplier's e-mail announcing a delay). Schedules are not reports: a schedule that disagrees
+# with the site meeting minutes stays a contradiction.
+updates:
+  - earlier:
+      - ordre-de-service
+      - contract-amendment
+      - schedule
+      - crew-schedule
+      - purchase-order
+      - site-meeting-minutes
+      - liste-des-reserves
+      - pv-de-reception
+      - supplier-email
+    later: [supplier-email, site-meeting-minutes, liste-des-reserves, pv-de-reception, delivery-note]
 # Pairs the authority rule does not decide: the point is arbitrated with the client.
 arbitrate:
   - types: [client-email, schedule]
     reason: >-
-      A client's written constraint about its own building or premises is a request the schedule
-      must take into account, not a claim the schedule overrules: arbitrate the point with the
-      client (and confirm it by an ordre de service or an amendment when it changes the contract).
+      Une contrainte écrite du client sur son propre bâtiment ou ses locaux est une demande que le
+      planning doit prendre en compte, pas une affirmation que le planning écarte : arbitrer le
+      point avec le client (et le confirmer par un ordre de service ou un avenant s'il modifie le
+      marché).
   - types: [client-email, crew-schedule]
     reason: >-
-      A client's written constraint about its own building or premises is a request the crew
-      schedule must take into account, not a claim it overrules: arbitrate the point with the
-      client.
+      Une contrainte écrite du client sur son propre bâtiment ou ses locaux est une demande que le
+      planning des équipes doit prendre en compte, pas une affirmation qu'il écarte : arbitrer le
+      point avec le client.
   # The PPSPS is our own safety plan: it organises the works and their phasing on the client's
   # premises, so a client's constraint against it is arbitrated too. Contracts, avenants and
   # ordres de service are not paired: the client signs them.
   - types: [client-email, ppsps]
     reason: >-
-      A client's written constraint about its own building or premises (its occupation, access or
-      hours) is a request the PPSPS and its phasing must take into account, not a claim our own
-      safety plan overrules: arbitrate the point with the client and the coordonnateur SPS, then
-      update the PPSPS.
+      Une contrainte écrite du client sur son propre bâtiment ou ses locaux (occupation, accès ou
+      horaires) est une demande que le PPSPS et son phasage doivent prendre en compte, pas une
+      affirmation que notre propre plan de sécurité écarte : arbitrer le point avec le client et le
+      coordonnateur SPS, puis mettre à jour le PPSPS.
 notes: >-
-  Signed acts that change or close a contract prevail: an amendment (avenant), an ordre de
-  service or a PV de réception (authority 10) over the contract they relate to (works contract,
-  acte d'engagement, CCAP or framework contract, 9), and a contract over the priced offer, the
-  DPGF or a subcontracting document (8). An avenant or an ordre de service that changes a term of
-  the contract of its chantier (a date, an amount, a scope of works) is a change, not a
-  contradiction; and a term of the contract is checked against the avenants and ordres de service
-  of the chantier before it is relied on. Signed site meeting minutes, the réserves list and the
-  general terms (7) prevail over a delivery note with its handwritten reserves, a situation, the
-  billing register and the price list (6); a delivery note prevails over the supplier invoice (5)
-  for the quantities actually delivered, as do purchase orders, the PPSPS and the company
-  registers at that level. Schedules (planning), the crew schedule and the suppliers' e-mails
-  have the same authority (4): the more recent statement prevails until a new schedule revision
-  (indice) supersedes the old one. Client e-mails, price studies and margin dashboards (3) are
-  requests or internal estimates; an amendment makes a request binding. A client's written
-  constraint (an e-mail) against our own schedule, crew schedule or PPSPS is never settled by the
-  rule: it is arbitrated with the client. Site photos and the organisation chart (2) never settle a quantity or a date.
+  Les actes signés qui modifient ou clôturent le marché l'emportent : avenant, ordre de service ou
+  PV de réception (rang 10) sur le marché auquel ils se rapportent (marché de travaux, acte
+  d'engagement, CCAP ou contrat-cadre, rang 9), et le marché sur le devis, la DPGF ou un document
+  de sous-traitance (rang 8). Un avenant ou un ordre de service qui modifie une clause du marché de
+  son chantier (une date, un montant, l'objet des travaux) est une modification, pas une
+  contradiction ; une clause du marché se vérifie contre les avenants et ordres de service du
+  chantier avant d'être retenue. Les comptes rendus de chantier signés, la liste des réserves et
+  les conditions générales (rang 7) l'emportent sur un bon de livraison et ses mentions
+  manuscrites, une situation, le suivi de facturation et le tarif (rang 6) ; le bon de livraison
+  l'emporte sur la facture fournisseur (rang 5) pour les quantités réellement livrées, comme les
+  bons de commande, le PPSPS et les registres de l'entreprise à ce rang. Les plannings, le planning
+  des équipes et les courriels des fournisseurs ont le même rang (4) : l'information la plus
+  récente l'emporte jusqu'à ce qu'un nouvel indice du planning remplace l'ancien. Un document plus
+  récent du chantier qui rapporte ce qui s'est passé depuis (une livraison reportée, une date
+  décalée, une réserve levée) met à jour le document plus ancien : c'est une mise à jour datée, pas
+  une contradiction tranchée par le rang. Les courriels des clients, les études de prix et les
+  tableaux de bord des marges (rang 3) sont des demandes ou des estimations internes ; un avenant
+  rend une demande contractuelle. Une contrainte écrite du client (un courriel) opposée à notre
+  planning, au planning des équipes ou au PPSPS n'est jamais tranchée par la règle : elle est
+  arbitrée avec le client. Les photos de chantier et l'organigramme (rang 2) ne tranchent jamais
+  une quantité ni une date.

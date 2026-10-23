@@ -133,3 +133,70 @@ def _query_frontmatter(summary: str) -> object:
     path = next(root.glob("releases/*/wiki/sources/pln-2026-003-indice-b-*.md"))
     page = Page.parse(path.read_text(encoding="utf-8"), "sources/" + path.name)
     return page.frontmatter.model_copy(update={"summary": summary})
+
+
+# v1.7 slice G: amounts copied from spreadsheet cells, VAT word first, point decimals.
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        (
+            "des travaux cumulés HT de 174910, un net à payer TTC de 27786.55 et un reste à "
+            "facturer HT de 9580.[^c3][^c4]",
+            f"des travaux cumulés de 174{THIN}910,00{NBSP}€{NBSP}HT, un net à payer de "
+            f"27{THIN}786,55{NBSP}€{NBSP}TTC et un reste à facturer de "
+            f"9{THIN}580,00{NBSP}€{NBSP}HT.[^c3][^c4]",
+        ),
+        # a footnote marker right after the amount is never part of the number
+        ("net à payer TTC de 27786.55[^c3]", f"net à payer de 27{THIN}786,55{NBSP}€{NBSP}TTC[^c3]"),
+        (
+            "soit un montant TTC de 29249.[^c1]",
+            f"soit un montant de 29{THIN}249,00{NBSP}€{NBSP}TTC.[^c1]",
+        ),
+        (
+            "commandée HT à 2390, facturée HT à 0,",
+            f"commandée à 2{THIN}390,00{NBSP}€{NBSP}HT, facturée à 0,00{NBSP}€{NBSP}HT,",
+        ),
+        (
+            "Le montant du marché HT est de 177650.",
+            f"Le montant du marché est de 177{THIN}650,00{NBSP}€{NBSP}HT.",
+        ),
+        ("un montant de 26 240 HT", f"un montant de 26{THIN}240,00{NBSP}€{NBSP}HT"),
+        ("un montant cumulé HT de 13 800.", f"un montant cumulé de 13{THIN}800,00{NBSP}€{NBSP}HT."),
+        (
+            "au PU HT de 18,20 € pour un total HT de 728,00 €.",
+            f"au PU de 18,20{NBSP}€{NBSP}HT pour un total de 728,00{NBSP}€{NBSP}HT.",
+        ),
+        ("un montant HT de 1484.8.", f"un montant de 1{THIN}484,80{NBSP}€{NBSP}HT."),
+        ("amount excl. VAT of 26590", f"amount of 26{THIN}590,00{NBSP}€{NBSP}HT"),
+        ("ordered excluding tax at 2390", f"ordered at 2{THIN}390,00{NBSP}€{NBSP}HT"),
+        ("27786.55 € TTC", f"27{THIN}786,55{NBSP}€{NBSP}TTC"),
+        ("27786.55 €", f"27{THIN}786,55{NBSP}€"),
+        # a point decimal in a sentence about money
+        (
+            "La retenue de garantie est de 1462.45, et la retenue cumulée est de 9620.05.[^c2]",
+            f"La retenue de garantie est de 1{THIN}462,45{NBSP}€, et la retenue cumulée est de "
+            f"9{THIN}620,05{NBSP}€.[^c2]",
+        ),
+    ],
+)
+def test_cell_amounts_and_vat_word_first(text: str, expected: str) -> None:
+    assert format_amounts(text) == expected
+    assert format_amounts(expected) == expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "HT de 10 %",  # a percentage
+        "TTC du 31/03/2026",  # a date
+        "TTC de 2026",  # a year
+        "Le poste 4.1 est terminé.",  # a poste number
+        "Le montant du poste 4.1 est connu.",
+        "une nacelle de 3.5 t",  # a quantity with a unit
+        "version 2.1 du planning",  # no money in the sentence
+        "HT de [9580](../x.md)",  # link text
+        'TTC de "27786.55"',  # quoted text
+    ],
+)
+def test_cell_amount_non_cases_are_left_as_written(text: str) -> None:
+    assert format_amounts(text) == text

@@ -61,3 +61,24 @@ def test_a_pack_without_terms_has_no_note(tmp_path: Path) -> None:
     (tmp_path / "pack" / "terms.yaml").unlink()
     pack = load_pack(tmp_path / "pack")
     assert pack.terms.terms == [] and locked_terms_note(pack) == ""
+
+
+def test_the_note_keeps_locked_terms_to_their_trade_sense() -> None:
+    # v1.7 slice G: « réception » was written for receiving an invoice or a delivery.
+    pack = load_pack(PACK)
+    note = locked_terms_note(pack)
+    assert "keeps its trade meaning only" in note
+    assert "taking delivery of goods" in note
+    senses = [
+        "receiving an invoice or a situation: write « remise »",
+        "taking delivery of goods: write « livraison »",
+    ]
+    terms = [
+        term.model_copy(update={"avoid_senses": senses}) if term.term == "réception" else term
+        for term in pack.terms.terms
+    ]
+    sensed = pack.model_copy(update={"terms": pack.terms.model_copy(update={"terms": terms})})
+    assert (
+        "- réception (also réception des travaux, PV de réception); never for receiving an "
+        "invoice or a situation: write « remise »; taking delivery of goods: write « livraison »\n"
+    ) in locked_terms_note(sensed)
