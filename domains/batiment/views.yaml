@@ -1,0 +1,175 @@
+# Computed views of the batiment pack (v1.7, ADR 0011 decision 5): cross-chantier figures
+# computed by code from the tables of the company registers and the chantiers' workbooks, every
+# result row cited to the row of the document it comes from. A language model never adds them.
+#
+# Each view reads the relation `rows`: the union of the tables (XLSX sheets, CSV, DOCX tables) of
+# the current documents of `doc_types`, columns renamed by matching the table headers to the
+# aliases below (without case or accents; a table that lacks one of the columns is skipped). The
+# cells are the text as extracted; parse_amount() and parse_date() read numbers and dates. The
+# registers end with footer rows ("Document", "Tenu par"...), which the WHERE clauses drop because
+# their amount or date cells are empty.
+#
+# Fixed dates are those of the documents, never "today": the registers are kept at 10/04/2026.
+#
+# Not a view: Zava Matériaux's invoices against the framework price list. The invoices are PDFs;
+# their lines are text on a page, not a table located row by row, so no view can cite them line
+# by line (a view only reads tables whose rows can be cited one by one).
+views:
+  # P43, S16. The billing register has two sheets with the same chantier code: "Marchés" (one row
+  # per chantier: the contract with its avenants and OS) and "Factures" (one row per client
+  # invoice). A contract row states the retention rule in words; an invoice row gives the amount
+  # retained: that tells them apart. Each row adds its own part, so the totals per chantier are
+  # the contract total, what was billed and retained, and what is left to bill (contract TTC
+  # minus the invoices TTC). Amounts are read as euros with two decimals (47271.6 in the sheet
+  # is 47271,60). The chantier of a row is its "Code chantier", not the folder of the register
+  # (entreprise).
+  - slug: position-financiere
+    title: Financial position by chantier
+    description: >-
+      Contract total with avenants and ordres de service, client invoices, retenue de garantie
+      and amount left to bill of every chantier, from the client billing register.
+    doc_types: [billing-register]
+    columns:
+      chantier: ["Code chantier"]
+      piece: ["N° facture", "Type de marché"]
+      objet: ["Objet", "Chantier"]
+      montant_ht: ["Montant total HT", "Montant HT"]
+      montant_ttc: ["Montant total TTC", "Montant TTC"]
+      retenue: ["Retenue de garantie"]
+    sql: |-
+      WITH lignes AS (
+        SELECT *,
+          parse_amount(retenue) IS NULL AS est_marche,
+          CAST(parse_amount(montant_ht) AS DECIMAL(18, 2)) AS ht,
+          CAST(parse_amount(montant_ttc) AS DECIMAL(18, 2)) AS ttc,
+          CAST(parse_amount(retenue) AS DECIMAL(18, 2)) AS rg
+        FROM rows
+        WHERE parse_amount(montant_ttc) IS NOT NULL AND chantier IS NOT NULL
+      )
+      SELECT
+        piece,
+        objet,
+        CASE WHEN est_marche THEN ht END AS marche_ht,
+        CASE WHEN est_marche THEN ttc END AS marche_ttc,
+        CASE WHEN NOT est_marche THEN ttc END AS facture_ttc,
+        CASE WHEN NOT est_marche THEN rg END AS retenue_ttc,
+        CASE WHEN est_marche THEN ttc ELSE -ttc END AS reste_a_facturer_ttc,
+        chantier AS _scope, _source_id, _table_id, _row_id
+      FROM lignes
+      ORDER BY chantier, est_marche DESC, _source_id, _row_id
+    per_scope: true
+    totals: [marche_ht, marche_ttc, facture_ttc, retenue_ttc, reste_a_facturer_ttc]
+
+  # P48. The equipment register is kept at 10/04/2026: an inspection due before that date is
+  # overdue. Equipment not subject to inspection has no due date and never matches.
+  - slug: vgp-en-retard
+    title: Overdue periodic inspections (VGP) at 10/04/2026
+    description: >-
+      Equipment of the equipment register whose next periodic inspection was due before
+      10/04/2026, the date of the register, with the days overdue at that date.
+    doc_types: [equipment-register]
+    columns:
+      code: ["Code"]
+      designation: ["Désignation"]
+      verification: ["Vérification périodique"]
+      derniere_verification: ["Dernière vérification"]
+      prochaine_echeance: ["Prochaine échéance"]
+      affectation: ["Affectation au 10/04/2026", "Affectation"]
+    sql: |-
+      SELECT
+        code, designation, verification, derniere_verification, prochaine_echeance, affectation,
+        date_diff('day', parse_date(prochaine_echeance), DATE '2026-04-10') AS jours_de_retard,
+        _source_id, _table_id, _row_id
+      FROM rows
+      WHERE parse_date(prochaine_echeance) < DATE '2026-04-10'
+      ORDER BY parse_date(prochaine_echeance), code
+
+  # P29, P31, S17. A subcontractor's situation must be covered by a valid attestation de
+  # vigilance. For each situation of a subcontractor (sheet "Sous-traitance" of the chantiers'
+  # situations) the view takes the latest attestation de vigilance dated on or before it (the
+  # attestations register) and keeps the situation when that attestation had expired, or when
+  # there is none. An attestation is valid six months from its date (the rule printed in the
+  # register and in the subcontract; the register's own "Valable jusqu'au" column has no
+  # counterpart in the situation sheet, so the view computes it). Both rows are listed and
+  # cited: the expired attestation and the situation it fails to cover, with the next
+  # attestation (the renewal) when the register has one.
+  - slug: attestations-de-vigilance-expirees
+    title: Attestations de vigilance expired at a subcontractor's situation
+    description: >-
+      Subcontractors' situations dated after their last attestation de vigilance had expired
+      (six months after its date), with the expired attestation and its renewal.
+    doc_types: [compliance-register, situation]
+    columns:
+      sous_traitant: ["Sous-traitant"]
+      piece: ["Document", "Situation du sous-traitant"]
+      date_piece: ["Date du document", "Date"]
+    sql: |-
+      WITH vigilance AS (
+        SELECT sous_traitant, parse_date(date_piece) AS du,
+               CAST(parse_date(date_piece) + INTERVAL 6 MONTH AS DATE) AS au,
+               _source_id, _table_id, _row_id
+        FROM rows
+        WHERE lower(trim(piece)) = 'attestation de vigilance' AND parse_date(date_piece) IS NOT NULL
+      ),
+      situations AS (
+        SELECT sous_traitant, piece, parse_date(date_piece) AS le, _source_id, _table_id, _row_id
+        FROM rows
+        WHERE lower(trim(piece)) LIKE 'situation%' AND parse_date(date_piece) IS NOT NULL
+      ),
+      constats AS (
+        SELECT s.*, v.du AS attestation_du, v.au AS valable_jusqu_au,
+               v._source_id AS v_source_id, v._table_id AS v_table_id, v._row_id AS v_row_id,
+               (SELECT min(n.du) FROM vigilance n
+                 WHERE n.sous_traitant = s.sous_traitant AND n.du > s.le) AS renouvelee_le
+        FROM situations s
+        LEFT JOIN vigilance v
+          ON v.sous_traitant = s.sous_traitant
+         AND v.du = (SELECT max(w.du) FROM vigilance w
+                      WHERE w.sous_traitant = s.sous_traitant AND w.du <= s.le)
+        WHERE v.au IS NULL OR v.au < s.le
+      )
+      SELECT * FROM (
+        SELECT sous_traitant, piece, le AS date_piece, attestation_du, valable_jusqu_au,
+               le AS situation_du, renouvelee_le,
+               date_diff('day', valable_jusqu_au, le) AS jours_apres_expiration,
+               _source_id, _table_id, _row_id
+        FROM constats
+        UNION ALL
+        SELECT sous_traitant, 'Attestation de vigilance', attestation_du, attestation_du,
+               valable_jusqu_au, le, renouvelee_le, date_diff('day', valable_jusqu_au, le),
+               v_source_id, v_table_id, v_row_id
+        FROM constats
+        WHERE v_source_id IS NOT NULL
+      )
+      ORDER BY sous_traitant, situation_du, date_piece, _source_id, _row_id
+
+  # P42, S15. A self-join on the crew schedule: the same person booked on two chantiers on
+  # overlapping days of the same schedule. Each booking of a clash is listed (and cited) with
+  # the other chantier and the overlapping days.
+  - slug: doubles-affectations
+    title: Crew double bookings
+    description: >-
+      People of the crew schedule booked on two chantiers on overlapping days, with the other
+      chantier and the days of the clash.
+    doc_types: [crew-schedule]
+    columns:
+      semaine: ["Semaine"]
+      debut: ["Début"]
+      fin: ["Fin"]
+      salarie: ["Salarié"]
+      chantier: ["Code chantier"]
+      tache: ["Tâche"]
+    sql: |-
+      SELECT
+        a.salarie, a.semaine, a.debut, a.fin, a.tache,
+        b.chantier AS autre_chantier,
+        greatest(parse_date(a.debut), parse_date(b.debut)) AS conflit_du,
+        least(parse_date(a.fin), parse_date(b.fin)) AS conflit_au,
+        a.chantier AS _scope, a._source_id, a._table_id, a._row_id
+      FROM rows a
+      JOIN rows b
+        ON a._source_id = b._source_id AND a._table_id = b._table_id
+       AND a.salarie = b.salarie AND a.chantier <> b.chantier
+       AND parse_date(a.debut) <= parse_date(b.fin)
+       AND parse_date(b.debut) <= parse_date(a.fin)
+      ORDER BY conflit_du, a.salarie, a.chantier, a._row_id
