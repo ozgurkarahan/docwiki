@@ -96,7 +96,7 @@ _HEADING_RE = re.compile(r"^(?P<marks>#{1,6})[ \t]+(?P<text>.*?)[ \t]*#*[ \t]*$"
 _LIST_RE = re.compile(r"^(?P<prefix>\s*(?:[-*+]|\d+[.)])\s+)(?P<text>\S.*)$")
 _TABLE_RE = re.compile(r"^\s*\|")
 _QUOTE_RE = re.compile(r"^\s*>")
-_COMMENT_RE = re.compile(r"^\s*<!--.*-->\s*$")
+_COMMENT_RE = re.compile(r"^\s*<!--.*?-->\s*$", re.DOTALL)
 _PROTECTED_RE = re.compile(
     r"(?P<code>(`+)(?:(?!\2).)+?\2)"
     r"|(?P<link>!?\[(?:[^\[\]\\]|\\.|\[(?:[^\[\]\\]|\\.)*\])*\](?:\([^)\n]*\)|\[[^\]\n]*\]))"
