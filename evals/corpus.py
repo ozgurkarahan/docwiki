@@ -21,6 +21,7 @@ import os
 import unicodedata
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Literal
 
@@ -475,8 +476,38 @@ def restricted_fingerprint(
     other: set[str] = set()
     for path, doc in docs.items():
         values = value_tokens(normalize_text(doc.text()))
-        (restricted if manifest.sensitivity(path) == "restricted" else other).update(values)
+        if manifest.sensitivity(path) == "restricted":
+            restricted.update(values)
+        else:
+            other.update(values)
+            other.update(_column_totals(doc))
     return frozenset(restricted - other)
+
+
+def _column_totals(doc: ExtractedDoc) -> set[str]:
+    """Totals anyone can compute from a non-restricted table: the sum of each numeric column,
+    with and without its last row (often a printed total). A restricted file that prints such a
+    total reveals nothing, so these values are not part of the fingerprint."""
+    totals: set[str] = set()
+    for table in doc.tables:
+        for index in range(len(table.columns)):
+            numbers: list[Decimal] = []
+            for row in table.rows:
+                found = value_tokens(normalize_text(row.cells[index]), min_digits=1)
+                if len(found) == 1 and (value := _as_decimal(next(iter(found)))) is not None:
+                    numbers.append(value)
+            if len(numbers) >= 2:
+                for subset in (numbers, numbers[:-1]):
+                    total = sum(subset, Decimal(0)).normalize()
+                    totals.add(format(total, "f"))
+    return totals
+
+
+def _as_decimal(token: str) -> Decimal | None:
+    try:
+        return Decimal(token)
+    except InvalidOperation:
+        return None
 
 
 # ------------------------------------------------------------------------------ context
