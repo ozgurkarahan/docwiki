@@ -127,7 +127,7 @@ TOOLS: dict[str, str] = {
         "sources come first; filter by status; paged with limit and offset."
     ),
     "quality_report": (
-        "Quality-gate results (G01-G15) of the served release, or of the release id given: "
+        "Quality-gate results (G01-G16) of the served release, or of the release id given: "
         "status, blocking flag, rule, violation count and the first violations of each gate "
         "(failing gates first), plus release counts."
     ),

@@ -83,7 +83,7 @@ def test_valid_release_is_published_and_dry_runs_are_not(tmp_path: Path):
         storage = FolderStorage(tmp_path / f"store-{name}", fsync=False)
         result = finalize_and_publish(
             writer,
-            gates=gate_results([], skipped=["G04", "G10", "G15"]),
+            gates=gate_results([], skipped=["G04", "G10", "G15", "G16"]),
             counts={"sources": 3},
             storage=None if dry else storage,
         )

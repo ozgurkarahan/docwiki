@@ -33,3 +33,4 @@ Release `20260401T090000Z-7ce99a3f`, audience public. This mock release was writ
 | G13 | orphans | pass |
 | G14 | skills | pass |
 | G15 | extraction | skipped |
+| G16 | locked-vocabulary | skipped |

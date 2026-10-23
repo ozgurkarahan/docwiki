@@ -31,7 +31,7 @@ runs in a Container Apps Job, and the agents read its results or ask it to run
 | `recent_changes` | Wiki.Read | none | Log entries, newest first |
 | `run_status` | Wiki.Operate | none | Latest or selected run report, and whether its release is served |
 | `list_sources` | Wiki.Operate | none | Per-source status, stage, last error, sensitivity |
-| `quality_report` | Wiki.Operate | none | Gate results G01 to G15 of a release |
+| `quality_report` | Wiki.Operate | none | Gate results G01 to G16 of a release |
 | `explain_source` | Wiki.Operate | none | Diagnostics of a failed or quarantined source |
 | `list_proposals` | Wiki.Operate | none | Entity, glossary, topic, injection and recompile proposals |
 | `write_health_report` | Wiki.Operate | none | Writes a sanitised `work/reports/health-<date>.md` |

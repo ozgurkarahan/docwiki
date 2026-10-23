@@ -68,7 +68,7 @@ VERSIONS = VersionInfo(
 )
 # Schedule indice A (PDF, superseded), schedule indice B (XLSX, current) and the minutes (DOCX).
 PLAN_A, PLAN_B, MINUTES = "src-c6436ec50050", "src-86eabe3d6d0d", "src-165f1d3a109c"
-SKIPPED_GATES = ("G04", "G10", "G15")
+SKIPPED_GATES = ("G04", "G10", "G15", "G16")
 
 GLOSSARY = [
     ("revision", {"en": ["revision letter"], "fr": ["indice"]}, "revision"),

@@ -312,9 +312,10 @@ pages referencing it. Snippets are plain text windows of about 240 characters. O
 ## 14. Validator and gates (`docwiki.release.validate_release`, `contracts.gates`)
 
 `validate_release(path, *, canaries=(), require_manifest=True, audience=None,
-orphan_threshold=0.05, glossary_seeded=None) -> list[Violation{gate, code, severity, path, line,
-message}]` (paths relative to the validated folder: `wiki/…` in a release folder, plain wiki paths
-and `.docwiki/…` in a portable folder (§19); lines 1-based in the file). Checks:
+orphan_threshold=0.05, glossary_seeded=None, locked_terms=None) -> list[Violation{gate, code,
+severity, path, line, message}]` (paths relative to the validated folder: `wiki/…` in a release
+folder, plain wiki paths and `.docwiki/…` in a portable folder (§19); lines 1-based in the file).
+Checks:
 
 | Gate | Checks |
 |---|---|
@@ -331,10 +332,12 @@ and `.docwiki/…` in a portable folder (§19); lines 1-based in the file). Chec
 | G12 | tag errors in frontmatter |
 | G13 | warning when more than `orphan_threshold` of pages (except `index.md`) have no inbound link outside backlinks blocks |
 | G14 | skill projections byte-identical, core skills present, `SkillFile` limits, no extra files |
+| G16 | with `locked_terms` (`{locked term: [banned renderings]}`): no page title or body line (except `_meta/quality.md`) contains a banned rendering as a whole word or phrase, case-insensitive, plural `s`/`es` allowed; blockquote lines and text between double quotes (straight, curly or guillemets) are not checked; code `banned-rendering` |
 
 G04 (quote verification) and G15 (quarantine rate) need pipeline data and stay with the `verify`
-stage. `gate_results(violations, skipped=…, metrics=…)` folds violations into one `GateResult` per
-gate (errors fail blocking gates, warnings warn).
+stage, which reports G16 as skipped without `locked_terms`. `gate_results(violations, skipped=…,
+metrics=…)` folds violations into one `GateResult` per gate (errors fail blocking gates, warnings
+warn).
 
 ## 15. Domain packs (`docwiki.domain`)
 

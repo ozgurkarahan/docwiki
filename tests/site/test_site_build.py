@@ -165,11 +165,11 @@ def test_site_settings_from_the_mock_release() -> None:
     assert settings["runPage"] is None  # the mock wiki has no run receipt page
     assert settings["qualityPage"] == "_meta/quality"
     assert settings["quality"] == {
-        "gates": 15,
+        "gates": 16,
         "passed": 12,
         "warned": 0,
         "failed": 0,
-        "skipped": 3,
+        "skipped": 4,
         "blockingFailed": 0,
     }
     assert settings["sources"][PLAN_B] == {

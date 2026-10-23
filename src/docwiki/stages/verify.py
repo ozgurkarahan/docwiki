@@ -1,4 +1,4 @@
-"""Stage 11 — ``verify``: quality gates G01–G15 (pipeline §7) and ``_meta/quality.md``.
+"""Stage 11 — ``verify``: quality gates G01–G16 (pipeline §7) and ``_meta/quality.md``.
 
 Structural gates come from :func:`docwiki.release.validate_release` on the candidate release;
 this stage adds the gates that need pipeline data:
@@ -9,7 +9,9 @@ this stage adds the gates that need pipeline data:
   text scan of ``validate_release``, a byte-level scan of every release file (evidence originals,
   tables, ``search.db``, the built site…); :func:`extend_verdict` adds late findings, e.g. after
   the site is built;
-* G10 — whether the pack seeds a glossary; G15 — share of quarantined sources.
+* G10 — whether the pack seeds a glossary; G15 — share of quarantined sources;
+* G16 — the locked trade vocabulary of the pack (``{locked term: [banned renderings]}``), passed
+  to ``validate_release``; skipped when the pack locks no term.
 
 Gate results go into the manifest and the quality report page; a failing blocking gate stops the
 publish. The report never prints injected text: injection flags show the source id, the block id
@@ -251,8 +253,13 @@ def verify_release(
     sources_total: int = 0,
     quarantined: int = 0,
     require_manifest: bool = False,
+    locked_terms: Mapping[str, Sequence[str]] | None = None,
 ) -> VerifyResult:
-    """Run every gate on the release folder ``root`` (candidate or finalized)."""
+    """Run every gate on the release folder ``root`` (candidate or finalized).
+
+    ``locked_terms`` (``{locked term: [banned renderings]}``) enables G16; without it the gate is
+    skipped.
+    """
     violations = list(
         validate_release(
             root,
@@ -260,6 +267,7 @@ def verify_release(
             require_manifest=require_manifest,
             audience=audience,
             glossary_seeded=glossary_seeded or None,
+            locked_terms=locked_terms or None,
         )
     )
     violations = _merge_canary_findings(violations, scan_canaries(root, canaries))
@@ -295,6 +303,8 @@ def verify_release(
         skipped.append("G08")
     if not glossary_seeded:
         skipped.append("G10")
+    if not locked_terms:
+        skipped.append("G16")
     gates = gate_results(violations, skipped=skipped, metrics=metrics)
     return VerifyResult(
         gates=gates,

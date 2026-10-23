@@ -385,12 +385,13 @@ def test_gate_results_fold_violations() -> None:
         Violation(gate="G05", code="bare-url", severity="warning", message="w"),
     ]
     results = {result.gate: result for result in gate_results(violations, skipped=["G04"])}
-    assert len(results) == len(GATES) == 15
+    assert len(results) == len(GATES) == 16
     assert results["G02"].status == "fail" and results["G02"].blocks_publish
     assert results["G13"].status == "warn" and not results["G13"].blocks_publish
     assert results["G15"].status == "warn"
     assert results["G05"].status == "warn"
     assert results["G04"].status == "skipped"
+    assert results["G16"].status == "pass" and results["G16"].blocking
     assert results["G01"].status == "pass"
 
 

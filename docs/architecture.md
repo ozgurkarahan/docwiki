@@ -72,7 +72,7 @@ flowchart LR
   end
   perSource --> entities["5 entities"] --> topics["6 topics<br/>contradictions,<br/>supersession"] --> links["7 links<br/>backlinks, edges"]
   links --> indexes["8 indexes<br/>catalog, search.db,<br/>llms.txt, log"] --> agentkit["9 agent kit<br/>AGENTS.md, skills"]
-  agentkit --> evidence["10 evidence<br/>one sidecar per locator"] --> verify["11 verify<br/>gates G01 to G15"]
+  agentkit --> evidence["10 evidence<br/>one sidecar per locator"] --> verify["11 verify<br/>gates G01 to G16"]
   verify --> site["12 site<br/>Quartz"] --> publish["13 publish<br/>upload, pointer swap"]
 ```
 
@@ -88,7 +88,7 @@ flowchart LR
 | 8 | `indexes` | Home and category indexes, glossary, log, `llms.txt`, `catalog.json`, `search.db` | none |
 | 9 | `agentkit` | `AGENTS.md` and the skills, rendered from reviewed templates | none |
 | 10 | `evidence` | Evidence sidecars, page images with highlight boxes and, for the public sample, the original files | none |
-| 11 | `verify` | Quality gates G01 to G15; results in `_meta/quality.md` and the manifest | none |
+| 11 | `verify` | Quality gates G01 to G16; results in `_meta/quality.md` and the manifest | none |
 | 12 | `site` | Quartz build of the release (on by default in Azure mode) | none |
 | 13 | `publish` | Uploads the release, swaps `current.json`, applies retention | none |
 
