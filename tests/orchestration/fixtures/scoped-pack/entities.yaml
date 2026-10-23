@@ -1,0 +1,34 @@
+types:
+  - key: building-element
+    title: Building elements
+    description: Windows and other parts of the extension.
+  - key: organisation
+    title: Organisations
+  - key: chantier
+    title: Chantiers
+    description: The jobs of the company, one hub page each.
+registry:
+  - type: building-element
+    key: baie-f1
+    label: Bay window F1
+    aliases:
+      - {text: sliding window F1, lang: en}
+      - {text: baie coulissante F1, lang: fr}
+  - type: building-element
+    key: fenetre-f2
+    label: Window F2
+  - type: organisation
+    key: vanarsdel-menuiseries
+    label: VanArsdel Menuiseries
+  - type: chantier
+    key: alpha
+    label: Chantier Alpha
+    attributes:
+      client: Famille Moreau
+      contract_type: marché privé
+  - type: chantier
+    key: beta
+    label: Chantier Beta
+    attributes:
+      client: Zava Matériaux
+      contract_type: marché privé

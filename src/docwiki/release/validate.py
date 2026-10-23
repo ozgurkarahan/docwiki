@@ -777,10 +777,10 @@ def _check_catalog(state: _State, manifest: ReleaseManifest | None) -> None:
 
 
 def _check_page_sources(state: _State, page: Page, tiers: Mapping[str, str], rel: str) -> None:
-    """The ``sources`` of an entity, topic or query page have a page in the release (G02) and
-    the page tier is their highest tier (G07); ``tiers`` maps page ids to their sensitivity."""
+    """The ``sources`` of an entity, topic, hub or query page have a page in the release (G02)
+    and the page tier is their highest tier (G07); ``tiers`` maps page ids to their sensitivity."""
     fm = page.frontmatter
-    if not isinstance(fm, EntityFrontmatter | TopicFrontmatter | QueryFrontmatter):
+    if not isinstance(fm, EntityFrontmatter | TopicFrontmatter | HubFrontmatter | QueryFrontmatter):
         return
     found: list[str] = []
     for source_id in fm.sources:

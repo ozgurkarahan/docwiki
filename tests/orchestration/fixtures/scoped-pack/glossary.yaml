@@ -1,0 +1,12 @@
+terms:
+  - term: sliding window
+    definition: Window whose sash slides sideways, for example the sliding window F1 of the extension.
+    synonyms:
+      fr: [baie coulissante]
+    see_also: [topic:schedule-and-window-delivery]
+  - term: BC
+    definition: Purchase order (bon de commande); orders are numbered BC-YYYY-NNN.
+    synonyms:
+      en: [purchase order]
+      fr: [bon de commande]
+    see_also: [building-element:baie-f1]

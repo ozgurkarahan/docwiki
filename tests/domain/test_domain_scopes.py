@@ -72,6 +72,14 @@ def test_a_path_regex_may_only_name_known_groups(pack_dir: Path) -> None:
         load_pack(pack_dir)
 
 
+def test_the_hubs_folder_may_not_take_a_reserved_wiki_folder(pack_dir: Path) -> None:
+    (pack_dir / "scopes.yaml").write_text(
+        SCOPES.replace("plural: chantiers", "plural: topics"), encoding="utf-8"
+    )
+    with pytest.raises(PackValidationError, match="reserved wiki folder"):
+        load_pack(pack_dir)
+
+
 def test_revisions_supersede_within_their_scope_only(pack_dir: Path) -> None:
     pack = load_pack(pack_dir)
     records = [

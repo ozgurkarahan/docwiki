@@ -1,0 +1,13 @@
+topics:
+  - slug: schedule-and-window-delivery
+    title: Schedule and window delivery
+    description: Window sizes, orders and delivery dates of each chantier.
+    keywords: [window delivery, bay window, delivery date]
+    aliases:
+      - {text: livraison des menuiseries, lang: fr}
+    min_score: 2
+    min_sources: 2
+    per_scope: true
+  - slug: kitchen-renovation
+    title: Kitchen renovation
+    keywords: [kitchen renovation, kitchen units]

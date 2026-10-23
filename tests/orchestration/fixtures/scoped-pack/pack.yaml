@@ -1,0 +1,8 @@
+name: test-batiment-scoped
+title: Engine test pack with chantiers
+description: Tiny fictional domain pack for the engine tests about several chantiers of Lamna Bâtiment.
+default_audience: public
+languages: [en, fr]
+wiki_title: Lamna Bâtiment engine test wiki
+fictional: true
+banner: FICTIONAL - NOT FOR OPERATIONAL USE

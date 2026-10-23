@@ -1,0 +1,11 @@
+name: chantier
+title: Chantier
+plural: chantiers
+default: {key: entreprise, title: Entreprise}
+paths:
+  - regex: '^chantiers/(?P<scope>[a-z0-9-]+)/(?P<phase>[0-5])[^/]*/(?P<type>[a-z0-9-]+)/'
+  - regex: '^chantiers/(?P<scope>[a-z0-9-]+)/'
+  - regex: '^entreprise/(?P<type>[a-z0-9-]+)/'
+phases:
+  - {key: "1", title: marché}
+  - {key: "3", title: exécution}

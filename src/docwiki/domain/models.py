@@ -243,6 +243,10 @@ SCOPE_GROUPS = frozenset({"scope", "phase", "type", "lot"})
 """Named groups a scope path regex may capture."""
 
 
+RESERVED_WIKI_FOLDERS = frozenset({"sources", "entities", "topics", "queries", "evidence"})
+"""Wiki folders the hubs' folder (``scopes.plural``) may not take."""
+
+
 class ScopePath(ContractModel):
     """A raw-path regex; its named groups give the scope value and the axes."""
 
@@ -286,6 +290,13 @@ class ScopesFile(ContractModel):
     phases: list[PhaseDef] = []
     lot_regex: str | None = None
     """A regex with a ``lot`` group, tried on the file name when no path regex gave a lot."""
+
+    @field_validator("plural")
+    @classmethod
+    def _plural(cls, value: str) -> str:
+        if value in RESERVED_WIKI_FOLDERS:
+            raise ValueError(f"plural {value!r} is a reserved wiki folder")
+        return value
 
     @field_validator("lot_regex")
     @classmethod
