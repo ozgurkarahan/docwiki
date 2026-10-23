@@ -61,10 +61,42 @@
       ],
       "title": "ArbitrationPair",
       "type": "object"
+    },
+    "UpdateRule": {
+      "additionalProperties": false,
+      "description": "Doc types whose later documents report what happened since earlier ones (v1.7, slice G):\na document of a ``later`` type dated after a document of an ``earlier`` type of the same\nscope updates it (a delivery postponed, a date moved, a réserve lifted). A disagreement\nbetween them is an update, shown with both dates, not a contradiction for the rule to\ndecide by authority.",
+      "properties": {
+        "earlier": {
+          "items": {
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Earlier",
+          "type": "array"
+        },
+        "later": {
+          "items": {
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Later",
+          "type": "array"
+        }
+      },
+      "required": [
+        "earlier",
+        "later"
+      ],
+      "title": "UpdateRule",
+      "type": "object"
     }
   },
   "additionalProperties": false,
-  "description": "``resolution.yaml``: contradiction policy, stated on topic pages (never silently applied).\n\n``amendments`` and ``arbitrate`` (v1.7, optional) refine how the rule is stated: a\ncontradiction between an amended document and an amending document of the same scope is a\nchange, not a contradiction; a winner of an amended type is to review when its scope has\namending documents; a pair of ``arbitrate`` types is never decided by the rule.",
+  "description": "``resolution.yaml``: contradiction policy, stated on topic pages (never silently applied).\n\n``amendments`` and ``arbitrate`` (v1.7, optional) refine how the rule is stated: a\ncontradiction between an amended document and an amending document of the same scope is a\nchange, not a contradiction; a winner of an amended type is to review when its scope has\namending documents; a pair of ``arbitrate`` types is never decided by the rule. ``updates``\n(v1.7, slice G, optional): a later report of the same scope updates an earlier document.",
   "properties": {
     "order": {
       "default": [
@@ -96,6 +128,14 @@
         "$ref": "#/$defs/ArbitrationPair"
       },
       "title": "Arbitrate",
+      "type": "array"
+    },
+    "updates": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/UpdateRule"
+      },
+      "title": "Updates",
       "type": "array"
     },
     "notes": {

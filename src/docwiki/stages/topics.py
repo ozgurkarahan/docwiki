@@ -21,6 +21,13 @@ amending documents, the statement links them and says the point is to review; a 
 ``arbitrate`` types is never decided by the rule (to arbitrate, with the pack's reason). The
 frontmatter records the open contradictions (``contradictions`` and ``contradiction_pairs``).
 
+Slice G (v1.7) narrows what stays open, by code: two sides that state the same dates and values
+(one side's dates and quantities all found on the other, with at least one date) agree and are
+not a contradiction; and a disagreement where a document of a pack ``updates`` ``later`` type,
+dated after a document of an ``earlier`` type of the same scope, reports what happened since
+(a delivery postponed, a date moved) is an update, listed with both dates under "updated by a
+later document" and never decided by authority.
+
 A synthesis call that fails for its request only (content filter, output invalid or truncated,
 see :mod:`docwiki.stages.llm_failures`) does not stop the other topics: that topic is skipped with
 reason ``insufficient_evidence`` (the closest :class:`~docwiki.engine_types.TopicSkip` reason, as
@@ -80,13 +87,15 @@ __all__ = [
     "PROMPT_VERSION",
     "STAGE_VERSION",
     "ScopeContext",
+    "agree",
     "build_topic_pages",
     "is_change",
+    "is_update",
     "resolution_statement",
     "route_sources",
 ]
 
-STAGE_VERSION = "4"
+STAGE_VERSION = "5"
 PROMPT_VERSION = load_prompt("topic-synthesis").version
 SCHEMA_NAME = "topic_synthesis"
 MAX_FACT_TOKENS = 16_000
@@ -137,6 +146,9 @@ class _Synthesis:
     changes: list[_Contradiction] = field(default_factory=list)
     """Contradictions that are changes by an amending document: ``side_a`` is the amended
     document (the contract), ``side_b`` the amending one (v1.7)."""
+    updates: list[_Contradiction] = field(default_factory=list)
+    """Contradictions that are updates by a later report: ``side_a`` is the earlier document,
+    ``side_b`` the later one (v1.7, slice G)."""
 
 
 @dataclass(frozen=True)
@@ -472,6 +484,49 @@ def _verify(
     return _Synthesis(summary, overview, sections, contradictions, superseded, dropped, total)
 
 
+_DATE_RE = re.compile(r"(?<!\d)(?:(\d{1,2})/(\d{1,2})/(\d{4})|(\d{4})-(\d{2})-(\d{2}))(?!\d)")
+_IDENTIFIER_RE = re.compile(r"\b[A-Za-z]+[-_]?\d[\w-]*|n[°º]\s?\d+", re.IGNORECASE)
+
+
+def _stated_values(facts: Sequence[_Fact]) -> tuple[set[str], set[str]]:
+    """``(dates, quantities)`` the facts of one side state: dates as ``YYYY-MM-DD``, every other
+    number by value (identifiers such as ``R06``, ``T09`` or ``n°4`` left out)."""
+    dates: set[str] = set()
+    rest: list[str] = []
+    for fact in facts:
+        text = fact.record.text
+        for match in _DATE_RE.finditer(text):
+            day, month, year, iso_y, iso_m, iso_d = match.groups()
+            dates.add(
+                f"{iso_y}-{iso_m}-{iso_d}" if iso_y else f"{year}-{int(month):02d}-{int(day):02d}"
+            )
+        rest.append(_IDENTIFIER_RE.sub(" ", _DATE_RE.sub(" ", text)))
+    return dates, unsigned_values(rest)
+
+
+def agree(side_a: Sequence[_Fact], side_b: Sequence[_Fact]) -> bool:
+    """Whether two sides state the same dates and values (v1.7, slice G): every date and
+    quantity of one side, which states at least one date, is stated by the other side too. Such
+    a pair agrees (a completion and a réception both on 03/04/2026): not a contradiction."""
+    dates_a, values_a = _stated_values(side_a)
+    dates_b, values_b = _stated_values(side_b)
+    return (bool(dates_b) and dates_b <= dates_a and values_b <= values_a) or (
+        bool(dates_a) and dates_a <= dates_b and values_a <= values_b
+    )
+
+
+def is_update(pack: DomainPack, earlier: SourceInfo, later: SourceInfo) -> bool:
+    """Whether ``later`` reports news on ``earlier`` (v1.7, slice G): its type is a pack
+    ``updates`` ``later`` type for the type of ``earlier`` and it is dated strictly after it.
+    The caller checks they share a scope."""
+    return (
+        pack.resolution.update(earlier.doc_type, later.doc_type)
+        and earlier.date is not None
+        and later.date is not None
+        and earlier.date < later.date
+    )
+
+
 def _split_changes(
     synthesis: _Synthesis,
     pack: DomainPack,
@@ -479,21 +534,65 @@ def _split_changes(
     scope_of: Mapping[str, str | None],
 ) -> _Synthesis:
     """Move the contradictions between an amended and an amending document of the same scope
-    to ``changes`` (amended side first): they are changes, not open contradictions."""
-    if not pack.resolution.amendments:
-        return synthesis
+    to ``changes`` (amended side first): they are changes, not open contradictions. Drop the
+    pairs that agree, and move a later report's news on an earlier document of the same scope
+    to ``updates`` (earlier side first), unless the pack has the pair arbitrated (slice G)."""
     still: list[_Contradiction] = []
     changes: list[_Contradiction] = []
+    updates: list[_Contradiction] = []
     for item in synthesis.contradictions:
         a, b = item.side_a[0].record.source_id, item.side_b[0].record.source_id
+        first, second = infos[a], infos[b]
         same_scope = scope_of.get(a) == scope_of.get(b)
-        if same_scope and is_change(pack, infos[a], infos[b]):
+        arbitrated = pack.resolution.arbitration(first.doc_type, second.doc_type) is not None
+        if agree(item.side_a, item.side_b):
+            continue
+        if same_scope and is_change(pack, first, second):
             changes.append(item)
-        elif same_scope and is_change(pack, infos[b], infos[a]):
+        elif same_scope and is_change(pack, second, first):
             changes.append(_Contradiction(item.subject, item.side_b, item.side_a))
+        elif same_scope and not arbitrated and is_update(pack, first, second):
+            updates.append(item)
+        elif same_scope and not arbitrated and is_update(pack, second, first):
+            updates.append(_Contradiction(item.subject, item.side_b, item.side_a))
         else:
             still.append(item)
-    return replace(synthesis, contradictions=still, changes=[*synthesis.changes, *changes])
+    return replace(
+        synthesis,
+        contradictions=still,
+        changes=[*synthesis.changes, *changes],
+        updates=[*synthesis.updates, *updates],
+    )
+
+
+_UPDATE_STRINGS = {
+    "en": {
+        "topic.updates_intro": "Updated by a later document (news since, not contradictions):",
+        "topic.update": (
+            "- **{subject}.** {earlier} stated: {earlier_facts} ({earlier_meta}). Updated by "
+            "{later}: {later_facts} ({later_meta})."
+        ),
+    },
+    "fr": {
+        "topic.updates_intro": (
+            "Mis à jour par un document plus récent (faits nouveaux, pas des contradictions) :"
+        ),
+        "topic.update": (
+            "- **{subject}.** {earlier} indiquait : {earlier_facts} ({earlier_meta}). "
+            "Mis à jour par {later} : {later_facts} ({later_meta})."
+        ),
+    },
+}
+"""Fallback templates of the update lines until the engine string tables carry
+``topic.updates_intro`` and ``topic.update`` (a core or pack entry wins)."""
+
+
+def _update_string(t: Strings, key: str, **fields: str) -> str:
+    template = t.table.get(key)
+    if template is None:
+        table = _UPDATE_STRINGS.get(t.lang) or _UPDATE_STRINGS.get(t.lang.split("-")[0])
+        template = (table or _UPDATE_STRINGS["en"])[key]
+    return template.format(**fields) if fields else template
 
 
 def _confidence(current_sources: int, synthesis: _Synthesis) -> str:
@@ -593,7 +692,25 @@ def _render(
                     amending_meta=_meta(amending_doc, t),
                 )
             )
-    if synthesis.contradictions or synthesis.changes:
+    if synthesis.updates:
+        lines += ["", _update_string(t, "topic.updates_intro"), ""]
+        for item in synthesis.updates:
+            earlier = infos[item.side_a[0].record.source_id]
+            later = infos[item.side_b[0].record.source_id]
+            lines.append(
+                _update_string(
+                    t,
+                    "topic.update",
+                    subject=item.subject,
+                    earlier=_source_link(earlier, path),
+                    earlier_facts=_fact_texts(item.side_a, footnotes),
+                    earlier_meta=_meta(earlier, t),
+                    later=_source_link(later, path),
+                    later_facts=_fact_texts(item.side_b, footnotes),
+                    later_meta=_meta(later, t),
+                )
+            )
+    if synthesis.contradictions or synthesis.changes or synthesis.updates:
         notes = clean_inline(pack.resolution.notes)
         if notes:
             lines += ["", t("topic.policy", notes=notes)]
@@ -843,6 +960,7 @@ async def build_topic_pages(
             or synthesis.sections
             or synthesis.contradictions
             or synthesis.changes
+            or synthesis.updates
             or synthesis.superseded
         ):
             skip(topic, scope, "insufficient_evidence", ordered)

@@ -74,7 +74,7 @@ async def test_pages_for_mentioned_registry_entities(corpus: Corpus, pack: Domai
         "building-element:baie-f1",
         "building-element:fenetre-f2",
     ], "no summary call without facts"
-    assert all(r.tier == "fast" and r.prompt_version == "entity-summary-v2" for r in llm.requests)
+    assert all(r.tier == "fast" and r.prompt_version == "entity-summary-v3" for r in llm.requests)
     for page in pages.values():
         assert find_violations(page.body) == []
         assert Page.parse(page.render(), page.path) == page
@@ -143,6 +143,35 @@ async def test_entity_without_facts(corpus: Corpus, pack: DomainPack) -> None:
         "mentioned in 1 source document."
     )
     assert "No evidence is cited on this page." in page.body
+
+
+async def test_validity_without_dates_is_dropped(corpus: Corpus, pack: DomainPack) -> None:
+    # Slice G: "ses attestations sont valables" hid an attestation that had expired before a
+    # situation; a validity claim must carry its dates, and the facts carry their document's date.
+    def handler(request: LlmRequest) -> dict:
+        text = request.text
+        if "- id: building-element:baie-f1" not in text:
+            return {"sentences": []}
+        first = fact_id(text, "is installed first")
+        wide = fact_id(text, "is widened to")
+        return {
+            "sentences": [
+                {"text": "Its documents are valid for every chantier.", "fact_ids": [first]},
+                {"text": "The bay window F1 is installed first.", "fact_ids": [first]},
+                {"text": "Its width of 3,00 m is valid.", "fact_ids": [wide]},
+            ]
+        }
+
+    llm = FakeLlmClient({"entity_summary": handler})
+    pages, _ = await build_entity_pages(
+        list(corpus.results.values()), corpus.pages, pack, llm, stamp=STAMP
+    )
+    page = next(p for p in pages if p.frontmatter.id == "building-element:baie-f1")
+    assert page.frontmatter.summary == (
+        "The bay window F1 is installed first. Its width of 3,00 m is valid."
+    )
+    request = next(r for r in llm.requests if "baie-f1" in str(r.metadata["entity_id"]))
+    assert "(Quote DEV-2026-014 indice B, current, dated 2026-02-03)" in request.text
 
 
 async def test_results_without_source_pages_are_ignored(corpus: Corpus, pack: DomainPack) -> None:

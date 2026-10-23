@@ -50,6 +50,7 @@ __all__ = [
     "TermsFile",
     "TopicDef",
     "TopicsFile",
+    "UpdateRule",
     "ViewDef",
     "ViewsFile",
     "locked_terms_note",
@@ -339,6 +340,10 @@ class LockedTerm(ContractModel):
     """Other written forms of the same term (feminine, plural, abbreviation)."""
     gloss: NonEmptyStr
     banned: list[NonEmptyStr] = []
+    avoid_senses: list[NonEmptyStr] = []
+    """Everyday senses of the same word that the term must not carry, each with the word to use
+    instead (v1.7, slice G), e.g. for « réception »: "receiving an invoice or a situation: write
+    « remise »". The compile, entity and topic prompts receive them with the term."""
 
 
 class TermsFile(ContractModel):
@@ -411,6 +416,23 @@ class AmendmentRule(ContractModel):
         return self
 
 
+class UpdateRule(ContractModel):
+    """Doc types whose later documents report what happened since earlier ones (v1.7, slice G):
+    a document of a ``later`` type dated after a document of an ``earlier`` type of the same
+    scope updates it (a delivery postponed, a date moved, a réserve lifted). A disagreement
+    between them is an update, shown with both dates, not a contradiction for the rule to
+    decide by authority."""
+
+    earlier: Annotated[list[Kebab], Field(min_length=1)]
+    later: Annotated[list[Kebab], Field(min_length=1)]
+
+    @field_validator("earlier", "later")
+    @classmethod
+    def _unique_types(cls, value: list[str]) -> list[str]:
+        _unique(value, "doc type")
+        return value
+
+
 class ArbitrationPair(ContractModel):
     """Two doc types the resolution rule does not decide between (v1.7): a contradiction between
     a document of each is stated as to arbitrate, with the pack's ``reason``."""
@@ -432,7 +454,8 @@ class ResolutionFile(ContractModel):
     ``amendments`` and ``arbitrate`` (v1.7, optional) refine how the rule is stated: a
     contradiction between an amended document and an amending document of the same scope is a
     change, not a contradiction; a winner of an amended type is to review when its scope has
-    amending documents; a pair of ``arbitrate`` types is never decided by the rule.
+    amending documents; a pair of ``arbitrate`` types is never decided by the rule. ``updates``
+    (v1.7, slice G, optional): a later report of the same scope updates an earlier document.
     """
 
     order: Annotated[list[Literal["authority", "recency"]], Field(min_length=1)] = [
@@ -441,6 +464,7 @@ class ResolutionFile(ContractModel):
     ]
     amendments: list[AmendmentRule] = []
     arbitrate: list[ArbitrationPair] = []
+    updates: list[UpdateRule] = []
     notes: str = ""
 
     @field_validator("order")
@@ -460,6 +484,10 @@ class ResolutionFile(ContractModel):
         return any(
             amending in rule.amending and amended in rule.amended for rule in self.amendments
         )
+
+    def update(self, earlier: str, later: str) -> bool:
+        """Whether a later document of type ``later`` reports news on one of type ``earlier``."""
+        return any(earlier in rule.earlier and later in rule.later for rule in self.updates)
 
     def amending_types(self, amended: str) -> set[str]:
         """The doc types that may change the documents of type ``amended``."""
@@ -658,7 +686,15 @@ def locked_terms_note(pack: DomainPack) -> str:
         ]
     for term in terms:
         forms = f" (also {', '.join(term.forms)})" if term.forms else ""
-        lines.append(f"- {term.term}{forms}: {term.gloss}" if english else f"- {term.term}{forms}")
+        line = f"- {term.term}{forms}: {term.gloss}" if english else f"- {term.term}{forms}"
+        if term.avoid_senses:
+            line += "; never for " + "; ".join(sense.rstrip(".") for sense in term.avoid_senses)
+        lines.append(line)
+    lines.append(
+        "A locked term keeps its trade meaning only: where a document uses the same word in an "
+        "everyday sense (receiving a letter or an invoice, taking delivery of goods), write the "
+        "everyday word of the wiki language instead, never the locked term."
+    )
     banned = sorted({rendering for term in terms for rendering in term.banned})
     if banned:
         lines.append(

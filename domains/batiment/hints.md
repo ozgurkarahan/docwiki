@@ -7,24 +7,26 @@
   fact belongs to, and never mix the facts, dates or amounts of two chantiers. When a question
   could concern several chantiers (a supplier, a delivery, a person), give the answer per
   chantier.
-- The documents are written in French; write the wiki in English, except the locked trade
-  terms (listed with the domain context): keep them in French, exactly as written, with their
-  English gloss in brackets the first time they appear, for example réception (formal acceptance
-  of the works), avenant (contract amendment), retenue de garantie (retention guarantee),
-  conducteur de travaux (works manager), maître d'œuvre (the designer who directs the works),
-  situation (progress payment application), lot (work package). For the other French trade
-  terms, write the English gloss and keep the French term in quotes after it the first time,
-  for example quote ("devis"), weathertight ("hors d'eau et hors d'air"), delivery note ("bon de
-  livraison"), site meeting minutes ("compte rendu de chantier"). Quotes from the documents stay
-  in French, exactly as written.
+- The documents are written in French and the wiki is written in the wiki language named in
+  the domain context. Keep the locked trade terms (listed with the domain context) exactly as
+  written, and only in their trade meaning. « Réception » is the réception des travaux (the PV
+  de réception and its réserves): an invoice, a situation or a letter is « remis » or « reçu »
+  (« payées dans les 30 jours suivant leur remise au maître d'ouvrage »), goods are « livrées »
+  (« la livraison et le contrôle des menuiseries le 20/04 »). Quotes from the documents stay in
+  French, exactly as written.
 - Copy every amount exactly as printed, with its comma decimal separator and without adding a
   thousands separator (`12500,00 €`, never `12,500.00 €`), in the facts, the quotes and the
   `numbers` list; the wiki adds the thousands separator itself. Never round, convert, add up or
   recompute an amount: totals across documents or chantiers are computed by code from the
   tables, never by the model.
-- Write "HT" or "TTC" right after every amount in euros (`2390,00 € HT`, `2868,00 € TTC`), never
-  "excluding VAT" or "including VAT", and give the VAT ("TVA") rate with a VAT amount; the rates
-  may differ between chantiers and between parts of the same job.
+- Write the euro sign then "HT" or "TTC" right after every amount in euros (`2390,00 € HT`,
+  `2868,00 € TTC`), never before it ("HT de 2390") and never "excluding VAT" or "including VAT";
+  give the VAT ("TVA") rate with a VAT amount; the rates may differ between chantiers and between
+  parts of the same job. A workbook cell holds the bare number (`27786.55`): take € and HT or TTC
+  from the column header and write `27786,55 € TTC`.
+- Attestations (vigilance, décennale, RC), insurance certificates and inspections are valid for a
+  period: give the date of each and the date it is valid until, never "valid" alone, and when a
+  register shows an expired attestation, say so with its expiry date.
 - Dates are printed day first (`JJ/MM/AAAA`): `07/01/2026` is 7 January 2026, not 1 July. In
   English text write dates as `2026-01-07`; in quotes keep them as printed.
 - "Indice A", "indice B" are revisions of the same numbered quote or DPGF (`DEV-`) or schedule

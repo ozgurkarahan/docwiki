@@ -88,7 +88,7 @@ __all__ = [
     "type_label",
 ]
 
-STAGE_VERSION = "3"
+STAGE_VERSION = "4"
 RELATED_HEADING = "Related"
 BACKLINKS_HEADING = "Referenced by"
 SOURCES_HEADING = "Sources"

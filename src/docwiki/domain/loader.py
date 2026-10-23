@@ -155,6 +155,17 @@ def _cross_checks(pack: DomainPack, errors: list[PackError]) -> None:
                             f"unknown doc type {key!r}",
                         )
                     )
+    for index, update in enumerate(pack.resolution.updates):
+        for field in ("earlier", "later"):
+            for type_index, key in enumerate(getattr(update, field)):
+                if key not in doc_types:
+                    errors.append(
+                        PackError(
+                            "resolution.yaml",
+                            f"updates[{index}].{field}[{type_index}]",
+                            f"unknown doc type {key!r}",
+                        )
+                    )
     for index, pair in enumerate(pack.resolution.arbitrate):
         for type_index, key in enumerate(pair.types):
             if key not in doc_types:
