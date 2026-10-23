@@ -25,6 +25,8 @@ export interface DocwikiSource {
   scope?: string | null
   phase?: string | null
   lot?: string | null
+  /** The document's own language (`original_lang`, e.g. `fr`): its quotations are marked. */
+  lang?: string | null
 }
 
 /** One scope of the Documents register: its phases, each with its document types. */

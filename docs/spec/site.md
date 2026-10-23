@@ -146,3 +146,53 @@ outside an allowlist (the repository URL and the site's own host), and the injec
   under the title of the one scope without a hub (`explorer.entitiesTitle`, "Entreprise"); its
   pages keep their paths. Tags, evidence, documents and pipeline stay hidden. Quartz runs the
   explorer functions in the browser from their source text, so these values are written into it.
+
+## 10. Accessibility
+
+(v1.7, slice H, from the accessibility checklist of the UX review of 2026-10-22.) The target is
+WCAG 2.2 AA; axe reports no serious or critical violation on the home, documents, pipeline, a
+source page and a topic page with the drawer open, at 1280×800 and 390×844, light and dark.
+
+- **Skip link.** "Skip to content" is the first focusable element of every page (the first
+  component of the left column), off screen until it has the focus, then a 44 px button at the
+  top left. It moves the focus to the page title (`h1#docwiki-main`, `tabindex="-1"`, rendered by
+  DocWiki's `ArticleTitle`) itself: following the hash natively would fire `popstate`, on which
+  Quartz's router reloads the page.
+- **Quartz's own markup**, corrected from the overlay after every navigation (Quartz is not
+  vendored): `aria-expanded` moves from the explorer's `div` to the buttons that toggle it and
+  follows its state; the phone's menu button is named "Browse the wiki"; the table of contents'
+  button controls the id its list really has; the page column is the `main` landmark, the side
+  columns `navigation` ("Wiki") and `complementary` ("About this page"), and the page column's
+  `header` is not a second banner.
+- **Drawer focus.** Opening moves the focus into the drawer (its heading, or the selected answer's
+  heading). A rebuilt drawer keeps the focus on the same control (its focus key), else on its
+  heading, never on the page body. Where the drawer covers the page (up to 1200 px, the phone's
+  bottom sheet included) Tab cycles inside it; wider, it is a non-modal panel beside the text and
+  Tab goes on into the page. Escape closes it and returns the focus to what opened it: the
+  floating button, or the home page's "Try: …" button.
+- **Contrast.** Text at least 4.5:1 on the page, its surface and the highlight tint (the light
+  theme's grey is `#666560`, the failed status `#a84300`). The borders of controls, cards, inputs,
+  stage cards, the documents table and the link pills use `--dw-border` (`#85837a` light,
+  `#767a70` dark: at least 3:1 on the page and the highlight tint); provenance badge and notice
+  borders at least 3:1 against the page and their own fill; stage cards mark their state with the
+  status colours. `--lightgray` stays for decorative separators only.
+- **Motion.** Under `prefers-reduced-motion: reduce` nothing animates, fades or scrolls smoothly:
+  transitions and animations (Quartz's popovers, explorer, table of contents, progress bar; the
+  drawer's sheet) end at once, `scroll-behavior` is `auto`, and scripted smooth scrolling
+  (`scrollIntoView({behavior: "smooth"})`, Quartz's explorer) jumps. There are no spinners.
+- **Targets.** Every visible link, button, summary and input is at least 24 × 24 px, except links
+  inside a sentence (WCAG 2.5.8's inline exception): navigation lists (explorer, table of
+  contents, backlinks, breadcrumbs, tags), a link alone in its list item, paragraph or cell (the
+  transformer marks it `docwiki-target`), Quartz's theme and reader-mode buttons, footnote
+  references and back links, the drawer's citation markers (inline padding, which does not move
+  the lines) and source lists. Main actions are 44 px on the phone: the tabs, Sign in, the story
+  cards, "Try: …", the floating button, the drawer's close and Ask buttons, the menu button.
+- **Language.** The pages are English (`lang="en"`); the documents' own words are marked with the
+  document's language (`original_lang` of the source page, given to the site as the source's
+  `lang`, when it is not English): the quoted passages ("…", “…”, « … ») and the non-notice
+  blockquotes of a source page, the verbatim blockquotes and the table rows of an evidence
+  sidecar. Source titles are the compiled English titles and the drawer's citations carry no
+  excerpt, so neither is marked. Nothing is translated.
+- **Zoom.** At 320 px and at 200 % zoom (640 CSS px) no page scrolls sideways; a wide table
+  scrolls inside its own box, which becomes a focusable, labelled region.
+- The pure parts are in `docwiki-a11y.ts`, tested with Node.

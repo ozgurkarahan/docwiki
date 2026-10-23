@@ -194,6 +194,7 @@ def test_site_settings_from_the_mock_release() -> None:
         "scope": None,
         "phase": None,
         "lot": None,
+        "lang": "fr",
     }
     plan_a = next(item for item in settings["sources"].values() if item["revision"] == "A")
     assert plan_a["supersededBy"] == "Planning and purchase tracking, indice B"

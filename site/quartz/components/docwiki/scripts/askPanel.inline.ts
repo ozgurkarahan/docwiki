@@ -42,12 +42,17 @@ import {
   stepsLabel,
   waitingLabel,
 } from "../../../plugins/transformers/docwiki-text"
+import { cycleFocus } from "../../../plugins/transformers/docwiki-a11y"
 
 const PANEL_ID = "docwiki-ask"
 const INPUT_ID = "docwiki-ask-input"
 const HINT_ID = "docwiki-ask-hint"
 const ANSWERS_PATH = "static/docwiki/answers.json"
 const SVG_NS = "http://www.w3.org/2000/svg"
+/** What Tab can reach inside the drawer (hidden elements are filtered out when it runs). */
+const FOCUSABLE =
+  "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), " +
+  "summary, [tabindex='0']"
 /** Quartz overlays that close on Escape themselves (search, global graph). */
 const OVERLAYS = ".search-container.active, .global-graph-outer.active"
 
@@ -100,6 +105,8 @@ let memoryState: AskState = parseAskState(null)
 let pendingFocus: string | null = null
 /** Link followed from a collapsed drawer, focused again by "Back to the answer". */
 let resumeFocus: string | null = null
+/** What opened the drawer when it was not the floating button ("Try: …" on the home page). */
+let opener: HTMLElement | null = null
 /** Scroll position of the question list, restored by "Back to questions". */
 let listScroll = 0
 let scrollFrame = 0
@@ -383,6 +390,11 @@ function onAskEvent(event: Event) {
   const found = elements()
   if (question === null || !found || found.fab.hidden) return
   resumeFocus = null
+  const active = document.activeElement
+  opener =
+    active instanceof HTMLElement && active !== document.body && !found.panel.contains(active)
+      ? active
+      : null
   void askFromPage(question)
 }
 
@@ -683,16 +695,25 @@ function paint(focusKey: string | null) {
   const { fab, panel } = found
   const state = readState()
   syncFab(fab, state)
+  // Rebuilding the drawer removes the focused element: the focus stays on its counterpart (the
+  // same focus key), else on the heading, never on the page body.
+  const active = document.activeElement
+  const kept =
+    active instanceof HTMLElement && panel.contains(active)
+      ? (active.dataset.focusKey ?? "title")
+      : null
   if (!state.open) {
     panel.hidden = true
     panel.replaceChildren()
+    if (kept) fab.focus()
     return
   }
   const body = element("div", "docwiki-ask-body")
   panel.replaceChildren(header(), body, footer(panel.dataset.repoUrl))
   panel.hidden = false
   fill(body, state)
-  if (focusKey) focusOn(panel, focusKey)
+  const target = focusKey ?? kept
+  if (target) focusOn(panel, target)
 }
 
 function update(change: Partial<AskState>, focusKey: string | null) {
@@ -700,9 +721,13 @@ function update(change: Partial<AskState>, focusKey: string | null) {
   paint(focusKey)
 }
 
+/** Close the drawer; the focus returns to what opened it (the floating button by default). */
 function close() {
   update({ open: false, resume: false }, null)
-  elements()?.fab.focus()
+  const back = opener
+  opener = null
+  if (back && back.isConnected && back.checkVisibility()) back.focus()
+  else elements()?.fab.focus()
 }
 
 function select(id: string) {
@@ -717,6 +742,7 @@ function back() {
 }
 
 function onFabClick() {
+  opener = null
   const focusKey = readState().resume && resumeFocus ? resumeFocus : "title"
   resumeFocus = null
   update({ open: true, resume: false }, focusKey)
@@ -763,6 +789,27 @@ function onPanelClick(event: MouseEvent) {
   }
 }
 
+/**
+ * Tab cycles inside the drawer where it covers the page (up to 1200 px, the phone's bottom sheet
+ * included): the focus never moves to a link hidden behind it. On wide screens the drawer sits
+ * beside the text and Tab goes on into the page.
+ */
+function onPanelKeydown(event: KeyboardEvent) {
+  if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey) return
+  if (!window.matchMedia(NARROW_QUERY).matches) return
+  const panel = event.currentTarget
+  if (!(panel instanceof HTMLElement)) return
+  const targets = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+    (node) => !node.closest("[hidden]") && node.checkVisibility(),
+  )
+  const active = document.activeElement
+  const index = active instanceof HTMLElement ? targets.indexOf(active) : -1
+  const next = cycleFocus(targets.length, index, event.shiftKey)
+  if (next === -1) return
+  event.preventDefault()
+  targets[next].focus()
+}
+
 function onKeydown(event: KeyboardEvent) {
   if (event.key !== "Escape" && event.key !== "Esc") return
   const found = elements()
@@ -802,6 +849,7 @@ function onPrenav() {
 document.addEventListener("nav", () => {
   const focusKey = pendingFocus
   pendingFocus = null
+  opener = null
   const found = elements()
   if (!found) return
   const { fab, panel } = found
@@ -815,6 +863,7 @@ document.addEventListener("nav", () => {
   }
   fab.addEventListener("click", onFabClick)
   panel.addEventListener("click", onPanelClick)
+  panel.addEventListener("keydown", onPanelKeydown)
   panel.addEventListener("scroll", onPanelScroll, { capture: true, passive: true })
   document.addEventListener("keydown", onKeydown, true)
   document.addEventListener("prenav", onPrenav)
@@ -822,6 +871,7 @@ document.addEventListener("nav", () => {
   window.addCleanup(() => {
     fab.removeEventListener("click", onFabClick)
     panel.removeEventListener("click", onPanelClick)
+    panel.removeEventListener("keydown", onPanelKeydown)
     panel.removeEventListener("scroll", onPanelScroll, { capture: true })
     document.removeEventListener("keydown", onKeydown, true)
     document.removeEventListener("prenav", onPrenav)

@@ -63,7 +63,9 @@ export default (() => {
               </li>
             </ul>
             <p>
-              <a href={settings.repoUrl}>Source code and documentation</a>
+              <a class="docwiki-target" href={settings.repoUrl}>
+                Source code and documentation
+              </a>
             </p>
           </details>
         </section>

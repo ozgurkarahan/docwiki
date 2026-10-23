@@ -367,6 +367,8 @@ def site_settings(
             "scope": _text(meta.get("scope")),
             "phase": _text(meta.get("phase")),
             "lot": _text(meta.get("lot")),
+            # The document's own language: its quotations are marked `lang` (slice H).
+            "lang": _text(meta.get("original_lang")),
         }
     scopes = scope_info(release.catalog)
     return {

@@ -106,7 +106,9 @@ def test_pages_render_the_docwiki_overlay(built_site: Path) -> None:
     source = html(built_site, f"{MINUTES_PAGE}.html")
     assert "Referenced by" not in source  # DocWiki backlinks block stripped
     assert "docwiki:backlinks" not in source
-    assert source.count('<h1 class="article-title">') == 1  # body title deduplicated
+    # body title deduplicated; the page title is the skip link's target (slice H)
+    assert source.count("<h1 ") == 1
+    assert '<h1 id="docwiki-main" class="article-title" tabindex="-1">' in source
     assert 'class="docwiki-badge docwiki-badge--verified"' in source
     assert 'class="docwiki-badge-legend"' in source
     assert 'class="docwiki-banner"' in source
@@ -201,6 +203,37 @@ def test_open_drawer_keeps_the_article_readable(built_site: Path) -> None:
     assert int(push.group(1)) == 1201  # Quartz's tablet layout ends at 1200 px included
     assert int(push.group(2)) == int(drawer.group(1)) - 320  # Quartz's right-hand panel
     assert "(max-width: 1200px)" in html(built_site, "postscript.js")  # NARROW_QUERY
+
+
+def test_accessibility_pass(built_site: Path) -> None:
+    """Slice H: skip link, French passages marked, lone links as targets, reduced motion."""
+    for rel in ("index.html", f"{MINUTES_PAGE}.html", "pipeline.html", "documents.html"):
+        tags = parse_html(html(built_site, rel))
+        focusable = [t for t in tags if t.name in {"a", "button", "input", "summary", "textarea"}]
+        first = focusable[0]
+        assert first.name == "a" and first.get("class") == "docwiki-skip", rel
+        assert first.get("href") == "#docwiki-main" and "data-router-ignore" in dict(first.attrs)
+        assert any(t.name == "h1" and t.get("id") == "docwiki-main" for t in tags), rel
+    # The documents are French: the source page's quotations and the sidecars' verbatim text and
+    # rows carry lang="fr"; the English notices do not.
+    source = html(built_site, f"{MINUTES_PAGE}.html")
+    assert '<span lang="fr">compte rendu de chantier</span>' in source
+    assert '<span lang="fr">élévation des murs</span>' in source
+    assert not re.search(r'<blockquote[^>]*docwiki-notice[^>]*lang=', source)
+    quote = html(built_site, f"evidence/{PLAN_A}/p0001.html")
+    assert '<blockquote class="docwiki-verbatim" lang="fr">' in quote
+    rows = html(built_site, f"evidence/{PLAN_B}/sheet-planning-r0006-r0009.html")
+    assert rows.count('<table lang="fr">') == 4
+    # A link alone in its list item is a 24 px target (an entity page lists its sources); a link
+    # inside a sentence is not.
+    entity = html(built_site, "entities/work-package/lot-3-gros-oeuvre.html")
+    assert re.search(r'<li><a href="[^"]*" class="docwiki-target internal', entity)
+    assert "docwiki-target" not in source.split('id="related"')[1].split("</ul>")[0]
+    css = re.sub(r"\s+", "", html(built_site, "index.css"))
+    assert "@media(prefers-reduced-motion:reduce)" in css
+    assert "a.docwiki-skip" in css and "--dw-border:" in css
+    postscript = html(built_site, "postscript.js")
+    assert "Browse the wiki" in postscript and "docwiki-main" in postscript
 
 
 def test_phone_header_title_shrinks_and_wraps(built_site: Path) -> None:

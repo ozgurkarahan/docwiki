@@ -54,8 +54,9 @@ against Quartz's own lock file, with no install scripts (`--ignore-scripts`) and
 | `quartz.config.ts` | Plugins: no Obsidian/raw-HTML, LaTeX, analytics, OG images, aliases or CNAME emitters; relative link resolution; no smart quotes (verbatim evidence) |
 | `quartz.layout.ts` | Search, graph, backlinks, table of contents, explorer, breadcrumbs, tags, popovers; the "Ask this wiki" drawer after the body of every page |
 | `quartz/plugins/transformers/docwiki.ts` | Strips the backlinks block, renders raw HTML as text, drops the duplicated `# Title`, dates from `updated` (release date for sidecars), provenance badges in footnotes, notices (the home page's copy of the fictional notice is dropped when the site banner shows it), evidence decorations |
+| `quartz/plugins/transformers/docwiki-a11y.ts` | Pure accessibility helpers (slice H): `lang` tags, quoted passages, lone links, the drawer's focus cycling, the skip link's target; tested with Node by `tests/site/test_a11y_text.py` |
 | `quartz/plugins/transformers/docwiki-text.ts` | Pure helpers without imports, including the drawer's (`answers.json` parser, question groups, relative links, session state); tested with Node by `tests/site/test_overlay_text.py` |
-| `quartz/components/docwiki/` | `Head` (no third-party requests, same-origin content-index loader), `Banner`, `EvidenceHeader`, `Breadcrumbs` (titles kept verbatim), `Story` (home page, under the title: the pattern in one sentence, three cards documents → pipeline → cited pages, the pipeline card's last run read from `/api/process`, and a "Try: …" button that opens the drawer on a question through the `docwiki:ask` event), `About` (home page, under the story: documents, release, quality gates, run receipt and quality report, then a collapsible "About DocWiki"), `AskPanel` (the "Ask this wiki" button and drawer), `Footer` |
+| `quartz/components/docwiki/` | `Head` (no third-party requests, same-origin content-index loader), `Banner`, `EvidenceHeader`, `Breadcrumbs` (titles kept verbatim), `Story` (home page, under the title: the pattern in one sentence, three cards documents → pipeline → cited pages, the pipeline card's last run read from `/api/process`, and a "Try: …" button that opens the drawer on a question through the `docwiki:ask` event), `About` (home page, under the story: documents, release, quality gates, run receipt and quality report, then a collapsible "About DocWiki"), `AskPanel` (the "Ask this wiki" button and drawer), `Footer`, `SkipLink` ("Skip to content", and corrections to the ARIA of Quartz's explorer and table of contents, landmarks), `ArticleTitle` (the page title, the skip link's target) |
 | `quartz/components/docwiki/scripts/askPanel.inline.ts` | Client of the drawer, bundled into `postscript.js` |
 | `quartz/components/docwiki/settings.ts` | Typed view of `docwiki-site.json` |
 | `quartz/styles/custom.scss` | Stone and sage theme, system font stacks (no web fonts are downloaded), WCAG AA contrast in light and dark modes; the drawer's styles; on phones the wiki title shrinks and wraps so that the header row fits 320 px, and the open menu covers the screen exactly, its list starting below the menu button |
@@ -100,10 +101,14 @@ people connect their own coding agent to the wiki (MCP).
   then reads "Back to the answer" and one tap reopens the drawer on the same answer, at the same
   place, with the focus on the followed link. Closing the drawer keeps the selected answer.
 - **Keyboard and screen readers.** Opening moves the focus to the drawer heading, selecting a
-  question to the answer's heading, "Back to questions" to that question. Escape, with the focus in
-  the drawer (or nowhere), closes it and returns the focus to the button; it is handled before
-  Quartz's own Escape handlers, which would move the focus to the search button. Visible focus
-  rings, AA contrast and both colour schemes come from the theme variables.
+  question to the answer's heading, "Back to questions" to that question. A rebuilt drawer (a live
+  answer arrives, the answers load) keeps the focus on the same control, else on its heading. Up to
+  1200 px, where the drawer covers the page, Tab cycles inside it; wider, it sits beside the text
+  and Tab goes on into the page. Escape, with the focus in the drawer (or nowhere), closes it and
+  returns the focus to what opened it (the button, or the home page's "Try: …"); it is handled
+  before Quartz's own Escape handlers, which would move the focus to the search button. Visible
+  focus rings, AA contrast and both colour schemes come from the theme variables (see
+  `docs/spec/site.md` §10).
 - **Safety.** Every string of `answers.json` is rendered with DOM nodes and `textContent` (no
   `innerHTML`, no code from strings); the parser keeps well-formed entries only and accepts content
   slugs, never URLs, as links. No new script tag, request host or inline handler: the drawer's

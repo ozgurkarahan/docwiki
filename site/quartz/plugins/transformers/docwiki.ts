@@ -17,15 +17,18 @@ import {
   splitTrailingBadge,
   stripBacklinksBlock,
 } from "./docwiki-text"
+import { foreignLang, loneElementIndex, splitQuoted } from "./docwiki-a11y"
 
 export interface Options {
   /** Release date (YYYY-MM-DD) used for pages without an `updated` date (evidence sidecars). */
   releaseDate: string | null
   /** The site banner shows the fictional-sample notice on every page. */
   siteBanner: boolean
+  /** Source id → the document's own language (`original_lang`), for the `lang` marks. */
+  sourceLangs: Record<string, string | null>
 }
 
-const defaultOptions: Options = { releaseDate: null, siteBanner: false }
+const defaultOptions: Options = { releaseDate: null, siteBanner: false, sourceLangs: {} }
 
 /** mdast parents whose children are blocks (a raw HTML node there becomes a paragraph). */
 const FLOW_PARENTS = new Set(["root", "blockquote", "listItem", "footnoteDefinition"])
@@ -245,6 +248,61 @@ function decorateDocumentLinks(tree: HtmlRoot) {
   })
 }
 
+/** Elements whose content is page chrome or code: no language marks inside them. */
+const NO_QUOTE_MARKS = new Set(["code", "pre", "script", "style", "svg"])
+
+/**
+ * The document's own words in an English page (slice H, WCAG 3.1.2): verbatim blockquotes and
+ * table rows of an evidence sidecar, the quoted passages and blockquotes of a source page. Notices
+ * (the fictional stamp, superseded) are English and stay unmarked.
+ */
+function markLanguage(tree: HtmlRoot, type: string | undefined, lang: string) {
+  if (type === "evidence") {
+    visit(tree, "element", (node: Element) => {
+      const quote = node.tagName === "blockquote" && classList(node).includes("docwiki-verbatim")
+      if (quote || node.tagName === "table") {
+        node.properties = { ...node.properties, lang }
+        return SKIP
+      }
+    })
+    return
+  }
+  if (type !== "source") return
+  visit(tree, "element", (node: Element) => {
+    if (node.tagName === "blockquote") {
+      if (!classList(node).includes("docwiki-notice")) node.properties = { ...node.properties, lang }
+      return SKIP
+    }
+    if (NO_QUOTE_MARKS.has(node.tagName) || isFootnotes(node)) return SKIP
+    for (let index = 0; index < node.children.length; index++) {
+      const child = node.children[index]
+      if (child.type !== "text") continue
+      const parts = splitQuoted(child.value)
+      if (!parts.some((part) => part.quoted)) continue
+      const nodes: ElementContent[] = parts.map((part) =>
+        part.quoted
+          ? { type: "element", tagName: "span", properties: { lang }, children: [text(part.text)] }
+          : text(part.text),
+      )
+      node.children.splice(index, 1, ...nodes)
+      index += nodes.length - 1
+    }
+  })
+}
+
+/** Blocks where a link alone is a control rather than a link inside a sentence. */
+const LONE_LINK_PARENTS = new Set(["li", "p", "td", "th", "dd"])
+
+/** A link alone in its list item, paragraph or cell gets a target of at least 24 px (CSS). */
+function markLoneLinks(tree: HtmlRoot) {
+  visit(tree, "element", (node: Element) => {
+    if (!LONE_LINK_PARENTS.has(node.tagName)) return
+    const index = loneElementIndex(node.children)
+    const child = index === -1 ? undefined : node.children[index]
+    if (child?.type === "element" && child.tagName === "a") addClass(child, "docwiki-target")
+  })
+}
+
 export const DocWiki: QuartzTransformerPlugin<Partial<Options>> = (userOpts) => {
   const opts = { ...defaultOptions, ...userOpts }
   return {
@@ -290,6 +348,18 @@ export const DocWiki: QuartzTransformerPlugin<Partial<Options>> = (userOpts) => 
             decorateNotices(tree, evidence, file.data.slug, opts.siteBanner)
             if (evidence) decorateEvidence(tree)
             decorateDocumentLinks(tree)
+            markLoneLinks(tree)
+            const frontmatter = file.data.frontmatter
+            const type = typeof frontmatter?.type === "string" ? frontmatter.type : undefined
+            const sourceId = frontmatter?.source_id
+            const lang = foreignLang(
+              type === "source"
+                ? frontmatter?.original_lang
+                : typeof sourceId === "string"
+                  ? opts.sourceLangs[sourceId]
+                  : null,
+            )
+            if (lang) markLanguage(tree, type, lang)
           }
         },
       ]
