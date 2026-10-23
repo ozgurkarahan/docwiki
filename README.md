@@ -46,7 +46,7 @@ MCP and Agent Skills).
 | **Two Foundry agents** | The **Researcher** answers with numbered citations and abstains when the wiki is silent; the **Librarian** runs and repairs ingests, with human approval for every change. |
 | **Ask this wiki** | A button on every page of the site opens a drawer. It lists reviewed Researcher answers (wiki pages in `queries/` that the owner files with `docwiki file-answer`, [ADR 0007](docs/adr/0007-answers-in-the-wiki.md)) and, where the portal enables it, lets a visitor ask the Researcher live: the answer is shown as verified only when each citation opens an evidence page of the wiki, behind per-visitor and global limits ([ADR 0008](docs/adr/0008-one-experience-live-agent-in-the-wiki.md), [docs/live-ask.md](docs/live-ask.md)). Numbered citations open the evidence beside the drawer. |
 | **Pipeline** | A page of the site (tab ② of ① Documents · ② Pipeline · ③ Wiki, [ADR 0010](docs/adr/0010-the-story-site.md)) that explains the pipeline and shows it live, read-only: each document's status, the ingest queue, the current release and the last runs (stages, timings, gates, cost). The owner signs in on the same site and uploads documents there; Event Grid and the ingest job do the rest ([ADR 0009](docs/adr/0009-one-site.md), [docs/operations.md](docs/operations.md#owner-sign-in-and-uploads-on-the-public-portal)). |
-| **Quality gates** | 15 gates (G01–G15): schemas, links and anchors, citations, quote verification, safe content, sidecars, audience, injection canaries, paths, supersession, skills… A failing blocking gate keeps the previous release online. |
+| **Quality gates** | 16 gates (G01–G16): schemas, links and anchors, citations, quote verification, safe content, sidecars, audience, injection canaries, paths, supersession, skills, the locked trade vocabulary… A failing blocking gate keeps the previous release online. |
 | **Immutable releases** | Each run publishes a complete, hashed release and swaps one pointer (`current.json`) with an ETag precondition. Readers never see a half-built wiki; rollback is a pointer change. |
 | **Domain packs** | Taxonomy, entity registry, topics, glossary, sensitivity, supersession and contradiction rules as YAML. Ships with one sample pack, `batiment` (the paperwork of a small French building contractor); small test packs exercise the engine with other domains. |
 
@@ -179,7 +179,7 @@ flowchart LR
   docs["Documents<br/>PDF, Word, Excel, CSV,<br/>PowerPoint, e-mail, scans, VTT"] --> raw[("Blob container raw")]
   raw -->|"BlobCreated / BlobDeleted"| eg["Event Grid system topic"]
   eg --> queue[["Storage queue ingest"]]
-  queue -->|"KEDA, one execution"| job["Container Apps Jobs<br/>ingest: queue-triggered<br/>reconcile: every 6 hours<br/>13 stages, 15 gates"]
+  queue -->|"KEDA, one execution"| job["Container Apps Jobs<br/>ingest: queue-triggered<br/>reconcile: every 6 hours<br/>13 stages, 16 gates"]
   job -->|"structured outputs, no tools"| foundry["Microsoft Foundry<br/>fast and smart models<br/>Content Understanding"]
   job -->|"publish, then If-Match pointer swap"| releases[("Blob container releases<br/>immutable releases + current.json")]
   releases --> mcp["Container App: MCP server<br/>built-in auth, roles per tool"]
