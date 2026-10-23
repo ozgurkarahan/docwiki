@@ -11,8 +11,7 @@ name: evals
 #   2. Repository variables: DOCWIKI_SMART_DEPLOYMENT (smart-tier deployment: baselines and
 #      judge), optionally DOCWIKI_FAST_DEPLOYMENT and DOCWIKI_SMART_MODEL (model id used to price
 #      the tokens).
-#   3. Azure sign-in with OpenID Connect: follow the comments of the "Azure login" step below.
-#      Until it is enabled, every Azure call of the run fails with an authentication error.
+#   3. Azure sign-in with OpenID Connect: see the comments of the "Azure login" step below.
 #   4. Optional private holdout: repository secret DOCWIKI_HOLDOUT_JSONL_B64 (the holdout JSONL,
 #      base64-encoded). Its questions and per-question results stay on the runner; only the
 #      aggregate result file is uploaded.
@@ -47,7 +46,7 @@ on:
 
 permissions:
   contents: read
-  # id-token: write   # required by the OIDC "Azure login" step; uncomment together with it
+  id-token: write   # the OIDC "Azure login" step
 
 concurrency:
   group: evals
@@ -84,15 +83,15 @@ jobs:
       #   2. Grant it the "Azure AI User" role on the Foundry project (agents, models, judge).
       #   3. Store its client id, the tenant id and the subscription id as repository secrets
       #      AZURE_CLIENT_ID, AZURE_TENANT_ID and AZURE_SUBSCRIPTION_ID.
-      #   4. Uncomment "id-token: write" in the permissions above and the step below.
+      #   4. "id-token: write" in the permissions above (enabled 2026-10-23).
       # DefaultAzureCredential (used by docwiki.llm, docwiki.agents_client and the judge) then
       # picks up the Azure CLI session of the runner.
-      # - name: Azure login (OIDC)
-      #   uses: azure/login@v2
-      #   with:
-      #     client-id: ${{ secrets.AZURE_CLIENT_ID }}
-      #     tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-      #     subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - uses: astral-sh/setup-uv@v7
         with:
