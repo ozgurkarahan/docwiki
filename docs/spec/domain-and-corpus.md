@@ -15,6 +15,7 @@ A domain pack is a folder under `domains/<pack>/`:
 | `supersession.yaml` | `doc_number_regex`, `revision_regex`, `revision_order` (e.g. `[A, B, C]` or numeric), `explicit_reference_regex` |
 | `resolution.yaml` | contradiction resolution policy: `order: [authority, recency]`, notes shown on topic pages |
 | `hints.md` | optional reviewed domain notes appended to compile prompts (no document text) |
+| `terms.yaml` | optional locked trade vocabulary (v1.7, [ADR 0012](../adr/0012-french-canonical-and-locked-vocabulary.md)): `terms: [{term, forms, gloss, banned}]`; kept in the documents' language with the English gloss on first use, given to the compile, entity and topic prompts; gate G16 fails a page with a banned rendering |
 | `skills/<skill>/SKILL.md.j2` | at most 3 domain skill templates (see §4) |
 
 Packs are validated by a schema; unknown keys are errors. Accepted proposals live in a runtime
