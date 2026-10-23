@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, create_model
 from docwiki.contracts._base import sha256_hex
 from docwiki.contracts.extracted import ExtractedDoc
 from docwiki.domain import DomainPack, match_doc_type, parse_doc_number, parse_revision
-from docwiki.domain.rules import revision_rank
+from docwiki.domain.rules import revision_rank, scope_axes
 from docwiki.engine_types import Classification
 from docwiki.llm import LlmClient
 from docwiki.stages.prompts import load_prompt
@@ -168,12 +168,35 @@ def _llm_doc_number(pack: DomainPack, value: str | None, haystack: str) -> str |
 
 
 async def classify_source(doc: ExtractedDoc, pack: DomainPack, llm: LlmClient) -> Classification:
-    """Classification of one source: rules first, ``fast`` LLM fallback with pack enums."""
+    """Classification of one source: its scope and axes from the raw path (v1.7, ADR 0011), a
+    document type named by the path first, then the rules, then a ``fast`` LLM fallback with the
+    pack's enums. Scope, phase and lot never come from the model."""
+    axes = scope_axes(pack, doc.source_path)
+    found = await _classify(doc, pack, llm, axes.doc_type)
+    return found.model_copy(update={"scope": axes.scope, "phase": axes.phase, "lot": axes.lot})
+
+
+async def _classify(
+    doc: ExtractedDoc, pack: DomainPack, llm: LlmClient, path_type: str | None
+) -> Classification:
     filename = posixpath.basename(doc.source_path)
     text = doc.text()
     head = text[:TEXT_HEAD_CHARS]
     match = match_doc_type(pack, filename, text)
     doc_number, revision = _rule_numbers(pack, doc, filename, head)
+    if path_type is not None:
+        doc_type = pack.doc_type(path_type)
+        return Classification(
+            doc_type=doc_type.key,
+            category=doc_type.category,
+            authority=doc_type.authority,
+            doc_number=doc_number,
+            revision=revision,
+            lang=_document_lang(doc),
+            confidence=1.0,
+            rule_id=None,
+            method="path",
+        )
     if match is not None:
         return Classification(
             doc_type=match.doc_type,

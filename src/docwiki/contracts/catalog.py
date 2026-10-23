@@ -11,6 +11,7 @@ from pydantic import Field, model_validator
 
 from docwiki.contracts._base import (
     ContractModel,
+    Kebab,
     MediaType,
     NonEmptyStr,
     RelPath,
@@ -21,6 +22,7 @@ from docwiki.contracts.enums import EdgeKind, PageType, Sensitivity, SourceStatu
 from docwiki.contracts.ids import RELEASE_ID_RE, SOURCE_ID_RE
 from docwiki.contracts.pages import (
     EntityFrontmatter,
+    HubFrontmatter,
     QueryFrontmatter,
     SourceFrontmatter,
     TopicFrontmatter,
@@ -51,6 +53,8 @@ class CatalogPage(ContractModel):
     entities: list[str] = []
     topics: list[str] = []
     sources: list[SourceId] = []
+    scope: Kebab | None = None
+    """The scope value of a source, scoped topic or hub page (v1.7, ADR 0011)."""
     lang: Literal["en"] = "en"
 
 
@@ -70,6 +74,8 @@ class CatalogSource(ContractModel):
     status: SourceStatus
     doc_number: str | None = None
     revision: str | None = None
+    scope: Kebab | None = None
+    phase: str | None = None
 
 
 class CatalogGlossaryEntry(ContractModel):
@@ -131,8 +137,11 @@ def catalog_page_for(frontmatter: Any, path: str) -> CatalogPage:
         entities = list(frontmatter.entities)
         topics = list(frontmatter.topics)
         status = frontmatter.status
-    elif isinstance(frontmatter, EntityFrontmatter | TopicFrontmatter | QueryFrontmatter):
+    elif isinstance(
+        frontmatter, EntityFrontmatter | TopicFrontmatter | QueryFrontmatter | HubFrontmatter
+    ):
         sources = list(frontmatter.sources)
+    scope = getattr(frontmatter, "scope", None)
     return CatalogPage(
         id=frontmatter.id,
         type=frontmatter.type,
@@ -145,6 +154,7 @@ def catalog_page_for(frontmatter: Any, path: str) -> CatalogPage:
         entities=entities,
         topics=topics,
         sources=sources,
+        scope=scope,
         lang=frontmatter.lang,
     )
 
@@ -158,4 +168,6 @@ def catalog_source_for(frontmatter: SourceFrontmatter) -> CatalogSource:
         status=frontmatter.status,
         doc_number=frontmatter.doc_number,
         revision=frontmatter.revision,
+        scope=frontmatter.scope,
+        phase=frontmatter.phase,
     )

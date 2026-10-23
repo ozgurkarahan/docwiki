@@ -17,6 +17,7 @@ __all__ = [
     "DEFAULT_MIN_SOURCES",
     "FIELD_WEIGHTS",
     "DocTypeMatch",
+    "ScopeAxes",
     "TopicScore",
     "compare_revisions",
     "explicit_references",
@@ -29,6 +30,7 @@ __all__ = [
     "parse_revision",
     "revision_rank",
     "route_topics",
+    "scope_axes",
     "score_topic",
     "sensitivity_floor",
     "sensitivity_for",
@@ -191,6 +193,55 @@ def explicit_references(pack: DomainPack, text: str) -> list[str]:
         if value and value not in found:
             found.append(value)
     return found
+
+
+@dataclass(frozen=True)
+class ScopeAxes:
+    """Where a document belongs, from its raw path only (v1.7, ADR 0011)."""
+
+    scope: str | None = None
+    """The scope value (``moreau``), the pack's default (``entreprise``), or ``None`` when the
+    pack declares no scopes."""
+    phase: str | None = None
+    doc_type: str | None = None
+    """A path segment that names one of the pack's document types."""
+    lot: str | None = None
+
+
+_SCOPE_VALUE_RE = re.compile(r"[^a-z0-9]+")
+
+
+def _scope_key(value: str) -> str:
+    return _SCOPE_VALUE_RE.sub("-", value.lower()).strip("-")
+
+
+def scope_axes(pack: DomainPack, raw_path: str) -> ScopeAxes:
+    """Scope, phase, type and lot of a document from its ``raw/``-relative path: the first path
+    regex of ``scopes.yaml`` that matches decides; no match gives the default scope."""
+    scopes = pack.scopes
+    if scopes is None:
+        return ScopeAxes()
+    path = raw_path.replace("\\", "/")
+    found: dict[str, str] = {}
+    for item in scopes.paths:
+        match = re.search(item.regex, path)
+        if match:
+            found = {k: v for k, v in match.groupdict().items() if v}
+            break
+    scope = _scope_key(found["scope"]) if found.get("scope") else scopes.default.key
+    doc_type = found.get("type")
+    known = {doc.key for doc in pack.taxonomy.doc_types}
+    lot = found.get("lot")
+    if lot is None and scopes.lot_regex:
+        name = path.rsplit("/", 1)[-1]
+        lot_match = re.search(scopes.lot_regex, name)
+        lot = lot_match.group("lot") if lot_match else None
+    return ScopeAxes(
+        scope=scope or scopes.default.key,
+        phase=found.get("phase"),
+        doc_type=doc_type if doc_type in known else None,
+        lot=lot,
+    )
 
 
 def order_revisions(

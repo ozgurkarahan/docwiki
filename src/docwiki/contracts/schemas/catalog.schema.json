@@ -81,6 +81,7 @@
             "source",
             "entity",
             "topic",
+            "hub",
             "index",
             "query",
             "meta",
@@ -162,6 +163,20 @@
           "title": "Sources",
           "type": "array"
         },
+        "scope": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scope"
+        },
         "lang": {
           "const": "en",
           "default": "en",
@@ -234,6 +249,32 @@
           ],
           "default": null,
           "title": "Revision"
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scope"
+        },
+        "phase": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Phase"
         }
       },
       "required": [

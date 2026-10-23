@@ -253,6 +253,97 @@
       "title": "GlossaryFrontmatter",
       "type": "object"
     },
+    "HubFrontmatter": {
+      "additionalProperties": false,
+      "description": "The hub page of one scope value (v1.7, ADR 0011), built by code: ``hub:<folder>/<key>``\nat ``<folder>/<key>.md`` (``chantiers/moreau.md``).",
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "hub",
+          "default": "hub",
+          "title": "Type",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "lang": {
+          "const": "en",
+          "default": "en",
+          "title": "Lang",
+          "type": "string"
+        },
+        "sensitivity": {
+          "enum": [
+            "public",
+            "internal",
+            "restricted"
+          ],
+          "title": "Sensitivity",
+          "type": "string"
+        },
+        "updated": {
+          "format": "date",
+          "title": "Updated",
+          "type": "string"
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "pattern": "^[a-z0-9]+(?:[-_/][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "docwiki": {
+          "$ref": "#/$defs/DocwikiStamp"
+        },
+        "scope_type": {
+          "maxLength": 64,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Scope Type",
+          "type": "string"
+        },
+        "scope": {
+          "maxLength": 64,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Scope",
+          "type": "string"
+        },
+        "sources": {
+          "default": [],
+          "items": {
+            "pattern": "^src-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "title": "Sources",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "summary",
+        "sensitivity",
+        "updated",
+        "docwiki",
+        "scope_type",
+        "scope"
+      ],
+      "title": "HubFrontmatter",
+      "type": "object"
+    },
     "IndexFrontmatter": {
       "additionalProperties": false,
       "description": "Index pages: ``index:home``, ``index:sources``, ``index:entities``,\n``index:entities/<type>``,\n``index:topics``, ``index:queries``.",
@@ -663,6 +754,44 @@
           "default": null,
           "title": "Revision"
         },
+        "scope": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scope"
+        },
+        "phase": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Phase"
+        },
+        "lot": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lot"
+        },
         "status": {
           "enum": [
             "current",
@@ -719,7 +848,7 @@
         "topics": {
           "default": [],
           "items": {
-            "pattern": "^topic:[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "pattern": "^topic:(?:[a-z0-9]+(?:-[a-z0-9]+)*/)?[a-z0-9]+(?:-[a-z0-9]+)*$",
             "type": "string"
           },
           "title": "Topics",
@@ -817,6 +946,20 @@
           "title": "Topic Slug",
           "type": "string"
         },
+        "scope": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scope"
+        },
         "sources": {
           "default": [],
           "items": {
@@ -866,6 +1009,7 @@
     "mapping": {
       "entity": "#/$defs/EntityFrontmatter",
       "glossary": "#/$defs/GlossaryFrontmatter",
+      "hub": "#/$defs/HubFrontmatter",
       "index": "#/$defs/IndexFrontmatter",
       "log": "#/$defs/LogFrontmatter",
       "meta": "#/$defs/MetaFrontmatter",
@@ -884,6 +1028,9 @@
     },
     {
       "$ref": "#/$defs/TopicFrontmatter"
+    },
+    {
+      "$ref": "#/$defs/HubFrontmatter"
     },
     {
       "$ref": "#/$defs/QueryFrontmatter"

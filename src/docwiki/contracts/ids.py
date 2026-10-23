@@ -24,9 +24,11 @@ __all__ = [
     "check_wiki_path",
     "entity_page_path",
     "format_entity_id",
+    "format_hub_id",
     "format_query_id",
     "format_release_id",
     "format_topic_id",
+    "hub_page_path",
     "index_page_path",
     "is_entity_id",
     "is_kebab",
@@ -34,6 +36,7 @@ __all__ = [
     "normalize_raw_path",
     "normalize_tags",
     "parse_entity_id",
+    "parse_hub_id",
     "parse_query_id",
     "parse_release_id",
     "parse_topic_id",
@@ -250,17 +253,39 @@ def is_entity_id(value: str) -> bool:
     return True
 
 
-def format_topic_id(slug: str) -> str:
+def format_topic_id(slug: str, scope: str | None = None) -> str:
+    """``topic:<slug>``, or ``topic:<scope>/<slug>`` for a topic of one scope (v1.7, ADR 0011)."""
     if not is_kebab(slug):
         raise ValueError(f"invalid topic slug: {slug!r}")
-    return f"topic:{slug}"
+    if scope is None:
+        return f"topic:{slug}"
+    if not is_kebab(scope):
+        raise ValueError(f"invalid topic scope: {scope!r}")
+    return f"topic:{scope}/{slug}"
 
 
 def parse_topic_id(topic_id: str) -> str:
-    prefix, sep, slug = topic_id.partition(":")
-    if prefix != "topic" or not sep or not is_kebab(slug):
-        raise ValueError(f"topic id must look like 'topic:<slug>': {topic_id!r}")
-    return slug
+    """The topic's path under ``topics/``: ``<slug>`` or ``<scope>/<slug>``."""
+    prefix, sep, rest = topic_id.partition(":")
+    parts = rest.split("/")
+    if prefix != "topic" or not sep or len(parts) > 2 or not all(is_kebab(p) for p in parts):
+        raise ValueError(f"topic id must look like 'topic:[<scope>/]<slug>': {topic_id!r}")
+    return rest
+
+
+def format_hub_id(folder: str, key: str) -> str:
+    """``hub:<folder>/<key>``: the hub page of one scope value (``hub:chantiers/moreau``)."""
+    if not is_kebab(folder) or not is_kebab(key):
+        raise ValueError(f"invalid hub folder or key: {folder!r}, {key!r}")
+    return f"hub:{folder}/{key}"
+
+
+def parse_hub_id(hub_id: str) -> tuple[str, str]:
+    prefix, sep, rest = hub_id.partition(":")
+    folder, slash, key = rest.partition("/")
+    if prefix != "hub" or not sep or not slash or not is_kebab(folder) or not is_kebab(key):
+        raise ValueError(f"hub id must look like 'hub:<folder>/<key>': {hub_id!r}")
+    return folder, key
 
 
 def format_query_id(day: date, slug: str) -> str:
@@ -291,6 +316,11 @@ def topic_page_path(topic_id: str) -> str:
     return f"topics/{parse_topic_id(topic_id)}.md"
 
 
+def hub_page_path(hub_id: str) -> str:
+    folder, key = parse_hub_id(hub_id)
+    return f"{folder}/{key}.md"
+
+
 def query_page_path(query_id: str) -> str:
     day, slug = parse_query_id(query_id)
     return f"queries/{day.isoformat()}-{slug}.md"
@@ -305,6 +335,9 @@ def index_page_path(scope: str) -> str:
         return f"{scope}/index.md"
     if scope.startswith("entities/") and is_kebab(scope.removeprefix("entities/")):
         return f"{scope}/index.md"
+    if scope.startswith("hubs/") and is_kebab(scope.removeprefix("hubs/")):
+        # The list of a scope's hubs (``index:hubs/chantiers`` → ``chantiers/index.md``).
+        return f"{scope.removeprefix('hubs/')}/index.md"
     raise ValueError(f"unknown index scope: {scope!r}")
 
 

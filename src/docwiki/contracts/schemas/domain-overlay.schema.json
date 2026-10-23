@@ -188,6 +188,11 @@
           ],
           "default": null,
           "title": "Min Sources"
+        },
+        "per_scope": {
+          "default": false,
+          "title": "Per Scope",
+          "type": "boolean"
         }
       },
       "required": [
