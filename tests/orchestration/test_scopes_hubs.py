@@ -88,7 +88,8 @@ async def test_hubs_list_the_sources_of_their_scope(scoped_release):
     assert documents.count("](../sources/") == 2 and ": current" in documents
     # the last document received is the dated supplier note (date prefix of its file name)
     last = alpha.split("## Last document received", 1)[1]
-    assert "(2026-03-02)" in last
+    # the title already shows its date, so the date is not repeated
+    assert "[2026-03-02 supplier note]" in last and "(2026-03-02)" not in last
 
     beta = _page(root, "chantiers/beta.md")
     assert "### No phase" in beta and "### Phase 1 marché" in beta
@@ -115,7 +116,7 @@ async def test_the_home_page_starts_with_the_company_dashboard(scoped_release):
     assert alpha.startswith(
         "| [Chantier Alpha](chantiers/alpha.md) | 3 exécution | Famille Moreau |"
     )
-    assert "| 2 |" in alpha and "(2026-03-02)" in alpha and alpha.endswith("| 0 |")
+    assert "| 2 |" in alpha and "2026-03-02" in alpha and alpha.endswith("| 0 |")
     beta = next(line for line in table.split("\n") if "[Chantier Beta]" in line)
     assert "| 1 marché | Zava Matériaux | 2 |" in beta
     entreprise = next(line for line in table.split("\n") if "[Entreprise]" in line)
