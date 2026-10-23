@@ -72,6 +72,10 @@ const toolbar = Component.Flex({
   ],
 })
 
+// "Skip to content", the first focusable element of every page; it leads to the page title
+// (DocWiki.ArticleTitle carries its target) and its script corrects Quartz's own markup (slice H).
+const skipLink = DocWiki.SkipLink()
+
 export const sharedPageComponents: SharedLayout = {
   head: DocWiki.Head(),
   // ① Documents · ② Pipeline · ③ Wiki, the pipeline's status chip and Sign in (ADR 0010).
@@ -96,7 +100,7 @@ const contentMeta = Component.ConditionalRender({
 export const defaultContentPageLayout: PageLayout = {
   beforeBody: [
     DocWiki.Breadcrumbs({ rootName: "Wiki" }),
-    Component.ArticleTitle(),
+    DocWiki.ArticleTitle(),
     contentMeta,
     // The pipeline page only: the owner's sign-in and upload form, before the text.
     DocWiki.OwnerBox(),
@@ -109,18 +113,30 @@ export const defaultContentPageLayout: PageLayout = {
     DocWiki.SourceHeader(),
     Component.TagList(),
   ],
-  left: [Component.PageTitle(), Component.MobileOnly(Component.Spacer()), toolbar, explorer],
+  left: [
+    skipLink,
+    Component.PageTitle(),
+    Component.MobileOnly(Component.Spacer()),
+    toolbar,
+    explorer,
+  ],
   right: [graph, Component.DesktopOnly(Component.TableOfContents()), Component.Backlinks()],
 }
 
 export const defaultListPageLayout: PageLayout = {
   beforeBody: [
     DocWiki.Breadcrumbs({ rootName: "Wiki" }),
-    Component.ArticleTitle(),
+    DocWiki.ArticleTitle(),
     contentMeta,
     // A document page (evidence/<source_id>/index) is a folder page for Quartz: same card.
     DocWiki.SourceHeader(),
   ],
-  left: [Component.PageTitle(), Component.MobileOnly(Component.Spacer()), toolbar, explorer],
+  left: [
+    skipLink,
+    Component.PageTitle(),
+    Component.MobileOnly(Component.Spacer()),
+    toolbar,
+    explorer,
+  ],
   right: [],
 }

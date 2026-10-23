@@ -29,7 +29,8 @@ const config: QuartzConfig = {
         lightMode: {
           light: "#f7f6f2",
           lightgray: "#e2e0d8",
-          gray: "#6b6a62",
+          // 4.5:1 on the page, its surface and the highlight tint (slice H).
+          gray: "#666560",
           darkgray: "#363732",
           dark: "#22231f",
           secondary: "#3c6250",
@@ -55,7 +56,13 @@ const config: QuartzConfig = {
     transformers: [
       Plugin.FrontMatter(),
       Plugin.CreatedModifiedDate({ priority: ["frontmatter"] }),
-      DocWiki({ releaseDate: settings.releaseDate, siteBanner: !!settings.banner }),
+      DocWiki({
+        releaseDate: settings.releaseDate,
+        siteBanner: !!settings.banner,
+        sourceLangs: Object.fromEntries(
+          Object.entries(settings.sources).map(([id, source]) => [id, source.lang ?? null]),
+        ),
+      }),
       Plugin.SyntaxHighlighting({
         theme: { light: "github-light", dark: "github-dark" },
         keepBackground: false,
