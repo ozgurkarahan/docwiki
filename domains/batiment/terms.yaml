@@ -7,7 +7,7 @@ terms:
   - term: réception
     forms: [réception des travaux, PV de réception]
     gloss: formal acceptance of the works by the client, the legal act that records the réserves and starts the guarantee periods
-    banned: [handover, hand-over, handed over]
+    banned: [handover, hand-over]
   - term: conducteur de travaux
     forms: [conductrice de travaux]
     gloss: works manager, who runs the job for the contractor (schedule, purchases, site meetings)
