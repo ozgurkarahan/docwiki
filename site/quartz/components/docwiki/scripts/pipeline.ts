@@ -34,7 +34,7 @@ export const PHASES: readonly { key: Phase; word: string; stages: readonly strin
   { key: "check", word: "Check and publish", stages: ["evidence", "verify", "site", "publish"] },
 ]
 
-export type PhaseMark = "done" | "current" | "todo"
+export type PhaseMark = "done" | "current" | "todo" | "failed"
 
 /** At most this many items of a list are shown; the rest is "and n more". */
 export const LIST_CAP = 10
@@ -81,8 +81,9 @@ export function phaseOfStage(stage: string | null, step: number | null = null): 
  *
  * Processing: the phases before its phase are done, its phase is in progress, the later ones are
  * not started (the portal's `phase`; its step or stage when the portal gives none). In the
- * release (in the wiki or superseded): all done. Received or queued: none started. Held back,
- * failed and removed documents have no bar: their status says it.
+ * release (in the wiki or superseded): all done. Received or queued: none started. Failed: the
+ * phase where it stopped is failed (its stage or step; Read when unknown). Held back and removed
+ * documents have no bar: their status says it.
  */
 export function phaseMarks(
   state: string,
@@ -92,10 +93,12 @@ export function phaseMarks(
 ): PhaseMark[] | null {
   if (state === "in_wiki" || state === "superseded") return PHASES.map(() => "done")
   if (state === "received" || state === "queued") return PHASES.map(() => "todo")
-  if (state !== "processing") return null
-  const at = phase ?? phaseOfStage(stage, step) ?? "check"
+  if (state !== "processing" && state !== "failed") return null
+  const fallback = state === "failed" ? "read" : "check"
+  const at = phase ?? phaseOfStage(stage, step) ?? fallback
   const index = PHASES.findIndex((item) => item.key === at)
-  return PHASES.map((_item, i) => (i < index ? "done" : i === index ? "current" : "todo"))
+  const here: PhaseMark = state === "failed" ? "failed" : "current"
+  return PHASES.map((_item, i) => (i < index ? "done" : i === index ? here : "todo"))
 }
 
 /** The text equivalent of a phase bar: "Phase 3 of 4: Write, step 4/13 compile". */
@@ -109,6 +112,10 @@ export function phaseText(
   const marks = phaseMarks(state, phase, step, stage)
   if (!marks) return ""
   if (marks.every((mark) => mark === "done")) return `All ${PHASES.length} phases done`
+  const stopped = marks.indexOf("failed")
+  if (stopped >= 0) {
+    return `Failed at phase ${stopped + 1} of ${PHASES.length}: ${PHASES[stopped].word}`
+  }
   const index = marks.indexOf("current")
   if (index < 0) return `Not started: ${PHASES.length} phases to go`
   let words = `Phase ${index + 1} of ${PHASES.length}: ${PHASES[index].word}`
@@ -130,6 +137,7 @@ export interface ChangedPage {
 }
 
 export interface LastChange {
+  runId: string | null
   finishedAt: string | null
   change: DocumentChange | null
   pages: ChangedPage[]
@@ -184,6 +192,7 @@ export function parseLastChange(value: unknown): LastChange | null {
     if (page) changed.push({ ...page, change: kind as PageChange })
   }
   return {
+    runId: text(data.run_id),
     finishedAt: text(data.finished_at),
     change: change && DOCUMENT_CHANGES.includes(change) ? (change as DocumentChange) : null,
     pages: changed,
@@ -212,6 +221,24 @@ export function parseRunDocuments(value: unknown): RunDocument[] {
     result.push({ path, title: text(data.title), change: text(data.change) })
   }
   return result
+}
+
+/** How the journey shows a page's change: a chip for added and removed pages only. */
+export function changeChip(change: PageChange): boolean {
+  return change !== "changed"
+}
+
+export type OriginalLink = "open" | "download" | "none"
+
+/** The original of a document: opened in a new tab, downloaded (e-mail) or not published. */
+export function originalLink(path: string, url: string | null): OriginalLink {
+  if (!url) return "none"
+  return /\.eml$/i.test(path) ? "download" : "open"
+}
+
+/** "and n more" of a journey links to the release's changes when its run made the release. */
+export function moreGoesToRelease(change: LastChange | null, currentRunId: string | null): boolean {
+  return !!change?.runId && change.runId === currentRunId
 }
 
 // ----- Words -----

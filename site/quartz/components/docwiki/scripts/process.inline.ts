@@ -26,11 +26,14 @@ import {
   announcements,
   asPhase,
   capped,
+  changeChip,
   changeCount,
   changeSummary,
   list,
+  moreGoesToRelease,
   noChangeSentence,
   number,
+  originalLink,
   parseChanges,
   parseLastChange,
   parseRunDocuments,
@@ -69,6 +72,8 @@ const MAX_DEPTH = 4
 const MAX_PATH_CHARS = 200
 const UNAVAILABLE = "Status unavailable, retrying…"
 const STATE_ORDER: readonly State[] = STATES
+/** The id of "What changed in this release" (a journey's "and n more" links to it). */
+const WHAT_CHANGED_ID = "docwiki-what-changed"
 
 interface Me {
   signIn: boolean
@@ -94,6 +99,7 @@ interface Doc {
   hidden: boolean
   pageUrl: string | null
   documentUrl: string | null
+  originalUrl: string | null
   lastChange: LastChange | null
   lastError: string | null
   failed: boolean
@@ -106,6 +112,7 @@ interface StageRun {
 }
 
 interface Run {
+  runId: string | null
   kind: string
   requestedBy: string
   status: string
@@ -212,6 +219,7 @@ function parseDoc(value: unknown): Doc | null {
     hidden: data.hidden === true,
     pageUrl: siteUrl(data.page_url),
     documentUrl: siteUrl(data.document_url),
+    originalUrl: siteUrl(data.original_url),
     lastChange: parseLastChange(data.last_change),
     lastError: text(data.last_error),
     failed: data.failed === true,
@@ -234,6 +242,7 @@ function parseRun(value: unknown): Run | null {
     })
   }
   return {
+    runId: text(data.run_id),
     kind: text(data.kind) ?? "run",
     requestedBy: text(data.requested_by) ?? "",
     status: text(data.status) ?? "",
@@ -485,7 +494,7 @@ function stageStrip(view: View): HTMLElement {
   return block
 }
 
-const PHASE_SHAPES = { done: "●", current: "◐", todo: "○" } as const
+const PHASE_SHAPES = { done: "●", current: "◐", todo: "○", failed: "✕" } as const
 
 /** The four phases of a document in one line: shape, word and colour, with a text equivalent. */
 function phaseBar(doc: Doc): HTMLElement | null {
@@ -500,7 +509,7 @@ function phaseBar(doc: Doc): HTMLElement | null {
     item.append(element("span", "docwiki-phase-shape", PHASE_SHAPES[mark]), phase.word)
     visual.append(item)
   })
-  const stage = doc.state === "processing" ? (doc.stage ?? "publish") : null
+  const stage = doc.state === "processing" ? (doc.stage ?? "publish") : doc.stage
   const words = phaseText(doc.state, doc.phase, doc.step, doc.steps, stage)
   bar.append(visual, element("span", "sr-only", words))
   return bar
@@ -516,15 +525,44 @@ function journeyStep(label: string, ...content: (Node | string)[]): HTMLLIElemen
   return item
 }
 
+/** The original, as in the documents register: a new tab, a download (e-mail) or none. */
+function originalItem(doc: Doc, key: string): Node {
+  const kind = originalLink(doc.path, doc.originalUrl)
+  if (kind === "none" || !doc.originalUrl) {
+    return element("span", "docwiki-journey-none", "Original not published")
+  }
+  const link = anchor(
+    doc.originalUrl,
+    kind === "download" ? "Download .eml" : "Original ↗",
+    `journey-original:${key}`,
+  )
+  link.dataset.noPopover = "true"
+  link.dataset.routerIgnore = "true"
+  if (kind === "download") {
+    link.setAttribute("download", "")
+  } else {
+    link.target = "_blank"
+    link.rel = "noopener"
+    link.append(element("span", "sr-only", " (opens in a new tab)"))
+  }
+  return link
+}
+
 /** "Follow this document": the original, its document page, its status, the pages, its page. */
-function journey(doc: Doc, key: string, id: string): HTMLElement {
+function journey(doc: Doc, key: string, id: string, currentRunId: string | null): HTMLElement {
   const block = element("div", "docwiki-journey")
   block.id = id
   const steps = element("ol", "docwiki-journey-steps")
   const received = [doc.path]
   if (doc.modified) received.push(`received ${when(doc.modified)}`)
   if (doc.size !== null) received.push(size(doc.size))
-  steps.append(journeyStep("Original", received.join(" · ")))
+  steps.append(
+    journeyStep(
+      "Original",
+      originalItem(doc, key),
+      element("span", "docwiki-journey-secondary", received.join(" · ")),
+    ),
+  )
   steps.append(
     journeyStep(
       "Document page",
@@ -533,10 +571,10 @@ function journey(doc: Doc, key: string, id: string): HTMLElement {
         : "not in the wiki yet",
     ),
   )
-  const stage = doc.state === "processing" ? (doc.stage ?? "publish") : null
+  const stage = doc.state === "processing" ? (doc.stage ?? "publish") : doc.stage
   const status = [stateWords(doc.state, doc.step, doc.steps, stage)]
   const phase = phaseText(doc.state, doc.phase, doc.step, doc.steps, stage)
-  if (phase && doc.state === "processing") status.push(phase)
+  if (phase && (doc.state === "processing" || doc.state === "failed")) status.push(phase)
   steps.append(journeyStep("Status", status.join(" — ")))
   const change = doc.lastChange
   if (change) {
@@ -547,18 +585,27 @@ function journey(doc: Doc, key: string, id: string): HTMLElement {
     const pages = element("ul", "docwiki-journey-pages")
     shown.forEach((page, index) => {
       const item = element("li")
-      item.append(element("span", `docwiki-change docwiki-change--${page.change}`, page.change))
-      item.append(" ")
+      if (changeChip(page.change)) {
+        item.append(element("span", `docwiki-change docwiki-change--${page.change}`, page.change))
+        item.append(" ")
+      }
       if (page.url) item.append(anchor(page.url, page.title, `journey-page:${key}:${index}`))
       else item.append(element("span", "docwiki-journey-removed", page.title))
       pages.append(item)
     })
-    pages.append(...moreItem(more))
+    if (more > 0 && moreGoesToRelease(change, currentRunId)) {
+      // The rest is in "What changed in this release", made by the same run.
+      const item = element("li", "docwiki-process-and-more")
+      item.append(anchor(`#${WHAT_CHANGED_ID}`, andMore(more), `journey-more:${key}`))
+      pages.append(item)
+    } else {
+      pages.append(...moreItem(more))
+    }
     const value: (Node | string)[] = [head.join(" · ")]
     if (shown.length > 0) value.push(pages)
     steps.append(journeyStep("Its last run", ...value))
   } else {
-    steps.append(journeyStep("Its last run", "no published run yet"))
+    steps.append(journeyStep("Its last run", "No recorded run changed it"))
   }
   steps.append(
     journeyStep(
@@ -580,6 +627,7 @@ function documentRow(
   key: string,
   owner: boolean,
   mine: boolean,
+  currentRunId: string | null,
 ): HTMLTableSectionElement {
   const group = element("tbody", "docwiki-process-group")
   group.dataset.key = key
@@ -590,8 +638,8 @@ function documentRow(
   // A document whose stages are all done but whose release is not out yet is at "publish".
   const stage = doc.state === "processing" ? (doc.stage ?? "publish") : null
   status.append(statusPill(doc.state, stateWords(doc.state, doc.step, doc.steps, stage)))
+  // The phase bar goes under the title, in the Document column (on every screen).
   const bar = phaseBar(doc)
-  if (bar) status.append(bar)
   const name = element("td", "docwiki-process-name")
   const label = doc.title ?? doc.path
   if (doc.hidden) {
@@ -600,9 +648,11 @@ function documentRow(
     const open = anchor(doc.pageUrl, doc.title, `page:${key}`)
     open.className = "docwiki-process-doc"
     name.append(open)
+    if (bar) name.append(bar)
     name.append(element("span", "docwiki-process-path", doc.path))
   } else {
     name.append(element("span", "docwiki-process-doc", label))
+    if (bar) name.append(bar)
     if (doc.title) name.append(element("span", "docwiki-process-path", doc.path))
   }
   if (mine) name.append(element("span", "docwiki-process-mine", "your upload"))
@@ -633,7 +683,7 @@ function documentRow(
     const path = element("tr", "docwiki-journey-row")
     const cell = element("td")
     cell.colSpan = 3
-    cell.append(journey(doc, key, id))
+    cell.append(journey(doc, key, id, currentRunId))
     path.append(cell)
     path.hidden = !open
     group.classList.toggle("is-open", open)
@@ -724,6 +774,7 @@ class DocumentsBlock {
     const pseudo = uploaded !== null && mineAt < 0 ? uploaded.path : null
     const shown = showAll ? docs : docs.slice(0, ROWS_COLLAPSED)
     const keys = rowKeys(shown.map((doc) => doc.path))
+    const currentRunId = view.runs.find((run) => run.isCurrent)?.runId ?? null
     const next: { key: string; sig: string; build: () => HTMLTableSectionElement }[] = []
     if (pseudo) {
       const key = `upload:${pseudo}`
@@ -734,8 +785,8 @@ class DocumentsBlock {
       const mine = uploaded !== null && doc.path === uploaded.path
       next.push({
         key,
-        sig: JSON.stringify([doc, owner, mine]),
-        build: () => documentRow(doc, key, owner, mine),
+        sig: JSON.stringify([doc, owner, mine, currentRunId]),
+        build: () => documentRow(doc, key, owner, mine, currentRunId),
       })
     })
 
@@ -810,6 +861,7 @@ function releaseChanges(view: View): HTMLElement | null {
   if (!run || !run.changes) return null
   const changes = run.changes
   const block = element("div", "docwiki-release")
+  block.id = WHAT_CHANGED_ID
   block.append(heading("What changed in this release"))
   if (changeCount(changes) === 0) {
     block.append(element("p", "docwiki-process-caption", noChangeSentence(run.kind)))
