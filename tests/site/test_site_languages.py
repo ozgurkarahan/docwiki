@@ -335,7 +335,7 @@ def test_french_words_of_the_pure_helpers() -> None:
         "Phase 3 sur 4 : Rédiger, étape 4/13 compile",
         "Échec à la phase 2 sur 4 : Classer",
         "2 pages ajoutées · 1 modifiée · 1 contradiction ouverte · 1 résolue",
-        "Exécution en cours : compile (étape 4/13)",
+        "Exécution en cours : compile (étape 4/14)",
         "a.pdf est dans le wiki",
         "PV : Rédiger (étape 4/13)",
         "et 3 de plus",

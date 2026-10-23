@@ -94,6 +94,11 @@ _STAGES_FR: tuple[tuple[str, str], ...] = (
         "evidence",
         "Conserve le passage exact derrière chaque citation, avec l'image de la page d'origine.",
     ),
+    (
+        "translate",
+        "Écrit le wiki dans ses autres langues ; chiffres, citations et termes du métier "
+        "sont contrôlés.",
+    ),
     ("verify", "Passe les contrôles qualité : un échec bloquant arrête la publication."),
     ("site", "Construit ce site à partir de la version candidate du wiki."),
     (

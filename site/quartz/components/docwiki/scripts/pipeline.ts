@@ -120,7 +120,7 @@ export function phaseMarks(
   return PHASES.map((_item, i) => (i < index ? "done" : i === index ? here : "todo"))
 }
 
-/** The text equivalent of a phase bar: "Phase 3 of 4: Write, step 4/13 compile". */
+/** The text equivalent of a phase bar: "Phase 3 of 4: Write, step 4/14 compile". */
 export function phaseText(
   state: string,
   phase: Phase | null,
@@ -316,7 +316,7 @@ export function noChangeSentence(kind: string, t: Strings = en): string {
   return kind === "rebuild" ? words.noChangeRebuild : words.noChange
 }
 
-/** "Run at work: compile (step 4/13)", or "Run at work" when the stage is not known. */
+/** "Run at work: compile (step 4/14)", or "Run at work" when the stage is not known. */
 export function runAtWork(stage: string | null, t: Strings = en): string {
   const words = table(t).pipeline
   const index = stage ? STAGES.indexOf(stage as (typeof STAGES)[number]) : -1
