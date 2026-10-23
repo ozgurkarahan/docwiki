@@ -5,8 +5,11 @@
 // who is signed in. Both are read once per page load and the status is then polled (fast while
 // processing, slow otherwise, paused on a hidden tab). Quartz replaces the header on every
 // navigation, so each "nav" re-fills it from the last answers. Only site-absolute pages and the
-// platform's /.auth/ pages are linked; everything is rendered with textContent.
+// platform's /.auth/ pages are linked; everything is rendered with textContent. The words are in
+// the page's language, and its pages are linked in that language (ADR 0012); the language
+// switch remembers the reader's choice in a cookie the portal reads.
 import { relativeHref } from "../../../plugins/transformers/docwiki-text"
+import { clientLang, clientRoot, clientStrings, langCookie, localUrl } from "../i18n"
 import { statusPill } from "./status"
 
 const STATUS_PATH = "api/status"
@@ -79,25 +82,24 @@ function currentSlug(): string {
   return document.body.dataset.slug ?? "index"
 }
 
-/** A site-absolute page (`/sources/x`) as a link relative to the current page. */
+/** A site-absolute page (`/sources/x`) as a link relative to the current page, in its language. */
 function fromRoot(url: string): string {
-  return relativeHref(currentSlug(), url.replace(/^\/+/, "") || "index")
+  return relativeHref(currentSlug(), localUrl(url, clientRoot()).replace(/^\/+/, "") || "index")
 }
 
 function chipText(value: Status): { words: string; state: "processing" | "in_wiki" | "idle" } {
+  const t = clientStrings().header
   if (value.state === "processing") {
-    const n = value.processing
-    const words =
-      n > 0 ? `Processing ${n} document${n === 1 ? "" : "s"}` : "Processing — a run is at work"
-    return { words, state: "processing" }
+    return { words: t.chipProcessing(value.processing), state: "processing" }
   }
   if (value.state === "published" && value.document) {
-    return { words: "In the wiki → new page", state: "in_wiki" }
+    return { words: t.chipInWiki, state: "in_wiki" }
   }
-  return { words: "Pipeline idle", state: "idle" }
+  return { words: t.chipIdle, state: "idle" }
 }
 
 function render(): void {
+  const t = clientStrings()
   const chip = document.querySelector<HTMLAnchorElement>(".docwiki-chip")
   const live = document.querySelector<HTMLElement>(".docwiki-chip-live")
   if (chip) {
@@ -114,9 +116,9 @@ function render(): void {
       )
       chip.title =
         published && status.document
-          ? `In the wiki: ${status.document.title}`
+          ? t.header.chipTitleInWiki(status.document.title)
           : state === "idle"
-            ? "The pipeline is idle; open it"
+            ? t.header.chipTitleIdle
             : words
       if (published && status.document) {
         // The accessible name starts with the visible words (WCAG "label in name"); the
@@ -126,7 +128,9 @@ function render(): void {
         title.textContent = `: ${status.document.title}`
         chip.append(title)
       }
-      if (live && announced !== "" && announced !== words) live.textContent = `Pipeline: ${words}`
+      if (live && announced !== "" && announced !== words) {
+        live.textContent = t.header.chipLive(words)
+      }
       announced = words
     } else {
       chip.classList.remove("is-ready")
@@ -135,14 +139,14 @@ function render(): void {
   const signIn = document.querySelector<HTMLAnchorElement>(".docwiki-sign-in")
   if (signIn) {
     if (me?.owner) {
-      signIn.textContent = "Owner ✓"
+      signIn.textContent = t.header.owner
       signIn.setAttribute("href", fromRoot("/pipeline"))
-      signIn.title = "Signed in as the owner: add documents on the Pipeline page"
+      signIn.title = t.header.ownerTitle
       signIn.classList.add("is-ready")
     } else if (me?.signIn && me.signInUrl) {
-      signIn.textContent = "Sign in"
+      signIn.textContent = t.header.signIn
       signIn.setAttribute("href", me.signInUrl)
-      signIn.title = "Owner sign-in: only the owner adds documents"
+      signIn.title = t.header.signInTitle
       signIn.classList.add("is-ready")
     } else {
       signIn.classList.remove("is-ready")
@@ -200,6 +204,7 @@ const SCROLL_CUE = "docwiki-scroll-cue"
  * sideways →", with a shadow on the side that hides columns). Stacked cards never scroll.
  */
 function scrollableTables(): void {
+  const t = clientStrings().wiki
   for (const box of document.querySelectorAll<HTMLElement>("article .table-container")) {
     const cue = box.previousElementSibling?.classList.contains(SCROLL_CUE)
       ? (box.previousElementSibling as HTMLElement)
@@ -220,12 +225,12 @@ function scrollableTables(): void {
     const caption = box.querySelector("table")?.dataset.caption
     const before = cue ? cue.previousElementSibling : box.previousElementSibling
     const heading = (caption ?? before?.textContent ?? "").trim().slice(0, 80)
-    box.setAttribute("aria-label", caption ? caption : heading ? `Table: ${heading}` : "Table")
+    box.setAttribute("aria-label", caption ? caption : heading ? t.tableNamed(heading) : t.table)
     if (!cue) {
       const hint = document.createElement("p")
       hint.className = SCROLL_CUE
       hint.setAttribute("aria-hidden", "true")
-      hint.textContent = "Scroll sideways →"
+      hint.textContent = t.scrollSideways
       box.before(hint)
     }
   }
@@ -237,7 +242,30 @@ window.addEventListener("resize", () => {
   resizeTimer = window.setTimeout(scrollableTables, 150)
 })
 
+/**
+ * The language switch: the reader's choice is kept in a cookie (the portal then serves that
+ * language first), and the link is followed as a full page load (data-router-ignore), so the
+ * search index and the explorer are the ones of the new language.
+ */
+function onLanguage(event: MouseEvent): void {
+  const target = event.target instanceof Element ? event.target.closest("a") : null
+  const lang = target?.getAttribute("data-lang-switch")
+  if (!lang) return
+  try {
+    document.cookie = langCookie(lang, window.location.protocol === "https:")
+  } catch {
+    // Cookies disabled: the link still leads to the page in that language.
+  }
+}
+
 document.addEventListener("nav", () => {
+  // Quartz's router morphs the body but not <html>: its `lang` follows the page on screen.
+  const lang = clientLang()
+  if (document.documentElement.lang !== lang) document.documentElement.lang = lang
+  for (const nav of document.querySelectorAll<HTMLElement>(".docwiki-lang")) {
+    nav.addEventListener("click", onLanguage)
+    window.addCleanup(() => nav.removeEventListener("click", onLanguage))
+  }
   render()
   scrollableTables()
   if (!polling) {

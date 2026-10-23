@@ -98,6 +98,12 @@ class StageReport(ContractModel):
     cache_hits: NonNegInt = 0
     failures: NonNegInt = 0
     errors: list[str] = []
+    llm_calls: NonNegInt = 0
+    """Model calls made by this stage in this run (v1.7; from the usage ledger)."""
+    input_tokens: NonNegInt = 0
+    output_tokens: NonNegInt = 0
+    cost: NonNegFloat | None = None
+    """Estimated cost (USD) of this stage's model calls; ``None`` when they cannot be priced."""
 
 
 class RunCounts(ContractModel):

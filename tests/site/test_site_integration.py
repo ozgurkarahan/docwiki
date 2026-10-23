@@ -128,7 +128,7 @@ def test_pages_render_the_docwiki_overlay(built_site: Path) -> None:
     # the story first: the pattern, documents → pipeline → cited pages, a question to try
     assert 'class="docwiki-story"' in home and "docwiki-story" not in source
     assert home.index('class="docwiki-story"') < home.index('class="docwiki-about"')
-    assert "3 documents" in home and "13-step pipeline" in home and "8 cited pages" in home
+    assert "3 documents" in home and "14-step pipeline" in home and "8 cited pages" in home
     assert 'href="./documents"' in home and 'href="./pipeline"' in home
     assert 'href="#docwiki-wiki"' in home and 'id="docwiki-wiki"' in home
     assert 'data-question="When are the windows of the extension delivered?"' in home

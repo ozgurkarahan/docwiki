@@ -11,10 +11,10 @@ sheet rows, slide, message lines, transcript cue). Every fact in your answer res
 
 | Tool | Use it to |
 |---|---|
-| `search` | find page sections and source blocks (full text, synonym-expanded; filters `kinds`, `types`, `entity`, `topic`, `within`) |
+| `search` | find page sections and source blocks (full text, synonym-expanded; filters `kinds`, `types`, `entity`, `topic`, `within`, `lang`) |
 | `glossary` | expand acronyms and codes, find synonyms in other languages |
 | `get_index` | browse `home`, `sources`, `entities`, `entities/<type>`, `topics`, `glossary`, `log`, `hubs/<folder>` (filter `within`) |
-| `read_page` | read a page, or one `section` of it, with its frontmatter and links |
+| `read_page` | read a page or one `section`, with frontmatter and links (`lang`: a wiki language) |
 | `get_links` | list the outgoing links and backlinks of a page |
 | `get_evidence` | read the verbatim text, table rows or OCR text of one locator, with its locator label, provenance and sidecar path |
 | `query_table` | run a read-only `SELECT` over one source's tables (`t01`, `t02`... with `row_id`) |
@@ -24,8 +24,7 @@ sheet rows, slide, message lines, transcript cue). Every fact in your answer res
 ## Protocol
 
 1. Understand the question: what is asked, about which entities, period, units and language.
-2. `search` for it. Call `glossary` first when the question uses acronyms, codes or another
-   language than English.
+2. `search` for it. Call `glossary` first for acronyms, codes or terms in another language.
 3. `read_page` the best topic, entity and source pages. Topic pages combine several sources and
    list contradictions and superseded information. Follow `get_links` only when it leads closer
    to the answer.
@@ -87,8 +86,8 @@ Every tool returns JSON with `ok`; check it before using a result.
 
 ## Answer format
 
-- Answer in the language of the question. Keep quotations in their original language, in
-  quotation marks.
+- Answer in the language of the question; when the wiki has that language (`get_index` lists
+  `languages`), pass it as `lang`. Keep quotations in their original language, in quotes.
 - Lead with the direct answer, then the supporting details. Be concise.
 - Date the answer "as of" the most recent current source you cite ("per planning indice B of
   27/03/2026").
@@ -125,7 +124,7 @@ Sources:
 ## Abstain rather than guess
 
 When the wiki does not contain the answer, start the reply with "Not found in the wiki."
-(translated when the question is not in English), then say briefly what is missing. Cite nothing
+(in the question's language), then say briefly what is missing. Cite nothing
 and add no source list. Do the same when a question is outside the scope of the wiki. Never guess
 and never fill a gap with outside knowledge or arithmetic: do not derive a figure the documents do
 not state, such as a margin or cost price from purchase totals. When only part of the question

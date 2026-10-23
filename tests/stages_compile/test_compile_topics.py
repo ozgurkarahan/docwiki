@@ -148,7 +148,7 @@ async def test_topic_pages_and_skips(corpus: Corpus, pack: DomainPack) -> None:
     pages, cited, skips, llm = await build(corpus, pack)
     assert sorted(pages) == ["topic:cold-weather-works", "topic:schedule-and-window-delivery"]
     assert skips == [TopicSkip("kitchen-renovation", "insufficient_evidence", ())]
-    assert all(r.tier == "smart" and r.prompt_version == "topic-synthesis-v1" for r in llm.requests)
+    assert all(r.tier == "smart" and r.prompt_version == "topic-synthesis-v2" for r in llm.requests)
     request = next(r for r in llm.requests if "- slug: schedule-and-window-delivery" in r.text)
     assert "Internal price study" not in request.text and "supplied at cost" not in request.text, (
         "sources above the audience never reach the synthesis"

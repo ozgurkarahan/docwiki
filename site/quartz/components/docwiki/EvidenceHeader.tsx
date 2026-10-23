@@ -2,9 +2,9 @@ import { Root } from "hast"
 import { visit } from "unist-util-visit"
 import { FullSlug, resolveRelative } from "../../util/path"
 import { classNames } from "../../util/lang"
-import { PROVENANCE_BADGES } from "../../plugins/transformers/docwiki-text"
+import { provenanceBadge } from "../../plugins/transformers/docwiki-text"
 import { QuartzComponent, QuartzComponentConstructor, QuartzComponentProps } from "../types"
-import { settings } from "./settings"
+import { pageLang, pageStrings, settingsFor } from "./settings"
 
 function pdfPage(locator: unknown): number | undefined {
   if (typeof locator !== "object" || locator === null) return undefined
@@ -42,12 +42,13 @@ export default (() => {
     const frontmatter = fileData.frontmatter
     if (frontmatter?.type !== "evidence" && frontmatter?.type !== "evidence-index") return null
     const slug = fileData.slug as FullSlug
+    const t = pageStrings(fileData)
     const sourceId = typeof frontmatter.source_id === "string" ? frontmatter.source_id : ""
-    const source = settings.sources[sourceId]
+    const source = settingsFor(pageLang(fileData)).sources[sourceId]
     const body = bodyTargets(slug, tree)
     const badge =
       typeof frontmatter.provenance === "string" && !body.badge
-        ? PROVENANCE_BADGES[frontmatter.provenance]
+        ? provenanceBadge(frontmatter.provenance, t)
         : undefined
     const page = pdfPage(frontmatter.locator)
     let sourceHref = source?.page ? resolveRelative(slug, source.page as FullSlug) : undefined
@@ -62,7 +63,7 @@ export default (() => {
       <div class={classNames(displayClass, "docwiki-evidence-header")}>
         {badge && (
           <span class="docwiki-evidence-provenance">
-            Provenance{" "}
+            {t.documents.provenance}{" "}
             <span class={`docwiki-badge docwiki-badge--${badge.kind}`} title={badge.meaning}>
               {badge.text}
             </span>
@@ -70,7 +71,7 @@ export default (() => {
         )}
         {sourceHref && (
           <a class="internal" href={sourceHref}>
-            Source page: {source?.title}
+            {t.documents.sourcePage(source?.title ?? "")}
           </a>
         )}
         {originalHref && (
@@ -80,7 +81,7 @@ export default (() => {
             data-no-popover="true"
             data-router-ignore="true"
           >
-            Original document{page ? `, page ${page}` : ""}
+            {t.documents.originalDocument(page ?? null)}
           </a>
         )}
       </div>

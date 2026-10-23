@@ -12,6 +12,7 @@ from pydantic import Field, model_validator
 from docwiki.contracts._base import (
     ContractModel,
     Kebab,
+    LangCode,
     MediaType,
     NonEmptyStr,
     RelPath,
@@ -56,7 +57,12 @@ class CatalogPage(ContractModel):
     sources: list[SourceId] = []
     scope: Kebab | None = None
     """The scope value of a source, scoped topic or hub page (v1.7, ADR 0011)."""
-    lang: Literal["en"] = "en"
+    lang: LangCode = "en"
+    """The page's language (v1.7, ADR 0012): canonical pages carry the canonical language,
+    mirror pages their own; pages are unique by ``(id, lang)``."""
+    translation_of: NonEmptyStr | None = None
+    """On a mirror page: the id of the canonical page it translates (its own id). Left out of
+    the JSON on canonical pages."""
 
 
 class CatalogEdge(ContractModel):
@@ -94,12 +100,26 @@ class Catalog(ContractModel):
     edges: list[CatalogEdge] = []
     sources: list[CatalogSource] = []
     glossary: list[CatalogGlossaryEntry] = []
+    wiki_languages: Annotated[list[LangCode], Field(min_length=1)] = ["en"]
+    """The wiki languages (v1.7, ADR 0012), canonical first; mirror pages live under
+    ``<lang>/`` for the others. Left out of the JSON when it is ``["en"]``."""
 
     @model_validator(mode="after")
     def _consistency(self) -> Self:
-        ids = [page.id for page in self.pages]
+        if len(set(self.wiki_languages)) != len(self.wiki_languages):
+            raise ValueError("wiki_languages must be unique")
+        keys = [(page.id, page.lang) for page in self.pages]
+        if len(keys) != len(set(keys)):
+            raise ValueError("catalog pages must be unique by (id, lang)")
+        ids = [page.id for page in self.pages if page.translation_of is None]
         if len(ids) != len(set(ids)):
             raise ValueError("catalog page ids must be unique")
+        mirrors = set(self.wiki_languages[1:])
+        for page in self.pages:
+            if page.translation_of is not None and (
+                page.lang not in mirrors or not page.path.startswith(f"{page.lang}/")
+            ):
+                raise ValueError(f"{page.path}: a mirror page lives under <mirror language>/")
         paths = [page.path for page in self.pages]
         if len(paths) != len(set(paths)):
             raise ValueError("catalog page paths must be unique")
@@ -115,8 +135,33 @@ class Catalog(ContractModel):
             raise ValueError("catalog source ids must be unique")
         return self
 
-    def page_by_id(self) -> dict[str, CatalogPage]:
-        return {page.id: page for page in self.pages}
+    def to_json_dict(self) -> dict[str, Any]:
+        """JSON dict; ``translation_of`` only on mirror pages and ``wiki_languages`` only for a
+        wiki with mirrors (an English-only catalog stays as before v1.7)."""
+        data = super().to_json_dict()
+        for page in data.get("pages", []):
+            if page.get("translation_of") is None:
+                page.pop("translation_of", None)
+        if data.get("wiki_languages") == ["en"]:
+            data.pop("wiki_languages", None)
+        return data
+
+    @property
+    def canonical_lang(self) -> str:
+        return self.wiki_languages[0]
+
+    def page_by_id(self, lang: str | None = None) -> dict[str, CatalogPage]:
+        """Pages by id: the canonical wiki (default, mirror pages left out), or the pages of
+        one mirror language (``lang``) completed by the canonical pages it does not mirror."""
+        canonical = {page.id: page for page in self.pages if page.translation_of is None}
+        if lang is None or lang == self.canonical_lang:
+            return canonical
+        mirrored = {
+            page.id: page
+            for page in self.pages
+            if page.translation_of is not None and page.lang == lang
+        }
+        return {**canonical, **mirrored}
 
     def page_by_path(self) -> dict[str, CatalogPage]:
         return {page.path: page for page in self.pages}
@@ -158,6 +203,7 @@ def catalog_page_for(frontmatter: Any, path: str) -> CatalogPage:
         sources=sources,
         scope=scope,
         lang=frontmatter.lang,
+        translation_of=frontmatter.translation_of,
     )
 
 

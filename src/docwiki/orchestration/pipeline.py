@@ -9,7 +9,8 @@
   ``work/artifacts/<stage>/<cache_key>/`` and recorded in the source's state shard;
 * :meth:`Pipeline.resolve` — final sensitivity (doc type rules) and audience filtering;
 * :meth:`Pipeline.assemble` — render, entities, topics, links, indexes, agent kit, evidence,
-  catalog, search index, verify, site and publish.
+  translate (the mirror of the wiki in its other languages, v1.7), catalog, search index,
+  verify, site and publish.
 
 Remote raw files are downloaded only when a stage needs their bytes (extraction, an evidence page
 render or embedded figure, a published original) into ``<scratch>/raw/<source_id>/<hash>/``,
@@ -28,6 +29,7 @@ reuses every artifact that already exists.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import re
@@ -51,6 +53,7 @@ from docwiki.contracts.enums import (
 )
 from docwiki.contracts.extracted import ExtractedDoc
 from docwiki.contracts.gates import GateResult, Violation
+from docwiki.contracts.i18n import Strings
 from docwiki.contracts.ids import assign_source_slugs, cache_key, new_run_id, source_page_path
 from docwiki.contracts.layout import (
     EVIDENCE_MOUNT,
@@ -89,6 +92,7 @@ from docwiki.contracts.runs import (
     RunCounts,
     RunDocument,
     RunReport,
+    StageReport,
     VersionInfo,
 )
 from docwiki.contracts.state import RETRY_ATTEMPTS, SourceState
@@ -171,6 +175,20 @@ from docwiki.stages.indexes import build_catalog, build_indexes, changes_since, 
 from docwiki.stages.links import apply_links, build_edges, md_link, replace_frontmatter
 from docwiki.stages.publish import finalize_and_publish, run_receipt_page
 from docwiki.stages.sitehook import SiteResult, build_site_for_release, site_unavailable
+from docwiki.stages.translate import PROMPT_VERSION as TRANSLATE_PROMPT_VERSION
+from docwiki.stages.translate import STAGE_VERSION as TRANSLATE_STAGE_VERSION
+from docwiki.stages.translate import (
+    TRANSLATED_TYPES,
+    TranslationResult,
+    Vocabulary,
+    anchor_map,
+    assemble_mirror,
+    plan_page,
+    relocate_page,
+    translate_plan,
+    translation_digest,
+    unrelocate_text,
+)
 from docwiki.stages.verify import (
     QuarantineItem,
     extend_verdict,
@@ -225,9 +243,6 @@ DETERMINISTIC_NOTE = (
 )
 _WITHDRAWN_BANNER = "> **Warning:** this answer cited sources that were withdrawn"
 _SUPERSEDED_BANNER = "> **Superseded:** this answer cites"
-_QUERY_LEFT_OUT = "it no longer passes the checks of this release"
-"""Log reason of a research answer left out because it fails the release checks (the run
-report has the details)."""
 _HASH_CHUNK = 1 << 20
 
 
@@ -370,6 +385,8 @@ class _Previous:
     catalog: Catalog | None = None
     log: str | None = None
     queries: list[Page] = field(default_factory=list)
+    mirror_logs: dict[str, str] = field(default_factory=dict)
+    """``log.md`` of each mirror language (v1.7), its links as in the canonical layout."""
 
 
 def _error_text(exc: BaseException) -> str:
@@ -698,6 +715,12 @@ class Pipeline:
             self.previous.log = storage.read_bytes(f"{base}/wiki/{WikiFiles.LOG}").decode("utf-8")
         except KeyNotFoundError:
             return
+        for lang in self.domain.mirror_langs:
+            try:
+                text = storage.read_bytes(f"{base}/wiki/{lang}/{WikiFiles.LOG}").decode("utf-8")
+            except KeyNotFoundError:
+                continue
+            self.previous.mirror_logs[lang] = unrelocate_text(text, lang, WikiFiles.LOG)
         for key in storage.list(f"{base}/wiki/queries/"):
             rel = key[len(f"{base}/wiki/") :]
             if not rel.endswith(".md") or rel == WikiFiles.QUERIES_INDEX:
@@ -1048,8 +1071,10 @@ class Pipeline:
                 sources={w.source_id: w.item.state.content_hash for w in included}
             ),
             run_id=self.run_id,
+            wiki_languages=pack.wiki_languages,
         )
         stamp = writer.stamp
+        strings = pack.strings()
 
         # injection containment: redacted documents for every downstream stage
         contained = self._containment(included)
@@ -1087,7 +1112,7 @@ class Pipeline:
                     )
                 if fm.sensitivity != work.sensitivity:
                     page = replace_frontmatter(page, sensitivity=work.sensitivity)
-                source_pages[work.source_id] = page
+                source_pages[work.source_id] = self._in_canonical_lang(page)
                 cited.extend(page_cited)
         fingerprints = {sid: fingerprint(page) for sid, page in source_pages.items()}
         results = [work.result for work in included if work.result is not None]
@@ -1151,6 +1176,9 @@ class Pipeline:
                 day,
             )
         self.clock.finish("topics")
+        # the canonical pages carry the wiki's canonical language (v1.7, ADR 0012)
+        entity_pages = [self._in_canonical_lang(page) for page in entity_pages]
+        topic_pages = [self._in_canonical_lang(page) for page in topic_pages]
         cited.extend(entity_cited)
         cited.extend(topic_cited)
 
@@ -1230,20 +1258,26 @@ class Pipeline:
             self.clock.count("agentkit", items=1 + len(kit.skills))
         self.clock.finish("agentkit")
         self.clock.start("indexes")
-        removed = self._removed_reasons()
+        removed = self._removed_reasons(strings)
         entries = changes_since(
             self.previous.catalog,
             content,
             day=day,
             removed=removed,
-            removed_queries=dict.fromkeys(invalid_queries, _QUERY_LEFT_OUT),
+            removed_queries=dict.fromkeys(
+                invalid_queries, strings("index.log.reason.query_checks")
+            ),
+            strings=strings,
         )
         # hub pages of the pack's scopes (v1.7, ADR 0011); none without scopes.yaml
         hubs = build_hubs(
             content, pack, stamp=stamp, updated=day, dates=doc_dates(results), views=views.results
         )
         views_index = build_views_index(
-            [page for page in content if page.frontmatter.type == "view"], stamp=stamp, updated=day
+            [page for page in content if page.frontmatter.type == "view"],
+            stamp=stamp,
+            updated=day,
+            strings=strings,
         )
         bundle = build_indexes(
             content,
@@ -1298,8 +1332,27 @@ class Pipeline:
             by_path = {page.path: page for page in pages}
         self.clock.finish("evidence")
 
+        # translate (v1.7, ADR 0012): the mirror of the wiki in each other language, before the
+        # catalog, the search index and the gates, which cover it too
+        if pack.mirror_langs:
+            mirror_pages = await self._mirrors(
+                [by_path[page.path] for page in content],
+                views_input=view_sources(source_pages, docs, scopes),
+                hub_scopes=hub_scopes,
+                results=results,
+                topic_skips=topic_skips,
+                invalid_queries=invalid_queries,
+                stamp=stamp,
+                day=day,
+                tier=tier,
+            )
+            for page in mirror_pages:
+                writer.write_page(page)
+            pages = [*pages, *mirror_pages]
+            by_path = {page.path: page for page in pages}
+
         # catalog and search index
-        edges = build_edges(pages)
+        edges = build_edges([page for page in pages if not page.is_mirror])
         catalog = build_catalog(
             pages,
             edges,
@@ -1307,6 +1360,7 @@ class Pipeline:
             audience=self.audience,
             generated_at=created_at,
             glossary=bundle.glossary,
+            wiki_languages=pack.wiki_languages,
         )
         writer.write_catalog(catalog)
         blocks = []
@@ -1347,6 +1401,7 @@ class Pipeline:
                 canaries=self.ctx.canaries,
                 glossary_seeded=bool(pack.glossary.terms),
                 locked_terms={term.term: term.banned for term in pack.terms.terms if term.banned},
+                wiki_languages=pack.wiki_languages,
                 citations=[c for w in included if w.result for c in w.result.citations],
                 sources_total=len(considered),
                 quarantined=sum(1 for w in considered if w.status in ("quarantined", "failed")),
@@ -1479,6 +1534,12 @@ class Pipeline:
             staged=None if published.published else published.staged.root,
         )
 
+    def _in_canonical_lang(self, page: Page) -> Page:
+        """``page`` with ``lang`` set to the pack's canonical language (engine functions that
+        predate v1.7 leave the default ``en``)."""
+        lang = self.domain.canonical_lang
+        return page if page.frontmatter.lang == lang else replace_frontmatter(page, lang=lang)
+
     def _retention(self) -> None:
         """Keep the newest releases; a failure is a warning (the next publish prunes again)."""
         outcome = try_retention(self.ctx.storage, keep=self.ctx.settings.retention)
@@ -1490,14 +1551,174 @@ class Pipeline:
         elif outcome.deleted:
             logger.info("retention removed %d old release(s)", len(outcome.deleted))
 
-    def _removed_reasons(self) -> dict[str, str]:
+    def _removed_reasons(self, strings: Strings) -> dict[str, str]:
         reasons: dict[str, str] = {}
         for work in self.work.values():
             if work.status in ("quarantined", "failed"):
-                reasons[work.source_id] = "the current version could not be processed"
+                reasons[work.source_id] = strings("index.log.reason.unprocessed")
             elif work.status == "excluded":
-                reasons[work.source_id] = "the source is above the audience of this build"
+                reasons[work.source_id] = strings("index.log.reason.audience")
         return reasons
+
+    # -- translate (v1.7, ADR 0012) ---------------------------------------------------------
+
+    async def _mirrors(
+        self,
+        content: Sequence[Page],
+        *,
+        views_input: Sequence[Any],
+        hub_scopes: Collection[str],
+        results: Sequence[CompiledResult],
+        topic_skips: Sequence[TopicSkip],
+        invalid_queries: Mapping[str, str],
+        stamp: DocwikiStamp,
+        day: date,
+        tier: str,
+    ) -> list[Page]:
+        """The mirror pages of every other wiki language, under ``<lang>/``.
+
+        Source, entity and topic pages are translated (cached per page content, language,
+        prompt and model); views, hubs, indexes, glossary and log are rebuilt by code in the
+        mirror language from the mirror pages; research answers and agent files stay canonical.
+        """
+        pack = self.domain
+        vocabulary = Vocabulary.of(pack)
+        self.check_lease()
+        self.clock.start("translate")
+        mirror_pages: list[Page] = []
+        with stage_span("translate", run_id=self.run_id):
+            for lang in pack.mirror_langs:
+                mirror_pages += await self._mirror(
+                    lang,
+                    content,
+                    vocabulary,
+                    views_input=views_input,
+                    hub_scopes=hub_scopes,
+                    results=results,
+                    topic_skips=topic_skips,
+                    invalid_queries=invalid_queries,
+                    stamp=stamp,
+                    day=day,
+                    tier=tier,
+                )
+        self.clock.finish("translate")
+        return mirror_pages
+
+    async def _translated(
+        self, page: Page, lang: str, vocabulary: Vocabulary, semaphore: asyncio.Semaphore
+    ) -> Page:
+        """The translation of one canonical page (at its canonical path), from the cache when
+        the same content was translated before."""
+        pack = self.domain
+        plan = plan_page(page, pack, lang)
+        model_id, model_version = self._model(self.fast)
+        key = cache_key(
+            "translate",
+            translation_digest(plan, vocabulary),
+            stage_version=TRANSLATE_STAGE_VERSION,
+            prompt_version=TRANSLATE_PROMPT_VERSION,
+            model_id=model_id,
+            model_version=model_version,
+        )
+        artifact = self.artifacts.load("translate", key)
+        if artifact is not None:
+            result = TranslationResult.from_json(artifact.bytes("translation.json"))
+            self.clock.count("translate", items=1, cache_hits=1)
+        else:
+            async with semaphore:
+                self.check_lease()
+                result = await translate_plan(self.ctx.llm, plan, pack, vocabulary)
+            self.artifacts.save("translate", key, {"translation.json": result.to_json()})
+            self.clock.count("translate", items=1)
+        if result.status != "translated":
+            problems = "; ".join(result.problems[:3])
+            message = (
+                f"translate: {page.frontmatter.id} kept untranslated in {lang} "
+                f"(the translation failed the preservation check twice: {problems})"
+            )
+            logger.warning("%s", message)
+            self.warnings.append(message)
+            self.clock.count("translate", failures=1)
+        return assemble_mirror(plan, result, pack)
+
+    async def _mirror(
+        self,
+        lang: str,
+        content: Sequence[Page],
+        vocabulary: Vocabulary,
+        *,
+        views_input: Sequence[Any],
+        hub_scopes: Collection[str],
+        results: Sequence[CompiledResult],
+        topic_skips: Sequence[TopicSkip],
+        invalid_queries: Mapping[str, str],
+        stamp: DocwikiStamp,
+        day: date,
+        tier: str,
+    ) -> list[Page]:
+        pack = self.domain
+        strings = pack.strings(lang)
+        canonical = pack.canonical_lang
+        semaphore = asyncio.Semaphore(self.concurrency("translate"))
+        originals = [
+            page
+            for page in content
+            if page.frontmatter.type in TRANSLATED_TYPES and page.frontmatter.lang == canonical
+        ]
+        translated = list(
+            await asyncio.gather(
+                *(self._translated(page, lang, vocabulary, semaphore) for page in originals)
+            )
+        )
+        # pages built by code, rebuilt in the mirror language from the mirror pages
+        views = build_view_pages(pack, views_input, stamp=stamp, hub_scopes=hub_scopes, lang=lang)
+        view_pages = [format_page_amounts(page) for page in views.pages]
+        queries = [page for page in content if page.frontmatter.type == "query"]
+        mirror_content = [*translated, *view_pages, *queries]
+        hubs = build_hubs(
+            mirror_content,
+            pack,
+            stamp=stamp,
+            updated=day,
+            dates=doc_dates(results),
+            views=views.results,
+            lang=lang,
+        )
+        views_index = build_views_index(view_pages, stamp=stamp, updated=day, strings=strings)
+        entries = changes_since(
+            self.previous.catalog,
+            mirror_content,
+            day=day,
+            removed=self._removed_reasons(strings),
+            removed_queries=dict.fromkeys(
+                invalid_queries, strings("index.log.reason.query_checks")
+            ),
+            strings=strings,
+        )
+        bundle = build_indexes(
+            mirror_content,
+            pack,
+            stamp=stamp,
+            updated=day,
+            sensitivity=tier,
+            run_id=self.run_id,
+            previous_log=self.previous.mirror_logs.get(lang),
+            new_entries=entries,
+            topic_skips=topic_skips,
+            extra_paths=[WikiFiles.AGENTS, WikiFiles.QUALITY, run_page_path(self.run_id)],
+            hubs=hubs,
+            lang=lang,
+        )
+        rebuilt = [*view_pages, *hubs.pages, *bundle.pages]
+        if views_index is not None:
+            rebuilt.append(views_index)
+        mirrored = {page.path for page in [*translated, *rebuilt]}
+        by_path = {page.path: page for page in originals}
+        anchors = {page.path: anchor_map(by_path[page.path], page) for page in translated}
+        moved = [relocate_page(page, lang, mirrored, anchors) for page in translated]
+        moved += [relocate_page(page, lang, mirrored) for page in rebuilt]
+        self.clock.count("translate", items=len(rebuilt))
+        return self._normalize_updated(moved, day)
 
     def _normalize_updated(self, pages: Sequence[Page], day: date) -> list[Page]:
         state = self._build_state() or {}
@@ -1643,6 +1864,8 @@ class Pipeline:
 
     def _counts(self, pages: Sequence[Page], writer: ReleaseWriter) -> dict[str, int]:
         types: dict[str, int] = {}
+        mirrors = sum(1 for page in pages if page.is_mirror)
+        pages = [page for page in pages if not page.is_mirror]
         for page in pages:
             types[page.frontmatter.type] = types.get(page.frontmatter.type, 0) + 1
         evidence_root = writer.root / "evidence"
@@ -1662,6 +1885,7 @@ class Pipeline:
             "evidence": sidecars,
             "tables": tables,
             "quarantined": sum(1 for w in self.work.values() if w.status == "quarantined"),
+            **({"mirror_pages": mirrors} if mirrors else {}),
         }
 
     def _save_build_state(self, release_id: str, pages: Sequence[Page]) -> None:
@@ -1775,7 +1999,7 @@ class Pipeline:
             previous_release_id=self.previous.release_id,
             messages=self.request.messages,
             counts=counts,
-            stages=self.clock.reports(finished_only=status == "running"),
+            stages=self._stage_reports(finished_only=status == "running"),
             current_stage=self.clock.current() if status == "running" else None,  # type: ignore[arg-type]
             documents=self._run_documents(),
             page_changes=list(self.page_changes),
@@ -1787,6 +2011,33 @@ class Pipeline:
             errors=list(self.errors),
             warnings=[*self.warnings, *self.ctx.notices()],
         )
+
+    def _stage_reports(self, *, finished_only: bool) -> list[StageReport]:
+        """The stage reports with the model calls, tokens and cost of each stage (v1.7)."""
+        reports = self.clock.reports(finished_only=finished_only)
+        ledger = self.cursor.run_ledger()
+        if ledger is None:
+            return reports
+        receipt = ledger.receipt()
+        updated: list[StageReport] = []
+        for report in reports:
+            usage = receipt.stages.get(report.stage)
+            if usage is not None:
+                cost = (
+                    round(usage.estimated_cost_usd, 6)
+                    if usage.calls and not usage.unpriced_calls
+                    else None
+                )
+                report = report.model_copy(
+                    update={
+                        "llm_calls": usage.calls,
+                        "input_tokens": usage.input_tokens,
+                        "output_tokens": usage.output_tokens,
+                        "cost": cost,
+                    }
+                )
+            updated.append(report)
+        return updated
 
     def _run_documents(self) -> list[RunDocument]:
         """The documents this run processes (new, changed, deleted or recompiled on request)."""

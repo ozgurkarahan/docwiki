@@ -25,6 +25,7 @@ from docwiki.contracts.compiled import CompiledSource
 from docwiki.contracts.enums import PROVENANCES, Provenance, badge_for
 from docwiki.contracts.extracted import ExtractedDoc, Figure, Table
 from docwiki.contracts.fences import FenceTracker, escape_fence, opening_fence, widen_fences
+from docwiki.contracts.i18n import CORE_STRINGS, Strings, core_strings
 from docwiki.contracts.ids import normalize_tags, parse_release_id, source_page_path
 from docwiki.contracts.locators import Locator, locator_key, locator_label
 from docwiki.contracts.markdown import FOOTNOTE_DEF_RE, relative_link
@@ -68,23 +69,25 @@ MAX_RENDERED_TABLE_ROWS = 200
 logger = logging.getLogger("docwiki.stages.render")
 
 FICTIONAL_NOTICE = "FICTIONAL - NOT FOR OPERATIONAL USE."
-RESERVED_SECTION_HEADINGS = frozenset(
-    {
-        "key facts",
-        "contents",
-        "figures",
-        "related",
-        "referenced by",
-        "sources",
-        "facts",
-        "timeline",
-        "documents",
-        "overview",
-        "contradictions",
-        "superseded information",
-        "sources consulted",
-    }
+_RESERVED_KEYS = (
+    "key_facts",
+    "contents",
+    "figures",
+    "related",
+    "referenced_by",
+    "sources",
+    "facts",
+    "timeline",
+    "documents",
+    "overview",
+    "contradictions",
+    "superseded",
+    "sources_consulted",
 )
+RESERVED_SECTION_HEADINGS = frozenset(
+    table[f"heading.{key}"].casefold() for table in CORE_STRINGS.values() for key in _RESERVED_KEYS
+)
+"""Generated headings of content pages, in every core language (case-folded)."""
 
 _MARKER_RE = re.compile(r"\[\[\s*cite\s*:\s*([^\]\n]*?)\s*\]\]", re.IGNORECASE)
 _WIKILINK_RE = re.compile(r"\[\[([^\[\]\n]*)\]\]")
@@ -272,9 +275,12 @@ class _CitedEntry:
 class Footnotes:
     """Footnote labels ``c1…cN`` in order of first use and the cited locators behind them."""
 
-    def __init__(self, page_path: str, titles: Mapping[str, str]) -> None:
+    def __init__(
+        self, page_path: str, titles: Mapping[str, str], strings: Strings | None = None
+    ) -> None:
         self.page_path = page_path
         self.titles = titles
+        self.strings = strings or core_strings()
         self._labels: dict[tuple[str, str, str], str] = {}
         self._definitions: list[str] = []
         self._cited: dict[tuple[str, str, str], _CitedEntry] = {}
@@ -354,8 +360,8 @@ class Footnotes:
 
     def sources_section(self) -> list[str]:
         """The ``## Sources`` section lines (always present: the assemble lane anchors on it)."""
-        lines = ["## Sources", ""]
-        lines += self._definitions or ["No evidence is cited on this page."]
+        lines = [f"## {self.strings.heading('sources')}", ""]
+        lines += self._definitions or [self.strings("render.no_evidence")]
         return lines
 
 
@@ -371,12 +377,21 @@ def _cell(text: str) -> str:
     return escape_document_text(text).replace("|", "\\|")
 
 
-def render_table(table: Table, *, max_rows: int = MAX_RENDERED_TABLE_ROWS) -> list[str]:
+def render_table(
+    table: Table, *, max_rows: int = MAX_RENDERED_TABLE_ROWS, strings: Strings | None = None
+) -> list[str]:
     """A table rendered from the extracted data (never re-typed by a model)."""
+    t = strings or core_strings()
     label = locator_label(table.locator)
-    lines = [f"**Table {table.id}** · {escape_document_text(label)}", ""]
-    columns = [_cell(name) or f"Column {number}" for number, name in enumerate(table.columns, 1)]
-    header = ["Row", *columns]
+    lines = [
+        t("render.table_caption", table_id=table.id, label=escape_document_text(label)),
+        "",
+    ]
+    columns = [
+        _cell(name) or t("render.column", number=number)
+        for number, name in enumerate(table.columns, 1)
+    ]
+    header = [t("render.row"), *columns]
     lines.append("| " + " | ".join(header) + " |")
     lines.append("| " + " | ".join("---" for _ in header) + " |")
     for row in table.rows[:max_rows]:
@@ -385,12 +400,9 @@ def render_table(table: Table, *, max_rows: int = MAX_RENDERED_TABLE_ROWS) -> li
     lines.append("")
     shown = min(len(table.rows), max_rows)
     if len(table.rows) > shown:
-        lines.append(
-            f"Showing the first {shown} of {len(table.rows)} rows. Agents can query the full "
-            f"table as `{table.id}` with the `query_table` tool."
-        )
+        lines.append(t("render.table_more", shown=shown, total=len(table.rows), table_id=table.id))
     else:
-        lines.append(f"Agents can query this table as `{table.id}` with the `query_table` tool.")
+        lines.append(t("render.table_query", table_id=table.id))
     return lines
 
 
@@ -480,6 +492,7 @@ def _render_section_body(
 
 
 def _figure_line(figure: Figure, index: DocIndex, source_id: str, footnotes: Footnotes) -> str:
+    t = footnotes.strings
     locator = figure_locator(figure)
     parts: list[str] = []
     if figure.caption:
@@ -489,16 +502,16 @@ def _figure_line(figure: Figure, index: DocIndex, source_id: str, footnotes: Foo
     if figure.description:
         description = clean_inline(figure.description)
         if description:
-            parts.append(f"Generated description: {description.rstrip('.')}.")
+            parts.append(t("render.generated_description", text=description.rstrip(".")))
     if not parts:
-        parts.append("No caption or description was extracted.")
+        parts.append(t("render.no_caption"))
     if figure.description:
         ref = footnotes.ref(source_id, locator, "model-description", "verified")
     else:
         provenance = index.page_provenance(locator)
         ref = footnotes.ref(source_id, locator, provenance, "unverified-paraphrase")
     label = escape_document_text(locator_label(locator))
-    return f"- **Figure {figure.id}** ({label}): " + attach_refs(" ".join(parts), ref)
+    return t("render.figure", figure_id=figure.id, label=label) + attach_refs(" ".join(parts), ref)
 
 
 def render_source_page(
@@ -526,7 +539,8 @@ def render_source_page(
         or clean_title(posixpath.splitext(posixpath.basename(doc.source_path))[0])
         or source_id
     )
-    footnotes = Footnotes(path, {source_id: title})
+    t = pack.strings()
+    footnotes = Footnotes(path, {source_id: title}, t)
     index = DocIndex(doc)
     grouped = _citations_by_ref(result.citations)
 
@@ -538,9 +552,9 @@ def render_source_page(
     older = sorted({sid for sid in supersedes if sid != source_id})
     if newer:
         refs = ", ".join(f"`{sid}`" for sid in newer)
-        lines += [f"> **Superseded** by {refs}. Use the current revision.", ""]
+        lines += [t("render.superseded_banner", links=refs), ""]
     summary = clean_inline(compiled.summary) or f"{title}."
-    lines += [summary, "", "## Key facts", ""]
+    lines += [summary, "", f"## {t.heading('key_facts')}", ""]
 
     fact_lines: list[str] = []
     for number, fact in enumerate(compiled.key_facts, start=1):
@@ -550,9 +564,9 @@ def render_source_page(
         text = clean_inline(fact.text)
         if text:
             fact_lines.append(f"- {attach_refs(text, footnotes.cite_all(citations))}")
-    lines += fact_lines or ["No verified key facts were extracted from this document."]
+    lines += fact_lines or [t("render.no_key_facts")]
 
-    lines += ["", "## Contents", ""]
+    lines += ["", f"## {t.heading('contents')}", ""]
     used_headings: set[str] = set()
     rendered_tables: set[str] = set()
     section_count = 0
@@ -578,26 +592,27 @@ def render_source_page(
             lines += [body, ""]
         for table in tables:
             if table.id in rendered_tables:
-                lines += [f"See table {table.id} above.", ""]
+                lines += [t("render.see_table", table_id=table.id), ""]
                 continue
             rendered_tables.add(table.id)
-            lines += [*render_table(table), ""]
+            lines += [*render_table(table, strings=t), ""]
     remaining = [table for table in doc.tables if table.id not in rendered_tables]
     if remaining:
-        heading = section_heading("Tables", used_headings) or "Tables"
+        tables_title = t.heading("tables")
+        heading = section_heading(tables_title, used_headings) or tables_title
         lines += [f"### {heading}", ""]
         for table in remaining:
-            lines += [*render_table(table), ""]
+            lines += [*render_table(table, strings=t), ""]
     elif not section_count:
-        lines += ["No content sections were compiled from this document.", ""]
+        lines += [t("render.no_sections"), ""]
     while lines and not lines[-1]:
         lines.pop()
 
-    lines += ["", "## Figures", ""]
+    lines += ["", f"## {t.heading('figures')}", ""]
     if doc.figures:
         lines += [_figure_line(figure, index, source_id, footnotes) for figure in doc.figures]
     else:
-        lines.append("No figures were extracted from this document.")
+        lines.append(t("render.no_figures"))
     lines += ["", *footnotes.sources_section()]
 
     entity_ids = sorted({mention.entity_id for mention in compiled.entity_mentions})
@@ -610,6 +625,7 @@ def render_source_page(
         id=source_id,
         title=title,
         summary=summary,
+        lang=pack.canonical_lang,
         sensitivity=state.sensitivity,
         updated=release_date(stamp),
         tags=normalize_tags([classification.doc_type, classification.category]),

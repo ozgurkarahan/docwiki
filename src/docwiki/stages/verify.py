@@ -1,4 +1,4 @@
-"""Stage 11 — ``verify``: quality gates G01–G16 (pipeline §7) and ``_meta/quality.md``.
+"""Stage 12 — ``verify``: quality gates G01–G17 (pipeline §7) and ``_meta/quality.md``.
 
 Structural gates come from :func:`docwiki.release.validate_release` on the candidate release;
 this stage adds the gates that need pipeline data:
@@ -11,7 +11,9 @@ this stage adds the gates that need pipeline data:
   the site is built;
 * G10 — whether the pack seeds a glossary; G15 — share of quarantined sources;
 * G16 — the locked trade vocabulary of the pack (``{locked term: [banned renderings]}``), passed
-  to ``validate_release``; skipped when the pack locks no term.
+  to ``validate_release``; skipped when the pack locks no term. It covers the mirror pages too.
+* G17 — every canonical page has its mirror in each other wiki language (``validate_release``
+  warns when one is missing or kept untranslated); skipped for a one-language wiki.
 
 Gate results go into the manifest and the quality report page; a failing blocking gate stops the
 publish. The report never prints injected text: injection flags show the source id, the block id
@@ -254,11 +256,12 @@ def verify_release(
     quarantined: int = 0,
     require_manifest: bool = False,
     locked_terms: Mapping[str, Sequence[str]] | None = None,
+    wiki_languages: Sequence[str] = ("en",),
 ) -> VerifyResult:
     """Run every gate on the release folder ``root`` (candidate or finalized).
 
     ``locked_terms`` (``{locked term: [banned renderings]}``) enables G16; without it the gate is
-    skipped.
+    skipped. G17 (mirror pages) is skipped for a wiki with one language.
     """
     violations = list(
         validate_release(
@@ -305,6 +308,8 @@ def verify_release(
         skipped.append("G10")
     if not locked_terms:
         skipped.append("G16")
+    if len(wiki_languages) < 2:
+        skipped.append("G17")
     gates = gate_results(violations, skipped=skipped, metrics=metrics)
     return VerifyResult(
         gates=gates,

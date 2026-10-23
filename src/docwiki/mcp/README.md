@@ -42,7 +42,7 @@ provenance; compiled wiki text comes with the citations it carries.
 | `ingest_start` | `reason`, `scope?: {source_ids?, prefix?}` | Enqueues a `docwiki.ingest/v1` message (`kind=ingest`, `requested_by=librarian`, deterministic idempotency key; identical requests within ~10 minutes are not queued twice) | required |
 | `run_status` | `run_id?` | Latest or selected run report summary, and whether its release is the one served | none |
 | `list_sources` | `status?`, `limit=50`, `offset=0` | Per-source state (status, stage, last error, sensitivity, presence in the release), problems first | none |
-| `quality_report` | `release?` | Gate results G01–G16 of the served or of another release | none |
+| `quality_report` | `release?` | Gate results G01–G17 of the served or of another release | none |
 | `explain_source` | `source_id` | Stage errors, extraction warnings, sample blocks (with locators and injection flags), related proposals, whether a quarantine is retried automatically, next steps | none |
 | `recompile` | `source_ids`, `hints` | Enqueues `kind=recompile` with `hints.operator_notes` (text addressed to an AI system is refused) | required |
 | `list_proposals` | `status?`, `limit=20`, `offset=0` | Proposals with summary, payload, evidence and decision | none |

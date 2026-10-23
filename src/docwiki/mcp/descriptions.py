@@ -42,7 +42,9 @@ TOOLS: dict[str, str] = {
         "(confirm with get_evidence). status 'superseded' marks an outdated document revision; "
         "scope, when present, names the scope value (for example a chantier) the page belongs "
         "to. Narrow with kinds, types (page types), entity, topic or within (one scope value); "
-        "page with offset."
+        "page with offset. Every hit says its lang; wiki hits come from the canonical language "
+        "unless lang names a mirror language of the wiki (source hits are the documents' own "
+        "words, in their language)."
     ),
     "read_page": (
         "Read one wiki page by page id (for example 'topic:<slug>', '<entity-type>:<key>', "
@@ -54,7 +56,9 @@ TOOLS: dict[str, str] = {
         "and one citation per footnote [^cN] in the returned text: source_title, locator_label, "
         "source_id, locator_key, evidence_path, badge and provenance, ready to cite or to open "
         "with get_evidence. Long pages are paged: call again with next_offset or ask for a "
-        "section. The generated 'Referenced by' block is omitted (use get_links)."
+        "section. The generated 'Referenced by' block is omitted (use get_links). lang reads the "
+        "mirror page of another wiki language when there is one (the result says its lang and "
+        "translation_of); quotes, citations and evidence stay in the documents' language."
     ),
     "get_index": (
         "Get an index page of the wiki as Markdown: 'home' (purpose, categories, topics, stats, "
@@ -63,7 +67,8 @@ TOOLS: dict[str, str] = {
         "when the wiki has scopes (for example chantiers), 'hubs/<folder>' (one hub page per "
         "scope value, for example 'hubs/chantiers'). Use it to browse when search terms are "
         "unknown or to list everything of one kind; within keeps only the entries of one scope "
-        "value. Paged with offset."
+        "value; lang returns the index of a mirror language ('home' lists the languages). Paged "
+        "with offset."
     ),
     "get_links": (
         "Typed relations of a page from the release catalog, as outgoing links and backlinks "
@@ -132,7 +137,7 @@ TOOLS: dict[str, str] = {
         "sources come first; filter by status; paged with limit and offset."
     ),
     "quality_report": (
-        "Quality-gate results (G01-G16) of the served release, or of the release id given: "
+        "Quality-gate results (G01-G17) of the served release, or of the release id given: "
         "status, blocking flag, rule, violation count and the first violations of each gate "
         "(failing gates first), plus release counts."
     ),
@@ -192,6 +197,10 @@ PARAMS: dict[str, str] = {
     "text_offset": "Paging: character offset in the text (use next_offset from the previous call).",
     "page": "Page id (for example 'topic:<slug>' or 'src-<12 hex>') or wiki path ('topics/x.md').",
     "section": "Heading text or anchor of one section to read (subsections included).",
+    "lang": (
+        "Wiki language of the pages to return, for example 'en' when the wiki is written in "
+        "French with an English mirror. Default: the canonical language of the wiki."
+    ),
     "scope": (
         "Index to read: home, sources, entities, entities/<type>, topics, queries, glossary, log, "
         "or hubs/<folder> when the wiki has scopes."

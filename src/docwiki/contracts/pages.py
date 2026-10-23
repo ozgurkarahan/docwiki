@@ -108,7 +108,11 @@ class _BaseFrontmatter(ContractModel):
     type: str
     title: NonEmptyStr
     summary: str
-    lang: Literal["en"] = "en"
+    lang: LangCode = "en"
+    """The page's language: the canonical wiki language, or a mirror language (v1.7)."""
+    translation_of: NonEmptyStr | None = None
+    """On a mirror page only (``wiki/<lang>/…``, v1.7, ADR 0012): the id of the canonical page
+    it translates, which is also its own ``id``. Never written on canonical pages."""
     sensitivity: Sensitivity
     updated: IsoDate
     tags: list[Tag] = []
@@ -125,6 +129,12 @@ class _BaseFrontmatter(ContractModel):
         if "\n" in value:
             raise ValueError("summary must be a single line")
         return value
+
+    @model_validator(mode="after")
+    def _translation(self) -> Self:
+        if self.translation_of is not None and self.translation_of != self.id:
+            raise ValueError("a mirror page keeps the id of the page it translates")
+        return self
 
 
 class ExtractionSummary(ContractModel):
@@ -391,9 +401,17 @@ class Page(ContractModel):
         return cls(path=path, frontmatter=parse_frontmatter(data), body=body)
 
     def render(self) -> str:
-        """File text with LF line endings and stable frontmatter key order."""
+        """File text with LF line endings and stable frontmatter key order (``translation_of``
+        only on mirror pages)."""
         data = self.frontmatter.model_dump(mode="python", by_alias=True)
+        if data.get("translation_of") is None:
+            data.pop("translation_of", None)
         return write_frontmatter(data, self.body)
+
+    @property
+    def is_mirror(self) -> bool:
+        """Whether this is a mirror page (``wiki/<lang>/…``) written by the translate stage."""
+        return self.frontmatter.translation_of is not None
 
 
 class EvidenceFrontmatter(ContractModel):

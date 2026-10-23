@@ -16,7 +16,14 @@ from typing import Annotated, Any, Literal, Self
 
 from pydantic import Field, model_validator
 
-from docwiki.contracts._base import ContractModel, Hex64, RelPath, Sha256Ref, UtcDateTime
+from docwiki.contracts._base import (
+    ContractModel,
+    Hex64,
+    LangCode,
+    RelPath,
+    Sha256Ref,
+    UtcDateTime,
+)
 from docwiki.contracts.enums import Sensitivity
 from docwiki.contracts.gates import GateResult
 from docwiki.contracts.ids import RELEASE_ID_RE, RUN_ID_RE, SOURCE_ID_RE, release_id_for
@@ -50,6 +57,22 @@ class ReleaseManifest(ContractModel):
     counts: dict[str, Annotated[int, Field(ge=0)]] = {}
     gates: list[GateResult] = []
     files: dict[RelPath, FileEntry] = {}
+    wiki_languages: Annotated[list[LangCode], Field(min_length=1)] = ["en"]
+    """The wiki languages of the release (v1.7, ADR 0012): the first is canonical (``wiki/``),
+    each other one has a mirror under ``wiki/<lang>/``. Not part of the release identity (the
+    domain pack hash in ``versions`` already is). Left out of the JSON when it is ``["en"]``."""
+
+    @property
+    def canonical_lang(self) -> str:
+        return self.wiki_languages[0]
+
+    def to_json_dict(self) -> dict[str, Any]:
+        """JSON dict; ``wiki_languages`` only for a wiki with mirrors (left out when it is
+        ``["en"]``, so an English-only manifest stays as before v1.7)."""
+        data = super().to_json_dict()
+        if data.get("wiki_languages") == ["en"]:
+            data.pop("wiki_languages", None)
+        return data
 
     @staticmethod
     def identity_payload(
@@ -106,6 +129,8 @@ class ReleaseManifest(ContractModel):
             )
         if "manifest.json" in self.files:
             raise ValueError("manifest.json cannot list itself")
+        if len(set(self.wiki_languages)) != len(self.wiki_languages):
+            raise ValueError("wiki_languages must be unique")
         return self
 
     @property

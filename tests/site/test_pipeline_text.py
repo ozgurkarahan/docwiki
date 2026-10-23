@@ -60,7 +60,7 @@ def test_the_stages_and_phases_match_the_pipeline() -> None:
         "Write",
         "Check and publish",
     ]
-    # The four phases cover the 13 stages once, in order.
+    # The four phases cover the 14 stages once, in order.
     assert tuple(stage for _key, _word, stages in phases for stage in stages) == STAGE_NAMES
 
 
@@ -241,7 +241,7 @@ def test_run_at_work() -> None:
         ]"""
     )
     assert result == [
-        "Run at work: compile (step 4/13)",
+        "Run at work: compile (step 4/14)",
         "Run at work",
         "Run at work: mystery",
         "1 document: PLN-2026-003 indice B",

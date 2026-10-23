@@ -97,10 +97,23 @@
           "type": "string"
         },
         "lang": {
-          "const": "en",
           "default": "en",
+          "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
           "title": "Lang",
           "type": "string"
+        },
+        "translation_of": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Translation Of"
         },
         "sensitivity": {
           "enum": [
@@ -238,10 +251,23 @@
           "type": "string"
         },
         "lang": {
-          "const": "en",
           "default": "en",
+          "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
           "title": "Lang",
           "type": "string"
+        },
+        "translation_of": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Translation Of"
         },
         "sensitivity": {
           "enum": [
@@ -305,10 +331,23 @@
           "type": "string"
         },
         "lang": {
-          "const": "en",
           "default": "en",
+          "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
           "title": "Lang",
           "type": "string"
+        },
+        "translation_of": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Translation Of"
         },
         "sensitivity": {
           "enum": [
@@ -396,10 +435,23 @@
           "type": "string"
         },
         "lang": {
-          "const": "en",
           "default": "en",
+          "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
           "title": "Lang",
           "type": "string"
+        },
+        "translation_of": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Translation Of"
         },
         "sensitivity": {
           "enum": [
@@ -464,10 +516,23 @@
           "type": "string"
         },
         "lang": {
-          "const": "en",
           "default": "en",
+          "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
           "title": "Lang",
           "type": "string"
+        },
+        "translation_of": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Translation Of"
         },
         "sensitivity": {
           "enum": [
@@ -531,10 +596,23 @@
           "type": "string"
         },
         "lang": {
-          "const": "en",
           "default": "en",
+          "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
           "title": "Lang",
           "type": "string"
+        },
+        "translation_of": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Translation Of"
         },
         "sensitivity": {
           "enum": [
@@ -598,10 +676,23 @@
           "type": "string"
         },
         "lang": {
-          "const": "en",
           "default": "en",
+          "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
           "title": "Lang",
           "type": "string"
+        },
+        "translation_of": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Translation Of"
         },
         "sensitivity": {
           "enum": [
@@ -695,10 +786,23 @@
           "type": "string"
         },
         "lang": {
-          "const": "en",
           "default": "en",
+          "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
           "title": "Lang",
           "type": "string"
+        },
+        "translation_of": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Translation Of"
         },
         "sensitivity": {
           "enum": [
@@ -948,10 +1052,23 @@
           "type": "string"
         },
         "lang": {
-          "const": "en",
           "default": "en",
+          "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
           "title": "Lang",
           "type": "string"
+        },
+        "translation_of": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Translation Of"
         },
         "sensitivity": {
           "enum": [
@@ -1076,10 +1193,23 @@
           "type": "string"
         },
         "lang": {
-          "const": "en",
           "default": "en",
+          "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
           "title": "Lang",
           "type": "string"
+        },
+        "translation_of": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Translation Of"
         },
         "sensitivity": {
           "enum": [

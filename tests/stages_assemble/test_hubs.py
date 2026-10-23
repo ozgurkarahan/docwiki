@@ -199,7 +199,8 @@ def test_the_details_take_their_labels_from_the_pack_never_from_the_keys():
     content = [source_page(raw, "Devis", "# Devis\n", slug="devis")]
     hubs = build_hubs(content, batiment, stamp=STAMP, updated=DAY)
     moreau = next(page for page in hubs.pages if page.path == "chantiers/moreau.md").body
-    details = moreau.split("## Details", 1)[1].split("## Documents", 1)[0]
+    # the batiment wiki is French (v1.7, ADR 0012): generated headings come from its table
+    details = moreau.split("## Détails", 1)[1].split("## Documents", 1)[0]
     assert "| Maître d'œuvre | aucun |" in details
     assert "| Conducteur de travaux | Inès Roux |" in details
     # the phase shows its title from scopes.yaml, once
@@ -217,7 +218,7 @@ def test_the_details_take_their_labels_from_the_pack_never_from_the_keys():
         "Works",
     ]
     # the batiment pack has views: the hub says when none has rows for it
-    assert "No computed view has rows for this chantier." in moreau
+    assert "Aucune vue calculée n'a de ligne pour ce chantier." in moreau
 
 
 def test_the_dashboard_shortens_long_titles_and_says_when_a_date_is_not_the_documents():

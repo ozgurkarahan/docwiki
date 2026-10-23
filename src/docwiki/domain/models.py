@@ -19,6 +19,7 @@ from docwiki.contracts._base import (
     sha256_hex,
 )
 from docwiki.contracts.enums import Sensitivity
+from docwiki.contracts.i18n import CORE_STRINGS, STRUCTURAL_KEYS, Strings
 from docwiki.contracts.ids import RESERVED_ENTITY_TYPES
 from docwiki.contracts.layout import CORE_SKILLS
 
@@ -86,8 +87,12 @@ class PackInfo(ContractModel):
     wiki_title: NonEmptyStr
     fictional: bool = False
     banner: str | None = None
+    wiki_languages: Annotated[list[LangCode], Field(min_length=1)] = ["en"]
+    """The languages of the wiki (v1.7, ADR 0012): the first is canonical (the language the
+    pages are compiled in), the others get a mirror written by the ``translate`` stage under
+    ``wiki/<lang>/``. A pack that does not declare it keeps the English-only wiki."""
 
-    @field_validator("languages")
+    @field_validator("languages", "wiki_languages")
     @classmethod
     def _languages(cls, value: list[str]) -> list[str]:
         _unique(value, "language")
@@ -543,6 +548,9 @@ class DomainPack(ContractModel):
     resolution: ResolutionFile = Field(default_factory=ResolutionFile)
     hints: str | None = None
     skill_templates: dict[str, str] = {}
+    i18n: dict[LangCode, dict[NonEmptyStr, str]] = {}
+    """Pack overrides of the generated wiki strings, ``i18n/<lang>.yaml`` (v1.7, ADR 0012):
+    language → key → template; structural keys (headings) cannot be overridden."""
     overlay_applied: bool = False
 
     @field_validator("skill_templates")
@@ -557,9 +565,41 @@ class DomainPack(ContractModel):
                 raise ValueError(f"skill {name!r} clashes with a core skill")
         return value
 
+    @field_validator("i18n")
+    @classmethod
+    def _i18n(cls, value: dict[str, dict[str, str]]) -> dict[str, dict[str, str]]:
+        known = set(CORE_STRINGS["en"])
+        for lang, table in value.items():
+            for key in table:
+                if key in STRUCTURAL_KEYS:
+                    raise ValueError(f"{lang}: {key!r} is a structural heading and cannot change")
+                if key not in known:
+                    raise ValueError(f"{lang}: unknown string key {key!r}")
+        return value
+
     @property
     def name(self) -> str:
         return self.info.name
+
+    @property
+    def wiki_languages(self) -> list[str]:
+        """The wiki languages, canonical first (``["en"]`` unless the pack declares them)."""
+        return list(self.info.wiki_languages)
+
+    @property
+    def canonical_lang(self) -> str:
+        """The language the wiki is compiled in (``wiki_languages[0]``)."""
+        return self.info.wiki_languages[0]
+
+    @property
+    def mirror_langs(self) -> list[str]:
+        """The languages of the mirrors written by the ``translate`` stage (may be empty)."""
+        return list(self.info.wiki_languages[1:])
+
+    def strings(self, lang: str | None = None) -> Strings:
+        """The generated-text table of ``lang`` (default: canonical) with the pack overrides."""
+        chosen = lang or self.canonical_lang
+        return Strings(chosen, self.i18n.get(chosen))
 
     def content_hash(self) -> str:
         """SHA-256 of the canonical pack content (overlay included) — the ``domain_pack_hash``."""

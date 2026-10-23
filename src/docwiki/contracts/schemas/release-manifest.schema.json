@@ -44,7 +44,8 @@
             "G13",
             "G14",
             "G15",
-            "G16"
+            "G16",
+            "G17"
           ],
           "title": "Gate",
           "type": "string"
@@ -252,7 +253,8 @@
             "G13",
             "G14",
             "G15",
-            "G16"
+            "G16",
+            "G17"
           ],
           "title": "Gate",
           "type": "string"
@@ -380,6 +382,18 @@
       "default": {},
       "title": "Files",
       "type": "object"
+    },
+    "wiki_languages": {
+      "default": [
+        "en"
+      ],
+      "items": {
+        "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Wiki Languages",
+      "type": "array"
     }
   },
   "required": [

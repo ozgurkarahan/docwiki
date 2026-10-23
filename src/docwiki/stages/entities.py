@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from docwiki.contracts.enums import max_sensitivity
+from docwiki.contracts.i18n import language_name
 from docwiki.contracts.ids import entity_page_path, normalize_tags
 from docwiki.contracts.markdown import relative_link
 from docwiki.contracts.pages import (
@@ -63,7 +64,7 @@ __all__ = [
     "fact_date",
 ]
 
-STAGE_VERSION = "2"
+STAGE_VERSION = "3"
 PROMPT_VERSION = load_prompt("entity-summary").version
 SCHEMA_NAME = "entity_summary"
 MAX_SUMMARY_FACTS = 40
@@ -207,10 +208,12 @@ def _summary_request(
     facts: Sequence[_EntityFact],
     infos: Mapping[str, SourceInfo],
     locked: str = "",
+    lang: str = "en",
 ) -> str:
     lines = [
         "# Task",
         "Write the introduction of the entity page described below.",
+        f"Wiki language: {language_name(lang)}.",
         "",
         "# Entity (reviewed registry)",
         f"- id: {entry.id}",
@@ -241,6 +244,7 @@ async def _summarize(
     facts: Sequence[_EntityFact],
     infos: Mapping[str, SourceInfo],
     locked: str = "",
+    lang: str = "en",
 ) -> EntitySummaryOutput | None:
     """The model's introduction, or None without facts or when the call fails for this entity."""
     if not facts:
@@ -249,7 +253,7 @@ async def _summarize(
         result = await llm.structured(
             tier="fast",
             system=load_prompt("entity-summary").text,
-            user=_summary_request(entry, type_title, facts, infos, locked),
+            user=_summary_request(entry, type_title, facts, infos, locked, lang),
             output=EntitySummaryOutput,
             schema_name=SCHEMA_NAME,
             prompt_version=PROMPT_VERSION,
@@ -317,7 +321,8 @@ def _render(
     stamp: DocwikiStamp,
 ) -> tuple[Page, list[CitedLocator]]:
     path = entity_page_path(entry.id)
-    footnotes = Footnotes(path, {sid: info.title for sid, info in infos.items()})
+    t = pack.strings()
+    footnotes = Footnotes(path, {sid: info.title for sid, info in infos.items()}, t)
     title = clean_title(entry.label) or entry.label
     lines = [f"# {title}", ""]
     banner = banner_line(pack)
@@ -331,19 +336,16 @@ def _render(
         plain = " ".join(text for text, _ in summary)
     else:
         count = len(sources)
-        plain = (
-            f"{title} is an entity of type {type_title.lower()} in the domain registry, "
-            f"mentioned in {count} source document{'s' if count != 1 else ''}."
-        )
+        plain = t.count("entity.intro", count, title=title, type_title=type_title.lower())
         intro = plain
-    lines += [intro, "", "## Facts", ""]
+    lines += [intro, "", f"## {t.heading('facts')}", ""]
     if facts:
         for fact in facts:
-            text = f"Superseded: {fact.text}" if fact.superseded else fact.text
+            text = t("entity.superseded_fact", text=fact.text) if fact.superseded else fact.text
             lines.append(f"- {attach_refs(text, footnotes.cite_all(fact.citations))}")
     else:
-        lines.append("No verified facts name this entity yet.")
-    lines += ["", "## Timeline", ""]
+        lines.append(t("entity.no_facts"))
+    lines += ["", f"## {t.heading('timeline')}", ""]
     dated = sorted(
         (fact for fact in facts if fact.date), key=lambda fact: (fact.date or "", fact.text)
     )
@@ -353,11 +355,11 @@ def _render(
                 f"- {fact.date}: {attach_refs(fact.text, footnotes.cite_all(fact.citations))}"
             )
     else:
-        lines.append("No dated facts.")
-    lines += ["", "## Documents", ""]
+        lines.append(t("entity.no_dated"))
+    lines += ["", f"## {t.heading('documents')}", ""]
     for source_id in sorted(sources, key=lambda sid: source_order(infos[sid])):
         info = infos[source_id]
-        suffix = " (superseded)" if info.status == "superseded" else ""
+        suffix = t("entity.superseded_suffix") if info.status == "superseded" else ""
         lines.append(f"- [{info.title}]({relative_link(path, info.path)}){suffix}")
     lines += ["", *footnotes.sources_section()]
     aliases: list[Alias] = []
@@ -372,6 +374,7 @@ def _render(
         id=entry.id,
         title=title,
         summary=summary_line,
+        lang=pack.canonical_lang,
         sensitivity=max_sensitivity(*(infos[sid].sensitivity for sid in sources)),  # type: ignore[arg-type]
         updated=release_date(stamp),
         tags=normalize_tags([entry.type]),
@@ -434,6 +437,7 @@ async def build_entity_pages(
                 facts,
                 infos,
                 locked_terms_note(pack),
+                pack.canonical_lang,
             )
             for entry, _, facts in jobs
         )

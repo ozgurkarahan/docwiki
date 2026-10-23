@@ -1,9 +1,12 @@
 // DocWiki Quartz configuration (copied over the pinned Quartz checkout by docwiki.site.build_site).
 // docwiki-site.json is generated per build from the release (title, base URL, banner, sources).
 import { QuartzConfig } from "./quartz/cfg"
+import * as Component from "./quartz/components"
 import * as Plugin from "./quartz/plugins"
 import { DocWiki } from "./quartz/plugins/transformers/docwiki"
-import { settings } from "./quartz/components/docwiki/settings"
+import { FolderBody, Localized } from "./quartz/components/docwiki"
+import { stringsFor } from "./quartz/components/docwiki/i18n"
+import { canonicalLang, languages, settings } from "./quartz/components/docwiki/settings"
 
 const config: QuartzConfig = {
   configuration: {
@@ -12,7 +15,9 @@ const config: QuartzConfig = {
     enableSPA: true,
     enablePopovers: true,
     analytics: null,
-    locale: "en-US",
+    // The canonical language's locale (ADR 0012); pages of a mirror get theirs per page
+    // (DocWiki.Localized, and their `lang`).
+    locale: stringsFor(canonicalLang).locale,
     baseUrl: settings.baseUrl ?? undefined,
     ignorePatterns: [],
     defaultDateType: "modified",
@@ -59,6 +64,7 @@ const config: QuartzConfig = {
       DocWiki({
         releaseDate: settings.releaseDate,
         siteBanner: !!settings.banner,
+        languages: [...languages],
         sourceLangs: Object.fromEntries(
           Object.entries(settings.sources).map(([id, source]) => [id, source.lang ?? null]),
         ),
@@ -78,8 +84,15 @@ const config: QuartzConfig = {
     emitters: [
       Plugin.ComponentResources(),
       Plugin.ContentPage(),
-      Plugin.FolderPage(),
-      Plugin.TagPage(),
+      // Folder and tag listings speak their page's language; a mirror's home (`en/index`) reads
+      // like the home page, without the listing.
+      Plugin.FolderPage({
+        pageBody: FolderBody({
+          home: Component.Content(),
+          folder: Localized(Component.FolderContent()),
+        }),
+      }),
+      Plugin.TagPage({ pageBody: Localized(Component.TagContent()) }),
       Plugin.ContentIndex({ enableSiteMap: !!settings.baseUrl, enableRSS: !!settings.baseUrl }),
       Plugin.Assets(),
       Plugin.Static(),

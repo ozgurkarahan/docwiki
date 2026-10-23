@@ -264,6 +264,43 @@ def _load_skills(root: Path, errors: list[PackError]) -> dict[str, str]:
     return templates
 
 
+I18N_DIR = "i18n"
+"""Optional pack folder of generated-string overrides, one ``<lang>.yaml`` per language."""
+
+
+def _load_i18n(root: Path, errors: list[PackError]) -> dict[str, dict[str, str]]:
+    """``i18n/<lang>.yaml`` files: flat mappings of string key → template (v1.7, ADR 0012)."""
+    from docwiki.contracts.i18n import CORE_STRINGS, STRUCTURAL_KEYS
+
+    folder = root / I18N_DIR
+    tables: dict[str, dict[str, str]] = {}
+    if not folder.is_dir():
+        return tables
+    known = set(CORE_STRINGS["en"])
+    for child in sorted(folder.iterdir()):
+        rel = f"{I18N_DIR}/{child.name}"
+        if not child.is_file() or child.suffix != ".yaml":
+            errors.append(PackError(rel, "", "expected <lang>.yaml files only"))
+            continue
+        try:
+            data = load_yaml_mapping(child.read_text(encoding="utf-8"), where=rel)
+        except FrontmatterError as exc:
+            errors.append(PackError(rel, "", str(exc)))
+            continue
+        table: dict[str, str] = {}
+        for key, value in data.items():
+            if not isinstance(value, str):
+                errors.append(PackError(rel, key, "expected a string"))
+            elif key in STRUCTURAL_KEYS:
+                errors.append(PackError(rel, key, "structural headings cannot be overridden"))
+            elif key not in known:
+                errors.append(PackError(rel, key, "unknown string key"))
+            else:
+                table[key] = value
+        tables[child.stem] = table
+    return tables
+
+
 def load_pack(path: str | Path, *, overlay: str | Path | None = None) -> DomainPack:
     """Load and validate the pack folder ``path``; apply ``overlay`` (``overlay.yaml``) if given.
 
@@ -277,7 +314,7 @@ def load_pack(path: str | Path, *, overlay: str | Path | None = None) -> DomainP
     errors: list[PackError] = []
     for child in sorted(root.iterdir()):
         if child.is_dir():
-            if child.name != "skills":
+            if child.name not in ("skills", I18N_DIR):
                 errors.append(PackError(child.name, "", "unknown folder in domain pack"))
         elif child.name not in PACK_FILES and child.name not in _IGNORED_FILES:
             errors.append(PackError(child.name, "", "unknown file in domain pack"))
@@ -294,6 +331,7 @@ def load_pack(path: str | Path, *, overlay: str | Path | None = None) -> DomainP
     hints_path = root / "hints.md"
     hints = hints_path.read_text(encoding="utf-8") if hints_path.is_file() else None
     skills = _load_skills(root, errors)
+    i18n = _load_i18n(root, errors)
     if errors:
         raise PackValidationError(errors)
     try:
@@ -311,9 +349,19 @@ def load_pack(path: str | Path, *, overlay: str | Path | None = None) -> DomainP
             resolution=parsed.get("resolution.yaml", ResolutionFile()),
             hints=hints,
             skill_templates=skills,
+            i18n=i18n,
         )
     except ValidationError as exc:
         raise PackValidationError(errors_from_validation("skills", exc)) from exc
+    for lang in pack.i18n:
+        if lang not in pack.wiki_languages:
+            errors.append(
+                PackError(
+                    f"{I18N_DIR}/{lang}.yaml",
+                    "",
+                    f"{lang!r} is not one of the wiki_languages of pack.yaml",
+                )
+            )
     _cross_checks(pack, errors)
     _check_views(pack, errors)
     if errors:

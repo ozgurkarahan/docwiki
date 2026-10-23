@@ -23,6 +23,7 @@ from docwiki.contracts.catalog import Catalog, catalog_page_for, catalog_source_
 from docwiki.contracts.enums import BADGES, allowed_for_audience, max_sensitivity
 from docwiki.contracts.frontmatter import FrontmatterError
 from docwiki.contracts.gates import Violation
+from docwiki.contracts.i18n import MIRRORED_PAGE_TYPES, heading_variants, untranslated_marker
 from docwiki.contracts.ids import (
     RELEASE_ID_RE,
     SOURCE_ID_RE,
@@ -83,6 +84,8 @@ _BADGES_BY_PROVENANCE = {
 }
 _TEXT_SUFFIXES = (".md", ".json", ".txt")
 _SAFETY_GATE = "G05"
+_ANY_LANGUAGE_TYPES = frozenset({"query", "meta"})
+"""Canonical pages that need not be in the canonical language (v1.7)."""
 
 
 @dataclass
@@ -98,6 +101,26 @@ class _State:
     offsets: dict[str, int] = field(default_factory=dict)
     cache: dict[Path, bytes] = field(default_factory=dict)
     layout: ReleaseLayout | None = None
+    languages: list[str] = field(default_factory=lambda: ["en"])
+    """The wiki languages (v1.7, ADR 0012), canonical first: from the manifest, else the
+    catalog, else English only."""
+
+    def canonical_pages(self) -> dict[str, Page]:
+        """The canonical wiki (mirror pages left out), by wiki path."""
+        return {rel: page for rel, page in self.pages.items() if not page.is_mirror}
+
+    def trees(self) -> list[dict[str, Page]]:
+        """The canonical wiki, then each mirror tree: pages by wiki path."""
+        groups = [self.canonical_pages()]
+        for lang in self.languages[1:]:
+            groups.append(
+                {
+                    rel: page
+                    for rel, page in self.pages.items()
+                    if page.is_mirror and page.frontmatter.lang == lang
+                }
+            )
+        return groups
 
     @property
     def lay(self) -> ReleaseLayout:
@@ -287,6 +310,19 @@ def _check_manifest(
 
 def _expected_page_path(page: Page) -> str | None:
     fm = page.frontmatter
+    if fm.translation_of is not None:
+        # a mirror page (v1.7, ADR 0012): the canonical path under <lang>/
+        prefix = f"{fm.lang}/"
+        if not page.path.startswith(prefix):
+            return None
+        canonical = Page(path=page.path[len(prefix) :], frontmatter=fm, body="")
+        expected = _expected_canonical_path(canonical)
+        return f"{prefix}{expected}" if expected else None
+    return _expected_canonical_path(page)
+
+
+def _expected_canonical_path(page: Page) -> str | None:
+    fm = page.frontmatter
     if isinstance(fm, SourceFrontmatter):
         return (
             page.path
@@ -359,6 +395,7 @@ def _load_wiki(state: _State) -> None:
             continue
         state.pages[rel] = page
         state.offsets[rel] = text[: len(text) - len(page.body)].count("\n")
+        _check_page_lang(state, page, rel)
         expected = _expected_page_path(page)
         if expected != rel:
             state.add(
@@ -384,6 +421,29 @@ def _load_wiki(state: _State) -> None:
                 state.wiki_display(rel),
             )
         state.headings[rel] = {heading.anchor for heading in extract_headings(page.body)}
+
+
+def _check_page_lang(state: _State, page: Page, rel: str) -> None:
+    """A canonical page is in the canonical language (a filed research answer keeps the language
+    it was filed in, the agent files and run pages are English); a mirror page is in one of the
+    mirror languages (v1.7, ADR 0012)."""
+    fm = page.frontmatter
+    shown = state.wiki_display(rel)
+    if fm.translation_of is not None:
+        if fm.lang not in state.languages[1:]:
+            state.add(
+                "G01",
+                "page-lang",
+                f"mirror page in {fm.lang!r}, not a mirror language of this wiki {state.languages}",
+                shown,
+            )
+    elif fm.lang != state.languages[0] and fm.type not in _ANY_LANGUAGE_TYPES:
+        state.add(
+            "G01",
+            "page-lang",
+            f"canonical page in {fm.lang!r}; the wiki is written in {state.languages[0]!r}",
+            shown,
+        )
 
 
 def _load_evidence(state: _State, source_ids: set[str] | None) -> None:
@@ -602,9 +662,9 @@ def _check_footnotes(
 def _check_cited_lists(state: _State, ns_path: str, page: Page) -> None:
     fm = page.frontmatter
     wanted = (
-        {"Key facts"}
+        set(heading_variants("key_facts"))
         if isinstance(fm, SourceFrontmatter)
-        else {"Facts", "Timeline"}
+        else heading_variants("facts") | heading_variants("timeline")
         if isinstance(fm, EntityFrontmatter)
         else set()
     )
@@ -646,6 +706,13 @@ def _check_catalog(state: _State, manifest: ReleaseManifest | None) -> None:
         state.add("G01", "catalog-invalid", _summarize(exc), ReleaseFiles.CATALOG)
         return
     state.catalog = catalog
+    if catalog.wiki_languages != state.languages:
+        state.add(
+            "G01",
+            "catalog-languages",
+            f"catalog wiki_languages {catalog.wiki_languages} differ from {state.languages}",
+            ReleaseFiles.CATALOG,
+        )
     if state.release_id and catalog.release_id != state.release_id:
         state.add(
             "G01",
@@ -698,9 +765,10 @@ def _check_catalog(state: _State, manifest: ReleaseManifest | None) -> None:
                 f"{entry.id} is {entry.sensitivity}",
                 ReleaseFiles.CATALOG,
             )
+    canonical = state.canonical_pages()
     expected_sources = {
         page.frontmatter.source_id: catalog_source_for(page.frontmatter)
-        for page in state.pages.values()
+        for page in canonical.values()
         if isinstance(page.frontmatter, SourceFrontmatter)
     }
     actual_sources = {source.source_id: source for source in catalog.sources}
@@ -730,11 +798,15 @@ def _check_catalog(state: _State, manifest: ReleaseManifest | None) -> None:
                     ReleaseFiles.CATALOG,
                 )
     edges = {(edge.from_, edge.to, edge.kind) for edge in catalog.edges}
-    page_ids = {page.frontmatter.id: page for page in state.pages.values()}
+    page_ids = {page.frontmatter.id: page for page in canonical.values()}
     tiers = {page_id: page.frontmatter.sensitivity for page_id, page in page_ids.items()}
     for page in state.pages.values():
         fm = page.frontmatter
         rel = state.wiki_display(page.path)
+        if page.is_mirror:
+            # edges are the canonical wiki's; a mirror page's sources are checked all the same
+            _check_page_sources(state, page, tiers, rel)
+            continue
         if isinstance(fm, SourceFrontmatter):
             for entity_id in fm.entities:
                 if entity_id not in page_ids:
@@ -813,9 +885,15 @@ def _intro_targets(page: Page) -> set[str | None]:
 
 
 def _check_supersession(state: _State) -> None:
+    for tree in state.trees():
+        _check_supersession_tree(state, tree)
+
+
+def _check_supersession_tree(state: _State, tree: Mapping[str, Page]) -> None:
+    """G11 within one language tree (the canonical wiki or one mirror)."""
     sources: dict[str, tuple[Page, SourceFrontmatter]] = {
         page.frontmatter.id: (page, page.frontmatter)
-        for page in state.pages.values()
+        for page in tree.values()
         if isinstance(page.frontmatter, SourceFrontmatter)
     }
     for page, fm in sources.values():
@@ -853,19 +931,19 @@ def _check_supersession(state: _State) -> None:
                 state.add(
                     "G11", "superseded-status", f"{older_id} must have status superseded", rel
                 )
-    for page in state.pages.values():
+    for page in tree.values():
         topic = page.frontmatter
         if not isinstance(topic, TopicFrontmatter):
             continue
         headings = {section.heading for section in split_sections(page.body)}
-        if topic.superseded_claims and "Superseded information" not in headings:
+        if topic.superseded_claims and not headings & heading_variants("superseded"):
             state.add(
                 "G11",
                 "superseded-section",
                 "topic with superseded claims needs '## Superseded information'",
                 state.wiki_display(page.path),
             )
-        if topic.contradictions and "Contradictions" not in headings:
+        if topic.contradictions and not headings & heading_variants("contradictions"):
             state.add(
                 "G11",
                 "contradictions-section",
@@ -1123,6 +1201,53 @@ def _check_tables(state: _State, source_ids: set[str]) -> None:
                 )
 
 
+def _check_mirrors(state: _State) -> None:
+    """G17 (v1.7, ADR 0012): every canonical page of a mirrored type has its mirror in each
+    other wiki language (warning when it is missing or was kept untranslated); a mirror page
+    always translates a canonical page of the same path (error)."""
+    mirrors = state.languages[1:]
+    if not mirrors:
+        return
+    canonical = state.canonical_pages()
+    for rel, page in sorted(state.pages.items()):
+        fm = page.frontmatter
+        if not page.is_mirror:
+            continue
+        original = canonical.get(rel.removeprefix(f"{fm.lang}/"))
+        if original is None or original.frontmatter.id != fm.translation_of:
+            state.add(
+                "G01",
+                "mirror-orphan",
+                f"{fm.translation_of} has no canonical page at the same path",
+                state.wiki_display(rel),
+            )
+    for rel, page in sorted(canonical.items()):
+        if page.frontmatter.type not in MIRRORED_PAGE_TYPES:
+            continue
+        for lang in mirrors:
+            mirror = state.pages.get(f"{lang}/{rel}")
+            shown = state.wiki_display(f"{lang}/{rel}")
+            if mirror is None or mirror.frontmatter.translation_of != page.frontmatter.id:
+                state.add(
+                    "G17",
+                    "mirror-missing",
+                    f"{page.frontmatter.id} has no {lang} mirror",
+                    shown,
+                    warning=True,
+                )
+            elif mirror.body.lstrip().startswith(untranslated_marker(lang)) or (
+                f"\n{untranslated_marker(lang)}" in mirror.body
+            ):
+                state.add(
+                    "G17",
+                    "mirror-untranslated",
+                    f"{page.frontmatter.id}: the {lang} translation was rejected, the page is "
+                    "shown untranslated",
+                    shown,
+                    warning=True,
+                )
+
+
 def _check_orphans(state: _State, inbound: dict[str, set[str]], threshold: float) -> None:
     candidates = [path for path in state.pages if path != WikiFiles.INDEX]
     if not candidates:
@@ -1261,6 +1386,9 @@ def validate_release(
     state.release_id = (manifest.release_id if manifest else None) or (
         raw_catalog.get("release_id") if isinstance(raw_catalog.get("release_id"), str) else None  # type: ignore[assignment]
     )
+    languages = manifest.wiki_languages if manifest else raw_catalog.get("wiki_languages")
+    if isinstance(languages, list) and languages and all(isinstance(x, str) for x in languages):
+        state.languages = list(languages)
     _load_wiki(state)
     _check_catalog(state, manifest)
     source_ids = {
@@ -1271,7 +1399,7 @@ def validate_release(
     _load_evidence(state, source_ids)
     source_titles = {
         page.frontmatter.source_id: page.frontmatter.title
-        for page in state.pages.values()
+        for page in state.canonical_pages().values()
         if isinstance(page.frontmatter, SourceFrontmatter)
     }
     inbound: dict[str, set[str]] = {}
@@ -1288,6 +1416,7 @@ def validate_release(
     _check_search_db(state)
     _check_tables(state, source_ids)
     _check_orphans(state, inbound, orphan_threshold)
+    _check_mirrors(state)
     if locked_terms:
         _check_locked_vocabulary(state, locked_terms)
     if glossary_seeded and state.catalog is not None and not state.catalog.glossary:

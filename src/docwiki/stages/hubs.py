@@ -28,6 +28,7 @@ from datetime import date
 from typing import TYPE_CHECKING
 
 from docwiki.contracts.enums import max_sensitivity
+from docwiki.contracts.i18n import Strings, core_strings
 from docwiki.contracts.ids import (
     format_hub_id,
     format_view_id,
@@ -35,7 +36,7 @@ from docwiki.contracts.ids import (
     index_page_path,
     view_page_path,
 )
-from docwiki.contracts.markdown import relative_link
+from docwiki.contracts.markdown import heading_anchor, relative_link
 from docwiki.contracts.pages import (
     DocwikiStamp,
     EntityFrontmatter,
@@ -66,7 +67,7 @@ __all__ = [
     "source_scope",
 ]
 
-STAGE_VERSION = "3"
+STAGE_VERSION = "4"
 NO_PHASE = "No phase"
 MAX_SUBJECTS = 3
 """Subjects shown per open contradiction on a hub; the others are counted."""
@@ -318,20 +319,23 @@ def _phase_text(pack: DomainPack, key: str | None) -> str:
     return f"{key} {title}" if title and title != key else key
 
 
-def _status(page: Page, from_path: str, by_id: Mapping[str, Page]) -> str:
+def _status(page: Page, from_path: str, by_id: Mapping[str, Page], t: Strings) -> str:
     fm = page.frontmatter
     assert isinstance(fm, SourceFrontmatter)
     if fm.status != "superseded":
-        return fm.status
+        return t.status(fm.status)
     newer = _by_title(by_id[sid] for sid in fm.superseded_by if sid in by_id)
     if not newer:
-        return "superseded"
-    return "superseded by " + ", ".join(
-        md_link(item.frontmatter.title, from_path, item.path) for item in newer
+        return t.status("superseded")
+    return t(
+        "hub.superseded_by",
+        links=", ".join(md_link(item.frontmatter.title, from_path, item.path) for item in newer),
     )
 
 
-def _documents(summary: ScopeSummary, pack: DomainPack, by_id: Mapping[str, Page]) -> list[str]:
+def _documents(
+    summary: ScopeSummary, pack: DomainPack, by_id: Mapping[str, Page], t: Strings
+) -> list[str]:
     scopes = pack.scopes
     assert scopes is not None
     grouped: dict[str | None, list[Page]] = {}
@@ -341,11 +345,11 @@ def _documents(summary: ScopeSummary, pack: DomainPack, by_id: Mapping[str, Page
         assert isinstance(fm, SourceFrontmatter)
         phase = _source_phase(pack, fm)
         grouped.setdefault(phase if phase in known else None, []).append(page)
-    lines = ["## Documents", ""]
+    lines = [f"## {t.heading('documents')}", ""]
     order: list[tuple[str | None, str]] = [
-        (phase.key, f"Phase {_phase_text(pack, phase.key)}") for phase in scopes.phases
+        (phase.key, t("hub.phase", phase=_phase_text(pack, phase.key))) for phase in scopes.phases
     ]
-    order.append((None, NO_PHASE))
+    order.append((None, t("hub.no_phase")))
     shown = [(key, title) for key, title in order if key in grouped]
     for key, title in shown:
         if len(shown) > 1 or key is not None:
@@ -360,13 +364,13 @@ def _documents(summary: ScopeSummary, pack: DomainPack, by_id: Mapping[str, Page
         )
         for page in members:
             link = md_link(page.frontmatter.title, summary.path, page.path)
-            lines.append(f"- {link}: {_status(page, summary.path, by_id)}")
+            lines.append(f"- {link}: {_status(page, summary.path, by_id, t)}")
         lines.append("")
     return lines
 
 
 def _contradiction_lines(
-    items: Sequence[OpenContradiction], path: str, by_id: Mapping[str, Page]
+    items: Sequence[OpenContradiction], path: str, by_id: Mapping[str, Page], t: Strings
 ) -> list[str]:
     """One line per distinct open contradiction: its two sources, subjects and topics; then the
     topics written before v1.7 with their count."""
@@ -374,7 +378,7 @@ def _contradiction_lines(
     for item in items:
         topics = ", ".join(md_link(p.frontmatter.title, path, p.path) for p in item.topics)
         if not item.sources:
-            line = f"- {topics}: {item.count} {plural('contradiction', item.count)}"
+            line = t.count("hub.contradiction_count", item.count, topics=topics)
             rows.append((True, [], line))
             continue
         # the two sources in title order, each linked to its page (its id when it has none)
@@ -387,15 +391,17 @@ def _contradiction_lines(
         ]
         shown = [inline_text(subject) for subject in item.subjects[:MAX_SUBJECTS]]
         more = len(item.subjects) - len(shown)
-        subjects = "; ".join(shown) + (f"; and {more} more" if more > 0 else "")
-        line = f"- {links[0]} and {links[1]}: {subjects} (in {topics})."
+        subjects = "; ".join(shown) + (t("hub.more_subjects", count=more) if more > 0 else "")
+        line = t(
+            "hub.contradiction", first=links[0], second=links[1], subjects=subjects, topics=topics
+        )
         rows.append((False, names, line))
     return [line for *_, line in sorted(rows, key=lambda row: (row[0], row[1]))]
 
 
-def _counts(summary: ScopeSummary) -> str:
+def _counts(summary: ScopeSummary, t: Strings | None = None) -> str:
     count = len(summary.sources)
-    return f"{count} {plural('document', count)}, last received {summary.last_date.isoformat()}."
+    return (t or core_strings()).count("hub.counts", count, date=summary.last_date.isoformat())
 
 
 def _hub_page(
@@ -405,69 +411,70 @@ def _hub_page(
     *,
     stamp: DocwikiStamp,
     updated: date,
+    t: Strings,
 ) -> Page:
     scopes = pack.scopes
     assert scopes is not None
     path = summary.path
     noun = scopes.title.lower()
     last_title = summary.last.frontmatter.title
-    summary_text = one_line(f"{summary.label}: {_counts(summary)}")
+    counts = _counts(summary, t)
+    summary_text = one_line(f"{summary.label}: {counts}")
     lines = [f"# {inline_text(summary.label)}", ""]
     if pack.info.banner:
         lines += [f"> {inline_text(pack.info.banner)}", ""]
     lines += [
-        inline_text(_counts(summary)[:1].upper() + _counts(summary)[1:])
-        + " Built by code from the documents' folders and the domain pack; the facts themselves "
-        "are on the cited source and topic pages.",
+        inline_text(counts[:1].upper() + counts[1:]) + t("hub.built_by_code"),
         "",
-        "## Details",
+        f"## {t.heading('details')}",
         "",
     ]
     attributes = _attributes(summary.entry, pack)
     if attributes:
         lines += [
-            "From the domain pack's registry (reviewed, not read from the documents).",
+            t("hub.registry"),
             "",
-            "| Attribute | Value |",
+            t("hub.attribute_header"),
             "|---|---|",
         ]
         lines += [f"| {inline_text(label)} | {inline_text(value)} |" for label, value in attributes]
     else:
-        lines.append(f"The domain pack's registry has no entry for {inline_text(summary.label)}.")
+        lines.append(t("hub.no_registry", label=inline_text(summary.label)))
     lines.append("")
-    lines += _documents(summary, pack, by_id)
-    lines += ["## Topics", ""]
+    lines += _documents(summary, pack, by_id, t)
+    lines += [f"## {t.heading('topics')}", ""]
     if summary.topics:
         for page in summary.topics:
             link = md_link(page.frontmatter.title, path, page.path)
             text = inline_text(page.frontmatter.summary) if page.frontmatter.summary else ""
             lines.append(f"- {link}: {text}" if text else f"- {link}")
     else:
-        lines.append("No topic synthesises these documents yet.")
-    lines += ["", "## Entities", ""]
+        lines.append(t("hub.no_topics"))
+    lines += ["", f"## {t.heading('entities')}", ""]
     if summary.entities:
         lines += [
             f"- {md_link(page.frontmatter.title, path, page.path)}" for page in summary.entities
         ]
     else:
-        lines.append("No registry entity is mentioned by these documents yet.")
+        lines.append(t("hub.no_entities"))
     if pack.views is not None and pack.views.views:
-        lines += ["", "## Computed views", ""]
+        lines += ["", f"## {t.heading('computed_views')}", ""]
         if summary.views:
             lines += [
-                f"- {md_link(title, path, view_path)}: {rows} {plural('row', rows)} for this {noun}"
+                "- "
+                + t.count("hub.view_rows", rows, link=md_link(title, path, view_path), noun=noun)
                 for title, view_path, rows in summary.views
             ]
         else:
-            lines.append(f"No computed view has rows for this {noun}.")
-    lines += ["", "## Open contradictions", ""]
+            lines.append(t("hub.no_views", noun=noun))
+    lines += ["", f"## {t.heading('open_contradictions')}", ""]
     if summary.contradictions:
-        lines += _contradiction_lines(summary.contradictions, path, by_id)
+        lines += _contradiction_lines(summary.contradictions, path, by_id, t)
     else:
-        lines.append(f"No open contradictions in the topics of this {noun}.")
+        lines.append(t("hub.no_contradictions", noun=noun))
     lines += [
         "",
-        "## Last document received",
+        f"## {t.heading('last_document')}",
         "",
         f"- {md_link(last_title, path, summary.last.path)}"
         f"{_date_suffix(last_title, summary.last_date)}",
@@ -476,6 +483,7 @@ def _hub_page(
         id=format_hub_id(scopes.plural, summary.scope),
         title=summary.label,
         summary=summary_text,
+        lang=t.lang,
         sensitivity=max_sensitivity(  # type: ignore[arg-type]
             *(page.frontmatter.sensitivity for page in summary.sources)
         ),
@@ -517,14 +525,17 @@ def build_hubs(
     updated: date,
     dates: Mapping[str, date] | None = None,
     views: Sequence[ViewResult] = (),
+    lang: str | None = None,
 ) -> HubBundle:
     """Hub pages and the hubs index from the content pages after the ``links`` stage.
 
     ``dates`` maps source ids to the documents' own dates (see :func:`doc_dates`); without one,
     a ``YYYY-MM-DD`` in the file name, else the source page's ``updated`` date, is used.
     ``views`` are the computed views of the release: each hub lists those with rows for its
-    scope, and the dashboard links every one.
+    scope, and the dashboard links every one. ``lang`` is the language of the generated text
+    (default: the pack's canonical language; a mirror language for the translate stage).
     """
+    t = pack.strings(lang)
     scopes = pack.scopes
     if scopes is None:
         return HubBundle([], [])
@@ -534,17 +545,16 @@ def build_hubs(
         return HubBundle([], [])
     view_links = _view_links(views, summaries)
     by_id = {page.frontmatter.id: page for page in pages}
-    hubs = [_hub_page(summary, pack, by_id, stamp=stamp, updated=updated) for summary in summaries]
+    hubs = [
+        _hub_page(summary, pack, by_id, stamp=stamp, updated=updated, t=t) for summary in summaries
+    ]
     index_path = index_page_path(f"hubs/{scopes.plural}")
     title = plural(scopes.title, 2)
     noun = inline_text(scopes.title.lower())
     body = [f"# {inline_text(title)}", ""]
+    body += [t("hub.index_intro", noun=noun), ""]
     body += [
-        f"One hub page per {noun}, built by code from the documents' folders and the domain pack.",
-        "",
-    ]
-    body += [
-        f"- {md_link(hub.frontmatter.title, index_path, hub.path)}: {inline_text(_counts(item))}"
+        f"- {md_link(hub.frontmatter.title, index_path, hub.path)}: {inline_text(_counts(item, t))}"
         for hub, item in zip(hubs, summaries, strict=True)
     ]
     index = Page(
@@ -552,7 +562,8 @@ def build_hubs(
         frontmatter=IndexFrontmatter(
             id=f"index:hubs/{scopes.plural}",
             title=title,
-            summary=one_line(f"The hub page of every {scopes.title.lower()}."),
+            summary=one_line(t("hub.index_summary", noun=scopes.title.lower())),
+            lang=t.lang,
             sensitivity=max_sensitivity(  # type: ignore[arg-type]
                 *(hub.frontmatter.sensitivity for hub in hubs)
             ),
@@ -572,7 +583,12 @@ def _date_suffix(title: str, day: date) -> str:
 SHORT_TITLE = 40
 """Longest document title the dashboard shows whole; longer ones are cut at a word."""
 CONTRADICTIONS_ANCHOR = "open-contradictions"
-"""Anchor of a hub's ``## Open contradictions`` section."""
+"""Anchor of the English ``## Open contradictions`` (see :func:`contradictions_anchor`)."""
+
+
+def contradictions_anchor(strings: Strings) -> str:
+    """Anchor of a hub's open contradictions section in the language of ``strings``."""
+    return heading_anchor(strings.heading("open_contradictions"))
 
 
 def _short_title(title: str, limit: int = SHORT_TITLE) -> str:
@@ -582,19 +598,23 @@ def _short_title(title: str, limit: int = SHORT_TITLE) -> str:
     return f"{cut or title[: limit - 1]}…"
 
 
-def _last_document(item: ScopeSummary, from_path: str) -> str:
+def _last_document(item: ScopeSummary, from_path: str, t: Strings) -> str:
     """A short title of the scope's last document and its date, once: the document's own date,
     or ``received <date>`` when the document has none."""
     short = _short_title(item.last.frontmatter.title)
     link = md_link(short, from_path, item.last.path)
     if not item.last_dated:
-        return f"{link} (received {item.last_date.isoformat()})"
+        return t("dashboard.received", link=link, date=item.last_date.isoformat())
     return f"{link}{_date_suffix(short, item.last_date)}"
 
 
-def dashboard_lines(bundle: HubBundle, pack: DomainPack, from_path: str) -> list[str]:
+def dashboard_lines(
+    bundle: HubBundle, pack: DomainPack, from_path: str, lang: str | None = None
+) -> list[str]:
     """The company dashboard section of the home page: one table row per scope value (the
     client is on the hub), then a line linking every computed view."""
+    t = pack.strings(lang)
+    anchor = contradictions_anchor(t)
     scopes = pack.scopes
     if scopes is None or not bundle.summaries:
         return []
@@ -603,8 +623,7 @@ def dashboard_lines(bundle: HubBundle, pack: DomainPack, from_path: str) -> list
     lines = [
         f"## {inline_text(title)}",
         "",
-        f"| {inline_text(scopes.title)} | Phase | Open contradictions | Documents "
-        "| Last document (dated) |",
+        t("dashboard.header", scope_title=inline_text(scopes.title)),
         "|---|---|---:|---:|---|",
     ]
     for item in bundle.summaries:
@@ -612,25 +631,25 @@ def dashboard_lines(bundle: HubBundle, pack: DomainPack, from_path: str) -> list
         lines.append(
             f"| {md_link(item.label, from_path, item.path)} "
             f"| {inline_text(_phase_text(pack, item.phase))} "
-            f"| [{item.open_count}]({hub}#{CONTRADICTIONS_ANCHOR}) "
+            f"| [{item.open_count}]({hub}#{anchor}) "
             f"| {len(item.sources)} "
-            f"| {_last_document(item, from_path)} |"
+            f"| {_last_document(item, from_path, t)} |"
         )
     lines += [
         "",
-        f"Every {inline_text(scopes.title.lower())} has a hub page; see "
-        f"[all {inline_text(title.lower())}]({relative_link(from_path, index_path)}).",
+        t(
+            "dashboard.every",
+            noun=inline_text(scopes.title.lower()),
+            plural=inline_text(title.lower()),
+            href=relative_link(from_path, index_path),
+        ),
         "",
     ]
     if bundle.views:
         views = " · ".join(
-            f"{md_link(name, from_path, path)} ({rows} {plural('row', rows)})"
+            t.count("dashboard.view", rows, link=md_link(name, from_path, path))
             for name, path, rows in bundle.views
         )
         index = relative_link(from_path, index_page_path("views"))
-        lines += [
-            f"Computed views, figures computed by code with every row cited: {views} "
-            f"([all computed views]({index})).",
-            "",
-        ]
+        lines += [t("dashboard.views", views=views, href=index), ""]
     return lines

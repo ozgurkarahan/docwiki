@@ -74,6 +74,7 @@ RESEARCHER_REQUIREMENTS: dict[str, list[str]] = {
     "9 language": [
         r"Answer in the language of the question",
         r"Keep quotations in their original language",
+        r"pass it as `lang`",
     ],
     "scopes: name the chantier, ambiguity, within, as-of date (ADR 0011)": [
         r"Name the chantier in every answer",

@@ -346,7 +346,11 @@ def _text_lines(markdown: str) -> list[str]:
 def _resolve_citations(
     used: Sequence[int], by_number: dict[int, Source], release: ReleaseLookup
 ) -> tuple[list[_Citation], dict[int, int]]:
-    sources = {page.id: page for page in release.catalog.pages if page.type == "source"}
+    sources = {
+        page.id: page
+        for page in release.catalog.pages
+        if page.type == "source" and page.translation_of is None
+    }
     citations: list[_Citation] = []
     by_path: dict[str, int] = {}
     numbering: dict[int, int] = {}

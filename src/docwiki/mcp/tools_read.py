@@ -124,20 +124,49 @@ class ReadTools:
     # --- helpers ---------------------------------------------------------------------------
 
     @staticmethod
-    def _by_id(snap: Snapshot) -> dict[str, CatalogPage]:
-        return snap.cached("pages-by-id", snap.catalog.page_by_id)
+    def _by_id(snap: Snapshot, lang: str | None = None) -> dict[str, CatalogPage]:
+        """Pages by id: the canonical wiki, or one mirror language completed by the canonical
+        pages it does not translate (v1.7)."""
+        return snap.cached(f"pages-by-id:{lang or ''}", lambda: snap.catalog.page_by_id(lang))
+
+    @staticmethod
+    def _lang(snap: Snapshot, lang: str | None) -> str | None:
+        """The validated ``lang`` argument (``None`` for the canonical language)."""
+        if lang is None or not lang.strip():
+            return None
+        value = lang.strip().lower()
+        languages = list(snap.catalog.wiki_languages)
+        if value not in languages:
+            raise ToolInputError(
+                f"unknown lang {lang!r}; languages of this wiki: {', '.join(languages)} "
+                f"(the first, {languages[0]!r}, is canonical)",
+                code="invalid_argument",
+                details={"languages": languages},
+            )
+        return None if value == languages[0] else value
 
     @staticmethod
     def _by_path(snap: Snapshot) -> dict[str, CatalogPage]:
         return snap.cached("pages-by-path", snap.catalog.page_by_path)
 
-    def _resolve_page(self, snap: Snapshot, ref: str) -> tuple[CatalogPage, str | None]:
+    def _resolve_page(
+        self, snap: Snapshot, ref: str, lang: str | None = None
+    ) -> tuple[CatalogPage, str | None]:
         """Catalog entry for a page id or wiki path (``./``, ``../``, ``.md`` and ``#anchor``
-        tolerated); the anchor, if any, is returned as the section to read."""
+        tolerated); the anchor, if any, is returned as the section to read. With ``lang`` (a
+        mirror language) the mirror page of that language is returned when there is one."""
+        entry, anchor = self._find_page(snap, ref, lang)
+        if lang is not None and entry.lang != lang and entry.translation_of is None:
+            entry = self._by_id(snap, lang).get(entry.id, entry)
+        return entry, anchor
+
+    def _find_page(
+        self, snap: Snapshot, ref: str, lang: str | None = None
+    ) -> tuple[CatalogPage, str | None]:
         text = ref.strip()
         if not text:
             raise ToolInputError("page must not be empty")
-        by_id, by_path = self._by_id(snap), self._by_path(snap)
+        by_id, by_path = self._by_id(snap, lang), self._by_path(snap)
         if text in by_id:
             return by_id[text], None
         path, _, anchor = text.partition("#")
@@ -223,7 +252,7 @@ class ReadTools:
         """(frontmatter, processed body, citations by label, outgoing links)."""
 
         def build() -> tuple[Any, str, dict[str, dict[str, Any]], list[dict[str, Any]]]:
-            page = snap.reader.read_page(entry.id)
+            page = snap.reader.read_page(entry.path)
             body = strip_backlinks_block(page.body)
             _, defs = extract_footnotes(body)
             processed = _strip_footnote_definitions(body, defs)
@@ -234,7 +263,7 @@ class ReadTools:
                 self._outgoing(snap, entry, processed),
             )
 
-        return snap.cached(f"page:{entry.id}", build)
+        return snap.cached(f"page:{entry.path}", build)
 
     @staticmethod
     def _section(body: str, wanted: str) -> tuple[str, str]:
@@ -374,11 +403,13 @@ class ReadTools:
         limit: int = 10,
         offset: int = 0,
         within: str | None = None,
+        lang: str | None = None,
     ) -> str:
         snap = self.snapshot()
         if not query.strip():
             raise ToolInputError("query must not be empty")
         scope = self._within(snap, within)
+        language = self._lang(snap, lang)
         if topic and not topic.startswith("topic:"):
             topic = f"topic:{topic}"
         by_id = self._by_id(snap)
@@ -396,6 +427,7 @@ class ReadTools:
             topic=topic or None,
             limit=offset + limit,
             within=scope,
+            lang=language,
         )[offset:]
         expanded = [" ".join(phrase) for phrase in snap.search.expand(query)]
         rows = [self._hit(snap, hit) for hit in hits]
@@ -405,6 +437,7 @@ class ReadTools:
                 "release_id": snap.release_id,
                 "query": query,
                 **({"within": scope} if scope else {}),
+                **({"lang": language} if language else {}),
                 "expanded_terms": expanded,
                 "offset": offset,
                 "hits": list(items),
@@ -422,7 +455,7 @@ class ReadTools:
         return out
 
     def _hit(self, snap: Snapshot, hit: Any) -> dict[str, Any]:
-        entry = self._by_id(snap).get(hit.page_id)
+        entry = self._by_path(snap).get(hit.path) or self._by_id(snap).get(hit.page_id)
         row: dict[str, Any] = {
             "kind": hit.kind,
             "origin": "source" if hit.kind == "source-block" else "wiki",
@@ -434,6 +467,9 @@ class ReadTools:
             "snippet": hit.snippet,
             "score": hit.score,
         }
+        language = getattr(hit, "lang", None) or (entry.lang if entry is not None else None)
+        if language:
+            row["lang"] = language
         if entry is not None and entry.status:
             row["status"] = entry.status
         if entry is not None and entry.scope:
@@ -458,9 +494,11 @@ class ReadTools:
 
         return snap.cached(f"evidence-meta:{source_id}:{key}", build)
 
-    def read_page(self, page: str, section: str | None = None, offset: int = 0) -> str:
+    def read_page(
+        self, page: str, section: str | None = None, offset: int = 0, lang: str | None = None
+    ) -> str:
         snap = self.snapshot()
-        entry, anchor = self._resolve_page(snap, page)
+        entry, anchor = self._resolve_page(snap, page, self._lang(snap, lang))
         section = section or anchor
         frontmatter, body, citations, links = self._page_parts(snap, entry)
         heading = None
@@ -480,7 +518,10 @@ class ReadTools:
                     "path": entry.path,
                     "type": entry.type,
                     "title": entry.title,
+                    "lang": entry.lang,
                 }
+                if entry.translation_of is not None:
+                    payload["translation_of"] = entry.translation_of
                 if entry.status:
                     payload["status"] = entry.status
                 if offset == 0 and link_limit is not None:
@@ -527,10 +568,17 @@ class ReadTools:
         )
         return [scope for scope in scopes if INDEX_SCOPES.get(scope, f"index:{scope}") in by_id]
 
-    def get_index(self, scope: str = "home", offset: int = 0, within: str | None = None) -> str:
+    def get_index(
+        self,
+        scope: str = "home",
+        offset: int = 0,
+        within: str | None = None,
+        lang: str | None = None,
+    ) -> str:
         snap = self.snapshot()
         wanted = (scope or "home").strip().strip("/").lower().removeprefix("index:")
-        by_id = self._by_id(snap)
+        language = self._lang(snap, lang)
+        by_id = self._by_id(snap, language)
         hubs = sorted(page_id for page_id in by_id if page_id.startswith("index:hubs/"))
         if wanted == "hubs" and len(hubs) == 1:
             wanted = hubs[0].removeprefix("index:")
@@ -557,6 +605,7 @@ class ReadTools:
                 "page_id": entry.id,
                 "path": entry.path,
                 "title": entry.title,
+                "lang": entry.lang,
                 **filtered,
                 "offset": offset,
                 "chars_total": len(body),
@@ -566,6 +615,8 @@ class ReadTools:
             }
             if offset == 0:
                 payload["scopes"] = scopes
+                if len(snap.catalog.wiki_languages) > 1:
+                    payload["languages"] = list(snap.catalog.wiki_languages)
             labels = self._refs_in(window)
             if labels:
                 payload["citations"] = [citations[x] for x in labels if x in citations]

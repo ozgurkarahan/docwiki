@@ -11,8 +11,12 @@
 // Each document row has its four-phase bar and a "Follow this document" disclosure (its journey).
 // A poll updates the document rows by key: unchanged rows stay as they are, so focus, open
 // disclosures and scroll are kept, and only real changes are announced, in the one polite region.
-// The pure parts (phases, change lists, the row plan, the sentences) are in ./pipeline.
+// The pure parts (phases, change lists, the row plan, the sentences) are in ./pipeline. The
+// words are in the page's language (i18n/en.ts, i18n/fr.ts) and the wiki pages of the replies are
+// linked in that language (`localUrl`: `/sources/x` → `/en/sources/x` on an English page).
 import { relativeHref } from "../../../plugins/transformers/docwiki-text"
+import type { Strings } from "../i18n"
+import { clientRoot, clientStrings, localUrl } from "../i18n"
 import {
   DocFacts,
   LastChange,
@@ -40,7 +44,6 @@ import {
   phaseMarks,
   phaseText,
   planRows,
-  plural,
   record,
   rowKeys,
   runAtWork,
@@ -49,6 +52,16 @@ import {
   text,
 } from "./pipeline"
 import { STATES, State, asState, stateWords, statusPill } from "./status"
+
+/** The UI strings of the page on screen. */
+function T(): Strings {
+  return clientStrings()
+}
+
+/** A word of the portal (a stage, run or gate status, a run kind) in the page's language. */
+function said(words: Record<string, string>, word: string): string {
+  return Object.prototype.hasOwnProperty.call(words, word) ? words[word] : word
+}
 
 const SECTION = "section.docwiki-process"
 const ME_PATH = "api/owner/me"
@@ -70,7 +83,6 @@ const QUEUE_PEEK_LIMIT = 32
 const SEGMENT_RE = /^[A-Za-z0-9][A-Za-z0-9 ._()+-]{0,99}$/
 const MAX_DEPTH = 6
 const MAX_PATH_CHARS = 200
-const UNAVAILABLE = "Status unavailable, retrying…"
 const STATE_ORDER: readonly State[] = STATES
 /** The id of "What changed in this release" (a journey's "and n more" links to it). */
 const WHAT_CHANGED_ID = "docwiki-what-changed"
@@ -217,7 +229,7 @@ function parseDoc(value: unknown): Doc | null {
     step: number(data.step),
     steps: number(data.steps),
     hidden: data.hidden === true,
-    pageUrl: siteUrl(data.page_url),
+    pageUrl: local(siteUrl(data.page_url)),
     documentUrl: siteUrl(data.document_url),
     originalUrl: siteUrl(data.original_url),
     lastChange: parseLastChange(data.last_change),
@@ -294,6 +306,11 @@ function parseView(payload: unknown): View | null {
   }
 }
 
+/** A wiki page of a reply in the language of the page on screen (evidence stays shared). */
+function local(url: string | null): string | null {
+  return url === null ? null : localUrl(url, clientRoot())
+}
+
 function facts(doc: Doc): DocFacts {
   return {
     path: doc.path,
@@ -309,17 +326,34 @@ function facts(doc: Doc): DocFacts {
 
 // ----- Formatting -----
 
-const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" })
+const dateFormats = new Map<string, Intl.DateTimeFormat>()
 
+/** Dates in the page's language (English pages keep the reader's own locale). */
 function when(value: string | null): string {
   if (!value) return "—"
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? "—" : dateFormat.format(date)
+  if (Number.isNaN(date.getTime())) return "—"
+  const t = T()
+  const locale = t.lang === "en" ? "" : t.locale
+  let format = dateFormats.get(locale)
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale || undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    })
+    dateFormats.set(locale, format)
+  }
+  return format.format(date)
+}
+
+function fixed(value: number, digits: number): string {
+  const text = value.toFixed(digits)
+  return T().decimal === "," ? text.replace(".", ",") : text
 }
 
 function duration(seconds: number | null): string {
   if (seconds === null || seconds < 0) return "—"
-  if (seconds < 10) return `${seconds.toFixed(1)} s`
+  if (seconds < 10) return `${fixed(seconds, 1)} s`
   if (seconds < 60) return `${Math.round(seconds)} s`
   const minutes = Math.floor(seconds / 60)
   if (minutes < 60) return `${minutes} min ${Math.round(seconds % 60)} s`
@@ -328,9 +362,10 @@ function duration(seconds: number | null): string {
 
 function size(bytes: number | null): string {
   if (bytes === null) return "—"
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  const [b, kb, mb] = T().pipeline.sizeUnits
+  if (bytes < 1024) return `${bytes} ${b}`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} ${kb}`
+  return `${fixed(bytes / (1024 * 1024), 1)} ${mb}`
 }
 
 /** Elapsed time of a run: its receipt's duration, else from its start to its end (or now). */
@@ -382,7 +417,7 @@ function anchor(href: string, content: string, focusKey?: string): HTMLAnchorEle
 
 function badge(status: string): HTMLSpanElement {
   const known = /^[a-z-]+$/.test(status) ? ` docwiki-process-badge--${status}` : ""
-  return element("span", `docwiki-process-badge${known}`, status)
+  return element("span", `docwiki-process-badge${known}`, said(T().pipeline.runStatus, status))
 }
 
 function heading(content: string): HTMLHeadingElement {
@@ -391,7 +426,7 @@ function heading(content: string): HTMLHeadingElement {
 
 /** "and n more" after a capped list, or nothing. */
 function moreItem(more: number): HTMLLIElement[] {
-  return more > 0 ? [element("li", "docwiki-process-and-more", andMore(more))] : []
+  return more > 0 ? [element("li", "docwiki-process-and-more", andMore(more, T()))] : []
 }
 
 /** Replace a block's content only when it differs, so its focus and selection stay. */
@@ -406,28 +441,29 @@ function swap(slot: HTMLElement, next: HTMLElement | null): void {
 }
 
 function nowBlock(view: View): HTMLElement {
+  const t = T()
   const block = element("div", "docwiki-process-now")
   const parts: string[] = []
   const release = view.release
   if (release) {
-    parts.push(`Release ${release.id}, published ${when(release.publishedAt)}`)
+    parts.push(t.pipeline.releaseFacts(release.id, when(release.publishedAt)))
     const counts: string[] = []
-    if (release.sources !== null) counts.push(plural(release.sources, "source"))
-    if (release.pages !== null) counts.push(plural(release.pages, "page"))
+    if (release.sources !== null) counts.push(t.pipeline.sources(release.sources))
+    if (release.pages !== null) counts.push(t.pipeline.pageCount(release.pages))
     if (counts.length > 0) parts.push(counts.join(", "))
   } else {
-    parts.push("No release published yet")
+    parts.push(t.pipeline.noRelease)
   }
   if (view.queued !== null) {
     const queued = view.queued >= QUEUE_PEEK_LIMIT ? `${QUEUE_PEEK_LIMIT}+` : String(view.queued)
-    parts.push(`queue: ${queued}`)
+    parts.push(t.pipeline.queue(queued))
   }
   block.append(element("p", "docwiki-process-facts", parts.join(" · ")))
   const latest = view.runs[0]
   if (latest && !latest.finishedAt) {
     const work = element("p", "docwiki-process-at-work")
-    work.append(statusPill("processing", runAtWork(latest.currentStage)))
-    const documents = runDocumentsText(latest.documents)
+    work.append(statusPill("processing", runAtWork(latest.currentStage, t)))
+    const documents = runDocumentsText(latest.documents, 3, t)
     if (documents) work.append(element("span", "docwiki-process-at-work-docs", `— ${documents}`))
     block.append(work)
   }
@@ -435,12 +471,13 @@ function nowBlock(view: View): HTMLElement {
 }
 
 function stateSentence(view: View): string {
+  const t = T().pipeline
   const waiting = inPipeline(view)
   const latest = view.runs[0]
-  if (waiting > 0) return `Working — ${plural(waiting, "document")} in the pipeline`
-  if ((view.queued ?? 0) > 0) return "Working — a run is queued"
-  if (latest && !latest.finishedAt) return "Working — a run is in progress"
-  return "Idle — the wiki is up to date"
+  if (waiting > 0) return t.working(waiting)
+  if ((view.queued ?? 0) > 0) return t.workingQueued
+  if (latest && !latest.finishedAt) return t.workingRun
+  return t.idle
 }
 
 /** The shape of a stage's status, as in the status vocabulary (status.ts). */
@@ -454,21 +491,19 @@ function stageShape(status: string): string {
 
 /** The 13 stages of the latest run: done, skipped, failed, running or not run. */
 function stageStrip(view: View): HTMLElement {
+  const t = T().pipeline
   const block = element("div", "docwiki-process-pipeline")
-  block.append(heading("Pipeline"))
+  block.append(heading(t.heading))
   const latest = view.runs[0]
   const running = !!latest && !latest.finishedAt
   if (latest) {
-    const state = running ? "running" : latest.status || "finished"
+    const state = said(t.runStatus, running ? "running" : latest.status || "finished")
+    const kind = said(t.runKinds, latest.kind)
     block.append(
-      element(
-        "p",
-        "docwiki-process-caption",
-        `Latest run: ${latest.kind}, started ${when(latest.startedAt)} — ${state}`,
-      ),
+      element("p", "docwiki-process-caption", t.latestRun(kind, when(latest.startedAt), state)),
     )
   } else {
-    block.append(element("p", "docwiki-process-caption", "No run recorded yet."))
+    block.append(element("p", "docwiki-process-caption", t.noRun))
   }
   const byStage = new Map((latest?.stages ?? []).map((stage) => [stage.stage, stage]))
   // While a run is unfinished, the portal names the stage at work (else: the first without a
@@ -484,7 +519,8 @@ function stageStrip(view: View): HTMLElement {
     const key = status.replace(/ /g, "-")
     item.dataset.status = /^[a-z-]+$/.test(key) ? key : "none"
     item.append(element("span", "docwiki-process-stage-name", name))
-    item.append(element("span", "docwiki-process-stage-status", `${stageShape(key)} ${status}`))
+    const word = said(t.stageStatus, status)
+    item.append(element("span", "docwiki-process-stage-status", `${stageShape(key)} ${word}`))
     if (report?.durationS !== null && report?.durationS !== undefined) {
       item.append(element("span", "docwiki-process-stage-time", duration(report.durationS)))
     }
@@ -503,14 +539,18 @@ function phaseBar(doc: Doc): HTMLElement | null {
   const bar = element("span", "docwiki-phases")
   const visual = element("span", "docwiki-phases-bar")
   visual.setAttribute("aria-hidden", "true")
+  const t = T()
   PHASES.forEach((phase, index) => {
     const mark = marks[index]
     const item = element("span", `docwiki-phase docwiki-phase--${mark}`)
-    item.append(element("span", "docwiki-phase-shape", PHASE_SHAPES[mark]), phase.word)
+    item.append(
+      element("span", "docwiki-phase-shape", PHASE_SHAPES[mark]),
+      t.pipeline.phases[phase.key],
+    )
     visual.append(item)
   })
   const stage = doc.state === "processing" ? (doc.stage ?? "publish") : doc.stage
-  const words = phaseText(doc.state, doc.phase, doc.step, doc.steps, stage)
+  const words = phaseText(doc.state, doc.phase, doc.step, doc.steps, stage, t)
   bar.append(visual, element("span", "sr-only", words))
   return bar
 }
@@ -528,12 +568,13 @@ function journeyStep(label: string, ...content: (Node | string)[]): HTMLLIElemen
 /** The original, as in the documents register: a new tab, a download (e-mail) or none. */
 function originalItem(doc: Doc, key: string): Node {
   const kind = originalLink(doc.path, doc.originalUrl)
+  const t = T()
   if (kind === "none" || !doc.originalUrl) {
-    return element("span", "docwiki-journey-none", "Original not published")
+    return element("span", "docwiki-journey-none", t.documents.notPublished)
   }
   const link = anchor(
     doc.originalUrl,
-    kind === "download" ? "Download .eml" : "Original ↗",
+    kind === "download" ? t.documents.downloadEml : t.documents.original,
     `journey-original:${key}`,
   )
   link.dataset.noPopover = "true"
@@ -543,73 +584,77 @@ function originalItem(doc: Doc, key: string): Node {
   } else {
     link.target = "_blank"
     link.rel = "noopener"
-    link.append(element("span", "sr-only", " (opens in a new tab)"))
+    link.append(element("span", "sr-only", t.a11y.newTab))
   }
   return link
 }
 
 /** "Follow this document": the original, its document page, its status, the pages, its page. */
 function journey(doc: Doc, key: string, id: string, currentRunId: string | null): HTMLElement {
+  const t = T()
+  const words = t.pipeline
   const block = element("div", "docwiki-journey")
   block.id = id
   const steps = element("ol", "docwiki-journey-steps")
   const received = [doc.path]
-  if (doc.modified) received.push(`received ${when(doc.modified)}`)
+  if (doc.modified) received.push(words.received(when(doc.modified)))
   if (doc.size !== null) received.push(size(doc.size))
   steps.append(
     journeyStep(
-      "Original",
+      words.original,
       originalItem(doc, key),
       element("span", "docwiki-journey-secondary", received.join(" · ")),
     ),
   )
   steps.append(
     journeyStep(
-      "Document page",
+      words.documentPage,
       doc.documentUrl
-        ? anchor(doc.documentUrl, "Pages and full text", `journey-doc:${key}`)
-        : "not in the wiki yet",
+        ? anchor(doc.documentUrl, words.pagesAndText, `journey-doc:${key}`)
+        : words.notInWiki,
     ),
   )
   const stage = doc.state === "processing" ? (doc.stage ?? "publish") : doc.stage
-  const status = [stateWords(doc.state, doc.step, doc.steps, stage)]
-  const phase = phaseText(doc.state, doc.phase, doc.step, doc.steps, stage)
+  const status = [stateWords(doc.state, doc.step, doc.steps, stage, t)]
+  const phase = phaseText(doc.state, doc.phase, doc.step, doc.steps, stage, t)
   if (phase && (doc.state === "processing" || doc.state === "failed")) status.push(phase)
-  steps.append(journeyStep("Status", status.join(" — ")))
+  steps.append(journeyStep(words.statusLabel, status.join(" — ")))
   const change = doc.lastChange
   if (change) {
-    const head = [plural(change.pages.length, "wiki page")]
-    if (change.change) head.push(`document ${change.change}`)
+    const head = [words.wikiPages(change.pages.length)]
+    if (change.change) head.push(words.documentChange(change.change))
     if (change.finishedAt) head.push(when(change.finishedAt))
     const { shown, more } = capped(change.pages)
     const pages = element("ul", "docwiki-journey-pages")
     shown.forEach((page, index) => {
       const item = element("li")
       if (changeChip(page.change)) {
-        item.append(element("span", `docwiki-change docwiki-change--${page.change}`, page.change))
+        const chip = words.changedWords[page.change](1)
+        item.append(element("span", `docwiki-change docwiki-change--${page.change}`, chip))
         item.append(" ")
       }
-      if (page.url) item.append(anchor(page.url, page.title, `journey-page:${key}:${index}`))
+      const url = local(page.url)
+      if (url) item.append(anchor(url, page.title, `journey-page:${key}:${index}`))
       else item.append(element("span", "docwiki-journey-removed", page.title))
       pages.append(item)
     })
     if (more > 0 && moreGoesToRelease(change, currentRunId)) {
       // The rest is in "What changed in this release", made by the same run.
       const item = element("li", "docwiki-process-and-more")
-      item.append(anchor(`#${WHAT_CHANGED_ID}`, andMore(more), `journey-more:${key}`))
+      item.append(anchor(`#${WHAT_CHANGED_ID}`, andMore(more, t), `journey-more:${key}`))
       pages.append(item)
     } else {
       pages.append(...moreItem(more))
     }
     const value: (Node | string)[] = [head.join(" · ")]
     if (shown.length > 0) value.push(pages)
-    steps.append(journeyStep("Its last run", ...value))
+    steps.append(journeyStep(words.lastRun, ...value))
   } else {
-    steps.append(journeyStep("Its last run", "No recorded run changed it"))
+    steps.append(journeyStep(words.lastRun, words.noRecordedRun))
   }
   steps.append(
     journeyStep(
-      "Wiki page",
+      words.wikiPage,
       doc.pageUrl ? anchor(doc.pageUrl, doc.title ?? doc.path, `journey-wiki:${key}`) : "—",
     ),
   )
@@ -629,6 +674,7 @@ function documentRow(
   mine: boolean,
   currentRunId: string | null,
 ): HTMLTableSectionElement {
+  const t = T()
   const group = element("tbody", "docwiki-process-group")
   group.dataset.key = key
   const row = element("tr")
@@ -637,7 +683,7 @@ function documentRow(
   const status = element("td", "docwiki-process-status")
   // A document whose stages are all done but whose release is not out yet is at "publish".
   const stage = doc.state === "processing" ? (doc.stage ?? "publish") : null
-  status.append(statusPill(doc.state, stateWords(doc.state, doc.step, doc.steps, stage)))
+  status.append(statusPill(doc.state, stateWords(doc.state, doc.step, doc.steps, stage, t)))
   // The phase bar goes under the title, in the Document column (on every screen).
   const bar = phaseBar(doc)
   const name = element("td", "docwiki-process-name")
@@ -655,14 +701,14 @@ function documentRow(
     if (bar) name.append(bar)
     if (doc.title) name.append(element("span", "docwiki-process-path", doc.path))
   }
-  if (mine) name.append(element("span", "docwiki-process-mine", "your upload"))
+  if (mine) name.append(element("span", "docwiki-process-mine", t.pipeline.yourUpload))
   if (owner && doc.hidden) {
-    name.append(element("span", "docwiki-process-mine", "not in this site's audience"))
+    name.append(element("span", "docwiki-process-mine", t.pipeline.notInAudience))
   }
   if (owner && doc.lastError) {
     name.append(element("span", "docwiki-process-error", doc.lastError))
   } else if (doc.failed && doc.state !== "failed" && doc.state !== "held_back") {
-    name.append(element("span", "docwiki-process-error", "an earlier attempt failed"))
+    name.append(element("span", "docwiki-process-error", t.pipeline.earlierFailed))
   }
   // Documents kept out of the audience have no journey to show.
   if (!doc.hidden) {
@@ -676,8 +722,8 @@ function documentRow(
     follow.setAttribute("aria-controls", id)
     follow.append(
       element("span", "docwiki-follow-icon", "▸"),
-      "Follow this document",
-      element("span", "sr-only", `: ${label}`),
+      t.pipeline.follow,
+      element("span", "sr-only", `${t.lang === "fr" ? " " : ""}: ${label}`),
     )
     follow.firstElementChild?.setAttribute("aria-hidden", "true")
     const path = element("tr", "docwiki-journey-row")
@@ -715,7 +761,7 @@ function receivedRow(path: string, key: string): HTMLTableSectionElement {
   status.append(statusPill("received"))
   const name = element("td", "docwiki-process-name")
   name.append(element("span", "docwiki-process-doc", path))
-  name.append(element("span", "docwiki-process-mine", "received — waiting for the pipeline"))
+  name.append(element("span", "docwiki-process-mine", T().pipeline.receivedWaiting))
   row.append(status, name, element("td"))
   return group
 }
@@ -729,9 +775,9 @@ interface Row {
 /** The documents block: its rows are updated by key, never rebuilt as a whole. */
 class DocumentsBlock {
   readonly root = element("div", "docwiki-process-documents")
-  private readonly title = heading("Documents")
+  private readonly title = heading(T().pipeline.documentsTitle)
   private readonly caption = element("p", "docwiki-process-caption")
-  private readonly empty = element("p", "docwiki-process-caption", "No documents yet.")
+  private readonly empty = element("p", "docwiki-process-caption", T().pipeline.noDocuments)
   private readonly scroller = element("div", "docwiki-process-scroll")
   private readonly table = element("table", "docwiki-process-table")
   private readonly more = element("div", "docwiki-process-more-slot")
@@ -743,10 +789,11 @@ class DocumentsBlock {
     // Focusable, so that a keyboard scrolls a table wider than the screen.
     this.scroller.tabIndex = 0
     this.scroller.setAttribute("role", "region")
-    this.scroller.setAttribute("aria-label", "Documents")
+    const t = T().pipeline
+    this.scroller.setAttribute("aria-label", t.documentsTitle)
     this.scroller.dataset.focusKey = "documents"
     const head = element("tr")
-    for (const label of ["Status", "Document", "Received"]) {
+    for (const label of [t.columns.status, t.columns.document, t.columns.received]) {
       const cell = element("th", undefined, label)
       cell.scope = "col"
       head.append(cell)
@@ -760,10 +807,14 @@ class DocumentsBlock {
   }
 
   update(view: View, owner: boolean): void {
-    const title = `Documents (${view.total})`
+    const t = T()
+    const title = t.pipeline.documentsCount(view.total)
     if (this.title.textContent !== title) this.title.textContent = title
     const breakdown = STATE_ORDER.filter((state) => (view.states[state] ?? 0) > 0)
-      .map((state) => `${view.states[state]} ${stateWords(state).toLowerCase()}`)
+      .map((state) => {
+        const word = stateWords(state, null, null, null, t).toLowerCase()
+        return `${view.states[state]} ${word}`
+      })
       .join(" · ")
     if (this.caption.textContent !== breakdown) this.caption.textContent = breakdown
     this.caption.hidden = breakdown === ""
@@ -814,7 +865,7 @@ class DocumentsBlock {
     this.scroller.hidden = none
     let more: HTMLElement | null = null
     if (shown.length < docs.length) {
-      more = element("button", "docwiki-process-more", `Show all ${docs.length}`)
+      more = element("button", "docwiki-process-more", t.pipeline.showAll(docs.length))
       more.setAttribute("type", "button")
       more.dataset.focusKey = "more"
       more.addEventListener("click", () => {
@@ -827,13 +878,16 @@ class DocumentsBlock {
 }
 
 function runSources(counts: Record<string, number>): string | null {
+  const t = T()
+  const words = t.pipeline.runCounts
   const parts = ["new", "changed", "deleted", "unchanged", "quarantined", "failed"]
     .filter((key) => (counts[key] ?? 0) > 0)
-    .map((key) => `${counts[key]} ${key}`)
+    .map((key) => (words[key] ? words[key](counts[key]) : `${counts[key]} ${key}`))
   const total = counts.sources_total
   if (total === undefined && parts.length === 0) return null
-  const head = total === undefined ? "sources" : plural(total, "source")
-  return parts.length > 0 ? `${head}: ${parts.join(", ")}` : head
+  const head = t.pipeline.runSourcesHead(total === undefined ? null : total)
+  const colon = t.lang === "fr" ? " : " : ": "
+  return parts.length > 0 ? `${head}${colon}${parts.join(", ")}` : head
 }
 
 /** One kind of change of the release: its pages, linked, at most 10 then "and n more". */
@@ -845,7 +899,8 @@ function changeGroup(kind: string, label: string, pages: Page[]): HTMLElement | 
   const { shown, more } = capped(pages)
   shown.forEach((page, index) => {
     const item = element("li")
-    if (page.url) item.append(anchor(page.url, page.title, `release:${kind}:${index}`))
+    const url = local(page.url)
+    if (url) item.append(anchor(url, page.title, `release:${kind}:${index}`))
     else item.append(element("span", "docwiki-journey-removed", page.title))
     if (page.type) item.append(" ", element("span", "docwiki-release-type", page.type))
     items.append(item)
@@ -859,21 +914,23 @@ function changeGroup(kind: string, label: string, pages: Page[]): HTMLElement | 
 function releaseChanges(view: View): HTMLElement | null {
   const run = view.runs.find((item) => item.isCurrent && item.changes !== null)
   if (!run || !run.changes) return null
+  const t = T()
+  const words = t.pipeline
   const changes = run.changes
   const block = element("div", "docwiki-release")
   block.id = WHAT_CHANGED_ID
-  block.append(heading("What changed in this release"))
+  block.append(heading(words.whatChanged))
   if (changeCount(changes) === 0) {
-    block.append(element("p", "docwiki-process-caption", noChangeSentence(run.kind)))
+    block.append(element("p", "docwiki-process-caption", noChangeSentence(run.kind, t)))
     return block
   }
-  block.append(element("p", "docwiki-release-summary", changeSummary(changes)))
+  block.append(element("p", "docwiki-release-summary", changeSummary(changes, t)))
   const groups = [
-    changeGroup("added", "Pages added", changes.added),
-    changeGroup("changed", "Pages changed", changes.changed),
-    changeGroup("removed", "Pages removed", changes.removed),
-    changeGroup("opened", "Contradictions opened", changes.opened),
-    changeGroup("closed", "Contradictions closed", changes.closed),
+    changeGroup("added", words.pagesAdded, changes.added),
+    changeGroup("changed", words.pagesChanged, changes.changed),
+    changeGroup("removed", words.pagesRemoved, changes.removed),
+    changeGroup("opened", words.contradictionsOpenedLabel, changes.opened),
+    changeGroup("closed", words.contradictionsClosedLabel, changes.closed),
   ].filter((group): group is HTMLElement => group !== null)
   const grid = element("div", "docwiki-release-groups")
   grid.append(...groups)
@@ -882,38 +939,37 @@ function releaseChanges(view: View): HTMLElement | null {
 }
 
 function runsList(view: View): HTMLElement {
+  const t = T().pipeline
   const block = element("div", "docwiki-process-runs")
-  block.append(heading("Runs that published a release"))
+  block.append(heading(t.runsTitle))
   if (view.checks.count > 0) {
-    const checks = plural(view.checks.count, "scheduled check")
-    const last = view.checks.last ? `, the last ${when(view.checks.last)}` : ""
-    block.append(element("p", "docwiki-process-caption", `${checks} found nothing to do${last}.`))
+    const last = view.checks.last ? when(view.checks.last) : null
+    block.append(element("p", "docwiki-process-caption", t.checks(view.checks.count, last)))
   }
   if (view.runs.length === 0) {
-    const empty = "No run yet — the owner adds a document to start one."
-    block.append(element("p", "docwiki-process-caption", empty))
+    block.append(element("p", "docwiki-process-caption", t.noRunYet))
     return block
   }
   const items = element("ul", "docwiki-process-run-list")
   for (const run of view.runs.slice(0, RUNS_SHOWN)) {
     const item = element("li", "docwiki-process-run")
     const title = element("p", "docwiki-process-run-title")
-    const who = run.requestedBy ? ` · ${run.requestedBy}` : ""
-    title.append(element("strong", undefined, `${run.kind}${who}`), " ")
+    const who = run.requestedBy ? ` · ${said(t.runKinds, run.requestedBy)}` : ""
+    title.append(element("strong", undefined, `${said(t.runKinds, run.kind)}${who}`), " ")
     title.append(badge(run.finishedAt ? run.status || "finished" : "running"))
     if (run.isCurrent) {
-      title.append(" ", element("span", "docwiki-process-current", "current release"))
+      title.append(" ", element("span", "docwiki-process-current", t.currentRelease))
     }
-    const parts = [`started ${when(run.startedAt)}`, duration(runDuration(run))]
-    if (run.cost !== null) parts.push(`${run.currency ?? ""} ${run.cost.toFixed(2)}`.trim())
+    const parts = [t.started(when(run.startedAt)), duration(runDuration(run))]
+    if (run.cost !== null) parts.push(`${run.currency ?? ""} ${fixed(run.cost, 2)}`.trim())
     const sources = runSources(run.counts)
     if (sources) parts.push(sources)
     const changed = ["new", "changed", "deleted"].some((key) => (run.counts[key] ?? 0) > 0)
-    if (run.kind === "rebuild" && !changed) parts.push("no document changed: the site was rebuilt")
+    if (run.kind === "rebuild" && !changed) parts.push(t.rebuiltOnly)
     const gates = Object.entries(run.gates)
       .filter(([, count]) => count > 0)
-      .map(([status, count]) => `${count} ${status}`)
-    if (gates.length > 0) parts.push(`gates: ${gates.join(", ")}`)
+      .map(([status, count]) => `${count} ${said(t.gateWords, status)}`)
+    if (gates.length > 0) parts.push(t.gates(gates.join(", ")))
     item.append(title, element("p", "docwiki-process-run-facts", parts.join(" · ")))
     items.append(item)
   }
@@ -924,14 +980,15 @@ function runsList(view: View): HTMLElement {
 // ----- The owner: sign-in bar, upload form and rebuild -----
 
 function ownerBar(me: Me): HTMLElement | null {
+  const t = T().pipeline
   if (me.owner) {
-    const bar = element("p", "docwiki-process-owner", `Signed in as ${me.name ?? "the owner"}`)
-    if (me.signOutUrl) bar.append(" · ", anchor(me.signOutUrl, "sign out"))
+    const bar = element("p", "docwiki-process-owner", t.signedInAs(me.name))
+    if (me.signOutUrl) bar.append(" · ", anchor(me.signOutUrl, t.signOut))
     return bar
   }
   if (me.signIn && me.signInUrl) {
     const bar = element("div", "docwiki-process-owner")
-    const signIn = anchor(me.signInUrl, "Sign in to add a document")
+    const signIn = anchor(me.signInUrl, t.signInToAdd)
     signIn.className = "docwiki-process-submit docwiki-owner-box-sign-in"
     bar.append(signIn)
     return bar
@@ -946,22 +1003,19 @@ function uploadPath(folder: string, file: File): { path: string } | { error: str
     .map((part) => part.trim())
     .filter((part) => part !== "")
   parts.push(file.name)
-  if (parts.length > MAX_DEPTH) return { error: `Use at most ${MAX_DEPTH - 1} folders.` }
+  const t = T().pipeline
+  if (parts.length > MAX_DEPTH) return { error: t.tooManyFolders(MAX_DEPTH - 1) }
   for (const part of parts) {
-    if (!SEGMENT_RE.test(part) || part.endsWith(".")) {
-      return {
-        error: `“${part}” cannot be used: names use letters, digits, spaces and ._()+- only.`,
-      }
-    }
+    if (!SEGMENT_RE.test(part) || part.endsWith(".")) return { error: t.badName(part) }
   }
   const path = parts.join("/")
-  if (path.length > MAX_PATH_CHARS) return { error: "The path is too long." }
+  if (path.length > MAX_PATH_CHARS) return { error: t.pathTooLong }
   return { path }
 }
 
-function errorText(payload: unknown, status: number, what = "The upload"): string {
+function errorText(payload: unknown, status: number, what = T().pipeline.theUpload): string {
   const message = text(record(payload)?.error)
-  return message ? `${message} (HTTP ${status})` : `${what} failed (HTTP ${status}).`
+  return message ? `${message} (HTTP ${status})` : T().pipeline.failed(what, status)
 }
 
 /** The owner's polite status line, shared by the upload and the rebuild. */
@@ -978,18 +1032,19 @@ function uploadForm(
   titled: boolean,
   status: HTMLElement,
 ): HTMLElement {
+  const t = T().pipeline
   const form = element("form", "docwiki-process-upload")
   form.noValidate = true
-  if (titled) form.append(element("h3", "docwiki-process-title", "Add a document"))
+  if (titled) form.append(element("h3", "docwiki-process-title", t.addDocument))
 
-  const fileLabel = element("label", "docwiki-process-label", "Document")
+  const fileLabel = element("label", "docwiki-process-label", t.documentLabel)
   fileLabel.htmlFor = "docwiki-process-file"
   const file = element("input", "docwiki-process-file")
   file.type = "file"
   file.id = "docwiki-process-file"
   file.accept = upload.extensions.join(",")
 
-  const folderLabel = element("label", "docwiki-process-label", "Folder (optional)")
+  const folderLabel = element("label", "docwiki-process-label", t.folderLabel)
   folderLabel.htmlFor = "docwiki-process-folder"
   const folder = element("input", "docwiki-process-input")
   folder.type = "text"
@@ -997,23 +1052,21 @@ function uploadForm(
   folder.autocomplete = "off"
   folder.spellcheck = false
   folder.maxLength = MAX_PATH_CHARS
-  folder.placeholder = "for example planning, devis or achats"
+  folder.placeholder = t.folderPlaceholder
 
   const replaceLabel = element("label", "docwiki-process-check")
   const replace = element("input")
   replace.type = "checkbox"
-  replaceLabel.append(replace, " Replace if it exists")
+  replaceLabel.append(replace, t.replace)
 
-  const submit = element("button", "docwiki-process-submit", "Add to the wiki")
+  const submit = element("button", "docwiki-process-submit", t.addToWiki)
   submit.type = "submit"
   const problem = element("p", "docwiki-process-upload-error")
   problem.setAttribute("role", "alert")
   problem.hidden = true
   const hint = element("p", "docwiki-process-hint")
   const sayHint = () => {
-    hint.textContent =
-      `Up to ${upload.maxMb} MB · ${plural(upload.uploadsLeft, "upload")} left today · ` +
-      upload.extensions.join(" ")
+    hint.textContent = t.uploadHint(upload.maxMb, upload.uploadsLeft, upload.extensions.join(" "))
   }
   sayHint()
   const fail = (message: string) => {
@@ -1028,23 +1081,21 @@ function uploadForm(
     if (submit.disabled) return
     problem.hidden = true
     const chosen = file.files?.[0]
-    if (!chosen) return fail("Choose a document first.")
+    if (!chosen) return fail(t.chooseFirst)
     const dot = chosen.name.lastIndexOf(".")
     const extension = dot < 0 ? "" : chosen.name.slice(dot).toLowerCase()
     if (!upload.extensions.includes(extension)) {
-      return fail(`This file type cannot be added; use ${upload.extensions.join(" ")}.`)
+      return fail(t.badType(upload.extensions.join(" ")))
     }
-    if (chosen.size === 0) return fail("The file is empty.")
-    if (chosen.size > upload.maxMb * 1024 * 1024) {
-      return fail(`The file is larger than ${upload.maxMb} MB.`)
-    }
+    if (chosen.size === 0) return fail(t.emptyFile)
+    if (chosen.size > upload.maxMb * 1024 * 1024) return fail(t.tooLarge(upload.maxMb))
     const checked = uploadPath(folder.value, chosen)
     if ("error" in checked) return fail(checked.error)
     const encoded = checked.path.split("/").map(encodeURIComponent).join("/")
     const query = replace.checked ? "?replace=1" : ""
     const target = relativeHref(currentSlug(), `${UPLOAD_PATH}/${encoded}`) + query
     submit.disabled = true
-    status.textContent = `Uploading ${checked.path}…`
+    status.textContent = t.uploading(checked.path)
     fetch(target, {
       method: "PUT",
       headers: {
@@ -1065,13 +1116,13 @@ function uploadForm(
         uploaded = { path, at: Date.now() }
         followUntil = Date.now() + FOLLOW_MS
         form.reset()
-        status.textContent = `Uploaded ${path}. The pipeline starts within a minute: `
-        status.append(anchor("#docwiki-live", "follow it live"), ".")
+        status.textContent = t.uploaded(path)
+        status.append(anchor("#docwiki-live", t.followLive), ".")
         done()
       })
       .catch((error: unknown) => {
         console.error("DocWiki: the upload failed", error)
-        fail("The upload did not reach the portal; check the connection and try again.")
+        fail(t.uploadUnreachable)
       })
       .finally(() => {
         submit.disabled = false
@@ -1086,24 +1137,23 @@ function rebuildControl(
   done: () => void,
   status: HTMLElement,
 ): HTMLElement {
+  const t = T().pipeline
   const block = element("div", "docwiki-process-rebuild")
   const button = element("button", "docwiki-process-submit docwiki-process-rebuild-button")
   button.type = "button"
-  button.textContent = "Rebuild the wiki"
+  button.textContent = t.rebuild
   const hint = element("p", "docwiki-process-hint")
   hint.id = "docwiki-process-rebuild-hint"
   button.setAttribute("aria-describedby", hint.id)
   const sayHint = () => {
-    hint.textContent =
-      "Rebuilds every page and the site from the cache; about $0 when no document changed; " +
-      `at most ${REBUILDS_A_DAY} a day, ${rebuild.left} left.`
+    hint.textContent = t.rebuildHint(REBUILDS_A_DAY, rebuild.left)
     button.disabled = rebuild.left <= 0
   }
   sayHint()
   button.addEventListener("click", () => {
     if (button.disabled) return
     button.disabled = true
-    status.textContent = "Asking for a rebuild…"
+    status.textContent = t.askingRebuild
     const target = relativeHref(currentSlug(), `${REBUILD_PATH}/${randomKey()}`)
     fetch(target, { method: "PUT", headers: { [OWNER_HEADER]: "1" }, credentials: "same-origin" })
       .then(async (response) => {
@@ -1112,18 +1162,16 @@ function rebuildControl(
         if (left !== null) rebuild.left = Math.max(0, left)
         if (response.status !== 202) {
           if (response.status === 429) rebuild.left = 0
-          status.textContent = errorText(payload, response.status, "The rebuild")
+          status.textContent = errorText(payload, response.status, t.theRebuild)
           return
         }
         followUntil = Date.now() + FOLLOW_MS
-        status.textContent =
-          "Rebuild queued: it starts within a minute; follow it in the pipeline below."
+        status.textContent = t.rebuildQueued
         done()
       })
       .catch((error: unknown) => {
         console.error("DocWiki: the rebuild request failed", error)
-        status.textContent =
-          "The rebuild request did not reach the portal; check the connection and try again."
+        status.textContent = t.rebuildUnreachable
       })
       .finally(sayHint)
   })
@@ -1163,10 +1211,10 @@ document.addEventListener("nav", () => {
   state.append(sentence, latestChange)
   state.hidden = true
   const live = element("div", "docwiki-process-live")
-  const note = element("p", "docwiki-process-note", UNAVAILABLE)
+  const note = element("p", "docwiki-process-note", T().pipeline.unavailable)
   note.hidden = true
   if (!owner.isConnected) section.append(owner)
-  // The live view comes before the disclosure of the 13 technical steps (Process.tsx).
+  // The live view comes before the disclosure of the 14 technical steps (Process.tsx).
   const steps = section.querySelector<HTMLElement>(".docwiki-process-steps")
   if (steps) steps.before(state, live, note)
   else section.append(state, live, note)
@@ -1210,7 +1258,7 @@ document.addEventListener("nav", () => {
   /** Say what changed since the last poll; the first render says nothing. */
   const announce = (next: View) => {
     const current = next.documents.map(facts)
-    const sentences = announcements(seen, current)
+    const sentences = announcements(seen, current, 3, T())
     if (seen === null) {
       state.setAttribute("role", "status")
       state.setAttribute("aria-live", "polite")

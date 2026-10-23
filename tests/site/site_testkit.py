@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import json
+import posixpath
+import re
 import shutil
 from collections.abc import Sequence
 from pathlib import Path
+
+from docwiki.contracts.frontmatter import read_frontmatter
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MOCK_RELEASE = REPO_ROOT / "samples" / "fixtures" / "mock-release"
@@ -109,6 +113,100 @@ def make_scoped(dest: Path, release_dir: Path = MOCK_RELEASE_DIR) -> Path:
             update={"pages": sorted(entries.values(), key=lambda e: e.path), "sources": sources}
         )
         path.write_bytes(updated.to_json().encode("utf-8"))
+    return dest
+
+
+FR_HOME_TITLE = "Wiki maquette du chantier Moreau"
+FR_MINUTES_TITLE = "Compte rendu de chantier n°3"
+"""Titles of the canonical (French) copy of the mock release; the English mirror keeps the mock's
+English titles (``MOCK_TITLE``, "Site meeting minutes n°3")."""
+_LINK_RE = re.compile(r"\]\(([^)\s]+)\)")
+
+
+def _set_frontmatter(text: str, values: dict[str, str]) -> str:
+    """Set top-level ``key: value`` lines of a page's frontmatter (added before its end)."""
+    head, sep, body = text.partition("\n---\n")
+    lines = head.split("\n")
+    for key, value in values.items():
+        found = [i for i, line in enumerate(lines) if line.startswith(f"{key}:")]
+        if found:
+            lines[found[0]] = f"{key}: {value}"
+        else:
+            lines.append(f"{key}: {value}")
+    return "\n".join(lines) + sep + body
+
+
+def _mirror_links(body: str, page: str, mirrored: set[str]) -> str:
+    """Links of a page copied one folder down (``en/``): links to mirrored pages stay as they
+    are; links to anything else (evidence, ``llms.txt``, filed answers) go one level further up
+    to the canonical tree."""
+
+    def fix(match: re.Match[str]) -> str:
+        target = match.group(1)
+        if "://" in target or target.startswith(("#", "mailto:")):
+            return match.group(0)
+        path = target.split("#", 1)[0]
+        folder = posixpath.dirname(page)
+        resolved = posixpath.normpath(posixpath.join(folder, path)) if path else page
+        if resolved in mirrored:
+            return match.group(0)
+        return f"](../{target})"
+
+    return _LINK_RE.sub(fix, body)
+
+
+def make_bilingual(dest: Path, release_dir: Path = MOCK_RELEASE_DIR) -> Path:
+    """A two-language copy of the mock release, shaped as the release contract of ADR 0012 says:
+    canonical French pages at ``wiki/<path>`` (``lang: fr``), an English mirror at
+    ``wiki/en/<path>`` (``lang: en``, ``translation_of: <id>``, same ids and slugs, links to the
+    shared evidence one level further up), catalog pages unique by ``(id, lang)`` and
+    ``wiki_languages: ["fr", "en"]`` in the manifest. Filed answers (``queries/``) stay canonical
+    and keep ``lang: en`` (the schema-1 page model accepts only English there)."""
+    shutil.copytree(release_dir, dest)
+    wiki = dest / "wiki"
+    manifest = json.loads((dest / "manifest.json").read_text(encoding="utf-8"))
+    manifest["wiki_languages"] = ["fr", "en"]
+    (dest / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    pages = sorted(
+        path.relative_to(wiki).as_posix()
+        for path in wiki.rglob("*.md")
+        if not any(part.startswith(".") for part in path.relative_to(wiki).parts)
+    )
+    mirrored = {rel for rel in pages if not rel.startswith("queries/") and rel != "AGENTS.md"}
+    french = {"index.md": FR_HOME_TITLE, f"{MINUTES_PAGE}.md": FR_MINUTES_TITLE}
+    for rel in pages:
+        file = wiki / rel
+        text = file.read_text(encoding="utf-8")
+        if rel in mirrored:
+            meta, _ = read_frontmatter(text)
+            english = _set_frontmatter(text, {"lang": "en", "translation_of": str(meta["id"])})
+            head, sep, body = english.partition("\n---\n")
+            target = wiki / "en" / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(head + sep + _mirror_links(body, rel, mirrored), encoding="utf-8")
+        if not rel.startswith("queries/"):
+            values = {"lang": "fr"}
+            if rel in french:
+                values["title"] = french[rel]
+            file.write_text(_set_frontmatter(text, values), encoding="utf-8")
+    for path in (dest / "catalog.json", wiki / "catalog.json"):
+        catalog = json.loads(path.read_text(encoding="utf-8"))
+        canonical, mirror = [], []
+        for entry in catalog["pages"]:
+            if not entry["path"].startswith("queries/"):
+                if entry["path"] in mirrored:
+                    mirror.append(
+                        {
+                            **entry,
+                            "path": f"en/{entry['path']}",
+                            "lang": "en",
+                            "translation_of": entry["id"],
+                        }
+                    )
+                entry = {**entry, "lang": "fr", "title": french.get(entry["path"], entry["title"])}
+            canonical.append(entry)
+        catalog["pages"] = canonical + mirror
+        path.write_text(json.dumps(catalog, indent=2, ensure_ascii=False), encoding="utf-8")
     return dest
 
 

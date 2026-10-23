@@ -408,19 +408,20 @@ def render_source_page(
 ) -> tuple[Page, list[CitedLocator]]:
     compiled = result.compiled
     path = f"sources/{slug}.md"
+    t = pack.strings()  # the generated headings in the wiki's canonical language (v1.7)
     notes = _Footnotes(path, compiled.title)
     by_block = {citation.block_ids[0]: citation for citation in result.citations}
     lines = [f"# {compiled.title}", ""]
     if pack.info.banner:
         lines += [f"> {pack.info.banner}", ""]
-    lines += [compiled.summary, "", "## Key facts", ""]
+    lines += [compiled.summary, "", f"## {t.heading('key_facts')}", ""]
     for fact in compiled.key_facts:
         refs = "".join(
             notes.cite(by_block[c.block_id]) for c in fact.citations if c.block_id in by_block
         )
         if refs:
             lines.append(f"- {fact.text}{refs}")
-    lines += ["", "## Contents", ""]
+    lines += ["", f"## {t.heading('contents')}", ""]
     for section in compiled.sections:
         body = section.body
         for block_id, citation in by_block.items():
@@ -428,8 +429,8 @@ def render_source_page(
             if marker in body:
                 body = body.replace(marker, notes.cite(citation))
         lines += [f"### {section.heading}", "", body, ""]
-    lines += ["## Figures", "", "No figures were extracted from this document.", ""]
-    lines += ["## Sources", "", *notes.definitions]
+    lines += [f"## {t.heading('figures')}", "", t("render.no_figures"), ""]
+    lines += [f"## {t.heading('sources')}", "", *notes.definitions]
     mix: dict[str, int] = {}
     for block in doc.blocks:
         mix[block.provenance] = mix.get(block.provenance, 0) + 1
@@ -503,10 +504,11 @@ async def build_entity_pages(
             max_output_tokens=200,
             metadata={"stage": "entities"},
         )
+        t = pack.strings()
         lines = [f"# {entry.label}", ""]
         if pack.info.banner:
             lines += [f"> {pack.info.banner}", ""]
-        lines += [summary.output.summary, "", "## Facts", ""]
+        lines += [summary.output.summary, "", f"## {t.heading('facts')}", ""]
         definitions: list[str] = []
         documents: list[str] = []
         sources: list[str] = []
@@ -535,7 +537,16 @@ async def build_entity_pages(
                     citation.provenance,
                 )
             )
-        lines += ["", "## Documents", "", *documents, "", "## Sources", "", *definitions]
+        lines += [
+            "",
+            f"## {t.heading('documents')}",
+            "",
+            *documents,
+            "",
+            f"## {t.heading('sources')}",
+            "",
+            *definitions,
+        ]
         tiers = [source_pages[sid].frontmatter.sensitivity for sid in sources]
         frontmatter = EntityFrontmatter(
             id=entity_id,
@@ -625,21 +636,22 @@ async def build_topic_pages(
                     citation.provenance,
                 )
             )
+        t = pack.strings()
         lines = [f"# {topic.title}", ""]
         if pack.info.banner:
             lines += [f"> {pack.info.banner}", ""]
         lines += [
             f"Synthesis of {len(feeding)} sources.",
             "",
-            "## Overview",
+            f"## {t.heading('overview')}",
             "",
             synthesis.output.overview + "".join(refs),
             "",
-            "## Sources consulted",
+            f"## {t.heading('sources_consulted')}",
             "",
             *consulted,
             "",
-            "## Sources",
+            f"## {t.heading('sources')}",
             "",
             *notes,
         ]

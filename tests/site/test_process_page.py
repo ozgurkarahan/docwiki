@@ -17,7 +17,7 @@ from docwiki.site.process_page import (
 def test_the_steps_are_the_pipeline_stages_in_order() -> None:
     assert tuple(stage for stage, _text in STAGES) == STAGE_NAMES
     assert all(text for _stage, text in STAGES)
-    # The 13 steps are in a disclosure of the Process component, not in the page text.
+    # The 14 steps are in a disclosure of the Process component, not in the page text.
     assert process_markdown().rstrip().endswith("## Live")
 
 

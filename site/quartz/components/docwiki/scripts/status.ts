@@ -1,6 +1,9 @@
 // The one status vocabulary of the site (ADR 0010): always a shape, a word and a colour (the
 // colour comes from the `docwiki-status--<state>` class). The portal computes the state
-// (`document_state` in src/docwiki/portal/process.py); the browser only words it.
+// (`document_state` in src/docwiki/portal/process.py); the browser only words it, in the page's
+// language (i18n/en.ts, i18n/fr.ts: "In the wiki", "Dans le wiki").
+import { clientStrings } from "../i18n"
+import type { Strings } from "../i18n"
 
 export const STATES = [
   "received",
@@ -26,39 +29,30 @@ const SHAPES: Record<State, string> = {
   removed: "○",
 }
 
-const WORDS: Record<State, string> = {
-  received: "Received",
-  queued: "Queued",
-  processing: "Processing",
-  in_wiki: "In the wiki",
-  superseded: "Superseded",
-  held_back: "Held back",
-  failed: "Failed",
-  removed: "Removed",
-}
-
 export function asState(value: unknown): State | null {
   return typeof value === "string" && (STATES as readonly string[]).includes(value)
     ? (value as State)
     : null
 }
 
-/** "Processing 4/13 compile", "In the wiki", … */
+/** "Processing 4/14 compile", "In the wiki", "En cours 4/14 compile", … */
 export function stateWords(
   state: State,
   step: number | null = null,
   steps: number | null = null,
   stage: string | null = null,
+  t: Strings = clientStrings(),
 ): string {
-  if (state !== "processing" || step === null) return WORDS[state]
+  const word = t.status[state]
+  if (state !== "processing" || step === null) return word
   const of = steps ? `${step}/${steps}` : String(step)
-  return stage ? `${WORDS[state]} ${of} ${stage}` : `${WORDS[state]} ${of}`
+  return stage ? `${word} ${of} ${stage}` : `${word} ${of}`
 }
 
 /** A status pill: the shape (hidden from screen readers, the word says it) and the word. */
 export function statusPill(
   state: State,
-  words: string = WORDS[state],
+  words: string = clientStrings().status[state],
   tag: "span" | "a" = "span",
 ): HTMLElement {
   const pill = document.createElement(tag)
