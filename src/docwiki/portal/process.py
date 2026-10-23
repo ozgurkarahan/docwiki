@@ -256,6 +256,10 @@ class ProcessService:
         self._list_raw = list_raw or self._list_raw_from_storage
         self._queue_depth = queue_depth
         self._enqueue = enqueue
+        self._finished: dict[str, RunReport] = {}
+        """Run reports that will not change any more (finished runs), by run id."""
+        self._originals: tuple[str, dict[str, str]] | None = None
+        """``(release_id, {source_id: original file name})`` of the served release."""
         self.daily_rebuilds = daily_rebuilds
         self._rebuilds: dict[date, set[str]] = {}
         self._clock = clock
@@ -345,14 +349,20 @@ class ProcessService:
                 "sources": len(catalog.sources) if catalog else None,
                 "pages": len(catalog.pages) if catalog else None,
             }
-        reports, checks = self._reports()
+        reports, checks, history = self._reports()
         running = reports[0] if reports and reports[0].status == "running" else None
-        documents = self._documents(catalog, audience, running)
+        documents = self._documents(
+            catalog,
+            audience,
+            running,
+            released_at=pointer.created_at if pointer is not None else None,
+            originals=self._published_originals(pointer.release_id) if pointer else {},
+        )
         counts = Counter(row["status"] for row in documents)
         states = Counter(row["state"] for row in documents)
         hidden = {row["source_id"] for row in documents if row["hidden"]}
         runs = [self._run_view(report, release, catalog, hidden) for report in reports]
-        self._last_changes(documents, reports, catalog)
+        self._last_changes(documents, history, catalog)
         return {
             "release": release,
             "runs": runs,
@@ -411,7 +421,13 @@ class ProcessService:
             return None
 
     def _documents(
-        self, catalog: Catalog | None, audience: str, running: RunReport | None = None
+        self,
+        catalog: Catalog | None,
+        audience: str,
+        running: RunReport | None = None,
+        *,
+        released_at: datetime | None = None,
+        originals: dict[str, str] | None = None,
     ) -> list[dict[str, Any]]:
         blobs = self._list_raw()
         states, _broken = WorkStore(self.storage).source_states()
@@ -425,6 +441,11 @@ class ProcessService:
         for blob in blobs:
             listed.add(blob.path)
             row = self._row(blob, by_path.get(blob.path), pages, released, audience)
+            if _received_after(row, blob, released_at):
+                # A new version of a document of the release: received, not yet in the wiki.
+                row.update(state="received", stage=None, step=None, phase=None)
+            name = (originals or {}).get(row["source_id"] or "")
+            row["original_url"] = f"/evidence/{row['source_id']}/{name}" if name else None
             rows.append(self._follow_run(row, stage, blob.path in in_run))
         for path, state in by_path.items():
             if path not in listed and state.deleted:
@@ -481,6 +502,7 @@ class ProcessService:
             "in_release": in_release,
             "page_url": site_link(page.path) if page else None,
             "document_url": f"/evidence/{source_id}/" if page and source_id else None,
+            "original_url": None,
             "phase": document_phase(STAGE_NAMES[step - 1]) if step else None,
             "last_change": None,
             "last_error": _clip(state.last_error) if state else None,
@@ -530,32 +552,66 @@ class ProcessService:
         public = {**row, "last_error": None, "failed": bool(row["last_error"])}
         if row["hidden"]:
             public.update(
-                path="(not in this site's audience)", title=None, source_id=None, page_url=None
+                path="(not in this site's audience)",
+                title=None,
+                source_id=None,
+                page_url=None,
+                document_url=None,
+                original_url=None,
+                last_change=None,
             )
         return public
 
-    def _reports(self) -> tuple[list[RunReport], dict[str, Any]]:
-        """The last :data:`RUN_LIMIT` runs that did something, newest first, and the no-op checks
-        met on the way (``{"count", "last"}``: counted, not listed; ADR 0010)."""
+    def _reports(self) -> tuple[list[RunReport], dict[str, Any], list[RunReport]]:
+        """The last :data:`RUN_LIMIT` runs that did something, newest first, the no-op checks met
+        on the way (``{"count", "last"}``: counted, not listed; ADR 0010), and every published
+        run of the last :data:`RUN_SCAN` (for each document's last change). Finished reports are
+        read once."""
         store = WorkStore(self.storage)
         runs: list[RunReport] = []
+        history: list[RunReport] = []
         checks = 0
         last_check: str | None = None
         for run_id in reversed(store.run_ids()[-RUN_SCAN:]):
-            if len(runs) >= RUN_LIMIT:
-                break
-            try:
-                report = store.run_report(run_id)
-            except ValueError:
-                continue
+            report = self._finished.get(run_id)
             if report is None:
-                continue
+                try:
+                    report = store.run_report(run_id)
+                except ValueError:
+                    continue
+                if report is None:
+                    continue
+                if report.status != "running":
+                    self._finished[run_id] = report
             if report.status == "no-op":
-                checks += 1
-                last_check = last_check or _iso(report.finished_at) or _iso(report.started_at)
+                if len(runs) < RUN_LIMIT:
+                    checks += 1
+                    last_check = last_check or _iso(report.finished_at) or _iso(report.started_at)
                 continue
-            runs.append(report)
-        return runs, {"count": checks, "last": last_check}
+            if len(runs) < RUN_LIMIT:
+                runs.append(report)
+            if report.release_id is not None and report.page_changes:
+                history.append(report)
+        return runs, {"count": checks, "last": last_check}, history
+
+    def _published_originals(self, release_id: str) -> dict[str, str]:
+        """``{source_id: original file name}`` of the originals the release publishes (listed
+        once per release)."""
+        cached = self._originals
+        if cached is not None and cached[0] == release_id:
+            return cached[1]
+        prefix = release_prefix(release_id) + "evidence/"
+        found: dict[str, str] = {}
+        try:
+            for key in self.storage.list(prefix):
+                parts = key[len(prefix) :].split("/")
+                if len(parts) == 2 and parts[1].startswith("original."):
+                    found[parts[0]] = parts[1]
+        except Exception as exc:  # the view degrades, it does not fail
+            log.warning("originals of %s not listed: %s", release_id, exc)
+            return {}
+        self._originals = (release_id, found)
+        return found
 
     def _last_changes(
         self, rows: list[dict[str, Any]], reports: list[RunReport], catalog: Catalog | None
@@ -754,6 +810,17 @@ def azure_raw_lister(account_url: str, container: str, credential: Any) -> RawLi
         ]
 
     return list_raw
+
+
+def _received_after(row: dict[str, Any], blob: RawBlob, released_at: datetime | None) -> bool:
+    """A document of the release whose file changed after the release was published."""
+    if not row["in_release"] or row["state"] not in ("in_wiki", "superseded"):
+        return False
+    if blob.modified is None or released_at is None:
+        return False
+    modified = blob.modified if blob.modified.tzinfo else blob.modified.replace(tzinfo=UTC)
+    released = released_at if released_at.tzinfo else released_at.replace(tzinfo=UTC)
+    return modified > released
 
 
 def _title(source_id: str, catalog: Catalog | None) -> str | None:

@@ -119,9 +119,12 @@ function render(): void {
             ? "The pipeline is idle; open it"
             : words
       if (published && status.document) {
-        chip.setAttribute("aria-label", `In the wiki: ${status.document.title}`)
-      } else {
-        chip.removeAttribute("aria-label")
+        // The accessible name starts with the visible words (WCAG "label in name"); the
+        // document's title follows for screen readers only.
+        const title = document.createElement("span")
+        title.className = "sr-only"
+        title.textContent = `: ${status.document.title}`
+        chip.append(title)
       }
       if (live && announced !== "" && announced !== words) live.textContent = `Pipeline: ${words}`
       announced = words

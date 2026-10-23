@@ -279,3 +279,49 @@ def test_a_changed_document_in_the_wiki_follows_its_run(
     )
     row = _rows(_service(storage).process(owner=True))[DONE_PATH]
     assert (row["state"], row["stage"], row["step"], row["phase"]) == ("processing", *expected)
+
+
+def test_a_new_version_of_a_document_reads_received_until_its_run(storage: FolderStorage) -> None:
+    """The file changed after the release was published: not "In the wiki" any more."""
+    import os
+    import time
+
+    assert _rows(_service(storage).process(owner=True))[DONE_PATH]["state"] == "in_wiki"
+    now = time.time()
+    os.utime(storage.path_for(f"raw/{DONE_PATH}"), (now, now))
+    row = _rows(_service(storage).process(owner=True))[DONE_PATH]
+    assert (row["state"], row["phase"]) == ("received", None)
+    assert row["page_url"] == DONE_PAGE  # the version in the wiki is still linked
+
+
+def test_published_originals_are_linked(storage: FolderStorage) -> None:
+    sid = source_id_for(DONE_PATH)
+    storage.write_bytes(f"releases/{RELEASE_ID}/evidence/{sid}/original.docx", b"PK")
+    rows = _rows(_service(storage).process(owner=True))
+    assert rows[DONE_PATH]["original_url"] == f"/evidence/{sid}/original.docx"
+    assert rows[NEW_PATH]["original_url"] is None
+
+
+def test_a_last_change_older_than_the_listed_runs_is_found(storage: FolderStorage) -> None:
+    sid = source_id_for(DONE_PATH)
+    _write_report(
+        storage,
+        "run-29991230-000000-00000001",
+        status="succeeded",
+        release_id=RELEASE_ID,
+        documents=[{"source_id": sid, "path": DONE_PATH, "change": "new"}],
+        page_changes=[{"path": DONE_PAGE.lstrip("/") + ".md", "change": "added"}],
+    )
+    for n in range(12):  # newer runs that did something else
+        _write_report(
+            storage,
+            f"run-29991231-0000{n:02d}-000000{n:02d}",
+            status="succeeded",
+            release_id=RELEASE_ID,
+            documents=[],
+            page_changes=[],
+        )
+    view = _service(storage).process(owner=True)
+    assert len(view["runs"]) == 10
+    last = _rows(view)[DONE_PATH]["last_change"]
+    assert last["run_id"] == "run-29991230-000000-00000001" and last["change"] == "new"
