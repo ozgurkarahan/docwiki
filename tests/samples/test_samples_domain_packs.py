@@ -1,10 +1,10 @@
 """The shipped domain pack ``batiment`` on the real sample corpus (domain-and-corpus.md §1-§3).
 
-The pack must classify, tier and group the generated files of ``samples/corpus`` as the document
-contract (§3.4) and the planted scenarios (§3.2) expect. Every check runs the engine's own code on
-the real files: the local extraction adapters, the classify stage (with a model client that fails
-on any call), discovery, the topic resolution rule, the portal's upload check and the agent-kit
-renderer. No model and no network.
+The pack must classify, tier, scope and group the generated files of ``samples/corpus`` as the
+document contract (§3.4), the planted scenarios (§3.2) and the scopes of ADR 0011 expect. Every
+check runs the engine's own code on the real files: the local extraction adapters, the classify
+stage (with a model client that fails on any call), discovery, the topic resolution rule, the
+portal's upload check and the agent-kit renderer. No model and no network.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ from docwiki.domain import (
     sensitivity_floor,
     sensitivity_for,
 )
-from docwiki.domain.rules import normalize_for_matching
+from docwiki.domain.rules import match_doc_type, normalize_for_matching, scope_axes
 from docwiki.engine_types import Classification, ExtractSettings
 from docwiki.extract import extract_source
 from docwiki.llm import FakeLlmClient
@@ -55,6 +55,7 @@ PACK = "batiment"
 NOW = datetime(2026, 3, 28, 9, 0, tzinfo=UTC)
 SKILL_VARIABLES = {"wiki_title", "paths", "topics", "entity_types"}
 EXPECTED_TYPES = {
+    # chantier Moreau
     "devis-a": "quote",
     "devis-b": "quote",
     "contrat": "works-contract",
@@ -69,9 +70,45 @@ EXPECTED_TYPES = {
     "photo-dalle": "site-photo",
     "photo-palettes": "site-photo",
     "etude-prix": "price-study",
+    # chantier résidence Les Nacrines
+    "nac-marche": "works-contract",
+    "nac-sous-traitance": "subcontract",
+    "nac-dc4": "dc4",
+    "nac-os1": "ordre-de-service",
+    "nac-facture": "supplier-invoice",
+    "nac-situation4": "situation",
+    "nac-cr12": "site-meeting-minutes",
+    "nac-pv": "pv-de-reception",
+    "nac-reserves": "liste-des-reserves",
+    "nac-mail-vanarsdel": "supplier-email",
+    # chantier école de Montferrine
+    "eco-ccap": "ccap",
+    "eco-dpgf-a": "dpgf",
+    "eco-dpgf-b": "dpgf",
+    "eco-ae": "acte-d-engagement",
+    "eco-bc-vanarsdel": "purchase-order",
+    "eco-planning": "schedule",
+    "eco-cr-prep": "site-meeting-minutes",
+    "eco-mail-mairie": "client-email",
+    "eco-ppsps": "ppsps",
+    # entreprise
+    "ent-cgv": "general-terms",
+    "ent-organigramme": "organisation-chart",
+    "ent-contrat-cadre": "framework-agreement",
+    "ent-tarif": "price-list",
+    "ent-planning-equipes": "crew-schedule",
+    "ent-registre-materiel": "equipment-register",
+    "ent-registre-attestations": "compliance-register",
+    "ent-suivi-facturation": "billing-register",
+    "ent-marges": "margin-dashboard",
 }
-REVISED = ("devis-a", "devis-b", "planning-a", "planning-b")
-REPLACING = {"devis-b": ["DEV-2026-014"], "planning-b": ["PLN-2026-003"]}
+REVISED = ("devis-a", "devis-b", "planning-a", "planning-b", "eco-dpgf-a", "eco-dpgf-b",
+           "eco-planning")
+REPLACING = {"devis-b": ["DEV-2026-014"], "planning-b": ["PLN-2026-003"],
+             "eco-dpgf-b": ["DEV-2026-031"]}
+RESTRICTED = ["ent-marges", "etude-prix"]
+ORG_TYPES = {"electrical-subcontractor": "sous-traitant", "plumbing-subcontractor": "sous-traitant",
+             "architect": "maitre-d-oeuvre"}
 # French terms of the documents' headings, sheet names and table columns that the pack relies
 # on (topic aliases, hints), with the glossary term that must carry them as a synonym.
 HEADING_TERMS = {
@@ -182,23 +219,36 @@ def test_batiment_is_the_fictional_sample_pack(pack: DomainPack, bible: dict[str
     assert info.banner and info.banner.startswith("FICTIONAL SAMPLE")
     builder = next(org for org in bible["organisations"] if org["role"] == "builder")
     client = next(org for org in bible["organisations"] if org["role"] == "client")
-    town = next(place for place in bible["places"] if place["type"] == "town")
-    for name in (builder["name"], client["short"], town["name"]):
+    towns = [place["name"] for place in bible["places"] if place["type"] == "town"]
+    assert info.wiki_title == builder["name"]
+    for name in (builder["name"], client["short"], *towns):
         assert name in info.banner, name
     # A block made only of banner words is a notice for readers, never an injection: the stamp
     # printed on every document must be one.
     assert _words(bible["world"]["stamp"]) <= _words(info.banner)
-    assert 5 <= len(pack.topics.topics) <= 7
+    # Six topics per chantier (ADR 0011) and three company topics.
+    assert len(pack.topics.topics) == 9
+    assert sum(topic.per_scope for topic in pack.topics.topics) == 6
     for topic in pack.topics.topics:
         assert topic.keywords and topic.aliases, topic.slug
         assert {alias.lang for alias in topic.aliases} == {"fr"}, topic.slug
-    assert 5 <= len(pack.entities.types) <= 7
+    assert len(pack.entities.types) == 12
+    assert pack.scopes is not None
+    assert pack.scopes.name in {entity_type.key for entity_type in pack.entities.types}
     assert len(pack.skill_templates) == 3
 
 
 def test_the_registry_covers_the_bible(pack: DomainPack, bible: dict[str, Any]) -> None:
-    expected = {f"organisation:{org['key']}" for org in bible["organisations"]}
+    org_type = {org["key"]: ORG_TYPES.get(org["role"], "organisation")
+                for org in bible["organisations"]}
+    expected = {f"{org_type[key]}:{key}" for key in org_type}
     expected |= {f"person:{person['key']}" for person in bible["people"]}
+    expected |= {f"chantier:{chantier['code']}" for chantier in bible["chantiers"]}
+    expected |= {f"materiel:{item['code'].lower()}" for item in bible["equipment"]}
+    nacrines = bible["facts"]["nacrines"]
+    expected |= {f"reserve:nacrines-{row['id'].lower()}" for row in nacrines["reserves"]["rows"]}
+    expected |= {f"situation:nacrines-n{row['n']}" for row in nacrines["situations"]}
+    expected.add("situation:adatum-nacrines-n2")
     expected |= {f"work-package:{lot['key']}" for lot in bible["work_packages"]}
     expected |= {
         f"material:{product['code'].lower()}"
@@ -220,7 +270,14 @@ def test_the_registry_covers_the_bible(pack: DomainPack, bible: dict[str, Any]) 
     expected.add("building-element:fenetres-f2-f3")
     assert expected <= set(pack.entity_ids), sorted(expected - set(pack.entity_ids))
     for org in bible["organisations"]:
-        assert pack.entity(f"organisation:{org['key']}").label == org["name"]
+        assert pack.entity(f"{org_type[org['key']]}:{org['key']}").label == org["name"]
+    people = {person["key"]: person["name"] for person in bible["people"]}
+    for chantier in bible["chantiers"]:
+        attributes = pack.entity(f"chantier:{chantier['code']}").attributes
+        assert attributes["code"] == chantier["code"]
+        assert attributes["phase"] == chantier["phase"]
+        assert attributes["contract_type"] == chantier["contract_type"]
+        assert attributes["conducteur"] == people[chantier["conducteur"]]
     for person in bible["people"]:
         assert pack.entity(f"person:{person['key']}").label == person["name"]
     for product in bible["products"]:
@@ -231,18 +288,23 @@ def test_the_registry_covers_the_bible(pack: DomainPack, bible: dict[str, Any]) 
 # ------------------------------------------------------------------- classification and tiers
 
 
-def test_every_document_is_classified_by_its_file_name_rule(
+def test_every_document_is_classified_by_its_path_and_its_file_name_agrees(
     documents: list[dict[str, Any]],
     docs: dict[str, ExtractedDoc],
     classifications: dict[str, Classification],
     pack: DomainPack,
     llm: FakeLlmClient,
 ) -> None:
+    """The doc type folder of the path decides (ADR 0011); the file name rules give the same type,
+    so a document uploaded outside the layout is still classified without a model."""
     assert {entry["id"] for entry in documents} == set(EXPECTED_TYPES)
     for entry in documents:
         expected = pack.doc_type(EXPECTED_TYPES[entry["id"]])
         result = classifications[entry["id"]]
-        assert (result.method, result.rule_id) == ("rule", f"{expected.key}#0"), entry["path"]
+        assert (result.method, result.rule_id) == ("path", None), entry["path"]
+        name = PurePosixPath(entry["path"]).name
+        match = match_doc_type(pack, name, docs[entry["id"]].text())
+        assert match is not None and match.doc_type == expected.key, entry["path"]
         assert (result.doc_type, result.category, result.authority) == (
             expected.key,
             expected.category,
@@ -266,7 +328,7 @@ def test_tiers_follow_the_manifest_and_a_public_build_drops_only_the_price_study
             assert sensitivity_floor(pack, raw_path) == entry["sensitivity"], raw_path
         if not allowed_for_audience(entry["sensitivity"], "public"):
             dropped.append(entry["id"])
-    assert dropped == ["etude-prix"]
+    assert sorted(dropped) == RESTRICTED
 
 
 def test_resolution_rule_on_the_planted_contradictions(
@@ -318,7 +380,27 @@ def test_resolution_rule_on_the_planted_contradictions(
 # ------------------------------------------------------------------------------ supersession
 
 
-def test_discovery_groups_only_the_quote_and_the_schedule(
+def test_scope_phase_and_type_come_from_the_path(
+    documents: list[dict[str, Any]], classifications: dict[str, Classification], pack: DomainPack
+) -> None:
+    assert pack.scopes is not None
+    phases = {phase.key for phase in pack.scopes.phases}
+    for entry in documents:
+        parts = entry["path"].split("/")
+        result = classifications[entry["id"]]
+        for raw_path in (entry["path"], _relative(entry["path"])):
+            axes = scope_axes(pack, raw_path)
+            assert axes.doc_type == EXPECTED_TYPES[entry["id"]], raw_path
+            if parts[1] == "chantiers":
+                assert (axes.scope, axes.phase) == (parts[2], parts[3][0]), raw_path
+                assert axes.phase in phases
+                assert pack.entity(f"chantier:{axes.scope}")
+            else:
+                assert (axes.scope, axes.phase) == (pack.scopes.default.key, None), raw_path
+        assert (result.scope, result.phase) == (axes.scope, axes.phase), entry["path"]
+
+
+def test_discovery_groups_only_the_quotes_dpgf_and_schedules(
     tmp_path: Path, documents: list[dict[str, Any]], corpus_root: Path, pack: DomainPack
 ) -> None:
     raw = tmp_path / "raw"
@@ -331,10 +413,15 @@ def test_discovery_groups_only_the_quote_and_the_schedule(
 
     plan = discover(storage, pack, now=NOW)
     assert sorted(plan.new) == sorted(sid[entry["id"]] for entry in initial)
-    assert plan.supersedes == [(sid["devis-b"], sid["devis-a"])]
+    assert sorted(plan.supersedes) == sorted(
+        [(sid["devis-b"], sid["devis-a"]), (sid["eco-dpgf-b"], sid["eco-dpgf-a"])]
+    )
+    # Revision groups are keyed by (chantier, number): ADR 0011.
     assert plan.revision_groups == {
-        "DEV-2026-014": [sid["devis-a"], sid["devis-b"]],
-        "PLN-2026-003": [sid["planning-a"]],
+        "moreau/DEV-2026-014": [sid["devis-a"], sid["devis-b"]],
+        "moreau/PLN-2026-003": [sid["planning-a"]],
+        "ecole-montferrine/DEV-2026-031": [sid["eco-dpgf-a"], sid["eco-dpgf-b"]],
+        "ecole-montferrine/PLN-2026-007": [sid["eco-planning"]],
     }
     for entry in initial:
         group = plan.items[sid[entry["id"]]].state.revision_group
@@ -349,9 +436,10 @@ def test_discovery_groups_only_the_quote_and_the_schedule(
     later = discover(storage, pack, now=NOW + timedelta(minutes=5))
     assert later.new == [sid["planning-b"]]
     assert sorted(later.supersedes) == sorted(
-        [(sid["devis-b"], sid["devis-a"]), (sid["planning-b"], sid["planning-a"])]
+        [(sid["devis-b"], sid["devis-a"]), (sid["planning-b"], sid["planning-a"]),
+         (sid["eco-dpgf-b"], sid["eco-dpgf-a"])]
     )
-    assert later.revision_groups["PLN-2026-003"] == [sid["planning-a"], sid["planning-b"]]
+    assert later.revision_groups["moreau/PLN-2026-003"] == [sid["planning-a"], sid["planning-b"]]
 
 
 def test_supersession_after_classification(
@@ -376,15 +464,20 @@ def test_supersession_after_classification(
         if entry["id"] in REVISED:
             assert (record.doc_number, record.revision) == (entry["doc_number"], entry["revision"])
         else:
-            # The contract, the amendment, the e-mails, the invoice, the delivery note, the
-            # minutes, the photos and the price study cite numbers but form no revision group.
+            # The contracts, the amendment, the acte d'engagement, the purchase order, the
+            # e-mails, the invoices, the delivery note, the minutes, the photos and the price
+            # study cite numbers but form no revision group.
             assert (record.doc_number, record.revision) == (None, None), entry["path"]
         assert list(record.references) == REPLACING.get(entry["id"], []), entry["path"]
         records.append(record)
     initial = [record for record in records if not record.source_id.startswith("planning-b")]
-    assert resolve_supersession(pack, initial)[1] == [("devis-b", "devis-a")]
-    assert resolve_supersession(pack, records)[1] == [
+    assert sorted(resolve_supersession(pack, initial)[1]) == [
         ("devis-b", "devis-a"),
+        ("eco-dpgf-b", "eco-dpgf-a"),
+    ]
+    assert sorted(resolve_supersession(pack, records)[1]) == [
+        ("devis-b", "devis-a"),
+        ("eco-dpgf-b", "eco-dpgf-a"),
         ("planning-b", "planning-a"),
     ]
 

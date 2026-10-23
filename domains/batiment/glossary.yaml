@@ -7,81 +7,101 @@ terms:
   - term: quote
     definition: A contractor's priced offer for the works, organised in work packages and lines, with totals excluding and including VAT; signed by the client, it becomes the basis of the contract.
     synonyms: {fr: [devis, devis de travaux], en: [quotation, estimate]}
-    see_also: [commercial-document:dev-2026-014, topic:quotes-contract-and-amendment]
+    see_also: [commercial-document:dev-2026-014, topic:marche-et-avenants]
   - term: revision
     definition: A new issue of the same numbered document (quote or schedule), identified by a letter; a later revision supersedes the earlier ones.
     synonyms: {fr: [indice], en: [revision letter]}
-    see_also: [topic:quotes-contract-and-amendment, topic:schedule-and-window-delivery]
+    see_also: [topic:marche-et-avenants, topic:planning]
   - term: works contract
     definition: The contract by which a contractor undertakes to carry out building works for a client at an agreed price, start date and duration.
     synonyms: {fr: [contrat de travaux, marché de travaux], en: [building contract]}
-    see_also: [commercial-document:contrat-de-travaux, topic:quotes-contract-and-amendment]
+    see_also: [commercial-document:contrat-de-travaux, topic:marche-et-avenants]
   - term: contract amendment
     definition: A written agreement signed by both parties that changes some points of a works contract (scope, price, time) while every other clause stays in force; it amends the contract, it does not replace it.
     synonyms: {fr: [avenant, avenant au contrat], en: [amendment, variation]}
-    see_also: [commercial-document:avenant-n1, topic:quotes-contract-and-amendment]
+    see_also: [commercial-document:avenant-n1, topic:marche-et-avenants]
   - term: additional works
     definition: Works added to a contract after it is signed, usually at the client's request, and priced in a contract amendment.
     synonyms: {fr: [travaux supplémentaires, travaux complémentaires], en: [extra works, additional work]}
-    see_also: [commercial-document:avenant-n1, topic:client-change-requests]
+    see_also: [commercial-document:avenant-n1, topic:marche-et-avenants]
   - term: global fixed price
     definition: A contract price agreed for the whole of the works described, not re-measured or revised during the job.
     synonyms: {fr: [prix global et forfaitaire, prix forfaitaire], en: [lump-sum price, fixed price]}
-    see_also: [topic:quotes-contract-and-amendment]
+    see_also: [topic:marche-et-avenants]
   - term: excluding VAT
     definition: An amount before value added tax.
     synonyms: {fr: [HT, hors taxes], en: [net of VAT, before VAT]}
-    see_also: [topic:quotes-contract-and-amendment]
+    see_also: [topic:marche-et-avenants]
   - term: including VAT
     definition: An amount with value added tax included, the amount the client actually pays.
     synonyms: {fr: [TTC, toutes taxes comprises], en: [VAT included, gross amount]}
-    see_also: [topic:quotes-contract-and-amendment]
+    see_also: [topic:marche-et-avenants]
   - term: VAT
     definition: Value added tax, charged on top of the amount excluding VAT; its rate can differ between parts of a building job.
     synonyms: {fr: [TVA, taxe sur la valeur ajoutée], en: [value added tax]}
-    see_also: [topic:quotes-contract-and-amendment]
+    see_also: [topic:marche-et-avenants]
   - term: deposit
     definition: An advance payment of part of the price, made when a contract or an order is signed and deducted from the amount due at the end.
     synonyms: {fr: [acompte], en: [down payment, advance payment]}
-    see_also: [topic:payments-deposit-and-retention]
+    see_also: [topic:situations-et-paiements]
   - term: payment schedule
     definition: The list of the payments due under a contract, each with its share of the price, its amount and the event that triggers it.
     synonyms: {fr: [échéancier, échéancier de paiement, échéancier de règlement], en: [schedule of payments]}
-    see_also: [topic:payments-deposit-and-retention]
+    see_also: [topic:situations-et-paiements]
   - term: retention
     definition: A share of the contract price held back by the client as a guarantee that the réserves recorded at réception are put right, and released after an agreed period.
     synonyms: {fr: [retenue de garantie], en: [retention money, holdback]}
-    see_also: [topic:payments-deposit-and-retention]
+    see_also: [topic:situations-et-paiements]
   - term: progress payment application
     definition: A statement of the works carried out to date that the contractor sends to request an interim payment.
-    synonyms: {fr: [situation de travaux], en: [interim payment application, progress claim]}
-    see_also: [topic:payments-deposit-and-retention]
+    synonyms: {fr: [situation, situation de travaux, situations], en: [interim payment application, progress claim]}
+    see_also: [topic:situations-et-paiements]
   - term: payment terms
     definition: The time allowed to pay an invoice, for example a number of days at the end of the month of the invoice.
     synonyms: {fr: [conditions de règlement, délai de paiement], en: [terms of payment]}
-    see_also: [topic:payments-deposit-and-retention]
+    see_also: [topic:situations-et-paiements]
   - term: due date
     definition: The date, or the event, at which a payment or an action is due.
     synonyms: {fr: [échéance, date d'échéance], en: [deadline]}
-    see_also: [topic:payments-deposit-and-retention]
+    see_also: [topic:situations-et-paiements]
 
   # --- parties and roles ------------------------------------------------------------------------
   - term: client
-    definition: The person or household who commissions the works and pays for them; in a works contract, the party called "le Client".
-    synonyms: {fr: [maître d'ouvrage, le Client], en: [project owner]}
+    definition: The person, household, copropriété or public body who commissions the works and pays for them; in a private household's works contract, the party called "le Client".
+    synonyms: {fr: [le Client, client particulier], en: [customer]}
     see_also: [organisation:famille-moreau]
+  - term: maître d'ouvrage
+    definition: The client of a building contract, who commissions and pays for the works - a household, a copropriété represented by its syndic, or a public body such as a commune (a locked term, kept in French).
+    synonyms: {fr: [maîtrise d'ouvrage, maître d'ouvrage public], en: [project owner, employer]}
+    see_also: [organisation:syndicat-nacrines, organisation:commune-montferrine]
+  - term: maître d'œuvre
+    definition: The designer who directs the works on behalf of the maître d'ouvrage, usually an architect - issues the ordres de service, checks the situations and organises the réception (a locked term, kept in French).
+    synonyms: {fr: [maître d'oeuvre, maîtrise d'œuvre, maîtrise d'oeuvre, architecte], en: [architect, contract administrator]}
+    see_also: [maitre-d-oeuvre:atelier-fabrikam]
+  - term: property manager
+    definition: The professional manager of a copropriété, who represents the syndicat des copropriétaires and signs for it.
+    synonyms: {fr: [syndic, syndic de copropriété, gestionnaire de copropriété], en: [managing agent]}
+    see_also: [organisation:proseware-gestion]
+  - term: copropriété
+    definition: A building divided into lots owned by several co-owners, who decide the works on the common parts in a general assembly and form the syndicat des copropriétaires.
+    synonyms: {fr: [syndicat des copropriétaires, copropriétaires, parties communes], en: [co-ownership, condominium]}
+    see_also: [organisation:syndicat-nacrines]
+  - term: public contract
+    definition: A works contract awarded by a public body after a competitive procedure, made of an acte d'engagement, a CCAP and a priced breakdown.
+    synonyms: {fr: [marché public, marché public de travaux, procédure adaptée], en: [public works contract]}
+    see_also: [chantier:ecole-montferrine]
   - term: general contractor
     definition: A building company that carries out most of the works of a job with its own teams and subcontracts the other trades.
-    synonyms: {fr: [entreprise générale de bâtiment, entreprise générale, l'Entreprise], en: [main contractor, builder]}
+    synonyms: {fr: [entreprise générale de bâtiment, entreprise générale, l'Entreprise, l'entrepreneur, entrepreneur principal, titulaire], en: [main contractor, builder]}
     see_also: [organisation:lamna-batiment]
   - term: subcontracting
     definition: Entrusting part of the works to another company, which works for the contractor and not directly for the client.
     synonyms: {fr: [sous-traitance, sous-traitant], en: [subcontract, subcontractor]}
-    see_also: [organisation:adatum-electricite, commercial-document:bc-2026-008]
+    see_also: [sous-traitant:adatum-electricite, sous-traitant:litware-plomberie, commercial-document:bc-2026-008]
   - term: builders' merchant
     definition: A trade supplier that sells and delivers building materials to contractors.
     synonyms: {fr: [négoce de matériaux, négociant en matériaux], en: [building materials supplier]}
-    see_also: [organisation:zava-materiaux, topic:materials-deliveries-and-invoices]
+    see_also: [organisation:zava-materiaux, topic:achats]
   - term: conducteur de travaux
     definition: The contractor's works manager, who runs a job, its schedule, purchases and site meetings (a locked term, kept in French).
     synonyms: {fr: [conductrice de travaux], en: [works manager]}
@@ -98,65 +118,65 @@ terms:
   - term: purchase order
     definition: A numbered order sent by the contractor to a supplier or subcontractor, with the items and their prices.
     synonyms: {fr: [bon de commande, BC, commande]}
-    see_also: [topic:materials-deliveries-and-invoices]
+    see_also: [topic:achats]
   - term: delivery note
     definition: The document that comes with a delivery, listing what is delivered; the person receiving the goods signs it and writes any reserves on it.
     synonyms: {fr: [bon de livraison, BL], en: [delivery slip, docket]}
-    see_also: [commercial-document:bl-2026-0391, topic:materials-deliveries-and-invoices]
+    see_also: [commercial-document:bl-2026-0391, topic:achats]
   - term: delivery reserves
     definition: Remarks written on a delivery note when goods are missing or damaged at delivery; they are the evidence used to dispute the invoice.
     synonyms: {fr: [réserves, réserves à la livraison], en: [delivery remarks]}
-    see_also: [topic:materials-deliveries-and-invoices]
+    see_also: [topic:achats]
   - term: invoice
     definition: A supplier's request for payment for goods or services, with quantities, unit prices, totals excluding and including VAT and a due date.
     synonyms: {fr: [facture, facture fournisseur], en: [supplier invoice]}
-    see_also: [commercial-document:fa-2026-0217, topic:materials-deliveries-and-invoices]
+    see_also: [commercial-document:fa-2026-0217, topic:achats]
   - term: purchase tracking
     definition: The follow-up of the orders of a job, with the amounts ordered, invoiced and their status.
     synonyms: {fr: [suivi des achats, achats], en: [purchases follow-up]}
-    see_also: [commercial-document:pln-2026-003, topic:materials-deliveries-and-invoices]
+    see_also: [commercial-document:pln-2026-003, topic:achats]
   - term: pallet
     definition: A wooden platform on which blocks or bags are stacked and delivered; materials are often sold by the pallet.
     synonyms: {fr: [palette, palettes], en: [pallets]}
-    see_also: [material:zm-20450, topic:materials-deliveries-and-invoices]
+    see_also: [material:zm-20450, topic:achats]
   - term: truck crane
     definition: A delivery lorry fitted with a crane that unloads heavy materials on site.
     synonyms: {fr: [camion-grue, camion grue]}
-    see_also: [topic:materials-deliveries-and-invoices]
+    see_also: [topic:achats]
 
   # --- schedule and site ------------------------------------------------------------------------
   - term: schedule
     definition: The planned sequence of the tasks of a job, with their dates, the trade doing them and their progress.
     synonyms: {fr: [planning, planning de travaux, calendrier des travaux], en: [works schedule, programme]}
-    see_also: [commercial-document:pln-2026-003, topic:schedule-and-window-delivery]
+    see_also: [commercial-document:pln-2026-003, topic:planning]
   - term: site meeting minutes
     definition: The written record of a site meeting, with the people present, the progress, the decisions and the actions with their owners and due dates.
     synonyms: {fr: [compte rendu de chantier, compte rendu de réunion de chantier, compte rendu, CR de chantier], en: [site meeting report, meeting minutes]}
-    see_also: [topic:site-progress-and-meetings]
+    see_also: [topic:suivi-de-chantier]
   - term: site meeting
     definition: A regular meeting on site between the contractor, the client and the trades to review progress and decide on the next steps.
     synonyms: {fr: [réunion de chantier], en: [progress meeting]}
-    see_also: [topic:site-progress-and-meetings]
+    see_also: [topic:suivi-de-chantier]
   - term: building site
     definition: The place where the works are carried out, and the job itself.
     synonyms: {fr: [chantier], en: [job site, construction site]}
-    see_also: [topic:site-progress-and-meetings]
+    see_also: [topic:suivi-de-chantier]
   - term: progress
     definition: The share of a task that is done, usually given as a percentage.
     synonyms: {fr: [avancement], en: [completion percentage]}
-    see_also: [topic:site-progress-and-meetings]
+    see_also: [topic:suivi-de-chantier]
   - term: time for completion
     definition: The time allowed to carry out the works, from the start date to the planned completion.
     synonyms: {fr: [délai d'exécution, délais, délai], en: [contract period, completion time]}
-    see_also: [topic:schedule-and-window-delivery]
+    see_also: [topic:planning]
   - term: réception
     definition: The formal acceptance of the works by the client, with or without réserves; the legal act that starts the guarantee periods and usually triggers the last payments (a locked term, kept in French).
     synonyms: {fr: [réception des travaux, PV de réception], en: [acceptance of the works]}
-    see_also: [topic:schedule-and-window-delivery, topic:payments-deposit-and-retention]
+    see_also: [topic:reception-et-reserves, topic:situations-et-paiements]
   - term: weathertight
     definition: The stage at which a building is closed against the weather, with its roof covered and its openings closed.
     synonyms: {fr: [hors d'eau et hors d'air, mise hors d'eau et hors d'air, hors d'eau hors d'air], en: [weatherproof, closed in]}
-    see_also: [topic:payments-deposit-and-retention]
+    see_also: [topic:situations-et-paiements]
   - term: planning permission
     definition: The authorisation of the local authority that some works need before they start, for example a prior declaration of works.
     synonyms: {fr: [autorisation d'urbanisme, déclaration préalable de travaux, déclaration préalable], en: [building permission]}
@@ -166,7 +186,7 @@ terms:
   - term: work package
     definition: A group of lines of a quote for one trade or part of the job, with its own subtotal.
     synonyms: {fr: [lot, lots], en: [trade package]}
-    see_also: [topic:quotes-contract-and-amendment]
+    see_also: [topic:marche-et-avenants]
   - term: quote item
     definition: One numbered line of a quote, with its description, unit, quantity, unit price and total.
     synonyms: {fr: [poste, ligne de devis], en: [line item]}
@@ -182,7 +202,7 @@ terms:
   - term: windows and external doors
     definition: The windows, glazed doors and sliding bay windows of a building, and the trade that supplies and installs them.
     synonyms: {fr: [menuiseries extérieures, menuiseries], en: [exterior joinery, joinery]}
-    see_also: [work-package:lot-5-menuiseries-exterieures, topic:schedule-and-window-delivery]
+    see_also: [work-package:lot-5-menuiseries-exterieures, topic:planning]
   - term: sliding bay window
     definition: A large glazed opening whose panels slide sideways, often in aluminium.
     synonyms: {fr: [baie coulissante, baie vitrée coulissante], en: [sliding patio door]}
@@ -190,7 +210,7 @@ terms:
   - term: roof window
     definition: A window set in the slope of a roof, installed with a flashing kit that keeps the roof watertight.
     synonyms: {fr: [fenêtre de toit, châssis de toit], en: [skylight]}
-    see_also: [building-element:fenetre-de-toit-ft1, topic:client-change-requests]
+    see_also: [building-element:fenetre-de-toit-ft1, topic:marche-et-avenants]
   - term: double glazing
     definition: Glazing made of two panes separated by a sealed gap, for thermal insulation.
     synonyms: {fr: [double vitrage]}
@@ -242,11 +262,11 @@ terms:
   - term: floor tiling
     definition: Ceramic or stoneware tiles laid on a floor.
     synonyms: {fr: [carrelage, carrelage de sol, grès cérame], en: [floor tiles, porcelain stoneware]}
-    see_also: [topic:client-change-requests, topic:kitchen-renovation]
+    see_also: [topic:marche-et-avenants]
   - term: splashback
     definition: The wall tiles behind a kitchen worktop.
     synonyms: {fr: [crédence, faïence, faïence murale], en: [wall tiles]}
-    see_also: [topic:kitchen-renovation]
+    see_also: []
   - term: earthworks
     definition: Excavating and removing soil to prepare foundations.
     synonyms: {fr: [terrassement, décapage], en: [excavation]}
@@ -255,3 +275,93 @@ terms:
     definition: The temporary installations of a job - fencing, site toilet, skip - put in place at the start and removed at the end.
     synonyms: {fr: [installation de chantier, installation et repli de chantier]}
     see_also: [work-package:lot-1-installation-de-chantier]
+
+  # --- contracts, réception, compliance and company documents (slice F) ------------------------
+  - term: service order
+    definition: A written order of the maître d'œuvre, countersigned by the maître d'ouvrage, that starts, changes or adds works and states their price and effect on the time for completion; it amends the contract, it does not replace it.
+    synonyms: {fr: [ordre de service, OS, OS n°1], en: [site instruction, variation order]}
+    see_also: [commercial-document:os-n1-nacrines, topic:marche-et-avenants]
+  - term: delay penalties
+    definition: The sums a contractor owes per day of delay on the contractual completion date, as fixed by the contract or the CCAP.
+    synonyms: {fr: [pénalités de retard, pénalités], en: [liquidated damages, late-completion penalties]}
+    see_also: [topic:marche-et-avenants]
+  - term: réserves list
+    definition: The list of the defects and missing items recorded at réception, with the trade responsible and the date each one is lifted.
+    synonyms: {fr: [liste des réserves, état de levée des réserves, levée des réserves], en: [snagging list, punch list]}
+    see_also: [topic:reception-et-reserves]
+  - term: pre-acceptance inspection
+    definition: The joint inspection organised by the maître d'œuvre before the réception, which lists the réserves.
+    synonyms: {fr: [opérations préalables à la réception, OPR], en: [snagging inspection]}
+    see_also: [topic:reception-et-reserves]
+  - term: tender form
+    definition: The form by which a contractor commits to a public contract at the stated price and terms; signed by the buyer, it is the contract.
+    synonyms: {fr: [acte d'engagement, AE], en: [form of tender, form of agreement]}
+    see_also: [commercial-document:acte-d-engagement-ecole, topic:marche-et-avenants]
+  - term: special administrative conditions
+    definition: The part of a public contract that fixes its specific administrative terms - prices, time for completion, penalties, retention, payment and réception.
+    synonyms: {fr: [CCAP, cahier des clauses administratives particulières], en: [special conditions of contract]}
+    see_also: [topic:marche-et-avenants]
+  - term: priced breakdown of a lump sum
+    definition: The table that breaks a lump-sum price down into items with quantities and unit prices; it can be revised in indices like a quote.
+    synonyms: {fr: [DPGF, décomposition du prix global et forfaitaire], en: [pricing schedule, bill of quantities]}
+    see_also: [commercial-document:dev-2026-031, topic:marche-et-avenants]
+  - term: health and safety plan
+    definition: The contractor's site-specific health and safety plan, which lists the risks of its works and the prevention measures.
+    synonyms: {fr: [PPSPS, plan particulier de sécurité et de protection de la santé], en: [site safety plan]}
+    see_also: [topic:equipes-et-materiel]
+  - term: subcontracting declaration
+    definition: The declaration by which the main contractor presents a subcontractor to the maître d'ouvrage, which accepts it and approves its payment terms.
+    synonyms: {fr: [déclaration de sous-traitance, DC4, acceptation du sous-traitant, agrément des conditions de paiement], en: [subcontractor approval]}
+    see_also: [sous-traitant:adatum-electricite, topic:sous-traitance-et-conformite]
+  - term: reverse charge
+    definition: The VAT rule under which the main contractor, not the subcontractor, accounts for the VAT on subcontracted building works.
+    synonyms: {fr: [autoliquidation, TVA autoliquidée], en: [VAT reverse charge]}
+    see_also: [topic:sous-traitance-et-conformite]
+  - term: vigilance certificate
+    definition: The certificate that a company is up to date with its social security declarations and payments; a main contractor must obtain it from each subcontractor at signature and then every six months.
+    synonyms: {fr: [attestation de vigilance, obligation de vigilance], en: [social security compliance certificate]}
+    see_also: [sous-traitant:adatum-electricite, topic:sous-traitance-et-conformite]
+  - term: ten-year liability
+    definition: The builder's liability for ten years after the réception for defects that endanger the building or make it unfit for use, which must be insured.
+    synonyms: {fr: [décennale, garantie décennale, responsabilité décennale, assurance décennale], en: [decennial liability, ten-year guarantee]}
+    see_also: [topic:reception-et-reserves]
+  - term: framework contract
+    definition: A yearly agreement with a supplier that fixes the prices and terms of all the orders of the year, whatever the job.
+    synonyms: {fr: [contrat-cadre, contrat-cadre d'approvisionnement], en: [framework agreement, master supply agreement]}
+    see_also: [organisation:zava-materiaux, topic:fournisseurs-et-contrat-cadre]
+  - term: price list
+    definition: A supplier's list of articles with their prices; under a framework contract, the net prices that the invoices must apply.
+    synonyms: {fr: [tarif, prix net, prix public], en: [net price list]}
+    see_also: [organisation:zava-materiaux, topic:fournisseurs-et-contrat-cadre]
+  - term: credit note
+    definition: A supplier's document that cancels all or part of an invoice, for example when a price above the agreed one was billed.
+    synonyms: {fr: [avoir], en: [credit memo]}
+    see_also: [topic:fournisseurs-et-contrat-cadre]
+  - term: crew schedule
+    definition: The weekly assignment of the company's workers to its chantiers and tasks.
+    synonyms: {fr: [planning des équipes, équipes], en: [workforce schedule, labour schedule]}
+    see_also: [topic:equipes-et-materiel]
+  - term: periodic inspection
+    definition: The compulsory inspection of lifting equipment and access platforms at fixed intervals by a competent person; equipment whose inspection is overdue must not be used.
+    synonyms: {fr: [vérification générale périodique, VGP, vérification périodique], en: [thorough examination]}
+    see_also: [materiel:mat-04, topic:equipes-et-materiel]
+  - term: equipment register
+    definition: The list of the company's equipment with its assignment and its inspection dates.
+    synonyms: {fr: [registre du matériel, matériel], en: [plant register]}
+    see_also: [topic:equipes-et-materiel]
+  - term: billing register
+    definition: The company's list of its contracts and client invoices, from which the amount billed, retained and left to bill of each chantier is computed.
+    synonyms: {fr: [suivi de facturation, facture client, factures clients], en: [sales ledger]}
+    see_also: [topic:situations-et-paiements]
+  - term: external thermal insulation
+    definition: Insulation boards fixed to the outside of the walls and covered with a reinforced render.
+    synonyms: {fr: [isolation thermique par l'extérieur, ITE, sous-enduit armé], en: [external wall insulation, EWI]}
+    see_also: [material:zm-52140]
+  - term: façade refurbishment
+    definition: Cleaning, repairing and repainting or rendering the façades of a building.
+    synonyms: {fr: [ravalement, ravalement des façades], en: [facade renovation]}
+    see_also: [chantier:nacrines]
+  - term: scaffolding
+    definition: The temporary structure that gives access to a façade; it is inspected before use and at fixed intervals.
+    synonyms: {fr: [échafaudage, échafaudages], en: [scaffold]}
+    see_also: [materiel:mat-03]

@@ -1,27 +1,46 @@
 # Document taxonomy of the batiment pack.
 #
+# With scopes.yaml (ADR 0011) a document filed as chantiers/<code>/<phase>/<type>/<file> or
+# entreprise/<type>/<file> takes its type from the <type> folder, which must be one of the keys
+# below; the rules are then only used for documents outside that layout (an owner upload with
+# another path, a renamed file).
+#
+# Doc type keys are English kebab-case, except the documents named by a locked trade term of
+# terms.yaml (ADR 0012), which keep the French term: situation, ordre-de-service, pv-de-reception,
+# liste-des-reserves, dpgf, ccap, ppsps, acte-d-engagement and dc4.
+#
 # Doc types are tried in this order and the first rule that matches wins: `filename_regex` is
 # searched in the file name (no folders), `text_regex` in the first `first_chars` characters of
 # the extracted text, and every regex of a rule must match. Every sample file matches a filename
 # rule (naming convention of samples/fiction/bible.yaml). The text rules are fallbacks for renamed
 # files: each matches only the title of its own type at the start of a line (the title word and
 # the number may be on two lines), never a reference to that document inside another one
-# ("Bon de livraison : BL-..." in an invoice does not match). The restricted price study comes
-# first; types that only have filename rules come next; documents that cite other documents
-# (minutes, amendment, contract) are tried before the types they cite.
+# ("Bon de livraison : BL-..." in an invoice does not match). The restricted types come first;
+# types that only have filename rules come next (the crew schedule before the schedule, the DPGF
+# before the quote, whose numbers it shares); documents that cite other documents (minutes,
+# amendment, contract) are tried before the types they cite.
 #
 # Authority (1-10) says which document prevails when two current sources disagree
-# (resolution.yaml): the amendment over the works contract, the contract over the quote, the
-# signed site records (minutes, then delivery notes with their reserves) over supplier invoices,
-# and the schedule and the supplier correspondence at the same level, so that the more recent of
-# the two prevails until a new schedule revision supersedes the old one.
+# (resolution.yaml): the signed acts that change or close a contract (avenant, ordre de service,
+# PV de réception) over the contracts (works contract, acte d'engagement, CCAP, framework
+# contract), the contracts over the priced offers (quote, DPGF) and the subcontracting documents,
+# the signed site records (minutes, réserves list) over the delivery notes, situations and
+# registers of amounts, those over invoices, orders and compliance registers, and the schedules
+# and the supplier correspondence at the same level, so that the more recent of the two prevails
+# until a new schedule revision supersedes the old one.
 categories:
-  - {key: contract-documents, title: "Quotes and contract", description: "Quotes (devis) and their revisions (indices), the works contract and its amendments (avenants)."}
-  - {key: schedule-and-purchases, title: "Schedule and purchase tracking", description: "The works schedule and the purchase tracking workbook (planning et suivi des achats)."}
-  - {key: purchasing, title: "Invoices and delivery notes", description: "Supplier invoices (factures) and delivery notes (bons de livraison)."}
+  - {key: contract-documents, title: "Quotes, contracts and amendments", description: "Quotes (devis) and DPGF with their revisions (indices), works contracts (marchés), acte d'engagement and CCAP of public contracts, amendments (avenants) and service orders (OS)."}
+  - {key: subcontracting, title: "Subcontracting", description: "Subcontracts and the subcontracting declarations (DC4) that make them binding on the maître d'ouvrage."}
+  - {key: schedule-and-purchases, title: "Schedules and purchase tracking", description: "The works schedules of the chantiers (planning) and their purchase tracking sheets."}
+  - {key: purchasing, title: "Purchasing", description: "Purchase orders (bons de commande), supplier invoices (factures) and delivery notes (bons de livraison)."}
+  - {key: billing, title: "Situations and billing", description: "Progress payment applications (situations) and the company's register of client invoices."}
   - {key: site-records, title: "Site records", description: "Site meeting minutes (comptes rendus de chantier) and site photos."}
-  - {key: correspondence, title: "Correspondence", description: "E-mails exchanged with the client and with the suppliers."}
-  - {key: internal-costing, title: "Internal costing", description: "Internal price studies with costs and margins (restricted)."}
+  - {key: reception, title: "Réception and réserves", description: "The PV de réception and the list of réserves with their lifting status."}
+  - {key: health-and-safety, title: "Health and safety", description: "The contractor's site-specific health and safety plan (PPSPS)."}
+  - {key: correspondence, title: "Correspondence", description: "E-mails exchanged with the clients and with the suppliers."}
+  - {key: company, title: "Company documents", description: "General terms, organisation chart, the framework contract with the builders' merchant and its price list."}
+  - {key: company-registers, title: "Company registers", description: "The crew schedule, the equipment register and the subcontractor attestations register."}
+  - {key: internal-costing, title: "Internal costing", description: "Internal price studies and margin dashboards with costs and margins (restricted)."}
 
 doc_types:
   # --- restricted first ------------------------------------------------------------------------
@@ -32,7 +51,19 @@ doc_types:
     rules:
       - {filename_regex: '(?i)(?:^|[_ -])etude[_ -]de[_ -]prix'}
       - {filename_regex: '(?i)\.xlsx$', text_regex: '(?im)^[ \t]*[ée]tude de prix\b', first_chars: 1000}
+  - key: margin-dashboard
+    title: Margin dashboard (tableau de bord des marges)
+    category: internal-costing
+    authority: 3
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])(?:tableau[_ -]de[_ -]bord[_ -]des[_ -])?marges(?:[_ .-]|$)'}
   # --- filename rules only ---------------------------------------------------------------------
+  - key: crew-schedule
+    title: Crew schedule (planning des équipes)
+    category: company-registers
+    authority: 4
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])planning[_ -]des[_ -][ée]quipes'}
   - key: client-email
     title: Client e-mail
     category: correspondence
@@ -51,6 +82,12 @@ doc_types:
     authority: 2
     rules:
       - {filename_regex: '(?i)\.(?:jpe?g|png|tiff?|heic)$'}
+  - key: dpgf
+    title: DPGF (décomposition du prix global et forfaitaire)
+    category: contract-documents
+    authority: 8
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])dpgf(?:[_ .-]|$)'}
   - key: schedule
     title: Schedule and purchase tracking (planning)
     category: schedule-and-purchases
@@ -58,6 +95,108 @@ doc_types:
     rules:
       - {filename_regex: '^PLN-\d{4}-\d{3}(?!\d)'}
       - {filename_regex: '(?i)(?:^|[_ -])planning(?:[_ .-]|$)'}
+  - key: equipment-register
+    title: Equipment register (registre du matériel)
+    category: company-registers
+    authority: 5
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])registre[_ -]du[_ -]mat[ée]riel'}
+  - key: compliance-register
+    title: Subcontractor attestations register (registre des attestations)
+    category: company-registers
+    authority: 5
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])registre[_ -]des[_ -]attestations'}
+  - key: billing-register
+    title: Client billing register (suivi de facturation)
+    category: billing
+    authority: 6
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])suivi[_ -]de[_ -]facturation'}
+  - key: price-list
+    title: Supplier price list (tarif)
+    category: company
+    authority: 6
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])tarif(?:[_ .-]|$)'}
+  - key: framework-agreement
+    title: Supplier framework contract (contrat-cadre)
+    category: company
+    authority: 9
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])contrat[_ -]cadre'}
+  - key: general-terms
+    title: General terms (conditions générales)
+    category: company
+    authority: 7
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])conditions[_ -]g[ée]n[ée]rales'}
+  - key: organisation-chart
+    title: Organisation chart (organigramme)
+    category: company
+    authority: 2
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])organigramme'}
+  - key: ppsps
+    title: PPSPS (site-specific health and safety plan)
+    category: health-and-safety
+    authority: 5
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])ppsps(?:[_ .-]|$)'}
+  - key: dc4
+    title: Subcontracting declaration (DC4)
+    category: subcontracting
+    authority: 8
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])dc4(?:[_ .-]|$)'}
+  - key: subcontract
+    title: Subcontract (contrat de sous-traitance)
+    category: subcontracting
+    authority: 8
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])contrat[_ -]de[_ -]sous[_ -]traitance'}
+  - key: acte-d-engagement
+    title: Acte d'engagement (public contract tender form)
+    category: contract-documents
+    authority: 9
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])acte[_ -]d[_ -]engagement'}
+  - key: ccap
+    title: CCAP (special administrative conditions)
+    category: contract-documents
+    authority: 9
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])ccap(?:[_ .-]|$)'}
+  - key: ordre-de-service
+    title: Ordre de service (OS)
+    category: contract-documents
+    authority: 10
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])ordre[_ -]de[_ -]service'}
+  - key: situation
+    title: Situation (progress payment application)
+    category: billing
+    authority: 6
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])situation[_ -]n\d'}
+  - key: pv-de-reception
+    title: PV de réception (record of the réception)
+    category: reception
+    authority: 10
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])(?:pv|proc[eè]s[_ -]verbal)[_ -]de[_ -]r[ée]ception'}
+  - key: liste-des-reserves
+    title: Réserves list and lifting status
+    category: reception
+    authority: 7
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])liste[_ -]des[_ -]r[ée]serves'}
+  - key: purchase-order
+    title: Purchase order (bon de commande)
+    category: purchasing
+    authority: 5
+    rules:
+      - {filename_regex: '(?i)(?:^|[_ -])(?:bon[_ -]de[_ -]commande|BC-\d{4}-\d{3})'}
   # --- filename rules, then title-line text rules ----------------------------------------------
   - key: site-meeting-minutes
     title: Site meeting minutes (compte rendu de chantier)
@@ -74,12 +213,12 @@ doc_types:
       - {filename_regex: '(?i)(?:^|[_ -])avenant(?:[_ .-]|$)'}
       - {filename_regex: '(?i)\.(?:pdf|docx)$', text_regex: '(?im)^[ \t]*avenant\s+n°\s*\d+\s+au\s+contrat\s+de\s+travaux\b', first_chars: 1000}
   - key: works-contract
-    title: Works contract (contrat de travaux)
+    title: Works contract (contrat de travaux, marché de travaux)
     category: contract-documents
     authority: 9
     rules:
-      - {filename_regex: '(?i)(?:^|[_ -])contrat[_ -]de[_ -]travaux'}
-      - {filename_regex: '(?i)\.(?:pdf|docx)$', text_regex: '(?im)^[ \t]*contrat de travaux[ \t]*(?:[-–—][ \t]*\S|$)', first_chars: 1000}
+      - {filename_regex: '(?i)(?:^|[_ -])(?:contrat|march[ée])[_ -]de[_ -]travaux'}
+      - {filename_regex: '(?i)\.(?:pdf|docx)$', text_regex: '(?im)^[ \t]*(?:contrat|marché) de travaux[ \t]*(?:[-–—][ \t]*\S|$)', first_chars: 1000}
   - key: quote
     title: Quote (devis)
     category: contract-documents
