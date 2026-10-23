@@ -475,6 +475,11 @@ var resolvedMcpImage = !empty(mcpImage) ? mcpImage : mcpCurrentImage.outputs.ima
 var resolvedPortalImage = !empty(portalImage) ? portalImage : portalCurrentImage.outputs.image
 
 var portalUrl = 'https://${names.portalApp}.${containerAppsEnvironment.outputs.defaultDomain}'
+// The site's canonical and hreflang URLs name the host readers use: the custom domain once its
+// certificate is bound, the app's default host until then.
+var siteUrl = !empty(portalCustomDomain) && !empty(portalCertificateName)
+  ? 'https://${portalCustomDomain}'
+  : portalUrl
 // The external FQDN the MCP app has (or gets from the hook) in this environment.
 var mcpFqdn = '${names.mcpApp}.${containerAppsEnvironment.outputs.defaultDomain}'
 var mcpUrl = 'https://${mcpFqdn}/mcp'
@@ -579,7 +584,7 @@ var pipelineEnv = concat(
     ? [
         {
           name: 'DOCWIKI_SITE_BASE_URL'
-          value: portalUrl
+          value: siteUrl
         }
       ]
     : []
