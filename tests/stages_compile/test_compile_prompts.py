@@ -37,8 +37,8 @@ PINNED = {
         "28fcc06474b1197a516aeef9b9a39116d67e887aaa5e7f64924a108b8927289b",
     ),
     "translate": (
-        "translate-v1",
-        "17102eddba109cca23099ab7c367ab5c02baf681a28f809f8272c0ee29a4b308",
+        "translate-v2",
+        "accf76ec1299586746020fc254fd14951833e44ea2d80b3147bf1f914cbb62fb",
     ),
 }
 
@@ -61,10 +61,10 @@ def test_stage_prompt_versions() -> None:
     assert compile.PROMPT_VERSION == (
         "compile-v3+compile-map-v2+compile-reduce-v2+compile-repair-v2"
     )
-    assert compile.STAGE_VERSION == "5"
+    assert compile.STAGE_VERSION == "6"
     assert entities.PROMPT_VERSION == "entity-summary-v2"
     assert topics.PROMPT_VERSION == "topic-synthesis-v2"
-    assert translate.PROMPT_VERSION == "translate-v1"
+    assert translate.PROMPT_VERSION == "translate-v2"
     text, version = combine_prompts("compile", "compile-map")
     assert version == "compile-v3+compile-map-v2"
     assert text.startswith(load_prompt("compile").text)

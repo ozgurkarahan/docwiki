@@ -100,7 +100,7 @@ __all__ = [
     "detect_mentions",
 ]
 
-STAGE_VERSION = "5"
+STAGE_VERSION = "6"
 CHARS_PER_TOKEN = 4
 SINGLE_PASS_MAX_TOKENS = 24_000
 MAP_CHUNK_MAX_TOKENS = 12_000

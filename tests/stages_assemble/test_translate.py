@@ -129,12 +129,14 @@ def test_the_plan_keeps_structure_out_of_the_model(batiment: DomainPack) -> None
     assert "- Topic: [Planning](../topics/moreau/planning.md)" in lines
     assert not any("Faits clés" in text or "Aucune figure" in text for text in texts)
     # links, citations and code spans are masked; the summary is a segment
-    first = next(segment for segment in plan.segments if "lot 5" in segment.text)
-    assert "⟦1⟧" in first.text and first.tokens == ("[^c1]",)
+    # (and locked terms: "lot" becomes a placeholder, named in the segment's terms)
+    first = next(segment for segment in plan.segments if "Le montant du" in segment.text)
+    assert "réception" not in first.text and first.tokens == ("[^c1]", "réception", "lot")
+    assert first.terms == (None, "réception", "lot")
     assert any(segment.text == "Délais" for segment in plan.segments)
     assert plan.segments[-1].id == "summary"
     pose = next(segment for segment in plan.segments if "pose" in segment.text)
-    assert pose.tokens == ("`t01`", "[^c1]")
+    assert pose.tokens == ("`t01`", "[^c1]", "OS")
 
 
 def test_the_cache_key_follows_what_the_model_reads(batiment: DomainPack) -> None:
@@ -205,14 +207,18 @@ async def test_translation_and_mirror_page(batiment: DomainPack) -> None:
     result = await translate_plan(llm, plan, batiment)
     assert result.status == "translated" and result.calls == 1 == len(handler.calls)
     request = handler.calls[0]
-    assert request.tier == "fast" and request.prompt_version == "translate-v1"
+    assert request.tier == "fast" and request.prompt_version == "translate-v2"
     assert "from French (fr) into English (en)" in request.text
-    assert "- réception (also" in request.text and "never write 'handover'" in request.text
+    # locked terms are placeholders now: the request names them per segment and lists the bans
+    assert '"terms"' in request.text and "Never write:" in request.text
+    assert "'handover'" in request.text
     mirror = assemble_mirror(plan, result, batiment)
     fm = mirror.frontmatter
     assert fm.lang == "en" and fm.translation_of == fm.id == page.frontmatter.id
     assert fm.title == page.frontmatter.title and fm.summary.startswith("EN: Devis")
-    assert "- EN: Le montant du lot 5" in mirror.body and "[^c1]" in mirror.body
+    # "lot" is a locked term: kept, and glossed by code on its first use on the page
+    assert "- EN: Le montant du lot [" in mirror.body and "] 5" in mirror.body
+    assert "[^c1]" in mirror.body
     assert "### EN: Délais" in mirror.body
     # a JSON round trip of the cached result rebuilds the same page
     again = assemble_mirror(plan, TranslationResult.from_json(result.to_json()), batiment)
@@ -270,3 +276,26 @@ def test_segments_are_ordered_and_hashable() -> None:
     plan = PagePlan(page=french_page(), source_lang="fr", target_lang="en")
     plan.segments.append(Segment("s1", "Bonjour"))
     assert re.fullmatch(r"[0-9a-f]{64}", plan.content_hash)
+
+
+def test_locked_terms_are_masked_for_the_model_and_glossed_once_by_code() -> None:
+    from docwiki.domain import load_pack as _load
+    from docwiki.stages.translate import Vocabulary, _mask_terms, _unmask
+
+    pack = _load(Path(__file__).resolve().parents[2] / "domains" / "batiment")
+    forms = Vocabulary.of(pack).forms
+    text = "La réception est prévue ; la réception [^c1] fixe la retenue de garantie."
+    masked, tokens, terms = _mask_terms(text, forms)
+    # the model sees no locked term, only placeholders (the footnote marker is one too)
+    assert "réception" not in masked and "retenue" not in masked
+    assert sorted(t for t in terms if t) == ["retenue de garantie", "réception", "réception"]
+    english = masked.replace("La ", "The ").replace("est prévue", "is planned")
+    glosses = {term.term: term.gloss for term in pack.terms.terms}
+    glossed: set[str] = set()
+    out = _unmask(english, tokens, terms, glosses, glossed)
+    gloss = glosses["réception"]
+    assert out.count(f"réception [{gloss}]") == 1  # first occurrence on the page only
+    assert out.count("réception") == 2 and "[^c1]" in out
+    # a second segment of the same page gets no gloss again
+    again = _unmask(masked, tokens, terms, glosses, glossed)
+    assert "[" + gloss not in again

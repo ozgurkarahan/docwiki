@@ -33,11 +33,25 @@ def test_the_glossary_and_hints_never_use_a_banned_rendering() -> None:
             assert word not in text.lower(), f"{word!r} in {text[:80]!r}"
 
 
-def test_the_note_lists_the_terms_their_gloss_and_the_banned_renderings() -> None:
+def test_the_french_note_lists_the_terms_without_gloss_and_the_bans_apart() -> None:
+    # The batiment wiki is written in French: no English gloss next to a term, and the banned
+    # English renderings in their own sentence (a model once pasted "never write 'handover'"
+    # into a page from a note that put the ban next to the term).
     note = locked_terms_note(load_pack(PACK))
     assert note.startswith("Locked trade terms")
+    assert "\n- réception (also réception des travaux, PV de réception)\n" in note
+    assert "formal acceptance" not in note and "never write" not in note
+    last = note.splitlines()[-1]
+    assert last.startswith("Banned English renderings") and "'site manager'" in last
+
+
+def test_an_english_wiki_gives_the_gloss() -> None:
+    pack = load_pack(PACK)
+    english = pack.model_copy(
+        update={"info": pack.info.model_copy(update={"wiki_languages": ["en"]})}
+    )
+    note = locked_terms_note(english)
     assert "- réception (also réception des travaux, PV de réception): formal acceptance" in note
-    assert "never write 'site manager'" in note
 
 
 def test_a_pack_without_terms_has_no_note(tmp_path: Path) -> None:

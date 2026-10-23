@@ -83,7 +83,7 @@ __all__ = [
     "unrelocate_text",
 ]
 
-STAGE_VERSION = "1"
+STAGE_VERSION = "2"
 PROMPT_VERSION = load_prompt("translate").version
 SCHEMA_NAME = "translate_page"
 TRANSLATED_TYPES = frozenset({"source", "entity", "topic"})
@@ -122,6 +122,8 @@ class Segment:
     text: str
     tokens: tuple[str, ...] = ()
     """The masked originals, in placeholder order (``⟦1⟧`` is ``tokens[0]``)."""
+    terms: tuple[str | None, ...] = ()
+    """For each token, the locked term it is (``None`` for a link, a marker or code)."""
 
 
 @dataclass
@@ -149,17 +151,53 @@ class PagePlan:
 
 
 def _mask(text: str) -> tuple[str, tuple[str, ...]]:
+    masked, tokens, _ = _mask_terms(text, ())
+    return masked, tokens
+
+
+def _mask_terms(
+    text: str, forms: Sequence[tuple[str, re.Pattern[str]]]
+) -> tuple[str, tuple[str, ...], tuple[str | None, ...]]:
+    """``text`` with links, markers and code masked, then every locked term (``forms``, longest
+    first): the model never sees a locked term, so it can neither translate nor drop it."""
     tokens: list[str] = []
+    terms: list[str | None] = []
 
-    def replace(match: re.Match[str]) -> str:
-        tokens.append(match.group(0))
-        return f"⟦{len(tokens)}⟧"
+    def replacer(term: str | None) -> Callable[[re.Match[str]], str]:
+        def replace(match: re.Match[str]) -> str:
+            tokens.append(match.group(0))
+            terms.append(term)
+            return f"⟦{len(tokens)}⟧"
 
-    return _PROTECTED_RE.sub(replace, text), tuple(tokens)
+        return replace
+
+    masked = _PROTECTED_RE.sub(replacer(None), text)
+    for term, pattern in forms:
+        masked = pattern.sub(replacer(term), masked)
+    return masked, tuple(tokens), tuple(terms)
 
 
-def _unmask(text: str, tokens: Sequence[str]) -> str:
-    return _PLACEHOLDER_RE.sub(lambda m: tokens[int(m.group(1)) - 1], text)
+def _unmask(
+    text: str,
+    tokens: Sequence[str],
+    terms: Sequence[str | None] = (),
+    glosses: Mapping[str, str] | None = None,
+    glossed: set[str] | None = None,
+) -> str:
+    """``text`` with its placeholders restored. With ``glosses``, the first occurrence of each
+    locked term on the page (``glossed`` collects them) is followed by its gloss in brackets."""
+
+    def restore(match: re.Match[str]) -> str:
+        index = int(match.group(1)) - 1
+        original = tokens[index]
+        term = terms[index] if index < len(terms) else None
+        if term is None or glosses is None or glossed is None or term in glossed:
+            return original
+        glossed.add(term)
+        gloss = glosses.get(term)
+        return f"{original} [{gloss}]" if gloss else original
+
+    return _PLACEHOLDER_RE.sub(restore, text)
 
 
 def _fixed_strings(source: Strings, target: Strings) -> tuple[dict[str, str], dict[str, str]]:
@@ -205,11 +243,13 @@ def plan_page(page: Page, pack: DomainPack, target_lang: str) -> PagePlan:
     in_backlinks = False
     counter = 0
 
+    forms = Vocabulary.of(pack).forms
+
     def add(text: str, prefix: str = "") -> Segment:
         nonlocal counter
         counter += 1
-        masked, tokens = _mask(text)
-        segment = Segment(id=f"s{counter}", text=masked, tokens=tokens)
+        masked, tokens, terms = _mask_terms(text, forms)
+        segment = Segment(id=f"s{counter}", text=masked, tokens=tokens, terms=terms)
         plan.segments.append(segment)
         plan.prefixes[segment.id] = prefix
         return segment
@@ -271,12 +311,14 @@ def plan_page(page: Page, pack: DomainPack, target_lang: str) -> PagePlan:
                 plan.lines.append(add(stripped, indent))
     fm = page.frontmatter
     if fm.summary.strip():
-        masked, tokens = _mask(fm.summary)
-        plan.segments.append(Segment(id="summary", text=masked, tokens=tokens))
+        masked, tokens, terms = _mask_terms(fm.summary, forms)
+        plan.segments.append(Segment(id="summary", text=masked, tokens=tokens, terms=terms))
     if isinstance(fm, TopicFrontmatter):
         for index, pair in enumerate(fm.contradiction_pairs, start=1):
-            masked, tokens = _mask(pair.subject)
-            plan.segments.append(Segment(id=f"subject.{index}", text=masked, tokens=tokens))
+            masked, tokens, terms = _mask_terms(pair.subject, forms)
+            plan.segments.append(
+                Segment(id=f"subject.{index}", text=masked, tokens=tokens, terms=terms)
+            )
     return plan
 
 
@@ -446,11 +488,25 @@ def _batches(segments: Sequence[Segment]) -> list[list[Segment]]:
     return [batch for batch in batches if batch]
 
 
+def _segment_payload(segment: Segment) -> dict[str, Any]:
+    """One segment as the model reads it; ``terms`` names the trade terms behind placeholders
+    (the model keeps the placeholder and builds the sentence around the word it stands for)."""
+    payload: dict[str, Any] = {"id": segment.id, "text": segment.text}
+    terms = {
+        f"⟦{index}⟧": segment.tokens[index - 1]
+        for index, term in enumerate(segment.terms, start=1)
+        if term is not None
+    }
+    if terms:
+        payload["terms"] = terms
+    return payload
+
+
 def _request(
     plan: PagePlan, batch: Sequence[Segment], pack: DomainPack, problems: Sequence[str]
 ) -> str:
     payload = json.dumps(
-        {"segments": [{"id": segment.id, "text": segment.text} for segment in batch]},
+        {"segments": [_segment_payload(segment) for segment in batch]},
         ensure_ascii=False,
         indent=0,
     )
@@ -464,17 +520,15 @@ def _request(
         f"- type: {plan.page.frontmatter.type}",
         f"- title (never translated): {plan.page.frontmatter.title}",
     ]
-    terms = pack.terms.terms
-    if terms:
-        lines += ["", "# Locked trade terms (reviewed domain pack; keep them as written)"]
-        for term in terms:
-            forms = f" (also {', '.join(term.forms)})" if term.forms else ""
-            banned = (
-                f"; never write {', '.join(repr(item) for item in term.banned)}"
-                if term.banned
-                else ""
-            )
-            lines.append(f"- {term.term}{forms}: {term.gloss}{banned}")
+    banned = sorted({item for term in pack.terms.terms for item in term.banned})
+    if banned:
+        lines += [
+            "",
+            "# Banned renderings (reviewed domain pack)",
+            "The trade terms are placeholders like the links: keep them. Never write: "
+            + ", ".join(repr(item) for item in banned)
+            + ".",
+        ]
     if problems:
         lines += [
             "",
@@ -567,11 +621,18 @@ def assemble_mirror(plan: PagePlan, result: TranslationResult, pack: DomainPack)
     """The mirror page of ``plan`` at the canonical path (:func:`relocate_page` moves it)."""
     texts = result.texts
     by_id = {segment.id: segment for segment in plan.segments}
+    glosses = (
+        {term.term: term.gloss for term in pack.terms.terms if term.gloss}
+        if plan.target_lang == "en" and result.status == "translated"
+        else None
+    )
+    glossed: set[str] = set()
     lines: list[str] = []
     for line in plan.lines:
         if isinstance(line, Segment):
             text = texts.get(line.id, line.text)
-            lines.append(plan.prefixes.get(line.id, "") + _unmask(text, line.tokens))
+            restored = _unmask(text, line.tokens, line.terms, glosses, glossed)
+            lines.append(plan.prefixes.get(line.id, "") + restored)
         else:
             lines.append(line)
     if result.status != "translated":
