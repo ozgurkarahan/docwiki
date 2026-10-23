@@ -47,7 +47,7 @@ from docwiki.stages.classify import classify_source
 from docwiki.stages.compile import detect_mentions
 from docwiki.stages.discover import SupersessionRecord, discover, resolve_supersession
 from docwiki.stages.models import SourceInfo
-from docwiki.stages.topics import resolution_statement
+from docwiki.stages.topics import ScopeContext, is_change, resolution_statement
 from docwiki.stages.verify import load_canaries
 from docwiki.storage.routed import DirectorySource, RoutedStorage
 
@@ -373,6 +373,26 @@ def test_resolution_rule_on_the_planted_contradictions(
         rule + "avenant prevails (authority 10 vs 9)."
     )
     assert info("contrat").authority > info("devis-b").authority
+    # v1.7: an avenant or an OS of the same chantier changes its contract (not a contradiction)
+    assert is_change(pack, info("contrat"), info("avenant"))
+    assert is_change(pack, info("nac-marche"), info("nac-os1"))
+    assert not is_change(pack, info("nac-os1"), info("nac-marche"))
+    # a contract that wins against another document is to review when its chantier has an OS
+    context = {
+        sid: ScopeContext("Les Nacrines", ((info("nac-os1"), "[OS n°1](nac-os1.md)"),))
+        for sid in ("nac-marche", "nac-cr12")
+    }
+    assert resolution_statement(pack, info("nac-cr12"), info("nac-marche"), context) == (
+        rule + "to review; the rule would favour nac-marche (authority 9 vs 7), but the terms of "
+        "nac-marche may have been changed by the amending documents of Les Nacrines: "
+        "[OS n°1](nac-os1.md); check them before relying on either statement."
+    )
+    # the client's written constraint against our own schedule is arbitrated with the client
+    arbitrated = resolution_statement(pack, info("eco-planning"), info("eco-mail-mairie"))
+    assert arbitrated.startswith(
+        rule + "to arbitrate; the rule does not decide between eco-planning and eco-mail-mairie. "
+    )
+    assert "arbitrate the point with the client" in arbitrated and "prevails" not in arbitrated
     notes = {int(number) for number in re.findall(r"\b(?:10|[1-9])\b", pack.resolution.notes)}
     assert notes == {doc_type.authority for doc_type in pack.taxonomy.doc_types}
 

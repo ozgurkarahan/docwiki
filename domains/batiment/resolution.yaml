@@ -1,16 +1,39 @@
 # Contradiction resolution policy, stated on topic pages next to both claims (never applied
-# silently). Authorities are those of taxonomy.yaml.
+# silently). Authorities are those of taxonomy.yaml; the doc type keys below are its keys.
 order: [authority, recency]
+# An amendment (avenant) or an ordre de service changes the terms of the contract of its
+# chantier: a disagreement between them is a change, shown as "changed by", not a contradiction;
+# and when the rule would let the contract win against another document, the page says that the
+# contract's term may have been changed by the amending documents of that chantier (to review).
+amendments:
+  - amending: [contract-amendment, ordre-de-service]
+    amended: [works-contract, acte-d-engagement, ccap]
+# Pairs the authority rule does not decide: the point is arbitrated with the client.
+arbitrate:
+  - types: [client-email, schedule]
+    reason: >-
+      A client's written constraint about its own building or premises is a request the schedule
+      must take into account, not a claim the schedule overrules: arbitrate the point with the
+      client (and confirm it by an ordre de service or an amendment when it changes the contract).
+  - types: [client-email, crew-schedule]
+    reason: >-
+      A client's written constraint about its own building or premises is a request the crew
+      schedule must take into account, not a claim it overrules: arbitrate the point with the
+      client.
 notes: >-
   Signed acts that change or close a contract prevail: an amendment (avenant), an ordre de
   service or a PV de réception (authority 10) over the contract they relate to (works contract,
   acte d'engagement, CCAP or framework contract, 9), and a contract over the priced offer, the
-  DPGF or a subcontracting document (8). Signed site meeting minutes, the réserves list and the
+  DPGF or a subcontracting document (8). An avenant or an ordre de service that changes a term of
+  the contract of its chantier (a date, an amount, a scope of works) is a change, not a
+  contradiction; and a term of the contract is checked against the avenants and ordres de service
+  of the chantier before it is relied on. Signed site meeting minutes, the réserves list and the
   general terms (7) prevail over a delivery note with its handwritten reserves, a situation, the
   billing register and the price list (6); a delivery note prevails over the supplier invoice (5)
   for the quantities actually delivered, as do purchase orders, the PPSPS and the company
   registers at that level. Schedules (planning), the crew schedule and the suppliers' e-mails
   have the same authority (4): the more recent statement prevails until a new schedule revision
   (indice) supersedes the old one. Client e-mails, price studies and margin dashboards (3) are
-  requests or internal estimates; an amendment makes a request binding. Site photos and the
-  organisation chart (2) never settle a quantity or a date.
+  requests or internal estimates; an amendment makes a request binding. A client's written
+  constraint (an e-mail) against our own schedule is never settled by the rule: it is arbitrated
+  with the client. Site photos and the organisation chart (2) never settle a quantity or a date.

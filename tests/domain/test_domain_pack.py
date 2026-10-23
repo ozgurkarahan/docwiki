@@ -162,6 +162,37 @@ def test_content_hash_changes_with_content(pack_dir: Path) -> None:
             "resolution.yaml: order[1]",
         ),
         (
+            "resolution.yaml",
+            "order: [authority, recency]",
+            "order: [authority, recency]\namendments:\n  - {amending: [avenant], amended: [devis]}",
+            "resolution.yaml: amendments[0].amending[0]: unknown doc type 'avenant'",
+        ),
+        (
+            "resolution.yaml",
+            "order: [authority, recency]",
+            "order: [authority, recency]\namendments:\n  - {amending: [devis], amended: [devis]}",
+            "doc types both amending and amended: devis",
+        ),
+        (
+            "resolution.yaml",
+            "order: [authority, recency]",
+            "order: [authority, recency]\narbitrate:\n  - {types: [devis, mail], reason: Ask.}",
+            "resolution.yaml: arbitrate[0].types[1]: unknown doc type 'mail'",
+        ),
+        (
+            "resolution.yaml",
+            "order: [authority, recency]",
+            "order: [authority, recency]\narbitrate:\n  - {types: [devis], reason: Ask.}",
+            "resolution.yaml: arbitrate[0].types",
+        ),
+        (
+            "resolution.yaml",
+            "order: [authority, recency]",
+            "order: [authority, recency]\narbitrate:\n  - {types: [devis, facture], reason: A.}"
+            "\n  - {types: [facture, devis], reason: B.}",
+            "duplicate arbitrate pair",
+        ),
+        (
             "glossary.yaml",
             "  - term: HT",
             "  - term: HT\n    term: X",
@@ -175,6 +206,23 @@ def test_validation_errors_name_file_and_key(
     edit(pack_dir / file, old, new)
     errors = errors_of(pack_dir)
     assert any(expected in error for error in errors), errors
+
+
+def test_resolution_amendments_and_pairs_to_arbitrate(pack_dir: Path) -> None:
+    assert load_pack(pack_dir).resolution.amendments == []
+    edit(
+        pack_dir / "resolution.yaml",
+        "order: [authority, recency]",
+        "order: [authority, recency]\n"
+        "amendments:\n  - {amending: [facture], amended: [devis]}\n"
+        "arbitrate:\n  - {types: [devis, etude-de-prix], reason: Ask the client.}",
+    )
+    resolution = load_pack(pack_dir).resolution
+    assert resolution.amendment("facture", "devis") and not resolution.amendment("devis", "facture")
+    assert resolution.amending_types("devis") == {"facture"} and not resolution.amending_types("x")
+    pair = resolution.arbitration("etude-de-prix", "devis")
+    assert pair is not None and pair.reason == "Ask the client."
+    assert resolution.arbitration("devis", "facture") is None
 
 
 def test_structural_errors(pack_dir: Path) -> None:

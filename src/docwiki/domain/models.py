@@ -23,6 +23,8 @@ from docwiki.contracts.ids import RESERVED_ENTITY_TYPES
 from docwiki.contracts.layout import CORE_SKILLS
 
 __all__ = [
+    "AmendmentRule",
+    "ArbitrationPair",
     "Category",
     "DocType",
     "DocTypeRule",
@@ -372,13 +374,58 @@ class SupersessionFile(ContractModel):
         return value
 
 
+class AmendmentRule(ContractModel):
+    """Doc types whose documents change the terms of others (v1.7): a document of an
+    ``amending`` type may change the terms of the documents of an ``amended`` type of the same
+    scope (an amendment or a service order and the contract they relate to)."""
+
+    amending: Annotated[list[Kebab], Field(min_length=1)]
+    amended: Annotated[list[Kebab], Field(min_length=1)]
+
+    @field_validator("amending", "amended")
+    @classmethod
+    def _unique_types(cls, value: list[str]) -> list[str]:
+        _unique(value, "doc type")
+        return value
+
+    @model_validator(mode="after")
+    def _disjoint(self) -> Self:
+        both = sorted(set(self.amending) & set(self.amended))
+        if both:
+            raise ValueError(f"doc types both amending and amended: {', '.join(both)}")
+        return self
+
+
+class ArbitrationPair(ContractModel):
+    """Two doc types the resolution rule does not decide between (v1.7): a contradiction between
+    a document of each is stated as to arbitrate, with the pack's ``reason``."""
+
+    types: Annotated[list[Kebab], Field(min_length=2, max_length=2)]
+    reason: NonEmptyStr
+
+    @field_validator("reason")
+    @classmethod
+    def _one_line(cls, value: str) -> str:
+        if "\n" in value.strip():
+            raise ValueError("reason must be a single line")
+        return value.strip()
+
+
 class ResolutionFile(ContractModel):
-    """``resolution.yaml``: contradiction policy, stated on topic pages (never silently applied)."""
+    """``resolution.yaml``: contradiction policy, stated on topic pages (never silently applied).
+
+    ``amendments`` and ``arbitrate`` (v1.7, optional) refine how the rule is stated: a
+    contradiction between an amended document and an amending document of the same scope is a
+    change, not a contradiction; a winner of an amended type is to review when its scope has
+    amending documents; a pair of ``arbitrate`` types is never decided by the rule.
+    """
 
     order: Annotated[list[Literal["authority", "recency"]], Field(min_length=1)] = [
         "authority",
         "recency",
     ]
+    amendments: list[AmendmentRule] = []
+    arbitrate: list[ArbitrationPair] = []
     notes: str = ""
 
     @field_validator("order")
@@ -386,6 +433,29 @@ class ResolutionFile(ContractModel):
     def _order(cls, value: list[str]) -> list[str]:
         _unique(value, "resolution criterion")
         return value
+
+    @field_validator("arbitrate")
+    @classmethod
+    def _pairs(cls, value: list[ArbitrationPair]) -> list[ArbitrationPair]:
+        _unique(["\n".join(sorted(pair.types)) for pair in value], "arbitrate pair")
+        return value
+
+    def amendment(self, amending: str, amended: str) -> bool:
+        """Whether documents of type ``amending`` may change those of type ``amended``."""
+        return any(
+            amending in rule.amending and amended in rule.amended for rule in self.amendments
+        )
+
+    def amending_types(self, amended: str) -> set[str]:
+        """The doc types that may change the documents of type ``amended``."""
+        return {key for rule in self.amendments if amended in rule.amended for key in rule.amending}
+
+    def arbitration(self, first: str, second: str) -> ArbitrationPair | None:
+        """The ``arbitrate`` entry for two doc types (in either order), if any."""
+        return next(
+            (pair for pair in self.arbitrate if sorted(pair.types) == sorted([first, second])),
+            None,
+        )
 
 
 ViewColumn = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]*$", max_length=48)]

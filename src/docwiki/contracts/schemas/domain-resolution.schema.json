@@ -1,8 +1,70 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Domain pack resolution.yaml",
+  "$defs": {
+    "AmendmentRule": {
+      "additionalProperties": false,
+      "description": "Doc types whose documents change the terms of others (v1.7): a document of an\n``amending`` type may change the terms of the documents of an ``amended`` type of the same\nscope (an amendment or a service order and the contract they relate to).",
+      "properties": {
+        "amending": {
+          "items": {
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Amending",
+          "type": "array"
+        },
+        "amended": {
+          "items": {
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Amended",
+          "type": "array"
+        }
+      },
+      "required": [
+        "amending",
+        "amended"
+      ],
+      "title": "AmendmentRule",
+      "type": "object"
+    },
+    "ArbitrationPair": {
+      "additionalProperties": false,
+      "description": "Two doc types the resolution rule does not decide between (v1.7): a contradiction between\na document of each is stated as to arbitrate, with the pack's ``reason``.",
+      "properties": {
+        "types": {
+          "items": {
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "title": "Types",
+          "type": "array"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "types",
+        "reason"
+      ],
+      "title": "ArbitrationPair",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
-  "description": "``resolution.yaml``: contradiction policy, stated on topic pages (never silently applied).",
+  "description": "``resolution.yaml``: contradiction policy, stated on topic pages (never silently applied).\n\n``amendments`` and ``arbitrate`` (v1.7, optional) refine how the rule is stated: a\ncontradiction between an amended document and an amending document of the same scope is a\nchange, not a contradiction; a winner of an amended type is to review when its scope has\namending documents; a pair of ``arbitrate`` types is never decided by the rule.",
   "properties": {
     "order": {
       "default": [
@@ -18,6 +80,22 @@
       },
       "minItems": 1,
       "title": "Order",
+      "type": "array"
+    },
+    "amendments": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/AmendmentRule"
+      },
+      "title": "Amendments",
+      "type": "array"
+    },
+    "arbitrate": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ArbitrationPair"
+      },
+      "title": "Arbitrate",
       "type": "array"
     },
     "notes": {
