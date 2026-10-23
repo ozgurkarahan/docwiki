@@ -2,6 +2,7 @@
 // no external social images. Quartz's inline content-index loader is replaced by a same-origin
 // script so the site also works under `Content-Security-Policy: script-src 'self'`; it is told the
 // wiki's languages, so that search and the explorer list the pages of the reader's language.
+import { cloneElement, isValidElement } from "preact"
 import { i18n } from "../../i18n"
 import { FullSlug, joinSegments, pathToRoot, resolveRelative } from "../../util/path"
 import {
@@ -11,7 +12,7 @@ import {
 } from "../../util/resources"
 import { unescapeHTML } from "../../util/escape"
 import { QuartzComponent, QuartzComponentConstructor, QuartzComponentProps } from "../types"
-import { languages, twins } from "./settings"
+import { languages, pageStrings, twins } from "./settings"
 
 const CONTENT_INDEX_LOADER = /^const fetchData = fetch\("[^"]*static\/contentIndex\.json"\)/
 
@@ -23,6 +24,15 @@ function isContentIndexLoader(resource: JSResource): boolean {
 function pageHref(base: string | undefined, from: FullSlug, slug: string): string {
   const path = slug === "index" ? "" : slug.endsWith("/index") ? slug.slice(0, -5) : slug
   return base ? `https://${base}/${path}` : resolveRelative(from, slug as FullSlug)
+}
+
+/** Quartz names the RSS feed's `<link>` "RSS Feed" whatever the locale. */
+function rssTitle<T>(resource: T, title: string): T {
+  if (!isValidElement(resource)) return resource
+  const props = resource.props as Record<string, unknown>
+  if (props.type !== "application/rss+xml" || props.title !== "RSS Feed") return resource
+  // The same element serves every page: a copy for this page's language.
+  return cloneElement(resource, { title }) as T
 }
 
 export default (() => {
@@ -41,6 +51,7 @@ export default (() => {
       unescapeHTML(fileData.description?.trim() ?? i18n(cfg.locale).propertyDefaults.description)
 
     const { css, js, additionalHead } = externalResources
+    const rss = pageStrings(fileData).wiki.rssFeed
     const url = new URL(`https://${cfg.baseUrl ?? "example.com"}`)
     const baseDir =
       fileData.slug === "404" ? (url.pathname as FullSlug) : pathToRoot(fileData.slug!)
@@ -93,7 +104,7 @@ export default (() => {
             ),
           )}
         {additionalHead.map((resource) =>
-          typeof resource === "function" ? resource(fileData) : resource,
+          rssTitle(typeof resource === "function" ? resource(fileData) : resource, rss),
         )}
       </head>
     )

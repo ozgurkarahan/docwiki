@@ -66,6 +66,8 @@ export interface DocwikiMirror {
   register?: DocwikiRegisterGroup[] | null
   explorer?: DocwikiSettings["explorer"]
   steps?: { name: string; text: string }[]
+  /** Its pages kept untranslated, content slug (`en/sources/x`) → summary (canonical text). */
+  untranslated?: Record<string, string>
 }
 
 export interface DocwikiSettings {

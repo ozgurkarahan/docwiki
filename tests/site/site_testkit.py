@@ -219,6 +219,33 @@ def write_site(root: Path, files: dict[str, str]) -> Path:
     return root
 
 
+UNTRANSLATED_SUMMARY = "Indice A remplacé du planning PLN-2026-003."
+"""The French summary an untranslated mirror page keeps (``make_untranslated``)."""
+
+
+def make_untranslated(release: Path, rel: str, lang: str = "en") -> Path:
+    """Turn the ``lang`` mirror of the page ``rel`` (``sources/x``) into a page kept untranslated,
+    as the translate stage writes it: the engine's ``mirror.untranslated`` notice under the title
+    and the canonical (French) summary; the mirror's home lists it with that summary."""
+    from docwiki.contracts.i18n import Strings
+
+    file = release / "wiki" / lang / f"{rel}.md"
+    text = file.read_text(encoding="utf-8")
+    meta, _ = read_frontmatter(text)
+    notice = Strings(lang)("mirror.untranslated", lang="fr")
+    head, sep, body = _set_frontmatter(text, {"summary": UNTRANSLATED_SUMMARY}).partition(
+        "\n---\n"
+    )
+    lines = body.split("\n")
+    title = next(index for index, line in enumerate(lines) if line.startswith("# "))
+    lines[title + 1 : title + 1] = ["", notice]
+    file.write_text(head + sep + "\n".join(lines), encoding="utf-8")
+    home = release / "wiki" / lang / "index.md"
+    entry = f"\n- [{meta['title']}]({rel}.md): {UNTRANSLATED_SUMMARY}\n"
+    home.write_text(home.read_text(encoding="utf-8") + entry, encoding="utf-8")
+    return file
+
+
 def page(body: str, *, head: str = "", depth: int = 0) -> str:
     """A page shaped like Quartz output (bundles referenced relative to the page)."""
     up = "../" * depth if depth else "./"

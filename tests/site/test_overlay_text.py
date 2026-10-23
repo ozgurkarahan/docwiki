@@ -101,6 +101,10 @@ def test_notices_document_links_and_dates() -> None:
             "Superseded by Planning and purchase tracking, indice B.",
             "Warning: this answer cites a withdrawn source.",
             "Fictional characters appear here.",
+            "Untranslated: this page could not be translated reliably.",
+            "Non traduit\\u00a0: cette page n'a pas pu être traduite.",
+            "[!docwiki-notice] Untranslated: this page could not be translated.",
+            "Untranslated pages are listed below.",
           ].map(m.noticeKind),
           documents: ["../evidence/src-1/original.pdf#page=3", "original.XLSX", "../a", "x.png"]
             .map(m.isDocumentHref),
@@ -109,7 +113,16 @@ def test_notices_document_links_and_dates() -> None:
         }))"""
     )
     assert result == {
-        "notices": ["fictional", "superseded", "warning", None],
+        "notices": [
+            "fictional",
+            "superseded",
+            "warning",
+            None,
+            "untranslated",
+            "untranslated",
+            "untranslated",
+            None,
+        ],
         "documents": [True, True, False, False],
         "days": [True, False, False, False],
         "provenance": ["deterministic-table", "model-description", "native-text", "ocr"],

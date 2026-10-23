@@ -71,6 +71,11 @@ export const fr: Strings = {
     tableNamed: (heading) => `Tableau : ${heading}`,
     openImage: "Ouvrir l'image en taille réelle",
     provenanceBadges: "Badges de provenance",
+    footnotes: "Notes",
+    footnoteBack: (reference) => `Retour à l'appel de note ${reference}`,
+    untranslated: "Non traduit",
+    globalGraph: "Graphe global",
+    rssFeed: "Flux RSS",
   },
 
   badges: {

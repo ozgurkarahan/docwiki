@@ -121,9 +121,10 @@ const explorers = languages.map((lang) => {
 const toolbar = L(
   Component.Flex({
     components: [
-      { Component: Component.Search(), grow: true },
-      { Component: Component.Darkmode() },
-      { Component: Component.ReaderMode() },
+      // Each one wrapped as well: Localized corrects what a component renders itself.
+      { Component: L(Component.Search()), grow: true },
+      { Component: L(Component.Darkmode()) },
+      { Component: L(Component.ReaderMode()) },
     ],
   }),
 )

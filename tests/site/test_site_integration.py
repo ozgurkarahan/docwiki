@@ -244,7 +244,13 @@ def test_phone_header_title_shrinks_and_wraps(built_site: Path) -> None:
     )
     assert rule, "the phone title rule is missing from index.css"
     assert "min-width:0" in rule.group(1)
-    assert ".sidebar.left.page-titlea{overflow-wrap:anywhere}" in rule.group(2)
+    # It wraps between words, hyphenated, and mid-word only for a word wider than its room; the
+    # narrowest phones show the search icon without its word, so that whole words fit.
+    wrap = ".sidebar.left.page-title,.sidebar.left.page-titlea{word-break:normal;"
+    assert wrap + "overflow-wrap:anywhere;" in rule.group(2)
+    assert "hyphens:auto}" in rule.group(2)
+    label = re.search(r"@media\(max-width:400px\)\{\.search>\.search-button>p\{([^}]*)\}", css)
+    assert label and "position:absolute" in label.group(1) and "width:1px" in label.group(1)
     # The open phone menu covers the screen (fixed, not inset by the page padding) and its list
     # starts below the menu button, which sits at the top of the header row.
     assert ".sidebar.left.explorer{margin-top:0}" in rule.group(2)

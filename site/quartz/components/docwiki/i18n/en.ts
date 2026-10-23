@@ -61,6 +61,11 @@ export const en: Strings = {
     tableNamed: (heading) => `Table: ${heading}`,
     openImage: "Open the full-size image",
     provenanceBadges: "Provenance badges",
+    footnotes: "Footnotes",
+    footnoteBack: (reference) => `Back to reference ${reference}`,
+    untranslated: "Untranslated",
+    globalGraph: "Global graph",
+    rssFeed: "RSS feed",
   },
 
   badges: {

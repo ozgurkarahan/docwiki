@@ -252,8 +252,22 @@ article blockquote.docwiki-notice {
 }
 
 // Phones: Quartz's header row (menu, title, search, theme and reader buttons) must fit 320 px
-// whatever the wiki's title, so the title shrinks and wraps instead of widening the page (the
-// link needs `anywhere` too: Quartz's `break-word` keeps the longest word as the minimum width).
+// whatever the wiki's title, so the title shrinks and wraps instead of widening the page: between
+// words, hyphenated in the page's language, and mid-word only for a word wider than its room (the
+// link needs `anywhere`: Quartz's `break-word` keeps the longest word as the minimum width). On
+// the narrowest phones the search button shows its icon only (its word stays its name), which
+// leaves the title room for whole words ("Lamna Bâtiment", not "Lamna Bâtimen / t").
+@media all and (max-width: 400px) {
+  .search > .search-button > p {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
 @media all and ($mobile) {
   .sidebar.left .page-title {
     min-width: 0;
@@ -261,7 +275,9 @@ article blockquote.docwiki-notice {
 
     &,
     a {
+      word-break: normal;
       overflow-wrap: anywhere;
+      hyphens: auto;
     }
   }
 
@@ -2761,6 +2777,17 @@ select:focus-visible,
     transition-delay: 0s !important;
     scroll-behavior: auto !important;
   }
+}
+
+// A collapsed explorer folder is 0 px tall but its links stayed in the Tab order (WCAG 2.4.7):
+// hidden once Quartz's 0.3 s collapse has run, visible at once when the folder opens.
+.explorer .folder-outer > ul {
+  transition: visibility 0s linear 0s;
+}
+
+.explorer .folder-outer:not(.open) > ul {
+  visibility: hidden;
+  transition: visibility 0s linear 0.3s;
 }
 
 // Targets of at least 24 × 24 px (WCAG 2.5.8) for every link that is a control rather than a
