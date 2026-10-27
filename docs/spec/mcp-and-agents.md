@@ -132,7 +132,9 @@ agents/
    `answer_context`, `read_page` or `search` (a source hit with its evidence path);
    `get_evidence` is only for quoting a decisive passage verbatim when the returned text is
    insufficient.
-3. At most 6 tool calls per question; stop and say what is missing if evidence is insufficient.
+3. At most 6 tool calls per question; after the sixth, answer and say what is missing. Answers stay
+   short (under 150 words before the source list) and the Researcher runs at reasoning effort
+   `low` (`reasoning_effort` in `agent.yaml`, optional for any agent).
 4. Every factual sentence ends with a citation `[n]`; the answer ends with a numbered source list:
    `[n] <source title> — <locator label> (<provenance>) — <sidecar path>`.
 5. Prefer current over superseded information and say so; surface contradictions explicitly.
