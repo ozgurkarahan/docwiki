@@ -175,6 +175,11 @@ the pointer forward again; pause the triggers first if that is not wanted
   to zero after about 8.5 minutes idle; from zero, `/healthz` took 22.6 s (1.2 s warm) and an
   agent turn 38.8 s (about 8 s warm). For a demo, `azd env set DOCWIKI_MCP_MIN_REPLICAS 1` and
   `azd provision` (or warm the app with a call to `/healthz` a minute before).
+- The public showcase keeps `DOCWIKI_MCP_MIN_REPLICAS=1` and `DOCWIKI_PORTAL_MIN_REPLICAS=1`, so
+  a visitor's first question never waits for a cold start. Idle replicas of 0.5 vCPU / 1 GiB (MCP)
+  and 0.25 vCPU / 0.5 GiB (portal) cost about $18 a month together at the consumption plan's idle
+  rates, before the monthly free grant (check the rates of your region). The portal also reuses
+  the Researcher's latest version for five minutes instead of reading it before every question.
 - Run receipts price tokens with `src/docwiki/llm/prices.yaml`, a placeholder table
   (`verified: false`): copy it, verify the prices for your region and deployment type, and
   point `DOCWIKI_LLM_PRICE_TABLE` at the copy before relying on receipts.
