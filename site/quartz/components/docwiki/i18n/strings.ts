@@ -150,6 +150,52 @@ export interface Strings {
     aboutAgentsAfter: string
     sourceCode: string
     theWiki: string
+    /** The button that starts the guided tour (Tour.tsx). */
+    tourButton: string
+    /** The link to the architecture page. */
+    architectureLink: string
+  }
+
+  /** The home page's evaluation panel: the wiki and its agent against two baselines. */
+  evals: {
+    heading: string
+    intro: string
+    caption: string
+    system: string
+    systems: Record<string, string>
+    accuracy: string
+    numeric: string
+    cost: string
+    latency: string
+    /** "32 dev questions · run 23 Oct 2026" */
+    run: (questions: number | null, split: string, date: string | null) => string
+    estimated: string
+    scoreboard: string
+    percent: (value: number) => string
+    seconds: (value: number) => string
+    money: (value: number) => string
+  }
+
+  /** The guided tour (Tour.tsx): six steps across the site's pages. */
+  tour: {
+    label: string
+    stepOf: (step: number, count: number) => string
+    back: string
+    next: string
+    done: string
+    close: string
+    steps: readonly { title: string; body: string }[]
+    /** Added when a step's element is not on the page (a static host, an empty register). */
+    missing: string
+    qualityReport: string
+    architecture: string
+  }
+
+  /** The architecture page (site.md §12.3). */
+  architecture: {
+    figureLabel: string
+    caption: string
+    openFull: string
   }
 
   /** Source pages and the documents register. */

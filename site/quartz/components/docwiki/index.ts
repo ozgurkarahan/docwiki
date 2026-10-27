@@ -1,4 +1,5 @@
 import About from "./About"
+import Architecture from "./Architecture"
 import ArticleTitle from "./ArticleTitle"
 import AskPanel from "./AskPanel"
 import Banner from "./Banner"
@@ -16,9 +17,11 @@ import SkipLink from "./SkipLink"
 import SourceHeader from "./SourceHeader"
 import Story from "./Story"
 import Tabs from "./Tabs"
+import Tour from "./Tour"
 
 export {
   About,
+  Architecture,
   ArticleTitle,
   AskPanel,
   Banner,
@@ -36,4 +39,5 @@ export {
   SourceHeader,
   Story,
   Tabs,
+  Tour,
 }

@@ -4,16 +4,94 @@
 // build; the pipeline card's last run (length and cost) is read on the client from the portal's
 // /api/process, and a static host keeps the build-time text (scripts/story.inline.ts). The
 // provenance line and "About DocWiki" (About.tsx) follow. Each language's home (`index`,
-// `en/index`) has it, in that language.
+// `en/index`) has it, in that language. Under the question: the button that starts the guided
+// tour (Tour.tsx, whose script un-hides it), the link to the architecture page, and the
+// evaluation panel "wiki + agent vs RAG" (site.md §12.1), left out when the build had no
+// evaluation results.
 import { FullSlug, resolveRelative } from "../../util/path"
 import { classNames } from "../../util/lang"
 import { QuartzComponent, QuartzComponentConstructor, QuartzComponentProps } from "../types"
 // @ts-ignore
 import script from "./scripts/story.inline"
-import { inLang, pageBase, pageLang, pageStrings, settings, settingsFor } from "./settings"
+import type { Strings } from "./i18n"
+import {
+  DocwikiEvalMetric,
+  DocwikiEvals,
+  humanDate,
+  inLang,
+  pageBase,
+  pageLang,
+  pageStrings,
+  settings,
+  settingsFor,
+} from "./settings"
 
 /** Id of the hidden "The wiki" heading at the end of About.tsx: the third card scrolls to it. */
 export const WIKI_ANCHOR = "docwiki-wiki"
+
+/** Id of the evaluation panel: the tour's last step points at it. */
+export const EVAL_ID = "docwiki-eval"
+
+function Metric({ metric, t }: { metric: DocwikiEvalMetric | null; t: Strings }) {
+  if (!metric) return <td class="docwiki-eval-none">–</td>
+  return (
+    <td>
+      <span class="docwiki-eval-value">{t.evals.percent(metric.value)}</span>
+      {metric.passed !== null && (
+        <span class="docwiki-eval-count">
+          {metric.passed}/{metric.n}
+        </span>
+      )}
+    </td>
+  )
+}
+
+/** "Wiki + agent vs RAG": accuracy, exact numbers, cost and median time of three systems. */
+function EvalPanel({ evals, t }: { evals: DocwikiEvals; t: Strings }) {
+  const e = t.evals
+  const estimated = evals.systems.some((row) => row.costPerQuestion !== null && !row.pricesVerified)
+  return (
+    <section id={EVAL_ID} class="docwiki-eval" aria-labelledby="docwiki-eval-title">
+      <h3 id="docwiki-eval-title" class="docwiki-eval-title">
+        {e.heading}
+      </h3>
+      <p class="docwiki-eval-intro">{e.intro}</p>
+      <div class="docwiki-eval-frame">
+        <table class="docwiki-eval-table">
+          <caption class="sr-only">{e.caption}</caption>
+          <thead>
+            <tr>
+              <th scope="col">{e.system}</th>
+              <th scope="col">{e.accuracy}</th>
+              <th scope="col">{e.numeric}</th>
+              <th scope="col">{e.cost}</th>
+              <th scope="col">{e.latency}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {evals.systems.map((row) => (
+              <tr class={row.system === "docwiki-researcher" ? "docwiki-eval-ours" : undefined}>
+                <th scope="row">{e.systems[row.system] ?? row.system}</th>
+                <Metric metric={row.accuracy} t={t} />
+                <Metric metric={row.numeric} t={t} />
+                <td>
+                  {row.costPerQuestion === null
+                    ? "–"
+                    : `${row.pricesVerified ? "" : "≈ "}${e.money(row.costPerQuestion)}`}
+                </td>
+                <td>{row.latencyP50 === null ? "–" : e.seconds(row.latencyP50)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="docwiki-eval-meta">
+        {e.run(evals.questions, evals.split, humanDate(evals.date, t))}
+        {estimated && <> · {e.estimated}</>} · <a href={evals.scoreboardUrl}>{e.scoreboard}</a>
+      </p>
+    </section>
+  )
+}
 
 export default (() => {
   const Story: QuartzComponent = ({ fileData, displayClass }: QuartzComponentProps) => {
@@ -91,7 +169,18 @@ export default (() => {
           <span aria-hidden="true">▶</span>
           <span class="sr-only">{s.tryOpens}</span>
         </button>
-        {/* Slice F: the evaluation's headline ("RAG vs wiki: …") goes here, under the question. */}
+        <p class="docwiki-story-more">
+          {/* Shown by the tour's script (Tour.tsx): the tour needs JavaScript. */}
+          <button type="button" class="docwiki-tour-start" hidden>
+            {s.tourButton}
+          </button>
+          <a class="docwiki-story-architecture" href={link("architecture")}>
+            {s.architectureLink}
+          </a>
+        </p>
+        {settings.evals && settings.evals.systems.length > 0 && (
+          <EvalPanel evals={settings.evals} t={t} />
+        )}
       </section>
     )
   }

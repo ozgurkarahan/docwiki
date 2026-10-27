@@ -11,6 +11,7 @@ import type { AskAnswer, AskCitation, AskState } from "../../../plugins/transfor
 import {
   ASK_EVENT,
   ASK_STATE_KEY,
+  askEventFill,
   LIVE_ASK_PATH,
   LIVE_KEEP,
   LIVE_POLL_MS,
@@ -372,13 +373,17 @@ function useExample(question: string) {
  * put in the form and asked (unless another one is in flight). Otherwise its filed answer opens,
  * or the question list when there is none.
  */
-async function askFromPage(question: string) {
+async function askFromPage(question: string, fill = false) {
   const slug = currentSlug()
   await checkLive(slug)
   if (liveEnabled) {
     writeState({ ...readState(), open: true, resume: false, answer: null, scroll: 0 })
     if (liveRun) {
       paint("live-status")
+    } else if (fill) {
+      // The guided tour: the question waits in the form; the reader sends it.
+      liveDraft = question
+      paint("ask-input")
     } else {
       liveDraft = question
       void startLive()
@@ -394,7 +399,8 @@ async function askFromPage(question: string) {
 }
 
 function onAskEvent(event: Event) {
-  const question = askEventQuestion(event instanceof CustomEvent ? event.detail : null)
+  const detail: unknown = event instanceof CustomEvent ? event.detail : null
+  const question = askEventQuestion(detail)
   const found = elements()
   if (question === null || !found || found.fab.hidden) return
   resumeFocus = null
@@ -403,7 +409,7 @@ function onAskEvent(event: Event) {
     active instanceof HTMLElement && active !== document.body && !found.panel.contains(active)
       ? active
       : null
-  void askFromPage(question)
+  void askFromPage(question, askEventFill(detail))
 }
 
 function waiting() {

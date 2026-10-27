@@ -25,7 +25,8 @@ const graph = Component.ConditionalRender({
       globalGraph: { showTags: false },
     }),
   ),
-  condition: ({ fileData }) => !["documents", "pipeline", "index"].includes(pageBase(fileData.slug)),
+  condition: ({ fileData }) =>
+    !["documents", "pipeline", "architecture", "index"].includes(pageBase(fileData.slug)),
 })
 
 type ExplorerOptions = NonNullable<Parameters<typeof Component.Explorer>[0]>
@@ -54,7 +55,9 @@ function explorerFor(lang: string) {
       "node",
       `const mirrors = ${mirrors}
       if (mirrors.includes(node.slugSegment) && node.slug.split("/").length === 2) return false
-      return !["tags", "evidence", "documents", "pipeline"].includes(node.slugSegment ?? "")`,
+      return !["tags", "evidence", "documents", "pipeline", "architecture"].includes(
+        node.slugSegment ?? "",
+      )`,
     ) as ExplorerOptions["filterFn"],
     // A mirror's folder becomes the explorer's root. Folders without an index page show their
     // path segment: `_meta` → "Meta", `queries` → "Queries". With scopes, `entities` shows as the
@@ -140,7 +143,8 @@ export const sharedPageComponents: SharedLayout = {
   header: [DocWiki.Tabs(), DocWiki.Banner()],
   // The documents page only: the release's documents. The pipeline page only: documents, queue
   // and runs, live from the portal, after the text. "Ask this wiki": the drawer on every page.
-  afterBody: [DocWiki.Documents(), DocWiki.Process(), DocWiki.AskPanel()],
+  // The guided tour's callout (hidden until the tour runs) goes after the drawer it points at.
+  afterBody: [DocWiki.Documents(), DocWiki.Process(), DocWiki.AskPanel(), DocWiki.Tour()],
   footer: DocWiki.Footer(),
 }
 
@@ -151,6 +155,7 @@ const contentMeta = Component.ConditionalRender({
   condition: ({ fileData }) =>
     pageBase(fileData.slug) !== "documents" &&
     pageBase(fileData.slug) !== "pipeline" &&
+    pageBase(fileData.slug) !== "architecture" &&
     fileData.frontmatter?.type !== "source" &&
     fileData.frontmatter?.type !== "evidence-index",
 })
@@ -170,6 +175,8 @@ export const defaultContentPageLayout: PageLayout = {
     contentMeta,
     // The pipeline page only: the owner's sign-in and upload form, before the text.
     DocWiki.OwnerBox(),
+    // The architecture page only: the diagram, before the text.
+    DocWiki.Architecture(),
     // Home page only: the story (the pattern in one sentence, documents → pipeline → cited
     // wiki, a question to try), then how the release was built and a collapsible "About DocWiki".
     DocWiki.Story(),

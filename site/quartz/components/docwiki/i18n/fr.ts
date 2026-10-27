@@ -198,6 +198,8 @@ export const fr: Strings = {
     aboutAgentsAfter: ", un guide pour les agents et des compétences.",
     sourceCode: "Code source et documentation",
     theWiki: "Le wiki",
+    tourButton: "Faire la visite en 2 minutes",
+    architectureLink: "Comment c'est construit : l'architecture",
   },
 
   documents: {
@@ -421,6 +423,95 @@ export const fr: Strings = {
       "La demande de reconstruction n'a pas atteint le portail ; vérifiez la connexion et " +
       "réessayez.",
     sizeUnits: ["o", "Ko", "Mo"],
+  },
+
+  evals: {
+    heading: "Wiki + agent face au RAG",
+    intro:
+      "Les mêmes questions de référence posées de trois façons : l'agent Researcher qui " +
+      "travaille dans ce wiki, un modèle qui lit tous les documents d'un coup, et une recherche " +
+      "classique par extraits.",
+    caption: "Évaluation de trois façons de répondre aux questions sur les mêmes documents",
+    system: "Système",
+    systems: {
+      "docwiki-researcher": "Wiki + agent Researcher",
+      "baseline-long-context": "Contexte long (tous les documents)",
+      "baseline-rag": "RAG (extraits)",
+    },
+    accuracy: "Réponses justes",
+    numeric: "Chiffres exacts",
+    cost: "Coût / question",
+    latency: "Temps médian",
+    run: (questions, split, date) =>
+      [
+        questions === null ? null : `${questions} questions (${split})`,
+        date && `exécution du ${date}`,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    estimated: "Coûts estimés d'après les prix publics.",
+    scoreboard: "Tableau complet sur GitHub",
+    percent: (value) => `${Math.round(value * 100)} %`,
+    seconds: (value) => `${value.toFixed(0)} s`,
+    money: (value) => `${value.toFixed(value < 0.1 ? 3 : 2).replace(".", ",")} $`,
+  },
+
+  tour: {
+    label: "Visite guidée",
+    stepOf: (step, count) => `Étape ${step} sur ${count}`,
+    back: "Précédent",
+    next: "Suivant",
+    done: "Terminer",
+    close: "Fermer la visite",
+    steps: [
+      {
+        title: "Les documents",
+        body:
+          "Tout part de fichiers ordinaires : devis, marchés, plans, e-mails, scans. Chacun garde " +
+          "son original, tel qu'il a été reçu.",
+      },
+      {
+        title: "Une page de document et ses preuves",
+        body:
+          "Un modèle a rédigé cette page à partir d'un seul document. Chaque fait est cité, et le " +
+          "document comme son original sont à un clic.",
+      },
+      {
+        title: "Le traitement",
+        body:
+          "Exécutions, étapes, contrôles qualité et coût : un contrôle bloquant arrête la " +
+          "publication, et chaque exécution affiche sa durée et son coût.",
+      },
+      {
+        title: "Une synthèse citée",
+        body:
+          "Les pages de synthèse croisent plusieurs documents. Chaque note de bas de page ouvre " +
+          "le passage exact d'où vient le fait.",
+      },
+      {
+        title: "Interroger le Researcher",
+        body:
+          "L'agent Researcher répond à partir du wiki, et ses citations sont vérifiées avant " +
+          "d'être affichées. Une question d'exemple est prête : posez-la, ou écrivez la vôtre.",
+      },
+      {
+        title: "Est-ce que ça vaut le coup ?",
+        body:
+          "Les mêmes questions traitées par le wiki et son agent, par un modèle à contexte long " +
+          "et par du RAG. Le rapport qualité montre les contrôles de cette version.",
+      },
+    ],
+    missing: "(Cette partie n'est pas affichée sur cette copie du site.)",
+    qualityReport: "Rapport qualité",
+    architecture: "Architecture",
+  },
+
+  architecture: {
+    figureLabel: "Schéma d'architecture",
+    caption:
+      "Documents → job de traitement → version contrôlée → ce site et le serveur MCP → " +
+      "agents Foundry.",
+    openFull: "Ouvrir le schéma en grand",
   },
 
   ask: {

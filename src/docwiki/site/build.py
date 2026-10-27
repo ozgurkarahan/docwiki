@@ -44,8 +44,14 @@ from docwiki.contracts.settings import SettingsKeys
 from docwiki.release.reader import ReleaseNotFoundError, ReleaseReader
 from docwiki.site.answers import build_answers, write_answers
 from docwiki.site.errors import SiteBuildError
+from docwiki.site.evals import default_evals_file, read_eval_panel
 from docwiki.site.linkcheck import check_links
-from docwiki.site.process_page import stages, write_documents_page, write_process_page
+from docwiki.site.process_page import (
+    stages,
+    write_architecture_page,
+    write_documents_page,
+    write_process_page,
+)
 from docwiki.site.register import explorer_settings, register_groups, scope_info
 from docwiki.site.security import REPO_URL, default_allowed_hosts, scan_site
 
@@ -91,6 +97,10 @@ UNUSED_QUARTZ_FILES = (
     "quartz/static/icon.png",
 )
 """Quartz static assets the DocWiki layout never references (giscus themes load from a CDN)."""
+ARCHITECTURE_DIAGRAM = "docs/assets/architecture.svg"
+"""Repository-relative source of the architecture page's diagram (copied into the job image)."""
+ARCHITECTURE_STATIC = "static/docwiki/architecture.svg"
+"""Where the diagram is published, under the checkout's ``quartz/`` (served at ``/static/…``)."""
 LANGUAGES_FILE = "static/docwiki/languages.json"
 """The site's languages (``{"schema": 1, "canonical": "fr", "languages": ["fr", "en"]}``), written
 only when the release has a mirror; the portal reads it to send English readers to the mirror."""
@@ -465,13 +475,17 @@ def site_settings(
     gates: Sequence[GateResult] | None = None,
     run_id: str | None = None,
     answers: int | None = None,
+    evals: Mapping[str, Any] | None = None,
+    architecture: str | None = None,
 ) -> dict[str, Any]:
     """The ``docwiki-site.json`` payload read by the overlay.
 
     Gate results and the run id come from the release manifest; the pipeline's site stage builds
     the staged release before its manifest exists and passes them explicitly. ``answers`` is the
     number of filed research answers (counted from ``queries/`` when ``None``); the "Ask this
-    wiki" drawer is left out of the pages when it is 0.
+    wiki" drawer is left out of the pages when it is 0. ``evals`` is the home page's evaluation
+    panel (:func:`docwiki.site.evals.read_eval_panel`; ``None`` leaves it out) and
+    ``architecture`` the static path of the architecture page's diagram, when it is published.
     """
     index_text = (release.wiki_dir / WikiFiles.INDEX).read_text(encoding="utf-8")
     if page_title is None:
@@ -561,6 +575,10 @@ def site_settings(
         "explorer": explorer_settings(release.catalog),
         "answers": len(build_answers(release)["answers"]) if answers is None else answers,
         "steps": _steps(languages.canonical),
+        # The home page's "wiki + agent vs RAG" panel (site.md §12.1), from evals/results.
+        "evals": dict(evals) if evals else None,
+        # The architecture page's diagram (site.md §12.3), under quartz/static.
+        "architecture": architecture,
         # What differs in each mirror (`en/…`): its title, page links and titles, register and
         # explorer; slugs are full content slugs, the explorer's folders relative to the mirror.
         "mirrors": {
@@ -717,6 +735,22 @@ def apply_overlay(overlay_dir: Path, quartz_dir: Path) -> list[str]:
     return written
 
 
+def _default_diagram() -> Path | None:
+    root = _repo_root()
+    return root / ARCHITECTURE_DIAGRAM if root else None
+
+
+def _publish_diagram(diagram: Path | None, quartz_dir: Path) -> str | None:
+    """Copy the architecture diagram to :data:`ARCHITECTURE_STATIC` under the checkout's
+    ``quartz/``; returns its path under the site's root, or ``None`` when there is none."""
+    if diagram is None or not diagram.is_file():
+        return None
+    target = quartz_dir / ARCHITECTURE_STATIC
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(diagram, target)
+    return ARCHITECTURE_STATIC
+
+
 def write_languages(languages: Languages, quartz_dir: Path) -> Path:
     """Write :data:`LANGUAGES_FILE` under the checkout's ``quartz/`` (Quartz publishes its
     ``static/`` folder as is); returns the file."""
@@ -841,6 +875,8 @@ def build_site(
     repo_url: str = REPO_URL,
     overlay_dir: Path | None = None,
     cache_dir: Path | None = None,
+    evals_file: Path | None = None,
+    diagram: Path | None = None,
     check: bool = True,
     runner: CommandRunner = subprocess_runner,
     env: Mapping[str, str] | None = None,
@@ -856,7 +892,10 @@ def build_site(
     notice when the home page carries one, and ``""`` disables it. ``gates`` and ``run_id``
     default to the release manifest (the pipeline passes them for a staged release). The filed
     research answers (``queries/``) are published as ``static/docwiki/answers.json`` for the
-    "Ask this wiki" drawer. With ``check`` the built site must pass the link checker and the
+    "Ask this wiki" drawer. ``evals_file`` (default: the checkout's
+    ``evals/results/latest.json``) feeds the home page's evaluation panel and ``diagram``
+    (default: ``docs/assets/architecture.svg``) the architecture page; either is simply left out
+    when its file is missing. With ``check`` the built site must pass the link checker and the
     security scan, otherwise :class:`SiteBuildError` is raised (the output is kept for review).
     """
     environment = os.environ if env is None else env
@@ -885,6 +924,7 @@ def build_site(
     checkout = ensure_quartz(tag, cache_dir or default_cache_dir(), runner=runner, log=log)
     apply_overlay(overlay, checkout)
     write_answers(answers, checkout)
+    architecture = _publish_diagram(diagram or _default_diagram(), checkout / "quartz")
     files = assemble_content(release, checkout / "content")
     languages = release.languages
     for lang in languages.all:
@@ -893,6 +933,7 @@ def build_site(
         )
         write_process_page(folder, lang)
         write_documents_page(folder, lang)
+        write_architecture_page(folder, lang)
     if languages.mirrors:
         write_languages(languages, checkout / "quartz")
     settings = site_settings(
@@ -905,6 +946,8 @@ def build_site(
         gates=gates,
         run_id=run_id,
         answers=len(answers["answers"]),
+        evals=read_eval_panel(evals_file or default_evals_file(), repo_url),
+        architecture=architecture,
     )
     (checkout / SETTINGS_FILE).write_text(
         json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
