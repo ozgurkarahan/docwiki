@@ -304,6 +304,9 @@ class AgentDefinition(_Strict):
     instructions_file: str
     tools: tuple[McpToolDefinition, ...] = Field(min_length=1)
     metadata: dict[str, str] = Field(default_factory=dict)
+    # The model's reasoning effort (Responses API ``reasoning.effort``); None keeps the
+    # deployment's default. Lower effort answers faster (ADR 0013).
+    reasoning_effort: Literal["minimal", "low", "medium", "high"] | None = None
 
     @field_validator("model")
     @classmethod

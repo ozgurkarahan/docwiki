@@ -54,3 +54,18 @@ was built to remove ([ADR 0001](0001-compiled-wiki-over-vector-index.md)).
 - The wiki's own agent kit (the `wiki-navigator` skill and `AGENTS.md` written by the
   `agentkit` stage for local agents) keeps the search-first protocol and its 12-call budget
   until the next stage version: changing it changes the published wiki.
+
+## Measured (2026-10-27) and first revision
+
+The first dev evaluation of this protocol (32 questions) halved the tool calls (13.0 → 6.2 on
+average) and lowered the median latency from 32.3 s to 25.0 s (p95 62 → 47.5 s), the cost from
+$0.164 to $0.124 a question and raised citation precision from 65.9 % to 77.5 %; answer
+accuracy moved from 71.9 % to 68.8 % (one question; partial omissions on questions that span
+several chantiers). The time left was mostly the model's own work per turn: long answers (800 to
+4,400 output tokens) and reasoning, and a few hard questions still made 13 to 16 calls.
+
+The revision keeps the tool and changes the agent only: reasoning effort `low` (new optional
+`reasoning_effort` in `agent.yaml`), answers under 150 words before the source list, a hard stop
+at six calls, `read_page` of a section only, and `answer_context` with `limit: 10` when the
+question names no chantier.
+

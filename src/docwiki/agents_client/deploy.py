@@ -238,6 +238,11 @@ def build_agent_payload(
             "model": model,
             "instructions": agent.instructions,
             "tools": tools,
+            **(
+                {"reasoning": {"effort": definition.reasoning_effort}}
+                if definition.reasoning_effort
+                else {}
+            ),
         },
         "description": definition.description,
         "metadata": metadata,
