@@ -18,9 +18,14 @@ MCP and Agent Skills).
 ([docs/live-ask.md](docs/live-ask.md)).
 
 > **Status: demo / proof of concept.** DocWiki shows that the pattern works end to end on Azure;
-> it is not a production-ready product. The sample is a small fictional corpus (the paperwork of
-> one building job: 12 public documents in French). Scores and costs on this sample are pending
-> re-evaluation and are published here once measured.
+> it is not a production-ready product. The sample is a small fictional corpus: the paperwork of a
+> building contractor, 39 public documents in French across three building jobs and the company's
+> own registers, compiled into a French wiki with an English mirror.
+
+**See it live:** [docwiki.ozgurkarahan.com](https://docwiki.ozgurkarahan.com/): press **Take the
+2-minute tour** on the home page. It walks from an original document to its evidence, the
+pipeline run, a cited topic page and the Researcher agent, then the evaluation against RAG. The
+[architecture page](https://docwiki.ozgurkarahan.com/en/architecture) shows how it is built.
 
 ![How DocWiki works: documents are compiled by an Azure Container Apps Job into an immutable release that serves a static site, Foundry agents and local coding agents](docs/assets/architecture.svg)
 
@@ -42,11 +47,11 @@ MCP and Agent Skills).
 | **Wiki pages** | One page per source (status `current`, `superseded` or `withdrawn`, revisions linked), entity pages (organisations, people, building elements, materials, quotes, invoices…), topic syntheses with `## Contradictions` and `## Superseded information` sections, indexes, a multilingual glossary and an append-only log. Plain Markdown with YAML frontmatter that renders on GitHub, Quartz, Obsidian and VS Code. |
 | **Evidence microscope** | Every footnote opens an evidence sidecar: the page image with highlight boxes, the exact spreadsheet rows, the slide, the e-mail lines, the transcript cue or the OCR crop, with an honest provenance badge: `✓ quote verified`, `paraphrase`, `table`, `OCR` or `generated description`. |
 | **Agent kit** | `AGENTS.md`, `llms.txt`, `catalog.json` (pages and typed edges), `search.db` (SQLite FTS5 over page sections **and** raw extracted blocks) and Agent Skills, projected identically for GitHub Copilot, Claude Code and Codex (`.github/skills`, `.claude/skills`, `.agents/skills`). |
-| **MCP server** | `docwiki-mcp`: 10 read tools (search, pages, indexes, links, glossary, evidence, read-only SQL over tables, skills, recent changes) and 9 operations tools, over stateless streamable HTTP or stdio. Roles are enforced by the server, not by tool visibility. |
+| **MCP server** | `docwiki-mcp`: 11 read tools (`answer_context`, search, pages, indexes, links, glossary, evidence, read-only SQL over tables, skills, recent changes) and 9 operations tools, over stateless streamable HTTP or stdio. Roles are enforced by the server, not by tool visibility. |
 | **Two Foundry agents** | The **Researcher** answers with numbered citations and abstains when the wiki is silent; the **Librarian** runs and repairs ingests, with human approval for every change. |
 | **Ask this wiki** | A button on every page of the site opens a drawer. It lists reviewed Researcher answers (wiki pages in `queries/` that the owner files with `docwiki file-answer`, [ADR 0007](docs/adr/0007-answers-in-the-wiki.md)) and, where the portal enables it, lets a visitor ask the Researcher live: the answer is shown as verified only when each citation opens an evidence page of the wiki, behind per-visitor and global limits ([ADR 0008](docs/adr/0008-one-experience-live-agent-in-the-wiki.md), [docs/live-ask.md](docs/live-ask.md)). Numbered citations open the evidence beside the drawer. |
 | **Pipeline** | A page of the site (tab ② of ① Documents · ② Pipeline · ③ Wiki, [ADR 0010](docs/adr/0010-the-story-site.md)) that explains the pipeline and shows it live, read-only: each document's status, the ingest queue, the current release and the last runs (stages, timings, gates, cost). The owner signs in on the same site and uploads documents there; Event Grid and the ingest job do the rest ([ADR 0009](docs/adr/0009-one-site.md), [docs/operations.md](docs/operations.md#owner-sign-in-and-uploads-on-the-public-portal)). |
-| **Quality gates** | 16 gates (G01–G16): schemas, links and anchors, citations, quote verification, safe content, sidecars, audience, injection canaries, paths, supersession, skills, the locked trade vocabulary… A failing blocking gate keeps the previous release online. |
+| **Quality gates** | 17 gates (G01–G17): schemas, links and anchors, citations, quote verification, safe content, sidecars, audience, injection canaries, paths, supersession, skills, the locked trade vocabulary… A failing blocking gate keeps the previous release online. |
 | **Immutable releases** | Each run publishes a complete, hashed release and swaps one pointer (`current.json`) with an ETag precondition. Readers never see a half-built wiki; rollback is a pointer change. |
 | **Domain packs** | Taxonomy, entity registry, topics, glossary, sensitivity, supersession and contradiction rules as YAML. Ships with one sample pack, `batiment` (the paperwork of a small French building contractor); small test packs exercise the engine with other domains. |
 
@@ -58,13 +63,15 @@ Live demo: **[docwiki.ozgurkarahan.com](https://docwiki.ozgurkarahan.com/)**, se
 Container Apps. Open **Ask this wiki** on any page and ask the Researcher agent a question; the
 site also has a graph view, full-text search, backlinks and the evidence microscope.
 
-The sample stands in for *your* documents: the paperwork of one small building job, written in
-French and compiled into an English wiki. A general contractor (Lamna Bâtiment) builds a 30 m²
-extension and renovates the kitchen of a private household (the Moreau family) in the invented
-town of Valbrise, from January to April 2026, with a builders' merchant, a window maker and an
-electrician. The corpus holds 12 public documents (quotes, a works contract and its amendment, a
-planning workbook, an invoice, a scanned delivery note, site minutes, two e-mails, two photos), a
-restricted internal price study and one held-back planning revision. Everything is fictional and
+The sample stands in for *your* documents: the paperwork of a small general contractor (Lamna
+Bâtiment), written in French and compiled into a French wiki with an English mirror at `/en/`.
+Three building jobs (chantiers) run from late 2025 to April 2026 in invented towns: a house
+extension and kitchen for the Moreau family, an apartment building at Les Nacrines (subcontract,
+progress claims, handover with snag list) and a school at Montferrine (public tender, priced
+bill of quantities in two revisions). Company-wide registers sit next to them (billing,
+subcontractor certificates, crew schedule, equipment, price list). The corpus holds 39 public
+documents (PDF, Word, Excel, e-mails, scans, photos), two restricted ones (an internal price
+study and a margin dashboard) and one held-back planning revision. Everything is fictional and
 stamped as such, and the two site photos are AI-generated images (model and prompts in
 [`PROVENANCE.md`](samples/generators/assets/photos/PROVENANCE.md)). The documents hide the
 situations that make real document sets hard; the wiki handles each one visibly:
@@ -81,11 +88,11 @@ situations that make real document sets hard; the wiki handles each one visibly:
 | A question no document answers (who is the architect?) | "Not found in the wiki." |
 | A later planning revision, held back | The owner uploads it on the `pipeline` page ([demo](docs/operations.md#live-upload-demo-optional)): it supersedes the first planning and the contradiction resolves |
 
-| Home | Topic synthesis |
+| Home: the three steps, the tour and the question box | Guided tour: the pipeline step |
 |---|---|
-| [![Home page of the sample wiki: purpose, navigation, categories and topics](docs/assets/screenshots/home.png)](docs/assets/screenshots/home.png) | [![Topic page: a cited synthesis across documents, with graph view and table of contents](docs/assets/screenshots/topic.png)](docs/assets/screenshots/topic.png) |
-| **Contradiction radar** | **Evidence microscope** |
-| [![Contradictions section: the planning and the window maker's e-mail give different delivery dates; both claims are shown with their citations and the resolution rule](docs/assets/screenshots/contradictions.png)](docs/assets/screenshots/contradictions.png) | [![Evidence sidecar: the cited page with the quoted text highlighted and a provenance badge](docs/assets/screenshots/evidence.png)](docs/assets/screenshots/evidence.png) |
+| [![Home page: documents, pipeline and wiki as three steps, a sample question, the tour button and the architecture link](docs/assets/screenshots/home.png)](docs/assets/screenshots/home.png) | [![Guided tour, step 3 of 6: the pipeline page with the last run, its stages, timings and cost](docs/assets/screenshots/tour.png)](docs/assets/screenshots/tour.png) |
+| **Wiki + agent vs RAG** | **Evidence microscope** |
+| [![Evaluation panel on the home page: answer accuracy, exact numbers, cost and median time of the Researcher, a long-context model and RAG on the same questions](docs/assets/screenshots/evals.png)](docs/assets/screenshots/evals.png) | [![Evidence page: the cited page of the original document with the quoted passages highlighted and a provenance badge](docs/assets/screenshots/evidence.png)](docs/assets/screenshots/evidence.png) |
 
 The site is built from a release. To build the hand-made mock release locally (Node 22+ and git
 required):
@@ -179,7 +186,7 @@ flowchart LR
   docs["Documents<br/>PDF, Word, Excel, CSV,<br/>PowerPoint, e-mail, scans, VTT"] --> raw[("Blob container raw")]
   raw -->|"BlobCreated / BlobDeleted"| eg["Event Grid system topic"]
   eg --> queue[["Storage queue ingest"]]
-  queue -->|"KEDA, one execution"| job["Container Apps Jobs<br/>ingest: queue-triggered<br/>reconcile: every 6 hours<br/>13 stages, 16 gates"]
+  queue -->|"KEDA, one execution"| job["Container Apps Jobs<br/>ingest: queue-triggered<br/>reconcile: every 6 hours<br/>14 stages, 17 gates"]
   job -->|"structured outputs, no tools"| foundry["Microsoft Foundry<br/>fast and smart models<br/>Content Understanding"]
   job -->|"publish, then If-Match pointer swap"| releases[("Blob container releases<br/>immutable releases + current.json")]
   releases --> mcp["Container App: MCP server<br/>built-in auth, roles per tool"]
@@ -238,9 +245,8 @@ DocWiki is measured against a naive RAG baseline (BM25 top-8 over about 800-toke
 first wiki generation: a public dev split in 12 categories (single-hop, multi-hop, numeric,
 tables, contradictions, supersession, multilingual, OCR, abstention, injection, restricted
 content, skills) plus a private holdout. Dev and holdout scores are published separately, with
-denominators, versions and the ids of failed questions. **Pending re-evaluation on the new
-sample:** the Researcher and both baselines are re-run on the 12-document corpus, and the
-scoreboard below is generated from those results. Method: [docs/evaluation.md](docs/evaluation.md).
+denominators, versions and the ids of failed questions. The scoreboard below is generated from
+the result files in `evals/results/`. Method: [docs/evaluation.md](docs/evaluation.md).
 
 <!-- scoreboard:start -->
 Each cell gives the score and its denominator: 0/1 metrics show passed / applicable questions, share metrics (coverage, citation precision and recall) the mean over the n applicable questions. Definitions, systems and honesty rules: `evals/README.md`.
@@ -249,7 +255,7 @@ Each cell gives the score and its denominator: 0/1 metrics show passed / applica
 
 | System | Answer accuracy | Numeric exactness | Citation precision | Citation recall | Abstention accuracy | Injection resistance | Restricted exclusion | Cost (USD) | Latency p50 |
 |---|---|---|---|---|---|---|---|---|---|
-| `docwiki-researcher` | 75.0 % (24/32) | 100.0 % (9/9) | 65.9 % (n=31) | 60.4 % (n=30) | 96.9 % (31/32) | 100.0 % (1/1) | 100.0 % (32/32) | $0.164/q* | 32.3 s |
+| `docwiki-researcher` | 68.8 % (22/32) | 100.0 % (9/9) | 77.5 % (n=30) | 61.5 % (n=30) | 100.0 % (32/32) | 100.0 % (1/1) | 100.0 % (32/32) | $0.124/q* | 25.0 s |
 | `baseline-rag` | 56.2 % (18/32) | 66.7 % (6/9) | 90.4 % (n=27) | 67.4 % (n=30) | 90.6 % (29/32) | 100.0 % (1/1) | 100.0 % (32/32) | $0.045/q* | 8.2 s |
 | `baseline-long-context` | 62.5 % (20/32) | 88.9 % (8/9) | 74.3 % (n=30) | 73.9 % (n=30) | 93.8 % (30/32) | 100.0 % (1/1) | 100.0 % (32/32) | $0.053/q* | 14.6 s |
 
@@ -260,9 +266,13 @@ Must-include coverage, tokens per question, p95 latency, versions, release ids a
 Dev and holdout scores are reported separately and prompts are never tuned on holdout results. The baselines measure trade-offs; DocWiki is not presented as a replacement for retrieval systems.
 <!-- scoreboard:end -->
 
-**Reading the scores.** Pending re-evaluation on the new sample: the Researcher and both baselines
-are re-run on the 12-document corpus, and this section is rewritten from the generated scoreboard
-above. No comparison between the systems is claimed until then. On a corpus this small, a
+**Reading the scores.** On the 39-document sample, the Researcher working in the wiki answers
+more questions fully (68.8 % against 62.5 % for one model reading every document and 56.2 % for
+RAG) and gets every number right (9/9 against 8/9 and 6/9), at about two to three times the cost
+and time of the baselines (25 s median against 8 to 15 s). RAG cites more precisely (90.4 %
+against 77.5 %): it only cites the chunks it retrieved. The Researcher's row is the index-first
+agent of [ADR 0013](docs/adr/0013-index-first-researcher.md), measured on 2026-10-27; the
+baselines were measured on 2026-10-23 on the same questions and corpus. On 32 questions, a
 difference of one or two questions is noise.
 
 ## Cost
@@ -278,10 +288,11 @@ difference of one or two questions is noise.
   duration). The packaged price table holds Global Standard list prices and is marked
   `verified: false`: check the prices of your region and deployment type before relying on it.
 
-**Figures for the new sample are pending re-measurement.** After the first cold compile and the
-evaluation on Azure, [docs/cost.md](docs/cost.md) reports, from the run receipts: a full ingest
-with a cold cache, a recompile of one source, a rebuild with no source changed, the cost of a
-Researcher answer and of a naive RAG answer, and an estimate of an idle month.
+**Measured on the sample** (run receipts and evaluation results; estimates from an unverified
+price table): adding one document to the wiki about $1.30; recompiling all 39 documents after a
+domain-pack change about $12 in about 22 minutes; a rebuild with no source changed $0.00 in
+under 3 minutes; a Researcher answer about $0.12 (RAG $0.045). Keeping the site and the MCP
+server warm costs about $18 a month. Details in [docs/cost.md](docs/cost.md#measured-costs).
 
 Cost model and levers: [docs/cost.md](docs/cost.md).
 
@@ -289,8 +300,8 @@ Cost model and levers: [docs/cost.md](docs/cost.md).
 
 DocWiki is a proof of concept. Known limits of this version:
 
-- **One small corpus.** The sample has 12 public documents; larger corpora, other domains and
-  repeated runs are untested, and scores and costs are pending re-evaluation on it.
+- **One small corpus.** The sample has 39 public documents; larger corpora, other domains and
+  repeated runs are untested.
 - **Document stamps read as content.** Compilation can list the `FICTIONAL — NOT FOR
   OPERATIONAL USE` stamp as a fact of a source page, or report it as a contradiction in a topic.
   A prompt rule would fix it, at the cost of a full recompile; to be re-checked on the new sample.
