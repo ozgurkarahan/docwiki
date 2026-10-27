@@ -69,3 +69,7 @@ The revision keeps the tool and changes the agent only: reasoning effort `low` (
 at six calls, `read_page` of a section only, and `answer_context` with `limit: 10` when the
 question names no chantier.
 
+Its evaluation (agent version 8) reached a 12.3 s median ($0.087 a question) but answer accuracy
+fell to 59.4 % and numeric exactness to 77.8 %: low effort mostly lost the number questions.
+The Researcher therefore runs at reasoning effort `medium`, keeping the short answers and the
+six-call stop; `reasoning_effort` stays available for any agent.

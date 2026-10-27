@@ -6,7 +6,7 @@ description: >-
   Answers questions from the DocWiki wiki with verifiable citations to evidence sidecars
   (read-only MCP tools).
 model: ${DOCWIKI_SMART_DEPLOYMENT}
-reasoning_effort: low
+reasoning_effort: medium
 instructions_file: instructions.md
 tools:
   - type: mcp

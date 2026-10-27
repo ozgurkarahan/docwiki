@@ -95,7 +95,7 @@ def test_researcher_payload_for_each_auth_strategy(tmp_path: Path, strategy: str
                     "project_connection_id": CONNECTION,
                 }
             ],
-            "reasoning": {"effort": "low"},
+            "reasoning": {"effort": "medium"},
         },
         "description": agent.definition.description,
         "metadata": {
@@ -505,12 +505,12 @@ def test_connection_target_and_existence_are_checked() -> None:
 
 def test_reasoning_effort_is_optional_and_part_of_the_hash(tmp_path: Path) -> None:
     root = copy_agents(tmp_path)
-    low = build_agent_payload(load_agent(root / "researcher"), DEPLOY_ENV)
-    edit_file(root / "researcher" / "agent.yaml", "reasoning_effort: low\n", "")
+    chosen = build_agent_payload(load_agent(root / "researcher"), DEPLOY_ENV)
+    edit_file(root / "researcher" / "agent.yaml", "reasoning_effort: medium\n", "")
     default = build_agent_payload(load_agent(root / "researcher"), DEPLOY_ENV)
-    assert low.body["definition"]["reasoning"] == {"effort": "low"}
+    assert chosen.body["definition"]["reasoning"] == {"effort": "medium"}
     assert "reasoning" not in default.body["definition"]
-    assert low.definition_sha256 != default.definition_sha256
+    assert chosen.definition_sha256 != default.definition_sha256
     assert (
         "reasoning"
         not in build_agent_payload(load_agent(root / "librarian"), DEPLOY_ENV).body["definition"]
