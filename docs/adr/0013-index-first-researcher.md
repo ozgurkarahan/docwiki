@@ -73,3 +73,12 @@ Its evaluation (agent version 8) reached a 12.3 s median ($0.087 a question) but
 fell to 59.4 % and numeric exactness to 77.8 %: low effort mostly lost the number questions.
 The Researcher therefore runs at reasoning effort `medium`, keeping the short answers and the
 six-call stop; `reasoning_effort` stays available for any agent.
+
+At medium effort (agent version 9) the median was 18.5 s and accuracy still 59.4 % (numeric
+exactness 88.9 %): the loss came from the 150-word limit, which dropped requested dates and
+amounts from answers that list several items. **Decision:** the Researcher keeps the first
+index-first definition (agent version 7: 25.0 s median, 68.8 % accuracy, 100 % numeric
+exactness, citation precision 77.5 %, $0.124 a question), with no word limit and the default
+reasoning effort. Faster answers next need streaming (the answer appears as it is written) or a
+smaller model for simple questions, not shorter answers.
+
