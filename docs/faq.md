@@ -99,7 +99,7 @@ document, map-reduce for long documents, concurrency limits per deployment), run
 and search runs on SQLite FTS5 inside each release. Every release is a complete snapshot, so
 storage grows with the corpus times the number of retained releases (10 by default). Beyond that
 scale, or for content that changes by the minute, use a managed search service next to the wiki.
-The pipeline has only been run on small corpora so far (the sample has 12 public documents);
+The pipeline has only been run on small corpora so far (the sample has 39 public documents);
 measure your own before relying on it.
 
 ## What does it cost?
@@ -107,8 +107,7 @@ measure your own before relying on it.
 Close to nothing when idle: jobs and apps scale to zero, models are pay-per-token, and there is no
 database or search service. You pay for tokens and Content Understanding pages when you compile,
 and for tokens when an agent answers. Every run writes a cost receipt, so you can measure your own
-corpus; the figures for the sample are pending re-measurement. Details and levers in
-[cost](cost.md).
+corpus. Figures measured on the sample, details and levers: [cost](cost.md#measured-costs).
 
 ## Can I use it offline?
 

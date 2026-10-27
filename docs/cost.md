@@ -2,7 +2,7 @@
 
 DocWiki is designed to cost close to nothing when idle and to make every run's cost visible. This
 page explains the cost model and the levers, then lists the figures that will be measured on the
-sample corpus (pending re-evaluation on the new sample); estimates are labelled as such.
+sample corpus (39 public documents); estimates are labelled as such.
 
 ## Cost model
 
@@ -84,7 +84,7 @@ estimated cost per tier is in [operations](operations.md#logs-and-queries).
 
 | Lever | Effect |
 |---|---|
-| Start small: `docwiki run --limit N` or `--only <source_id>` (the sample itself has 12 public documents) | Bounds the first runs |
+| Start small: `docwiki run --limit N` or `--only <source_id>` (the sample itself has 39 public documents) | Bounds the first runs |
 | Keep raw paths stable | A path is a source identity: a moved file becomes a new source with a new page, and the old one is withdrawn |
 | `DOCWIKI_FAST_MODEL`, `DOCWIKI_SMART_MODEL` (check with `scripts/preflight.py`) | Price per token of each tier |
 | `DOCWIKI_DEPLOYMENT_SKU` (`GlobalStandard` by default, or `DataZoneStandard`) | Price, quota and data residency: Global Standard has the widest quota and the lowest list price; Data Zone keeps processing in the EU or US data zone for about 10 % more |
@@ -96,17 +96,17 @@ estimated cost per tier is in [operations](operations.md#logs-and-queries).
 
 ## Measured costs
 
-Pending re-evaluation on the new sample (12 public documents): no figure is claimed here until it
-has been measured. The table lists what will be reported and where each figure comes from. Costs
-are receipt estimates: tokens × the unverified price table.
+Measured on the public showcase (39 public documents, October 2026). Costs are receipt
+estimates: tokens × the unverified price table.
 
-| Measurement | Where the figure comes from |
-|---|---|
-| Full ingest, cold cache | The cost receipt of the first run after a [data reset](../BOOTSTRAP.md#reset-the-sample-data): calls and tokens per tier, Content Understanding pages, duration, estimated cost |
-| Recompile one source; entities and topics rebuilt | The receipt of a `recompile` run of one source |
-| Rebuild with no source changed | The report of a run with no change, which is a no-op: no model or Content Understanding call is expected |
-| Researcher answer and naive RAG answer | Tokens, latency and estimated cost per question in [`evals/SCOREBOARD.md`](../evals/SCOREBOARD.md); see [evaluation](evaluation.md#results) |
-| Idle environment, one month | An estimate from the price list: the Basic registry, storage, logs and the scheduled reconcile job |
+| Measurement | Figure | Where the figure comes from |
+|---|---|---|
+| Add one document (extract, compile, entities and topics rebuilt, translate, publish) | about $1.30 | The receipts of two live uploads (2026-10-22: $1.37 and $1.28) |
+| Recompile all 39 documents after a domain-pack change (extraction reused) | about $12, about 22 minutes | The receipt of the run of 2026-10-23 ($11.96); every pack edit changes every cache key except extraction, so batch pack edits |
+| Rebuild with no source changed | $0.00, under 3 minutes | The report of the rebuild of 2026-10-27 (no model or Content Understanding call) |
+| Researcher answer / naive RAG answer / long-context answer | about $0.12 / $0.045 / $0.053 a question | [`evals/SCOREBOARD.md`](../evals/SCOREBOARD.md) (dev split, 32 questions); see [evaluation](evaluation.md#results) |
+| Warm site and MCP server, one month | about $18 | The consumption plan's idle rates for one 0.25 vCPU / 0.5 GiB and one 0.5 vCPU / 1 GiB replica, before the free grant |
+| Rest of an idle month | a few dollars | The Basic registry, storage, logs and the scheduled reconcile job (price list estimate) |
 
 The identity spike (about 1.5 hours of throwaway resources, three remote image builds and about 25
 agent turns on a small model) cost less than USD 1.

@@ -1614,11 +1614,11 @@
         "errors": []
       },
       "docwiki-researcher": {
-        "file": "2026-10-23-docwiki-researcher-dev.json",
+        "file": "2026-10-27-docwiki-researcher-dev.json",
         "status": "ok",
         "skipped": null,
-        "date": "2026-10-23",
-        "started_at": "2026-10-23T15:15:27Z",
+        "date": "2026-10-27",
+        "started_at": "2026-10-27T20:51:50Z",
         "questions": 32,
         "questions_total": 32,
         "complete": true,
@@ -1626,14 +1626,14 @@
           "questions": 32,
           "errors": 0,
           "answer_accuracy": {
-            "value": 0.75,
+            "value": 0.6875,
             "n": 32,
-            "passed": 24
+            "passed": 22
           },
           "must_include_coverage": {
-            "value": 0.9199,
+            "value": 0.8924,
             "n": 30,
-            "passed": 23
+            "passed": 20
           },
           "numeric_exactness": {
             "value": 1.0,
@@ -1641,19 +1641,19 @@
             "passed": 9
           },
           "citation_precision": {
-            "value": 0.6588,
-            "n": 31,
-            "passed": 14
+            "value": 0.7755,
+            "n": 30,
+            "passed": 16
           },
           "citation_recall": {
-            "value": 0.6039,
+            "value": 0.6153,
             "n": 30,
             "passed": 10
           },
           "abstention_accuracy": {
-            "value": 0.9688,
+            "value": 1.0,
             "n": 32,
-            "passed": 31
+            "passed": 32
           },
           "injection_resistance": {
             "value": 1.0,
@@ -1671,9 +1671,9 @@
             "questions": 1,
             "errors": 0,
             "answer_accuracy": {
-              "value": 0.0,
+              "value": 1.0,
               "n": 1,
-              "passed": 0
+              "passed": 1
             },
             "must_include_coverage": {
               "value": null,
@@ -1686,8 +1686,8 @@
               "passed": 0
             },
             "citation_precision": {
-              "value": 0.0,
-              "n": 1,
+              "value": null,
+              "n": 0,
               "passed": 0
             },
             "citation_recall": {
@@ -1696,9 +1696,9 @@
               "passed": 0
             },
             "abstention_accuracy": {
-              "value": 0.0,
+              "value": 1.0,
               "n": 1,
-              "passed": 0
+              "passed": 1
             },
             "injection_resistance": {
               "value": null,
@@ -1715,14 +1715,14 @@
             "questions": 1,
             "errors": 0,
             "answer_accuracy": {
-              "value": 0.0,
+              "value": 1.0,
               "n": 1,
-              "passed": 0
+              "passed": 1
             },
             "must_include_coverage": {
-              "value": 0.5,
+              "value": 1.0,
               "n": 1,
-              "passed": 0
+              "passed": 1
             },
             "numeric_exactness": {
               "value": null,
@@ -1730,9 +1730,9 @@
               "passed": 0
             },
             "citation_precision": {
-              "value": 0.5,
+              "value": 1.0,
               "n": 1,
-              "passed": 0
+              "passed": 1
             },
             "citation_recall": {
               "value": 0.5,
@@ -1803,14 +1803,14 @@
             "questions": 10,
             "errors": 0,
             "answer_accuracy": {
-              "value": 0.6,
+              "value": 0.4,
               "n": 10,
-              "passed": 6
+              "passed": 4
             },
             "must_include_coverage": {
-              "value": 0.8883,
+              "value": 0.7615,
               "n": 10,
-              "passed": 6
+              "passed": 4
             },
             "numeric_exactness": {
               "value": null,
@@ -1818,12 +1818,12 @@
               "passed": 0
             },
             "citation_precision": {
-              "value": 0.8274,
+              "value": 0.7214,
               "n": 10,
-              "passed": 6
+              "passed": 5
             },
             "citation_recall": {
-              "value": 0.55,
+              "value": 0.4375,
               "n": 10,
               "passed": 1
             },
@@ -1862,7 +1862,7 @@
               "passed": 0
             },
             "citation_precision": {
-              "value": 0.4,
+              "value": 0.6667,
               "n": 1,
               "passed": 0
             },
@@ -1906,14 +1906,14 @@
               "passed": 3
             },
             "citation_precision": {
-              "value": 0.2222,
+              "value": 1.0,
               "n": 3,
-              "passed": 0
+              "passed": 3
             },
             "citation_recall": {
-              "value": 0.3333,
+              "value": 0.6111,
               "n": 3,
-              "passed": 1
+              "passed": 0
             },
             "abstention_accuracy": {
               "value": 1.0,
@@ -2067,14 +2067,14 @@
             "questions": 3,
             "errors": 0,
             "answer_accuracy": {
-              "value": 0.6667,
+              "value": 0.3333,
               "n": 3,
-              "passed": 2
+              "passed": 1
             },
             "must_include_coverage": {
               "value": 0.8333,
               "n": 3,
-              "passed": 2
+              "passed": 1
             },
             "numeric_exactness": {
               "value": null,
@@ -2082,12 +2082,12 @@
               "passed": 0
             },
             "citation_precision": {
-              "value": 0.4833,
+              "value": 0.6111,
               "n": 3,
               "passed": 1
             },
             "citation_recall": {
-              "value": 0.5667,
+              "value": 0.5,
               "n": 3,
               "passed": 1
             },
@@ -2116,7 +2116,7 @@
               "passed": 2
             },
             "must_include_coverage": {
-              "value": 0.9048,
+              "value": 0.9333,
               "n": 3,
               "passed": 2
             },
@@ -2126,12 +2126,12 @@
               "passed": 0
             },
             "citation_precision": {
-              "value": 0.6,
+              "value": 0.85,
               "n": 3,
               "passed": 1
             },
             "citation_recall": {
-              "value": 0.4167,
+              "value": 0.75,
               "n": 3,
               "passed": 1
             },
@@ -2155,14 +2155,14 @@
             "questions": 6,
             "errors": 0,
             "answer_accuracy": {
-              "value": 1.0,
+              "value": 0.8333,
               "n": 6,
-              "passed": 6
+              "passed": 5
             },
             "must_include_coverage": {
-              "value": 1.0,
+              "value": 0.9762,
               "n": 6,
-              "passed": 6
+              "passed": 5
             },
             "numeric_exactness": {
               "value": 1.0,
@@ -2170,14 +2170,14 @@
               "passed": 6
             },
             "citation_precision": {
-              "value": 0.7222,
+              "value": 0.6667,
               "n": 6,
-              "passed": 3
+              "passed": 2
             },
             "citation_recall": {
-              "value": 0.7778,
+              "value": 0.75,
               "n": 6,
-              "passed": 3
+              "passed": 4
             },
             "abstention_accuracy": {
               "value": 1.0,
@@ -2198,32 +2198,32 @@
         },
         "cost": {
           "currency": "USD",
-          "input_tokens": 766767,
-          "cached_input_tokens": 116992,
-          "output_tokens": 64213,
-          "reasoning_tokens": 31969,
-          "estimated_cost_usd": 5.233761,
-          "per_question_usd": 0.163555,
+          "input_tokens": 579531,
+          "cached_input_tokens": 134912,
+          "output_tokens": 56173,
+          "reasoning_tokens": 31861,
+          "estimated_cost_usd": 3.975741,
+          "per_question_usd": 0.124242,
           "priced_questions": 32,
           "prices_verified": false,
           "receipt_totals": null
         },
         "latency": {
-          "mean_s": 37.715,
-          "p50_s": 32.34,
-          "p95_s": 71.082,
-          "max_s": 87.811,
-          "total_s": 1206.885
+          "mean_s": 25.202,
+          "p50_s": 24.974,
+          "p95_s": 47.495,
+          "max_s": 58.462,
+          "total_s": 806.451
         },
         "judge": null,
         "versions": {
-          "git_sha": "e8afd0ea670c93b1e4f814579e9674fb3f3201f1",
+          "git_sha": "92dba14a989bea6daf8fe29b66e7b1ae94320ad1",
           "release_id": null,
           "metrics": "evals-metrics-v1",
           "system": {
             "agent": "researcher",
-            "agent_version": "5",
-            "agent_definition_sha256": "f43b29dd82e92e209ffe8225d6ca97418df77ee6e251256da19d93db04b459b5",
+            "agent_version": "7",
+            "agent_definition_sha256": "932f30dab658515020bb9587cb04c368d21028e09f6dbceae0b15bca7e89194d",
             "model_deployment": "smart",
             "price_table": {
               "name": "prices.yaml (packaged)",
@@ -2235,43 +2235,72 @@
         },
         "failures": {
           "answer_accuracy": {
-            "contradiction": [
-              "q007"
-            ],
-            "abstain": [
-              "q011"
-            ],
             "skill": [
+              "q015",
               "q016"
             ],
             "multi-hop": [
+              "q017",
               "q018",
               "q021",
               "q022",
-              "q029"
+              "q029",
+              "q030"
+            ],
+            "table": [
+              "q020"
             ],
             "supersession": [
-              "q032"
+              "q031"
             ]
           },
           "must_include_coverage": {
-            "contradiction": [
-              "q007"
-            ],
             "skill": [
+              "q015",
               "q016"
             ],
             "multi-hop": [
+              "q017",
               "q018",
               "q021",
               "q022",
-              "q029"
+              "q029",
+              "q030"
+            ],
+            "table": [
+              "q020"
             ],
             "supersession": [
-              "q032"
+              "q031"
             ]
           },
           "citation_precision": {
+            "table": [
+              "q003",
+              "q004",
+              "q020",
+              "q024"
+            ],
+            "multi-hop": [
+              "q005",
+              "q006",
+              "q017",
+              "q022",
+              "q030"
+            ],
+            "supersession": [
+              "q008",
+              "q031"
+            ],
+            "multilingual": [
+              "q009"
+            ],
+            "skill": [
+              "q015",
+              "q016"
+            ]
+          },
+          "citation_recall": {
             "numeric": [
               "q002",
               "q025",
@@ -2279,42 +2308,11 @@
             ],
             "table": [
               "q004",
-              "q023",
-              "q024"
-            ],
-            "multi-hop": [
-              "q005",
-              "q006",
-              "q018",
-              "q030"
-            ],
-            "contradiction": [
-              "q007"
-            ],
-            "multilingual": [
-              "q009"
-            ],
-            "abstain": [
-              "q011"
-            ],
-            "skill": [
-              "q015",
-              "q016"
-            ],
-            "supersession": [
-              "q031",
-              "q032"
-            ]
-          },
-          "citation_recall": {
-            "table": [
-              "q004",
-              "q019",
               "q020"
             ],
             "multi-hop": [
               "q005",
-              "q006",
+              "q017",
               "q018",
               "q021",
               "q022",
@@ -2333,18 +2331,9 @@
               "q015",
               "q016"
             ],
-            "numeric": [
-              "q025",
-              "q026"
-            ],
             "supersession": [
               "q031",
               "q032"
-            ]
-          },
-          "abstention_accuracy": {
-            "abstain": [
-              "q011"
             ]
           }
         },
