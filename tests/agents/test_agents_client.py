@@ -37,6 +37,7 @@ from docwiki.agents_client import (
     ask,
     format_answer,
 )
+from docwiki.agents_client.client import VERSION_CACHE_S
 
 QUESTION = "When are the windows of the extension delivered?"
 SETTINGS = AgentClientSettings(project_endpoint=TEST_ENDPOINT, timeout_s=30.0)
@@ -526,3 +527,46 @@ async def test_request_on_the_wire_through_azure_ai_projects_and_openai() -> Non
         ("ingest_start", "completed", {"reason": "nightly"})
     ]
     assert answer.response_id == "resp_b"
+
+
+async def test_a_long_lived_client_reuses_the_latest_version_until_it_expires() -> None:
+    client = _client(
+        response(message(ANSWER_TEXT)),
+        response(message(ANSWER_TEXT)),
+        response(message(ANSWER_TEXT)),
+    )
+    agents = client._project.agents
+    first = await client.ask(QUESTION)
+    agents.versions["docwiki-researcher"].append(agent_version("4", "sha-4"))
+    second = await client.ask(QUESTION)
+    assert (first.version, second.version, second.definition_sha256) == ("3", "3", "sha-3")
+    assert agents.get_calls == ["docwiki-researcher"]
+
+    version, sha, resolved_at = client._latest["docwiki-researcher"]
+    client._latest["docwiki-researcher"] = (version, sha, resolved_at - VERSION_CACHE_S)
+    third = await client.ask(QUESTION)
+    assert (third.version, third.definition_sha256) == ("4", "sha-4")
+    assert agents.get_calls == ["docwiki-researcher", "docwiki-researcher"]
+
+
+async def test_a_cached_version_that_disappeared_is_resolved_again_once() -> None:
+    client = _client(
+        response(message(ANSWER_TEXT)), _status_error(404), response(message(ANSWER_TEXT))
+    )
+    agents = client._project.agents
+    await client.ask(QUESTION)
+    agents.versions["docwiki-researcher"] = [agent_version("4", "sha-4")]
+
+    answer = await client.ask(QUESTION)
+
+    assert answer.version == "4"
+    versions = [call["extra_body"]["agent_reference"]["version"] for call in _calls(client)]
+    assert versions == ["3", "3", "4"]
+    assert agents.get_calls == ["docwiki-researcher", "docwiki-researcher"]
+
+
+async def test_a_pinned_version_that_is_missing_is_not_retried() -> None:
+    client = _client(_status_error(404))
+    with pytest.raises(AgentNotFoundError):
+        await client.ask(QUESTION, version="9")
+    assert client._project.agents.get_calls == []

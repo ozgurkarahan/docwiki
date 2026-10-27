@@ -68,6 +68,9 @@ MAX_RETRIES_ENV = "DOCWIKI_AGENT_MAX_RETRIES"
 DEFAULT_TIMEOUT_S = 600.0  # an answer may chain several MCP calls of up to 100 s each
 DEFAULT_MAX_RETRIES = 2
 DEFAULT_MAX_APPROVAL_ROUNDS = 10
+# A long-lived client (the portal) reuses the latest version it resolved for this long instead of
+# reading the agent before every question; a redeploy is picked up after at most this delay.
+VERSION_CACHE_S = 300.0
 
 
 class ApprovalRequest(BaseModel):
@@ -196,6 +199,7 @@ class AgentClient:
         self._owns_openai = False
         self._http_client = http_client
         self._clock = clock
+        self._latest: dict[str, tuple[str, str | None, float]] = {}
 
     async def __aenter__(self) -> AgentClient:
         return self
@@ -265,6 +269,16 @@ class AgentClient:
         metadata = _get(latest, "metadata") or {}
         return str(version), _get(metadata, HASH_METADATA_KEY)
 
+    async def _cached_latest_version(self, name: str) -> tuple[str, str | None, bool]:
+        """``(version, definition_sha256, from_cache)`` of the latest version of an agent."""
+        cached = self._latest.get(name)
+        now = time.monotonic()
+        if cached is not None and now - cached[2] < VERSION_CACHE_S:
+            return cached[0], cached[1], True
+        version, definition_sha256 = await self.latest_version(name)
+        self._latest[name] = (version, definition_sha256, now)
+        return version, definition_sha256, False
+
     async def ask(
         self,
         question: str,
@@ -279,25 +293,42 @@ class AgentClient:
 
         ``approve`` is called for every MCP tool call that needs approval and must return ``True``
         to approve it; without a callback every such call is denied. ``version`` pins an agent
-        version; by default the latest version is resolved and pinned. ``headers`` are extra HTTP
-        headers of every Responses API call of this question (a gateway reads them, for example
-        to rate-limit per visitor).
+        version; by default the latest version is resolved and pinned (reused for
+        ``VERSION_CACHE_S``; a cached version that has disappeared is resolved again once).
+        ``headers`` are extra HTTP headers of every Responses API call of this question (a
+        gateway reads them, for example to rate-limit per visitor).
         """
         if not question.strip():
             raise ValueError("the question is empty")
         name = foundry_agent_name(agent)
         started = self._clock()
         definition_sha256: str | None = None
+        from_cache = False
         if version is None:
-            version, definition_sha256 = await self.latest_version(name)
-        reference = {"type": "agent_reference", "name": name, "version": version}
+            version, definition_sha256, from_cache = await self._cached_latest_version(name)
         openai = self._ensure_openai()
-        request: dict[str, Any] = {"input": question, "extra_body": {"agent_reference": reference}}
-        if conversation_id:
-            request["conversation"] = conversation_id
-        if headers:
-            request["extra_headers"] = dict(headers)
-        response = await self._create(openai, name, request)
+
+        def first_request(version: str) -> dict[str, Any]:
+            reference = {"type": "agent_reference", "name": name, "version": version}
+            request: dict[str, Any] = {
+                "input": question,
+                "extra_body": {"agent_reference": reference},
+            }
+            if conversation_id:
+                request["conversation"] = conversation_id
+            if headers:
+                request["extra_headers"] = dict(headers)
+            return request
+
+        try:
+            response = await self._create(openai, name, first_request(version))
+        except AgentNotFoundError:
+            if not from_cache:
+                raise
+            self._latest.pop(name, None)
+            version, definition_sha256, _ = await self._cached_latest_version(name)
+            response = await self._create(openai, name, first_request(version))
+        reference = {"type": "agent_reference", "name": name, "version": version}
         responses = [response]
         approvals: list[ApprovalDecision] = []
         tool_calls = _tool_calls(response)
