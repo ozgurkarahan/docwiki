@@ -145,8 +145,8 @@ def test_invalid_researcher_definitions_are_rejected(
             "explicit approval policy",
         ),
         (
-            "      never:\n        - search\n",
-            "      never:\n        - ingest_start\n        - search\n",
+            "      never:\n        - answer_context\n",
+            "      never:\n        - ingest_start\n        - answer_context\n",
             "both require_approval.always and .never",
         ),
         (

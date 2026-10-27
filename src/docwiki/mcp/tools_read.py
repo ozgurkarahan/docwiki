@@ -12,11 +12,12 @@ from __future__ import annotations
 import difflib
 import re
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
 from docwiki.contracts.catalog import CatalogPage
-from docwiki.contracts.enums import BADGE_BY_PROVENANCE
+from docwiki.contracts.enums import BADGE_BY_PROVENANCE, allowed_for_audience
 from docwiki.contracts.ids import SOURCE_ID_RE
 from docwiki.contracts.layout import EVIDENCE_MOUNT, SKILL_PROJECTIONS
 from docwiki.contracts.locators import locator_key, locator_label, parse_locator_key
@@ -29,14 +30,20 @@ from docwiki.contracts.markdown import (
     split_sections,
     strip_backlinks_block,
 )
-from docwiki.mcp.bounds import ResultTooLargeError, clip, fit_items, fit_text
+from docwiki.mcp.bounds import ResultTooLargeError, clip, fit_items, fit_text, result_json
 from docwiki.mcp.config import McpConfig
 from docwiki.mcp.errors import ToolFailure
 from docwiki.mcp.source import ReleaseSource, Snapshot
 from docwiki.release import TableQueryError
 from docwiki.search.text import tokenize
 
-__all__ = ["INDEX_SCOPES", "ReadTools", "ToolInputError"]
+__all__ = [
+    "ANSWER_CONTEXT_HITS",
+    "INDEX_SCOPES",
+    "MAX_ANSWER_CONTEXT_HITS",
+    "ReadTools",
+    "ToolInputError",
+]
 
 
 ToolInputError = ToolFailure
@@ -82,6 +89,47 @@ _FRONTMATTER_TOP = ("id", "type", "title", "summary", "sensitivity", "docwiki")
 MAX_LINKS = 60
 MAX_CELL_CHARS = 500
 MAX_SQL_CHARS = 4000
+
+ANSWER_CONTEXT_HITS = 5
+"""Default number of hits of ``answer_context``."""
+MAX_ANSWER_CONTEXT_HITS = 10
+CONTEXT_TEXT_BUDGETS = (1600, 1000, 600, 300)
+"""Characters of section or evidence text per hit, tried in turn until the result fits."""
+CONTEXT_INDEX_CHARS = 1500
+CONTEXT_HUB_CHARS = 1500
+_CONTEXT_SKIPPED_TYPES = frozenset({"index", "log", "meta"})
+"""Navigation pages are not answer hits (the home index and the hub come separately)."""
+ANSWER_CONTEXT_HINT = (
+    "Answer from these hits when they suffice, citing their citations. For more: read_page "
+    "(path, section) of ONE section, query_table for numbers, read_page of a view for money or "
+    "compliance, get_evidence only to quote a passage verbatim."
+)
+ANSWER_CONTEXT_EMPTY_HINT = (
+    "No hits: try other words or the glossary; if the wiki has no answer, say 'Not found in the "
+    "wiki.'"
+)
+
+
+@dataclass
+class _ContextHit:
+    """One ``answer_context`` hit before it is cut to the output budget."""
+
+    row: dict[str, Any]
+    text: str
+    by_label: dict[str, dict[str, Any]] = field(default_factory=dict)
+    """Footnote citations of the hit's page by label (wiki hits)."""
+    fixed: list[dict[str, Any]] = field(default_factory=list)
+    """Citations that always apply (the evidence sidecar of a source hit)."""
+
+
+def _dominant_scope(rows: Sequence[dict[str, Any]]) -> str | None:
+    """The scope carried by most hits when it accounts for at least half of them (two or more)."""
+    scopes = [row["scope"] for row in rows if row.get("scope")]
+    if not scopes:
+        return None
+    best = max(sorted(set(scopes)), key=scopes.count)
+    count = scopes.count(best)
+    return best if count >= 2 and count * 2 >= len(rows) else None
 
 
 def _norm(text: str) -> str:
@@ -493,6 +541,223 @@ class ReadTools:
             return {"path": record.path, "provenance": record.frontmatter.provenance}
 
         return snap.cached(f"evidence-meta:{source_id}:{key}", build)
+
+    # --- answer_context (index-first research, ADR 0013) -----------------------------------
+
+    @staticmethod
+    def _allowed(snap: Snapshot, sensitivity: str | None) -> bool:
+        """Defence in depth: content above the release's audience is never returned (the release
+        gates already keep it out of a public build)."""
+        return allowed_for_audience(sensitivity or "restricted", snap.audience or "public")
+
+    def _context_candidates(
+        self,
+        snap: Snapshot,
+        question: str,
+        scope: str | None,
+        language: str | None,
+        wanted: int,
+    ) -> list[Any]:
+        """Search hits for the question, one per section or per source locator, best first,
+        without content above the release's audience."""
+        raw = snap.search.search(
+            question, limit=min(max(wanted * 3, 20), 100), within=scope, lang=language
+        )
+        by_path, by_id = self._by_path(snap), self._by_id(snap)
+        seen: set[tuple[str, str]] = set()
+        out: list[Any] = []
+        for hit in raw:
+            if hit.kind == "source-block":
+                key = (f"src:{hit.source_id}", str(hit.locator_key))
+            else:
+                key = (hit.path, str(hit.anchor or ""))
+            if key in seen:
+                continue
+            entry = by_path.get(hit.path) or by_id.get(hit.page_id)
+            if entry is None or not self._allowed(snap, entry.sensitivity):
+                continue
+            if entry.type in _CONTEXT_SKIPPED_TYPES:
+                continue
+            seen.add(key)
+            out.append(hit)
+        return out
+
+    def _context_hit(self, snap: Snapshot, hit: Any) -> _ContextHit | None:
+        """The hit row, the full text of its section or evidence and the citations of that text
+        (``None`` when the evidence is above the release's audience).
+
+        A wiki hit gives its section (subsections included) and the footnote citations of the
+        text actually returned; a source hit gives the verbatim text of its evidence sidecar,
+        when one exists, as a ready-made citation."""
+        row = self._hit(snap, hit)
+        row.pop("snippet", None)
+        if hit.kind == "source-block":
+            if not (hit.source_id and hit.locator_key and row.get("evidence_path")):
+                row["note"] = "no evidence sidecar for this block: cite the source page instead"
+                return _ContextHit(row, hit.snippet)
+            try:
+                record = snap.reader.resolve_evidence(hit.source_id, hit.locator_key)
+            except (KeyError, ValueError):
+                return _ContextHit(row, hit.snippet)
+            if not self._allowed(snap, record.frontmatter.sensitivity):
+                return None
+            provenance = record.frontmatter.provenance
+            citation = {
+                "source_title": hit.title,
+                "locator_label": locator_label(record.frontmatter.locator),
+                "source_id": hit.source_id,
+                "locator_key": hit.locator_key,
+                "evidence_path": record.path,
+                "badge": BADGE_BY_PROVENANCE[provenance],
+                "provenance": provenance,
+            }
+            # the sidecar's content starts at its first section ("## Text", "## Row 6"...): the
+            # title, banner and source link before it are already in the hit row
+            body = record.body
+            start = body.find("\n## ")
+            content = body[start + 1 :] if start >= 0 else body
+            return _ContextHit(row, content.strip() + "\n", fixed=[citation])
+        entry = self._by_path(snap).get(hit.path) or self._by_id(snap).get(hit.page_id)
+        if entry is None:
+            return _ContextHit(row, hit.snippet)
+        _, body, citations, _ = self._page_parts(snap, entry)
+        sections = split_sections(body)
+        # The section the search row indexed: its own text, without its subsections (they are
+        # search rows of their own).
+        match = next((s for s in sections if hit.anchor and s.anchor == hit.anchor), None)
+        if match is None:
+            match = next((s for s in sections if s.heading is None), None)
+        if match is None or match.heading is None:
+            text = match.markdown if match is not None else hit.snippet
+        else:
+            text = f"{'#' * match.level} {match.heading}\n{match.markdown}"
+        return _ContextHit(row, text.strip() + "\n", by_label=citations)
+
+    @staticmethod
+    def _trim(text: str, limit: int) -> tuple[str, bool]:
+        """``text`` cut to at most ``limit`` characters at a line break when possible."""
+        if len(text) <= limit:
+            return text, False
+        cut = text.rfind("\n", 0, limit)
+        if cut < limit // 2:
+            cut = text.rfind(" ", 0, limit)
+        if cut < limit // 2:
+            cut = limit
+        return text[:cut].rstrip() + "\n…\n", True
+
+    def _bounded_page(
+        self, snap: Snapshot, entry: CatalogPage, limit: int, within: str | None = None
+    ) -> dict[str, Any]:
+        """A short window of an index or hub page, with the citations of that window."""
+        _, body, citations, _ = self._page_parts(snap, entry)
+        if within:
+            body, _, _ = self._filter_index(snap, entry, body, within)
+        window, cut = self._trim(body, limit)
+        out: dict[str, Any] = {
+            "page_id": entry.id,
+            "path": entry.path,
+            "title": entry.title,
+            "markdown": window,
+            "truncated": cut,
+        }
+        if entry.scope:
+            out["scope"] = entry.scope
+        labels = self._refs_in(window)
+        if labels:
+            out["citations"] = [citations[x] for x in labels if x in citations]
+        return out
+
+    def _hub_for(self, snap: Snapshot, scope: str, language: str | None) -> CatalogPage | None:
+        hubs = sorted(
+            (p for p in snap.catalog.pages if p.type == "hub" and p.scope == scope),
+            key=lambda p: p.id,
+        )
+        hubs = [p for p in hubs if p.translation_of is None] or hubs
+        if not hubs:
+            return None
+        entry = self._by_id(snap, language).get(hubs[0].id, hubs[0])
+        return entry if self._allowed(snap, entry.sensitivity) else None
+
+    def answer_context(
+        self,
+        question: str,
+        within: str | None = None,
+        limit: int = ANSWER_CONTEXT_HITS,
+        offset: int = 0,
+        lang: str | None = None,
+    ) -> str:
+        snap = self.snapshot()
+        if not question.strip():
+            raise ToolInputError("question must not be empty: give the user's question")
+        scope = self._within(snap, within)
+        language = self._lang(snap, lang)
+        limit = max(1, min(limit, MAX_ANSWER_CONTEXT_HITS))
+        offset = max(0, offset)
+        candidates = self._context_candidates(snap, question, scope, language, offset + limit)
+        window = candidates[offset : offset + limit]
+        more = len(candidates) > offset + limit
+        parts = [part for hit in window if (part := self._context_hit(snap, hit)) is not None]
+
+        def hit_rows(budget: int) -> list[dict[str, Any]]:
+            rows: list[dict[str, Any]] = []
+            for rank, part in enumerate(parts, offset + 1):
+                shown, cut = self._trim(part.text, budget)
+                cited = part.fixed + [
+                    part.by_label[x] for x in self._refs_in(shown) if x in part.by_label
+                ]
+                rows.append(
+                    {
+                        "rank": rank,
+                        **part.row,
+                        "text": shown,
+                        "text_truncated": cut,
+                        "citations": cited,
+                    }
+                )
+            return rows
+
+        context: dict[str, Any] = {}
+        if offset == 0:
+            home = self._by_id(snap, language).get("index:home")
+            if home is not None and self._allowed(snap, home.sensitivity):
+                context["home_index"] = self._bounded_page(snap, home, CONTEXT_INDEX_CHARS, scope)
+            hub_scope = scope or _dominant_scope([part.row for part in parts])
+            hub = self._hub_for(snap, hub_scope, language) if hub_scope else None
+            if hub is not None:
+                context["hub"] = self._bounded_page(snap, hub, CONTEXT_HUB_CHARS)
+            context["views"] = [
+                {
+                    "page_id": page.id,
+                    "path": page.path,
+                    "title": page.title,
+                    "summary": clip(page.summary, 160),
+                }
+                for page in sorted(self._by_id(snap, language).values(), key=lambda p: p.id)
+                if page.type == "view" and self._allowed(snap, page.sensitivity)
+            ]
+
+        def build(items: Sequence[dict[str, Any]], truncated: bool) -> dict[str, Any]:
+            return {
+                "release_id": snap.release_id,
+                "question": question,
+                **({"within": scope} if scope else {}),
+                **({"lang": language} if language else {}),
+                "offset": offset,
+                "hits": list(items),
+                **context,
+                "truncated": truncated,
+                "next_offset": offset + len(items) if truncated or more else None,
+                "hint": ANSWER_CONTEXT_HINT if items else ANSWER_CONTEXT_EMPTY_HINT,
+            }
+
+        # shorten the section texts first; drop hits only when even the shortest do not fit
+        for budget in CONTEXT_TEXT_BUDGETS:
+            rows = hit_rows(budget)
+            out = result_json(build(rows, False))
+            if len(out) <= self.max_chars:
+                return out
+        out, _ = fit_items(rows, build, self.max_chars)
+        return out
 
     def read_page(
         self, page: str, section: str | None = None, offset: int = 0, lang: str | None = None

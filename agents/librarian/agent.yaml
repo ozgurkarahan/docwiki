@@ -12,6 +12,7 @@ tools:
     server_label: docwiki
     server_url_env: DOCWIKI_MCP_URL
     allowed_tools:
+      - answer_context
       - search
       - read_page
       - get_index
@@ -38,6 +39,7 @@ tools:
         - recompile
         - decide_proposal
       never:
+        - answer_context
         - search
         - read_page
         - get_index

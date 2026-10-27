@@ -178,8 +178,10 @@ the pointer forward again; pause the triggers first if that is not wanted
 - Run receipts price tokens with `src/docwiki/llm/prices.yaml`, a placeholder table
   (`verified: false`): copy it, verify the prices for your region and deployment type, and
   point `DOCWIKI_LLM_PRICE_TABLE` at the copy before relying on receipts.
-- Bounded work: per-document page limit, map-reduce chunk limits and at most 12 research tool
-  calls per question (see `SETTINGS_DEFAULTS` in `src/docwiki/contracts/settings.py`). A per-run
+- Bounded work: per-document page limit, map-reduce chunk limits, at most 6 tool calls per
+  question for the deployed Researcher (its instructions, ADR 0013) and 12 for local agents
+  following the wiki's own agent kit (`DOCWIKI_RESEARCH_MAX_TOOL_CALLS`, see `SETTINGS_DEFAULTS`
+  in `src/docwiki/contracts/settings.py`). A per-run
   token budget (`DOCWIKI_MAX_TOKENS_PER_RUN`) is reserved in the settings but not enforced yet.
 
 ## Change models, capacity or settings

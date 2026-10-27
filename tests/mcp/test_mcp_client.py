@@ -33,6 +33,7 @@ from docwiki.mcp.workstore import WorkStore
 from mcp import Client
 
 SPEC_TOOLS = {
+    "answer_context",
     "search",
     "read_page",
     "get_index",

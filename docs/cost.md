@@ -41,7 +41,7 @@ artifacts; changing the domain pack invalidates almost everything.
 
 ### When an agent answers
 
-- One Researcher answer is one agent turn on the `smart` deployment with up to 12 tool calls. Tool
+- One Researcher answer is one agent turn on the `smart` deployment with up to 6 tool calls. Tool
   results (each bounded to 12,000 characters) become input tokens, so input tokens dominate.
 - The MCP app is billed while it serves requests; a cold start from zero adds about 30 seconds to
   the first turn.
@@ -70,7 +70,7 @@ estimated cost per tier is in [operations](operations.md#logs-and-queries).
 ## Guardrails
 
 - Bounded work: at most 300 pages per document (`DOCWIKI_MAX_PAGES_PER_DOCUMENT`), map-reduce
-  chunk limits, at most 64 described figures per source, at most 12 tool calls per research
+  chunk limits, at most 64 described figures per source, at most 6 tool calls per research
   question, MCP results of at most 12,000 characters, `query_table` results of at most 200 rows.
 - One job execution at a time (KEDA), a blob lease, and a poison queue after five failed
   deliveries, so a broken source cannot loop forever.

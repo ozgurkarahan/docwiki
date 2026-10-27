@@ -7,7 +7,7 @@ runner through [`docwiki.agents_client`](../src/docwiki/agents_client/).
 
 | Agent | Foundry name | What it does | MCP tools | MCP app roles |
 |---|---|---|---|---|
-| Researcher | `docwiki-researcher` | Answers questions with `[n]` citations to evidence sidecars, prefers current over superseded information, surfaces contradictions, abstains ("Not found in the wiki.") instead of guessing | read tools only: `search`, `read_page`, `get_index`, `get_links`, `glossary`, `get_evidence`, `query_table`, `get_skill`, `list_skills`, `recent_changes` (no approval) | `Wiki.Read` |
+| Researcher | `docwiki-researcher` | Answers questions with `[n]` citations to evidence sidecars, prefers current over superseded information, surfaces contradictions, abstains ("Not found in the wiki.") instead of guessing | read tools only: `answer_context`, `search`, `read_page`, `get_index`, `get_links`, `glossary`, `get_evidence`, `query_table`, `get_skill`, `list_skills`, `recent_changes` (no approval) | `Wiki.Read` |
 | Librarian | `docwiki-librarian` | Starts ingests, watches runs, diagnoses failed or quarantined sources, proposes recompiles with precise hints, reviews proposals, writes health reports | read tools + `run_status`, `list_sources`, `quality_report`, `explain_source`, `list_proposals`, `write_health_report` (no approval) + `ingest_start`, `recompile`, `decide_proposal` (**human approval on every call**) | `Wiki.Read`, `Wiki.Operate` |
 
 Both use the `smart` model deployment and one MCP tool (`server_label: docwiki`). Tool visibility

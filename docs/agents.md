@@ -20,6 +20,7 @@ runs in a Container Apps Job, and the agents read its results or ask it to run
 
 | Tool | Role | Approval (Librarian) | What it does |
 |---|---|---|---|
+| `answer_context` | Wiki.Read | none | The Researcher's first call: best sections and source blocks with their text and citations, the home index, the scope's hub and the computed views |
 | `search` | Wiki.Read | none | Full-text search over page sections and raw source blocks, with glossary synonyms |
 | `read_page` | Wiki.Read | none | A page or one section, with frontmatter, links and one citation per footnote |
 | `get_index` | Wiki.Read | none | Home, sources, entities (by type), topics, queries, glossary or log index |
@@ -53,16 +54,16 @@ The Researcher treats the wiki as the map and the evidence sidecars as the groun
 
 ```mermaid
 flowchart LR
-  q["Question"] --> s["search<br/>glossary for acronyms<br/>and other languages"]
-  s --> r["read_page<br/>topic, entity, source"]
-  r --> l["get_links<br/>when it leads closer"]
-  r --> e["get_evidence<br/>query_table for numbers"]
-  l --> e
-  e --> a["Answer with [n] citations<br/>or Not found in the wiki."]
+  q["Question"] --> c["answer_context<br/>sections + citations,<br/>home index, hub, views"]
+  c --> a["Answer with [n] citations<br/>or Not found in the wiki."]
+  c --> t["1-2 targeted calls, in parallel<br/>read_page of one section,<br/>query_table, a view, search"]
+  t --> a
 ```
 
-- **Bounded.** At most 12 tool calls per question; when the evidence is still insufficient it says
-  what is missing instead of searching further.
+- **Index first and bounded** ([ADR 0013](adr/0013-index-first-researcher.md)). One
+  `answer_context` call, then at most one or two targeted calls; `get_evidence` only to quote a
+  passage verbatim. At most 6 tool calls per question; when the evidence is still insufficient it
+  says what is missing instead of searching further.
 - **Cites sources, never the wiki.** Generated pages and filed research answers are not
   independent evidence. Every factual sentence ends with `[n]`, and the answer ends with:
 
