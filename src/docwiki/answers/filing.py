@@ -81,6 +81,7 @@ _MAX_QUESTION = 300
 _MAX_SUMMARY = 240
 _MAX_STEP = 80
 _STEP_ARGUMENTS: dict[str, tuple[str, ...]] = {
+    "answer_context": ("question", "within"),
     "search": ("query",),
     "read_page": ("path", "section"),
     "get_index": ("scope",),

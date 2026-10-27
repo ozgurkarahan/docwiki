@@ -7,8 +7,8 @@ changes only through pipeline runs (ingest, recompile) and accepted proposals.
 
 ## Tools
 
-- Read (role `Wiki.Read`): `search`, `read_page`, `get_index`, `get_links`, `glossary`,
-  `get_evidence`, `query_table`, `get_skill`, `list_skills`, `recent_changes`.
+- Read (role `Wiki.Read`): `answer_context`, `search`, `read_page`, `get_index`, `get_links`,
+  `glossary`, `get_evidence`, `query_table`, `get_skill`, `list_skills`, `recent_changes`.
 - Operations without approval (role `Wiki.Operate`): `run_status` (last or given run report),
   `list_sources` (per-source status, errors, sensitivity), `quality_report` (gate results of a
   release), `explain_source` (diagnostics of a failed or quarantined source), `list_proposals`,

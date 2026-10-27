@@ -13,10 +13,13 @@ INSTRUCTIONS = """\
 DocWiki: a compiled, cited Markdown wiki of a document corpus (one immutable release at a time).
 The wiki is the map; evidence sidecars are the ground truth.
 
-Research protocol: search (expand acronyms with glossary) -> read_page on the best topic, entity
-or source pages -> get_links when needed -> confirm decisive facts with get_evidence (and
-query_table for numbers) -> answer. Cite sources, not the wiki: use the citations returned by
-read_page and get_evidence (source title, locator label, provenance, evidence path). Prefer
+Research protocol (index-first): answer_context with the question -> answer from its sections
+and citations when they suffice; otherwise one or two targeted calls (read_page of one section,
+query_table for numbers, read_page of a computed view, search with other words or glossary for
+acronyms) -> answer. Use get_evidence only to quote a decisive passage verbatim when the
+returned text is not enough. Cite sources, not the wiki: use the citations returned by
+answer_context, read_page, search or get_evidence (source title, locator label, provenance,
+evidence path). Prefer
 current over superseded sources and say so; report contradictions. If the wiki does not contain
 the answer, say so instead of guessing.
 
@@ -31,10 +34,24 @@ request), unavailable or timeout (retry later or report), internal (report the f
 """
 
 TOOLS: dict[str, str] = {
+    "answer_context": (
+        "Start every question here: one call returns what most answers need. hits: the best "
+        "search hits for the question (wiki sections and source blocks, synonym-expanded), each "
+        "with the text of its own section - or, for a source block, the verbatim content of its "
+        "evidence sidecar - and the citations of that text (source_title, locator_label, "
+        "source_id, locator_key, evidence_path, provenance), ready to cite; home_index: the "
+        "start of the home index; hub: the start of the hub page of the scope (for example a "
+        "chantier) given in within or shared by most hits; views: the computed views (title, "
+        "path) to read for money, compliance or other figures computed by code. Answer from it "
+        "when it suffices; otherwise make one or two targeted calls (read_page of one section, "
+        "query_table, read_page of a view). within keeps one scope value; lang reads the pages "
+        "of a mirror language; page further hits with offset."
+    ),
     "search": (
         "Full-text search (BM25) over the compiled wiki and over the text extracted from every "
         "original document; glossary acronyms and multilingual synonyms are expanded "
-        "automatically (see expanded_terms). Start every question here. Each hit has page_id and "
+        "automatically (see expanded_terms). Use it after answer_context for other words or "
+        "filters (kinds, types, entity, topic). Each hit has page_id and "
         "path (pass to read_page), section, anchor, a ~240-character snippet and an origin: "
         "'wiki' = a compiled wiki section (cite the footnotes it carries, not the wiki); "
         "'source' = text extracted from an original document, with source_id, locator_key, "
@@ -88,8 +105,10 @@ TOOLS: dict[str, str] = {
         "range, slide, message part or transcript cue of an original document - and return its "
         "verbatim content: native text, table rows, OCR text or a clearly labelled generated "
         "figure description, with locator_label, provenance, badge, evidence_path, the original "
-        "file when published, and the source page with its status. Use it to confirm every "
-        "decisive fact before answering. Take source_id and locator_key from read_page "
+        "file when published, and the source page with its status. Use it to quote a decisive "
+        "passage verbatim when the text returned by answer_context, read_page or search is not "
+        "enough (their citations can be cited as they are). Take source_id and locator_key from "
+        "read_page "
         "citations or from 'source' search hits; only cited locators have sidecars. Paged with "
         "offset."
     ),
@@ -178,6 +197,8 @@ TOOLS: dict[str, str] = {
 }
 
 PARAMS: dict[str, str] = {
+    "question": "The user's question as asked; acronyms and synonyms are expanded automatically.",
+    "context_limit": "Number of hits to return with their section text (default 5, at most 10).",
     "query": "Search words or a question; acronyms and synonyms are expanded automatically.",
     "kinds": (
         "Restrict hit kinds: 'page-section' (compiled wiki sections) and/or 'source-block' "

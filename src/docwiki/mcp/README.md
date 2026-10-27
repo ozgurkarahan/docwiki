@@ -24,6 +24,7 @@ provenance; compiled wiki text comes with the citations it carries.
 
 | Tool | Parameters | Returns |
 |---|---|---|
+| `answer_context` | `question`, `within?`, `lang?`, `limit=5` (≤ 10), `offset=0` | `hits` `{rank, origin, kind, page_id, path, title, section, anchor, status?, scope?, lang, source_id?, locator_key?, text, text_truncated, citations}` (a wiki hit's own section, or a source hit's evidence sidecar content), and on the first window `home_index`, `hub` (the scope's hub) and `views` (computed views); see ADR 0013 |
 | `search` | `query`, `kinds?` (`page-section`, `source-block`), `types?`, `entity?`, `topic?`, `limit=10`, `offset=0` | Ranked hits `{kind, origin, page_id, path, title, section, anchor, snippet, score, status?, source_id?, locator_key?, locator_label?, evidence_path?, provenance?}` and the synonym-expanded terms |
 | `read_page` | `page` (id or path, `#anchor` allowed), `section?`, `offset=0` | Frontmatter, Markdown (whole page or one section with its subsections), section list, outgoing page links and one citation per footnote in the returned text `{source_title, locator_label, source_id, locator_key, evidence_path, badge, provenance}` |
 | `get_index` | `scope="home"` (`home`, `sources`, `entities`, `entities/<type>`, `topics`, `queries`, `glossary`, `log`), `offset=0` | Index Markdown |
@@ -240,8 +241,9 @@ Both prompt agents use an MCP tool pointing at the `mcp` Container App:
   "type": "mcp",
   "server_label": "docwiki",
   "server_url": "https://<mcp-app-fqdn>/mcp",
-  "allowed_tools": ["search", "read_page", "get_index", "get_links", "glossary",
-                    "get_evidence", "query_table", "get_skill", "list_skills", "recent_changes"],
+  "allowed_tools": ["answer_context", "search", "read_page", "get_index", "get_links",
+                    "glossary", "get_evidence", "query_table", "get_skill", "list_skills",
+                    "recent_changes"],
   "require_approval": "never"
 }
 ```

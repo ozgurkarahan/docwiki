@@ -34,11 +34,13 @@ RESEARCHER_REQUIREMENTS: dict[str, list[str]] = {
     "2 protocol": [
         r"## Protocol",
         r"expand acronyms|acronyms, codes",
-        r"Confirm every decisive fact with `get_evidence`",
+        r"Call `answer_context` with the question",
+        r"`get_evidence` only to quote a decisive passage verbatim",
+        r"citations the tools returned",
         r"`query_table` for numbers",
     ],
-    "3 at most 12 tool calls, then say what is missing": [
-        r"at most 12 tool calls per question",
+    "3 at most 6 tool calls (index first), then say what is missing": [
+        r"at most 6 tool calls per question",
         r"stop and say what is missing",
     ],
     "4 [n] citations and numbered source list": [
@@ -79,7 +81,7 @@ RESEARCHER_REQUIREMENTS: dict[str, list[str]] = {
     "scopes: name the chantier, ambiguity, within, as-of date (ADR 0011)": [
         r"Name the chantier in every answer",
         r"answer per chantier or ask which one",
-        r"pass its code as `within` to `search` or `get_index`",
+        r"pass its code as `within` to `answer_context`, `search` or `get_index`",
         r"Date the answer \"as of\" the most recent current source you cite",
     ],
     "tool results: check ok, follow the error, retry only when retryable": [
@@ -88,7 +90,7 @@ RESEARCHER_REQUIREMENTS: dict[str, list[str]] = {
         r"Read `error\.code` and `error\.message` and follow the message",
         r"Repeat a failed call only when `error\.retryable` is true",
         r"Never retry a `forbidden` call",
-        r"Failed calls count toward the 12 tool calls",
+        r"Failed calls count toward the 6 tool calls",
     ],
 }
 
@@ -175,7 +177,15 @@ def test_librarian_requirement(requirement: str, patterns: list[str]) -> None:
 
 def test_researcher_protocol_order() -> None:
     protocol = _section(RESEARCHER, "Protocol")
-    order = ["search", "glossary", "read_page", "get_links", "get_evidence", "query_table"]
+    order = [
+        "answer_context",
+        "search",
+        "glossary",
+        "read_page",
+        "get_links",
+        "get_evidence",
+        "query_table",
+    ]
     positions = [protocol.index(f"`{tool}`") for tool in order]
     assert positions == sorted(positions)
     assert _flat(protocol).endswith("stop and say what is missing instead of searching further.")

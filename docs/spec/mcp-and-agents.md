@@ -14,6 +14,7 @@
 
 | Tool | Parameters | Returns |
 |---|---|---|
+| `answer_context` (v1.8) | `question: str`, `within?: str`, `lang?: str`, `limit: int = 5` (≤ 10), `offset: int = 0` | `{hits: [{rank, origin, kind, page_id, path, title, section, anchor, status?, scope?, lang, source_id?, locator_key?, text, text_truncated, citations: [...]}], home_index?, hub?, views?, truncated, next_offset, hint}` |
 | `search` | `query: str`, `kinds?: [page-section, source-block]`, `types?: [source, entity, topic, hub, ...]`, `entity?: str`, `topic?: str`, `within?: str`, `lang?: str`, `limit: int = 10` | ranked hits `{page_id, path, title, section, anchor, snippet, source_id?, locator_key?, scope?, lang, score}` (synonym-expanded) |
 | `read_page` | `page: str` (id or path), `section?: str`, `lang?: str` | frontmatter + markdown (or one section), outgoing links, `lang` (and `translation_of` on a mirror page) |
 | `get_index` | `scope: str = "home"` (`home`, `sources`, `entities`, `entities/<type>`, `topics`, `glossary`, `log`, `hubs/<folder>`), `within?: str`, `lang?: str` | index markdown, `lang` (and `languages` on the first window of a multi-language wiki) |
@@ -24,6 +25,26 @@
 | `get_skill` | `name: str` | SKILL.md content of a wiki skill |
 | `list_skills` | — | names and descriptions |
 | `recent_changes` | `since?: date` | log entries |
+
+**`answer_context` (v1.8, [ADR 0013](../adr/0013-index-first-researcher.md)).** The first call of
+the Researcher: one bounded result, built at run time from the release's `search.db` and
+`catalog.json` (no pipeline output of its own). `hits` are the best `search` hits for the
+question (filtered by `within` and `lang` exactly as `search`), one per section or per source
+locator, without navigation pages (indexes, log, meta). A wiki hit gives the Markdown of its own
+section (not its subsections, not the whole page) and, in `citations`, the citations of the
+footnotes of that text in the fields of `read_page` (`label`, `source_title`, `locator_label`,
+`source_id`, `locator_key`, `evidence_path`, `badge`, `provenance`). A source hit gives the
+verbatim content of its evidence sidecar (header left out) with that sidecar as its one citation,
+or its snippet and a `note` when it has no sidecar. On the first window (`offset` 0) the result
+adds `home_index` (the start of the home index, at most 1,500 characters, filtered by `within`
+like `get_index`), `hub` (the start of the hub page of the `within` scope, or of the scope shared
+by at least half of the hits and two or more of them, at most 1,500 characters, with its
+citations) and `views` (every computed view: `page_id`, `path`, `title`, `summary`). Section
+texts are cut to 1,600, 1,000, 600 then 300 characters (`text_truncated`) until the result fits
+the output budget; when even that does not fit, hits are dropped and `truncated` and
+`next_offset` say where to continue. Pages above the release's audience are never returned
+(defence in depth: the release gates already keep them out). An empty question is
+`invalid_argument`; `within` and `lang` fail as in `search`.
 
 **Scopes (v1.7, [ADR 0011](../adr/0011-company-wide-wiki.md)).** `search.db` (schema 2) records
 each page's scope value in `docs.scope` and `pages.scope`: the frontmatter `scope` of source pages
@@ -102,10 +123,16 @@ agents/
 ### Researcher instruction requirements
 
 1. Treat the wiki as the map and evidence sidecars as the ground truth.
-2. Protocol: understand the question → `search` (expand acronyms via `glossary`) → `read_page` on the
-   best topic/entity/source pages → follow `get_links` when needed → confirm decisive facts with
-   `get_evidence` (and `query_table` for numbers) → answer.
-3. At most 12 tool calls per question; stop and say what is missing if evidence is insufficient.
+2. Protocol, index first (v1.8, [ADR 0013](../adr/0013-index-first-researcher.md)): understand the
+   question → `answer_context` (with `within` for one chantier, `lang` for the user's language)
+   → answer from its hits when they suffice; otherwise at most one or two targeted calls, issued
+   in parallel when independent (`read_page` of one section, `query_table` for numbers,
+   `read_page` of a computed view, `search` with other words after `glossary` for acronyms,
+   `get_links` when it leads closer) → answer. An answer may cite the citations returned by
+   `answer_context`, `read_page` or `search` (a source hit with its evidence path);
+   `get_evidence` is only for quoting a decisive passage verbatim when the returned text is
+   insufficient.
+3. At most 6 tool calls per question; stop and say what is missing if evidence is insufficient.
 4. Every factual sentence ends with a citation `[n]`; the answer ends with a numbered source list:
    `[n] <source title> — <locator label> (<provenance>) — <sidecar path>`.
 5. Prefer current over superseded information and say so; surface contradictions explicitly.

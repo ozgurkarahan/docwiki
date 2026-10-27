@@ -61,7 +61,7 @@ from docwiki.mcp.source import (
 )
 from docwiki.mcp.tokens import TokenValidator
 from docwiki.mcp.tools_ops import OpsTools
-from docwiki.mcp.tools_read import ReadTools
+from docwiki.mcp.tools_read import ANSWER_CONTEXT_HITS, MAX_ANSWER_CONTEXT_HITS, ReadTools
 from docwiki.mcp.workstore import WorkStore
 
 __all__ = ["SERVER_NAME", "build_server", "create_app", "main", "make_ops", "make_source"]
@@ -247,6 +247,7 @@ def tool_levels() -> dict[str, Level]:
 
 _READ_ONLY = {"read_only_hint": True, "open_world_hint": False}
 _TITLES = {
+    "answer_context": "Answer context",
     "search": "Search the wiki",
     "read_page": "Read a wiki page",
     "get_index": "Read an index",
@@ -309,6 +310,20 @@ def _tool(fn: Callable[..., Any], name: str, config: McpConfig) -> Tool:
 
 
 def _read_tools(reads: ReadTools, config: McpConfig) -> list[Tool]:
+    def answer_context(
+        question: Annotated[str, Field(min_length=1, max_length=500), _desc("question")],
+        within: Annotated[str | None, Field(max_length=64), _desc("within")] = None,
+        limit: Annotated[
+            int, Field(ge=1, le=MAX_ANSWER_CONTEXT_HITS), _desc("context_limit")
+        ] = ANSWER_CONTEXT_HITS,
+        offset: Annotated[int, Field(ge=0, le=100), _desc("offset")] = 0,
+        lang: Annotated[str | None, Field(max_length=16), _desc("lang")] = None,
+    ) -> CallToolResult:
+        return _result(
+            "answer_context",
+            lambda: reads.answer_context(question, within, limit, offset, lang),
+        )
+
     def search(
         query: Annotated[str, Field(min_length=1, max_length=500), _desc("query")],
         kinds: Annotated[list[SearchKind] | None, _desc("kinds")] = None,
@@ -383,6 +398,7 @@ def _read_tools(reads: ReadTools, config: McpConfig) -> list[Tool]:
         return _result("recent_changes", lambda: reads.recent_changes(since, limit, offset))
 
     functions: dict[str, Callable[..., Any]] = {
+        "answer_context": answer_context,
         "search": search,
         "read_page": read_page,
         "get_index": get_index,

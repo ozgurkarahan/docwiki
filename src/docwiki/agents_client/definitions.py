@@ -86,6 +86,7 @@ __all__ = [
 ]
 
 READ_TOOLS: tuple[str, ...] = (
+    "answer_context",
     "search",
     "read_page",
     "get_index",

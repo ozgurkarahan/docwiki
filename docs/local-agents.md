@@ -27,9 +27,9 @@ uv run --extra mcp python -m docwiki.mcp.server --stdio --release samples/fixtur
 > `current.json`, or a folder that contains `releases/current.json`, so a release you compiled
 > yourself works too (`--release .local/releases`).
 
-In local mode the server exposes the **read tools only**: `search`, `read_page`, `get_index`,
-`get_links`, `glossary`, `get_evidence`, `query_table`, `get_skill`, `list_skills` and
-`recent_changes`. The operations tools need `--allow-ops` and a work folder (development only).
+In local mode the server exposes the **read tools only**: `answer_context`, `search`,
+`read_page`, `get_index`, `get_links`, `glossary`, `get_evidence`, `query_table`, `get_skill`,
+`list_skills` and `recent_changes`. The operations tools need `--allow-ops` and a work folder (development only).
 
 ## GitHub Copilot in VS Code
 

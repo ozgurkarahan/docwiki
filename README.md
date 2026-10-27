@@ -205,9 +205,11 @@ Authoritative design: [docs/spec/](docs/spec/README.md) and the [ADRs](docs/adr/
 
 ## The two agents
 
-**Researcher** (`docwiki-researcher`, app role `Wiki.Read`). Read tools only. It searches
-(expanding acronyms with the glossary), reads the best topic, entity and source pages, confirms
-every decisive fact with `get_evidence` or `query_table`, and answers in at most 12 tool calls.
+**Researcher** (`docwiki-researcher`, app role `Wiki.Read`). Read tools only. It starts with one
+`answer_context` call (the best wiki sections and source blocks with their citations, the home
+index, the chantier's hub and the computed views), then makes at most one or two targeted calls
+(`read_page` of one section, `query_table` for numbers, `get_evidence` only to quote a passage
+verbatim), and answers in at most 6 tool calls.
 Every factual sentence ends with `[n]`; the answer ends with a `Sources:` list of
 `[n] <source title> — <locator label> (<provenance>) — <sidecar path>`. It gives current
 information before superseded information, states contradictions with the wiki's resolution rule
