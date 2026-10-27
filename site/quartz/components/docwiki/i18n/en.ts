@@ -178,6 +178,8 @@ export const en: Strings = {
     aboutAgentsAfter: " index, an agent guide and skills.",
     sourceCode: "Source code and documentation",
     theWiki: "The wiki",
+    tourButton: "Take the 2-minute tour",
+    architectureLink: "How it is built: the architecture",
   },
 
   documents: {
@@ -350,6 +352,91 @@ export const en: Strings = {
     rebuildUnreachable:
       "The rebuild request did not reach the portal; check the connection and try again.",
     sizeUnits: ["B", "KB", "MB"],
+  },
+
+  evals: {
+    heading: "Wiki + agent vs RAG",
+    intro:
+      "The same golden questions asked three ways: the Researcher agent working in this wiki, " +
+      "one model reading every document at once, and classic retrieval over chunks.",
+    caption: "Evaluation of three ways to answer questions about the same documents",
+    system: "System",
+    systems: {
+      "docwiki-researcher": "Wiki + Researcher agent",
+      "baseline-long-context": "Long context (all documents)",
+      "baseline-rag": "RAG (chunks)",
+    },
+    accuracy: "Answer accuracy",
+    numeric: "Exact numbers",
+    cost: "Cost / question",
+    latency: "Median time",
+    run: (questions, split, date) =>
+      [questions === null ? null : `${questions} ${split} questions`, date && `run ${date}`]
+        .filter(Boolean)
+        .join(" · "),
+    estimated: "Costs are estimates from list prices.",
+    scoreboard: "Full scoreboard on GitHub",
+    percent: (value) => `${Math.round(value * 100)} %`,
+    seconds: (value) => `${value.toFixed(0)} s`,
+    money: (value) => `$${value.toFixed(value < 0.1 ? 3 : 2)}`,
+  },
+
+  tour: {
+    label: "Guided tour",
+    stepOf: (step, count) => `Step ${step} of ${count}`,
+    back: "Back",
+    next: "Next",
+    done: "Done",
+    close: "Close the tour",
+    steps: [
+      {
+        title: "The documents",
+        body:
+          "Everything starts from ordinary files: quotes, contracts, plans, e-mails, scans. " +
+          "Each one keeps its original, exactly as it was received.",
+      },
+      {
+        title: "A source page and its evidence",
+        body:
+          "A model compiled this page from one document. Every fact is cited, and the document " +
+          "and its original are one click away.",
+      },
+      {
+        title: "The pipeline",
+        body:
+          "Runs, stages, quality gates and cost: a blocking gate stops the release, and each " +
+          "run shows how long it took and what it cost.",
+      },
+      {
+        title: "A topic with citations",
+        body:
+          "Topic pages combine several documents. Each footnote opens the exact passage a fact " +
+          "came from.",
+      },
+      {
+        title: "Ask the Researcher",
+        body:
+          "The Researcher agent answers from the wiki, with its citations checked before they " +
+          "are shown. An example question is ready: ask it, or write yours.",
+      },
+      {
+        title: "Does it pay off?",
+        body:
+          "The same questions answered by the wiki and its agent, by a long-context model and by " +
+          "RAG. The quality report shows the gates of this release.",
+      },
+    ],
+    missing: "(This part is not shown on this copy of the site.)",
+    qualityReport: "Quality report",
+    architecture: "Architecture",
+  },
+
+  architecture: {
+    figureLabel: "Architecture diagram",
+    caption:
+      "Documents → pipeline job → release with quality gates → this site and the MCP server → " +
+      "Foundry agents.",
+    openFull: "Open the diagram full size",
   },
 
   ask: {

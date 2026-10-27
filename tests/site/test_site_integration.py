@@ -323,3 +323,18 @@ def test_scoped_register_and_explorer(built_scoped_site: Path) -> None:
     assert 'const entitiesTitle = "Entreprise"' in fns["mapFn"]
     assert (built_scoped_site / "chantiers" / "moreau.html").is_file()
     assert check_links(built_scoped_site).ok
+
+
+def test_demo_eval_panel_tour_and_architecture(built_site: Path) -> None:
+    home = html(built_site, "index.html")
+    # the evaluation panel: a real table, the wiki first, a link to the full scoreboard
+    assert '<section id="docwiki-eval"' in home and '<th scope="row">Wiki + Researcher' in home
+    assert "evals/SCOREBOARD.md" in home
+    # the tour: its start button (shown by the script) and its pages, chosen at build time
+    assert 'class="docwiki-tour-start" hidden' in home and 'class="docwiki-tour"' in home
+    assert "&quot;topics/planning&quot;" in home and "&quot;pipeline&quot;" in home
+    # the architecture page, linked from the story, with its diagram
+    assert 'href="./architecture"' in home
+    page = html(built_site, "architecture.html")
+    assert 'src="./static/docwiki/architecture.svg"' in page and "How it works" in page
+    assert (built_site / "static" / "docwiki" / "architecture.svg").is_file()

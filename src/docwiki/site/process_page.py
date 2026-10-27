@@ -18,18 +18,22 @@ from __future__ import annotations
 from pathlib import Path
 
 __all__ = [
+    "ARCHITECTURE_SLUG",
     "DOCUMENTS_SLUG",
     "PROCESS_SLUG",
     "STAGES",
+    "architecture_markdown",
     "documents_markdown",
     "process_markdown",
     "stages",
+    "write_architecture_page",
     "write_documents_page",
     "write_process_page",
 ]
 
 PROCESS_SLUG = "pipeline"
 DOCUMENTS_SLUG = "documents"
+ARCHITECTURE_SLUG = "architecture"
 
 STAGES: tuple[tuple[str, str], ...] = (
     ("discover", "Lists the documents, spots what is new, changed or deleted, groups revisions."),
@@ -162,6 +166,77 @@ marchés, plans, factures, e-mails, photos et scans. Ouvrez l'original, ou la pa
 }
 
 
+_ARCHITECTURE_TEXT = {
+    "en": """title: Architecture
+---
+
+How a folder of ordinary documents becomes this site, and where the agents fit. Everything runs
+on Azure; the code is open source.
+
+## How it works
+
+1. **Documents.** PDF, Word, Excel, CSV, PowerPoint, e-mail and scans are kept exactly as they
+   were received: every one has its original on the [Documents](documents) tab.
+2. **A 14-step pipeline.** An Azure Container Apps job reads, classifies and compiles them with
+   Microsoft Foundry models, then links, indexes and saves the evidence behind every citation.
+   Models are used only where judgement is needed; whatever the structure gives is computed by
+   code. Follow it on the [Pipeline](pipeline) tab.
+3. **A release with quality gates.** Each run produces a complete, immutable release of the wiki.
+   Quality gates check citations, numbers and links, and leak gates keep restricted content and
+   private identifiers out; a blocking failure stops the release. Publishing switches the site
+   to the new release in one step.
+4. **A static site and an MCP server.** This site is built from the release with Quartz. The same
+   release is served to agents by an MCP server with read-only tools (search, read a page, open
+   the evidence, query a table). The MCP server is private: visitors ask through the "Ask this
+   wiki" drawer.
+5. **Two Microsoft Foundry agents.** The Researcher reads: it starts from the wiki's indexes and
+   search in one call, reads the pages, confirms decisive facts in the evidence and answers with
+   citations. The Librarian maintains: it queues new documents and follows the runs. Public
+   questions go through Azure API Management limits (requests per address, a token budget and a
+   daily cost cut-off, after which the filed answers are shown), and live answers pass the same
+   quote verification and leak checks before they are shown.
+6. **Hosting.** Azure Container Apps run the site, the MCP server and the pipeline jobs, with
+   managed identities and no keys. Only the owner, signed in with the platform's built-in
+   authentication (Easy Auth), uploads documents. The whole stack deploys with `azd up`.
+""",
+    "fr": """title: Architecture
+---
+
+Comment un dossier de documents ordinaires devient ce site, et où interviennent les agents. Tout
+tourne sur Azure ; le code est open source.
+
+## Comment ça marche
+
+1. **Les documents.** PDF, Word, Excel, CSV, PowerPoint, e-mails et scans sont conservés tels
+   qu'ils ont été reçus : chacun a son original dans l'onglet [Documents](documents).
+2. **Un traitement en 14 étapes.** Un job Azure Container Apps les lit, les classe et les compile
+   avec des modèles Microsoft Foundry, puis relie les pages, rédige les index et conserve la
+   preuve derrière chaque citation. Les modèles ne servent que là où il faut du jugement ; tout
+   ce que donne la structure est calculé par le code. Suivez-le dans l'onglet
+   [Traitement](pipeline).
+3. **Une version contrôlée.** Chaque exécution produit une version complète et immuable du wiki.
+   Les contrôles qualité vérifient citations, chiffres et liens, et les contrôles de fuite
+   écartent les contenus restreints et les identifiants privés ; un échec bloquant arrête la
+   publication. La publication bascule le site sur la nouvelle version d'un seul tenant.
+4. **Un site statique et un serveur MCP.** Ce site est construit à partir de la version avec
+   Quartz. La même version est servie aux agents par un serveur MCP aux outils en lecture seule
+   (rechercher, lire une page, ouvrir la preuve, interroger un tableau). Le serveur MCP est
+   privé : les visiteurs posent leurs questions dans le panneau « Interroger ce wiki ».
+5. **Deux agents Microsoft Foundry.** Le Researcher lit : il part des index du wiki et de la
+   recherche en un seul appel, lit les pages, confirme les faits décisifs dans les preuves et
+   répond avec ses citations. Le Librarian entretient : il met les nouveaux documents en file et
+   suit les exécutions. Les questions du public passent par les limites d'Azure API Management
+   (requêtes par adresse, budget de jetons et plafond de coût quotidien, au-delà duquel les
+   réponses classées sont affichées), et les réponses en direct passent les mêmes vérifications
+   de citations et de fuite avant d'être affichées.
+6. **L'hébergement.** Azure Container Apps fait tourner le site, le serveur MCP et les jobs du
+   traitement, avec des identités managées et sans clés. Seul le propriétaire, connecté par
+   l'authentification intégrée de la plateforme (Easy Auth), dépose des documents. L'ensemble se
+   déploie avec `azd up`.
+""",
+}
+
+
 def _page(texts: dict[str, str], lang: str) -> str:
     return f"---\nlang: {lang}\n" + texts.get(lang, texts["en"])
 
@@ -192,3 +267,13 @@ def write_documents_page(content_dir: Path, lang: str = "en") -> bool:
     """Write ``documents.md`` in ``lang`` into the Quartz content folder of that language unless
     the release has its own."""
     return _write_once(content_dir / f"{DOCUMENTS_SLUG}.md", documents_markdown(lang))
+
+
+def architecture_markdown(lang: str = "en") -> str:
+    return _page(_ARCHITECTURE_TEXT, lang)
+
+
+def write_architecture_page(content_dir: Path, lang: str = "en") -> bool:
+    """Write ``architecture.md`` in ``lang`` into the Quartz content folder of that language
+    unless the release has its own."""
+    return _write_once(content_dir / f"{ARCHITECTURE_SLUG}.md", architecture_markdown(lang))

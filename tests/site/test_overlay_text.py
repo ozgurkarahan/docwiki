@@ -652,3 +652,43 @@ def test_story_home_last_run_line_and_ask_hook() -> None:
         "questions": ["When are the windows delivered?", None, None, None, None, None],
         "plural": ["1 cited page", "8 cited pages"],
     }
+
+
+def test_tour_step_placement_and_fill_hook() -> None:
+    result = run_helpers(
+        """
+        const view = {width: 1280, height: 800}
+        const box = {width: 360, height: 200}
+        const at = (top, left = 100, height = 40, width = 300) => ({top, left, width, height})
+        console.log(JSON.stringify({
+          key: m.TOUR_KEY,
+          steps: [
+            m.tourStep(JSON.stringify({step: 2}), 6), m.tourStep(JSON.stringify({step: 6}), 6),
+            m.tourStep(JSON.stringify({step: -1}), 6), m.tourStep(JSON.stringify({step: 1.5}), 6),
+            m.tourStep("{bad", 6), m.tourStep(null, 6), m.tourStep("[]", 6),
+          ],
+          center: m.tourPlacement(null, view, box, false),
+          below: m.tourPlacement(at(100), view, box, false),
+          above: m.tourPlacement(at(700), view, box, false),
+          clamped: m.tourPlacement(at(100, 1200), view, box, false),
+          left: m.tourPlacement(at(100, -50), view, box, false),
+          dockTop: m.tourPlacement(at(600), {width: 390, height: 800}, box, true),
+          dockBottom: m.tourPlacement(at(100), {width: 390, height: 800}, box, true),
+          fill: [
+            m.askEventFill({question: "q", fill: true}), m.askEventFill({question: "q"}),
+            m.askEventFill({fill: "yes"}), m.askEventFill(null),
+          ],
+        }))
+        """
+    )
+    assert isinstance(result, dict)
+    assert result["key"] == "docwiki-tour"
+    assert result["steps"] == [2, None, None, None, None, None, None]
+    assert result["center"] == {"mode": "center"}
+    assert result["below"] == {"mode": "anchor", "top": 152, "left": 100, "above": False}
+    assert result["above"] == {"mode": "anchor", "top": 488, "left": 100, "above": True}
+    assert result["clamped"]["left"] == 1280 - 360 - 16
+    assert result["left"]["left"] == 16
+    assert result["dockTop"] == {"mode": "dock-top"}
+    assert result["dockBottom"] == {"mode": "dock-bottom"}
+    assert result["fill"] == [True, False, False, False]

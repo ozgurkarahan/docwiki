@@ -2929,3 +2929,282 @@ footer.docwiki-footer {
     display: none;
   }
 }
+
+// ----- Home page: the tour button, the architecture link and the evaluation panel (site.md §12) -----
+
+.docwiki-story-more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin: 0.75rem 0 0;
+}
+
+.docwiki-tour-start {
+  min-height: 44px;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--secondary);
+  border-radius: 8px;
+  background: var(--secondary);
+  color: var(--light);
+  font: inherit;
+  font-weight: $semiBoldWeight;
+  cursor: pointer;
+
+  &[hidden] {
+    display: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--secondary);
+    outline-offset: 2px;
+  }
+}
+
+.docwiki-eval {
+  box-sizing: border-box;
+  max-width: 100%;
+  margin: 1rem 0 0;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--dw-border);
+  border-radius: 8px;
+
+  .docwiki-eval-title {
+    margin: 0 0 0.25rem;
+    font-size: 1.05rem;
+  }
+
+  .docwiki-eval-intro,
+  .docwiki-eval-meta {
+    margin: 0.25rem 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--darkgray);
+  }
+}
+
+// A real table; on a phone its cells shrink and wrap, and only the frame could scroll, never the
+// page.
+.docwiki-eval-frame {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.docwiki-eval-table {
+  width: 100%;
+  margin: 0.5rem 0;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  line-height: 1.35;
+
+  th,
+  td {
+    padding: 0.35rem 0.4rem;
+    border-bottom: 1px solid var(--lightgray);
+    text-align: right;
+    vertical-align: top;
+  }
+
+  thead th {
+    font-weight: $semiBoldWeight;
+    color: var(--darkgray);
+    hyphens: auto;
+  }
+
+  th[scope="row"],
+  thead th:first-child {
+    text-align: left;
+  }
+
+  th[scope="row"] {
+    font-weight: normal;
+  }
+
+  .docwiki-eval-ours th[scope="row"],
+  .docwiki-eval-ours .docwiki-eval-value {
+    font-weight: $semiBoldWeight;
+    color: var(--secondary);
+  }
+
+  .docwiki-eval-value,
+  .docwiki-eval-count {
+    display: block;
+    white-space: nowrap;
+  }
+
+  .docwiki-eval-count {
+    font-size: 0.75rem;
+    color: var(--darkgray);
+  }
+}
+
+@media (max-width: 480px) {
+  .docwiki-eval {
+    padding: 0.6rem 0.5rem;
+  }
+
+  .docwiki-eval-table {
+    font-size: 0.78rem;
+
+    th,
+    td {
+      padding: 0.3rem 0.2rem;
+    }
+  }
+}
+
+// ----- The architecture page (site.md §12.3) -----
+
+.docwiki-architecture {
+  margin: 1rem 0;
+
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 12px;
+  }
+
+  figcaption {
+    margin-top: 0.4rem;
+    font-size: 0.85rem;
+    color: var(--darkgray);
+  }
+}
+
+// ----- The guided tour (Tour.tsx, site.md §12.2) -----
+
+.docwiki-tour {
+  position: absolute;
+  z-index: 900;
+  box-sizing: border-box;
+  width: min(360px, calc(100vw - 32px));
+  padding: 0.85rem 1rem 0.75rem;
+  border: 2px solid var(--secondary);
+  border-radius: 10px;
+  background: var(--light);
+  color: var(--dark);
+  box-shadow: 0 8px 28px var(--dw-shadow);
+  font-size: 0.9rem;
+  line-height: 1.5;
+
+  &[hidden] {
+    display: none;
+  }
+
+  &[data-mode="center"],
+  &[data-mode="dock-top"],
+  &[data-mode="dock-bottom"] {
+    position: fixed;
+    left: 16px;
+  }
+
+  &[data-mode="center"] {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  &[data-mode="dock-top"] {
+    top: max(16px, env(safe-area-inset-top));
+  }
+
+  &[data-mode="dock-bottom"] {
+    bottom: max(16px, env(safe-area-inset-bottom));
+  }
+
+  @media (max-width: 640px) {
+    &[data-mode="dock-top"],
+    &[data-mode="dock-bottom"] {
+      right: 16px;
+      width: auto;
+    }
+  }
+
+  .docwiki-tour-count {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--darkgray);
+  }
+
+  .docwiki-tour-title {
+    margin: 0.1rem 2rem 0.3rem 0;
+    font-size: 1rem;
+
+    &:focus {
+      outline: none;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--secondary);
+      outline-offset: 2px;
+    }
+  }
+
+  .docwiki-tour-body,
+  .docwiki-tour-links {
+    margin: 0 0 0.5rem;
+  }
+
+  .docwiki-tour-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  .docwiki-tour-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+
+  button {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0.35rem 0.85rem;
+    border: 1px solid var(--secondary);
+    border-radius: 8px;
+    background: none;
+    color: var(--secondary);
+    font: inherit;
+    font-weight: $semiBoldWeight;
+    cursor: pointer;
+
+    &:disabled {
+      border-color: var(--dw-border);
+      color: var(--darkgray);
+      cursor: default;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--secondary);
+      outline-offset: 2px;
+    }
+  }
+
+  .docwiki-tour-next {
+    background: var(--secondary);
+    color: var(--light);
+  }
+
+  .docwiki-tour-close {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.35rem;
+    padding: 0;
+    border-color: transparent;
+    font-size: 1.3rem;
+    line-height: 1;
+  }
+}
+
+.docwiki-tour-target {
+  scroll-margin: 5rem 0;
+  border-radius: 4px;
+  outline: 3px solid var(--secondary);
+  outline-offset: 3px;
+}

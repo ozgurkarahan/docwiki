@@ -680,6 +680,76 @@ export function askEventQuestion(detail: unknown): string | null {
   return question.length > 0 && question.length <= LIVE_QUESTION_MAX ? question : null
 }
 
+/**
+ * Whether an `ASK_EVENT` only fills the drawer's form (`{ question, fill: true }`, the guided
+ * tour): with the live agent the question waits in the form for the reader to send it, nothing
+ * is asked. Without it the drawer behaves as for any other question (its filed answer opens).
+ */
+export function askEventFill(detail: unknown): boolean {
+  return record(detail)?.fill === true
+}
+
+// ----- The guided tour (Tour.tsx, site.md §12.2) -----
+
+/** localStorage key of the tour's current step (`{"step": 2}`); the tour works without it. */
+export const TOUR_KEY = "docwiki-tour"
+
+/** The step saved under `TOUR_KEY`, or `null` (no tour, a foreign or out-of-range value). */
+export function tourStep(raw: string | null | undefined, count: number): number | null {
+  if (!raw) return null
+  try {
+    const step = record(JSON.parse(raw))?.step
+    return typeof step === "number" && Number.isInteger(step) && step >= 0 && step < count
+      ? step
+      : null
+  } catch {
+    return null
+  }
+}
+
+export interface TourBox {
+  top: number
+  left: number
+  width: number
+  height: number
+}
+
+export type TourPlacement =
+  | { mode: "center" }
+  | { mode: "dock-top" }
+  | { mode: "dock-bottom" }
+  | { mode: "anchor"; top: number; left: number; above: boolean }
+
+/** Gap between the callout and its element, and the margin kept from the viewport's edges. */
+const TOUR_GAP = 12
+const TOUR_MARGIN = 16
+
+/**
+ * Where the tour's callout goes, in viewport coordinates: centred when its element is missing;
+ * on a narrow screen (or for a fixed element such as the drawer) docked at the bottom, or at the
+ * top when the element sits in the lower half; otherwise under the element, or above it when
+ * there is no room under it, kept inside the viewport horizontally.
+ */
+export function tourPlacement(
+  target: TourBox | null,
+  view: { width: number; height: number },
+  callout: { width: number; height: number },
+  dock: boolean,
+): TourPlacement {
+  if (!target) return { mode: "center" }
+  if (dock) {
+    const middle = target.top + target.height / 2
+    return middle > view.height / 2 ? { mode: "dock-top" } : { mode: "dock-bottom" }
+  }
+  const maxLeft = Math.max(TOUR_MARGIN, view.width - callout.width - TOUR_MARGIN)
+  const left = Math.min(Math.max(target.left, TOUR_MARGIN), maxLeft)
+  const below = target.top + target.height + TOUR_GAP
+  if (below + callout.height <= view.height - TOUR_MARGIN || target.top < callout.height + TOUR_GAP) {
+    return { mode: "anchor", top: below, left, above: false }
+  }
+  return { mode: "anchor", top: target.top - TOUR_GAP - callout.height, left, above: true }
+}
+
 /** "42 s", "4 min", "1 h 5 min": a run's length on the story strip, in whole units. */
 export function shortDuration(seconds: number): string | null {
   if (!Number.isFinite(seconds) || seconds < 0) return null

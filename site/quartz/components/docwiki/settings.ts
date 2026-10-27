@@ -113,6 +113,33 @@ export interface DocwikiSettings {
   answers: number
   /** The 13 pipeline stages and what each does (`STAGES` in src/docwiki/site/process_page.py). */
   steps?: { name: string; text: string }[]
+  /** The home page's evaluation panel (src/docwiki/site/evals.py); null leaves it out. */
+  evals?: DocwikiEvals | null
+  /** Path of the architecture diagram under the site's root (`static/docwiki/architecture.svg`). */
+  architecture?: string | null
+}
+
+/** A headline metric of the evaluation: share, denominator and passes. */
+export interface DocwikiEvalMetric {
+  value: number
+  n: number
+  passed: number | null
+}
+
+/** "Wiki + agent vs RAG": the scoreboard's headline cells for three systems (site.md §12.1). */
+export interface DocwikiEvals {
+  split: string
+  questions: number | null
+  date: string | null
+  scoreboardUrl: string
+  systems: {
+    system: string
+    accuracy: DocwikiEvalMetric | null
+    numeric: DocwikiEvalMetric | null
+    costPerQuestion: number | null
+    pricesVerified: boolean
+    latencyP50: number | null
+  }[]
 }
 
 export const settings = raw as DocwikiSettings

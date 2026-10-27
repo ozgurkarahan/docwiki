@@ -22,7 +22,7 @@ FROM ${NODE_IMAGE} AS node
 # copied through this stage so that the build works whether or not they exist yet.
 FROM ${PYTHON_IMAGE} AS context
 COPY . /ctx
-RUN mkdir -p /ctx/domains /ctx/skills /ctx/site
+RUN mkdir -p /ctx/domains /ctx/skills /ctx/site /ctx/evals/results /ctx/docs/assets
 
 FROM ${PYTHON_IMAGE} AS build
 COPY --from=uv /uv /usr/local/bin/uv
@@ -64,6 +64,10 @@ COPY --from=build /opt/docwiki /opt/docwiki
 COPY --from=context /ctx/site /opt/docwiki/site
 COPY --from=context /ctx/domains /opt/docwiki/domains
 COPY --from=context /ctx/skills /opt/docwiki/skills
+# The home page's evaluation panel (evals/results/latest.json) and the architecture page's
+# diagram (docs/assets/architecture.svg); the site leaves either out when it is missing.
+COPY --from=context /ctx/evals/results /opt/docwiki/evals/results
+COPY --from=context /ctx/docs/assets /opt/docwiki/docs/assets
 # Clone and install the pinned Quartz exactly where docwiki.site looks for it, then hand the
 # cache to the runtime user: every site build resets the checkout and writes the overlay into it.
 RUN set -eu; \

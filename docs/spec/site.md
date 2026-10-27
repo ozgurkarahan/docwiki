@@ -274,3 +274,68 @@ source page and a topic page with the drawer open, at 1280×800 and 390×844, li
   non-HTML files are never redirected; canonical HTML responses carry `Vary: Accept-Language,
   Cookie`. Old URLs redirect in both languages (`/how-it-works`, `/en/how-it-works` → `pipeline`).
   Without `languages.json` (or with one language) the portal behaves as before.
+
+## 12. The demo: evaluation panel, guided tour, architecture page
+
+(Slice D2: the site tells the demo of the project to a visitor who arrives from GitHub. No wiki
+content changes; every word is in the overlay's string tables, in French and English.)
+
+### 12.1 Evaluation panel ("Wiki + agent vs RAG")
+
+- On each language's home page, inside the story, under the question to try: one small table of
+  three systems, the wiki and its Researcher agent first, then the long-context baseline (every
+  document in the prompt) and the RAG baseline (chunks). Columns: answer accuracy and exact numbers
+  (percentage, with passed/n under it), cost per question and median latency (p50). Under it: the
+  split and its question count, the run date, "costs are estimates" when the price table is not
+  verified (the cost then reads "≈ $0.164"), and a link to the full scoreboard
+  (`evals/SCOREBOARD.md` on GitHub).
+- **Data.** `evals/results/latest.json` (`docwiki.evals.latest/v1`, written by
+  `evals/scoreboard.py`, which already summarises cost and latency per system) is read at build
+  time by `docwiki.site.evals.read_eval_panel`; nothing is recomputed. The build passes it to
+  `docwiki-site.json` as `evals` (`split`, `questions`, `date`, `scoreboardUrl`, `systems[]` with
+  `accuracy`/`numeric` `{value, n, passed}`, `costPerQuestion`, `pricesVerified`, `latencyP50`).
+  A missing, unreadable or foreign file, or a split without `docwiki-researcher`, gives `null` and
+  the panel is absent. The job image ships `evals/results/latest.json` next to `site/`.
+- **Presentation.** A real `<table>` with a visually hidden caption, `scope="col"` headers and
+  `scope="row"` system names; at 390 px the cells shrink and wrap, and only the table's frame could
+  scroll, never the page. Both themes use the site's tokens.
+
+### 12.2 Guided tour
+
+- "Take the 2-minute tour", a button of the home story (shown by the script: the tour needs
+  JavaScript), starts six steps across the pages of the reader's language (a mirror's tour stays
+  under `/en/`):
+  1. `documents`: an "Original ↗" link of the register (`.docwiki-documents-links`);
+  2. the source page of the first document of the register that has a wiki page, and its links to
+     the document and the original (`.docwiki-source-links`);
+  3. `pipeline`: the live view (`.docwiki-process`): runs, stages, gates, cost;
+  4. the first topic page (by slug, `type: topic`): its first citation (`a[data-footnote-ref]`);
+  5. on the same page, the "Ask this wiki" drawer opens with the first example question in its
+     form, through `docwiki:ask` with `fill: true` (live: the question waits for the reader to send
+     it, nothing is asked; filed answers: its answer opens as for "Try");
+  6. the home page's evaluation panel, with links to the quality report and the architecture page.
+  The pages are chosen at build time (`Tour.tsx`, `data-pages`); no sample document is named.
+- **Callout.** A small non-modal dialog (`role="dialog"`, labelled by its title) anchored under
+  (or above) its element, which is outlined and scrolled into view; centred, with a short note,
+  when the element is missing (a static host, no drawer). On a phone, and for the drawer, it docks
+  at the bottom of the viewport (at the top when the element is in the lower half). Back, Next
+  (Done on the last step) and Close, 44 px targets; Esc closes when the focus is in the callout or
+  nowhere; the focus moves to the step's title, and a polite status region announces "Step n of
+  6. Title". Closing returns the focus to the start button (else the page title).
+- **State.** The step is kept in `localStorage` (`docwiki-tour`, `{"step": n}`) inside try/catch;
+  without storage it lives in memory for the page load. After a navigation the callout reappears
+  when the page is the step's page; elsewhere it waits. The pure helpers (`tourStep`,
+  `tourPlacement`, `askEventFill`) are in `docwiki-text.ts`, tested with Node.
+
+### 12.3 Architecture page
+
+- `/architecture` and `/<mirror>/architecture` are written by the site build like `pipeline` and
+  `documents` (`docwiki.site.process_page.write_architecture_page`, never over a release's own
+  page). The `Architecture` component shows `docs/assets/architecture.svg`, copied by the build to
+  `static/docwiki/architecture.svg` (absent diagram: the text stays), above a short "how it works":
+  documents → the 14-step pipeline → a release with quality and leak gates → the static site and a
+  private MCP server → two Foundry agents (the Researcher reads, starting from the wiki's indexes
+  and search in one call; the Librarian maintains) behind API Management limits; Container Apps,
+  owner sign-in with Easy Auth, managed identities, `azd up`. Visitors ask through the drawer.
+- Linked from the home story ("How it is built: the architecture") and from the tour's last step.
+  Like the other two pages it has no graph, no dates and no explorer entry.

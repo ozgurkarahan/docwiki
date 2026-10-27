@@ -8,6 +8,9 @@
 !domains
 !skills
 !site
+# The site's evaluation panel and architecture diagram (site.md §13).
+!evals/results/latest.json
+!docs/assets/architecture.svg
 **/__pycache__
 **/*.py[cod]
 **/.pytest_cache
