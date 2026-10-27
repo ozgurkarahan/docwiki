@@ -95,7 +95,6 @@ def test_researcher_payload_for_each_auth_strategy(tmp_path: Path, strategy: str
                     "project_connection_id": CONNECTION,
                 }
             ],
-            "reasoning": {"effort": "medium"},
         },
         "description": agent.definition.description,
         "metadata": {
@@ -295,7 +294,7 @@ def test_deploy_creates_a_version_only_when_the_definition_changes(tmp_path: Pat
     )
     assert len(project.agents.created) == 1
 
-    edit_file(root / "researcher" / "instructions.md", "Be concise:", "Be brief:")
+    edit_file(root / "researcher" / "instructions.md", "Be concise.", "Be brief.")
     changed = build_agent_payload(load_agent(root / "researcher"), DEPLOY_ENV)
     third = asyncio.run(deploy_agent(project, changed))
     assert (third.status, third.version, third.previous_version) == ("created", "2", "1")
@@ -505,13 +504,10 @@ def test_connection_target_and_existence_are_checked() -> None:
 
 def test_reasoning_effort_is_optional_and_part_of_the_hash(tmp_path: Path) -> None:
     root = copy_agents(tmp_path)
-    chosen = build_agent_payload(load_agent(root / "researcher"), DEPLOY_ENV)
-    edit_file(root / "researcher" / "agent.yaml", "reasoning_effort: medium\n", "")
     default = build_agent_payload(load_agent(root / "researcher"), DEPLOY_ENV)
-    assert chosen.body["definition"]["reasoning"] == {"effort": "medium"}
+    path = root / "researcher" / "agent.yaml"
+    edit_file(path, "instructions_file:", "reasoning_effort: low\ninstructions_file:")
+    low = build_agent_payload(load_agent(root / "researcher"), DEPLOY_ENV)
     assert "reasoning" not in default.body["definition"]
-    assert chosen.definition_sha256 != default.definition_sha256
-    assert (
-        "reasoning"
-        not in build_agent_payload(load_agent(root / "librarian"), DEPLOY_ENV).body["definition"]
-    )
+    assert low.body["definition"]["reasoning"] == {"effort": "low"}
+    assert low.definition_sha256 != default.definition_sha256
