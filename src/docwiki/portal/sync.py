@@ -1,22 +1,30 @@
 """Keep a local, verified copy of the current release's ``site/`` folder.
 
 The portal reads ``releases/current.json`` through the :class:`~docwiki.contracts.storage.Storage`
-protocol (folder or Blob), downloads only the ``site/`` files listed in the release manifest,
+protocol (folder or Blob), takes only the ``site/`` files listed in the release manifest,
 verifies every SHA-256 against the manifest (whose own hash is pinned by the pointer), then swaps
 the served folder atomically. :meth:`SiteSync.refresh` is cheap when the pointer's ETag did not
 change, so it can be polled.
+
+A new release reuses the files of the active copy that the manifests say are unchanged (same path,
+SHA-256 and size, re-verified locally) and downloads only the others. Text files of at least
+:data:`GZIP_MIN_BYTES` are also gzip-compressed once, before activation, into
+``<copy>/.docwiki-gzip/<path>.gz`` (a hidden folder the portal never serves directly).
 """
 
 from __future__ import annotations
 
+import gzip
+import logging
 import os
 import shutil
 import threading
+import zlib
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from docwiki.contracts._base import sha256_hex
 from docwiki.contracts.layout import ReleaseFiles, StorageKeys
@@ -24,10 +32,36 @@ from docwiki.contracts.manifest import FileEntry
 from docwiki.contracts.storage import Storage
 from docwiki.release.publish import ReleaseIntegrityError, read_current_pointer, read_manifest
 
-__all__ = ["PortalSyncError", "SiteState", "SiteSync", "site_state_from_dir"]
+__all__ = [
+    "COMPRESSIBLE_SUFFIXES",
+    "GZIP_DIR",
+    "GZIP_MIN_BYTES",
+    "PortalSyncError",
+    "SiteState",
+    "SiteSync",
+    "gzip_path",
+    "site_state_from_dir",
+]
+
+log = logging.getLogger("docwiki.portal")
 
 SITE_PREFIX = f"{ReleaseFiles.SITE_DIR}/"
 _COMPLETE_MARKER = ".docwiki-portal-complete"
+GZIP_DIR = ".docwiki-gzip"
+"""Hidden folder of a local copy holding the precompressed files (``<path>.gz``)."""
+GZIP_MIN_BYTES = 1024
+COMPRESSIBLE_SUFFIXES = frozenset(
+    {".html", ".css", ".js", ".mjs", ".json", ".svg", ".xml", ".txt", ".md", ".csv"}
+)
+
+
+def gzip_path(root: Path, rel: str) -> Path:
+    """Where the precompressed copy of the site file ``rel`` lives under ``root``."""
+    return root.joinpath(GZIP_DIR, *f"{rel}.gz".split("/"))
+
+
+def _compressible(rel: str, size: int) -> bool:
+    return size >= GZIP_MIN_BYTES and PurePosixPath(rel).suffix.lower() in COMPRESSIBLE_SUFFIXES
 
 
 class PortalSyncError(RuntimeError):
@@ -44,6 +78,10 @@ class SiteState:
     hashes: Mapping[str, str] = field(default_factory=dict)
     """Site-relative path → SHA-256 hex (strong ETags); empty for a plain folder."""
     synced_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    audience: str | None = None
+    """The release's audience (from its verified manifest); ``None`` for a plain folder."""
+    compressed: frozenset[str] = frozenset()
+    """Site-relative paths that have a precompressed copy (:func:`gzip_path`)."""
 
 
 def site_state_from_dir(root: Path) -> SiteState:
@@ -134,41 +172,112 @@ class SiteSync:
         if "index.html" not in files:
             raise PortalSyncError(f"release {pointer.release_id} has no site/index.html")
         target = self.cache_dir / f"{pointer.release_id}-{manifest_sha[:12]}"
-        if not (target / _COMPLETE_MARKER).is_file():
-            self._download(pointer.release_id, files, target)
+        if (target / _COMPLETE_MARKER).is_file():
+            compressed = frozenset(path for path in files if gzip_path(target, path).is_file())
+        else:
+            compressed = self._download(pointer.release_id, files, target, previous=state)
         self._state = SiteState(
             target,
             pointer.release_id,
             manifest_sha,
             {path: entry.sha256 for path, entry in files.items()},
+            audience=manifest.audience,
+            compressed=compressed,
         )
         self._pointer_etag = pointer_etag
         self._prune(keep_dir=target)
         return True
 
-    def _download(self, release_id: str, files: Mapping[str, FileEntry], target: Path) -> None:
+    def _download(
+        self,
+        release_id: str,
+        files: Mapping[str, FileEntry],
+        target: Path,
+        *,
+        previous: SiteState | None = None,
+    ) -> frozenset[str]:
+        """Fill ``target`` with verified copies of ``files``: unchanged files of ``previous``
+        (the active copy) are reused locally, the others are downloaded. Returns the paths that
+        were precompressed."""
         partial = target.with_name(f"{target.name}.partial-{os.getpid()}")
         shutil.rmtree(partial, ignore_errors=True)
         partial.mkdir(parents=True)
+        reusable = previous if previous is not None and previous.root.is_dir() else None
 
-        def fetch(item: tuple[str, FileEntry]) -> None:
-            path, entry = item
-            key = f"{self.prefix}/{release_id}/{SITE_PREFIX}{path}"
-            data = self.storage.read_bytes(key)
+        def local(path: str, entry: FileEntry) -> tuple[Path, bytes] | None:
+            """The previous copy of ``path`` when it is the same file (re-verified)."""
+            if reusable is None or reusable.hashes.get(path) != entry.sha256:
+                return None
+            source = reusable.root.joinpath(*path.split("/"))
+            try:
+                data = source.read_bytes()
+            except OSError:
+                return None
             if sha256_hex(data) != entry.sha256 or len(data) != entry.size:
-                raise ReleaseIntegrityError(f"site/{path} does not match the manifest")
-            destination = partial.joinpath(*path.split("/"))
+                return None
+            return source, data
+
+        def place(source: Path | None, data: bytes, destination: Path) -> None:
             destination.parent.mkdir(parents=True, exist_ok=True)
+            if source is not None:
+                try:
+                    os.link(source, destination)
+                    return
+                except OSError:
+                    pass
             destination.write_bytes(data)
+
+        def compress(path: str, entry: FileEntry, data: bytes) -> bool:
+            if not _compressible(path, len(data)):
+                return False
+            old: Path | None = None
+            packed: bytes | None = None
+            if reusable is not None and path in reusable.compressed:
+                old = gzip_path(reusable.root, path)
+                try:
+                    packed = old.read_bytes()
+                    if sha256_hex(gzip.decompress(packed)) != entry.sha256:
+                        packed = None
+                except (OSError, EOFError, zlib.error):
+                    packed = None
+            if packed is None:
+                old = None
+                packed = gzip.compress(data, compresslevel=9, mtime=0)
+            if len(packed) >= len(data):
+                return False
+            place(old, packed, gzip_path(partial, path))
+            return True
+
+        def fetch(item: tuple[str, FileEntry]) -> tuple[str, bool, bool]:
+            path, entry = item
+            found = local(path, entry)
+            if found is not None:
+                source, data = found
+            else:
+                source = None
+                key = f"{self.prefix}/{release_id}/{SITE_PREFIX}{path}"
+                data = self.storage.read_bytes(key)
+                if sha256_hex(data) != entry.sha256 or len(data) != entry.size:
+                    raise ReleaseIntegrityError(f"site/{path} does not match the manifest")
+            place(source, data, partial.joinpath(*path.split("/")))
+            return path, found is not None, compress(path, entry, data)
 
         try:
             with ThreadPoolExecutor(max_workers=self.workers) as pool:
-                list(pool.map(fetch, sorted(files.items())))
+                results = list(pool.map(fetch, sorted(files.items())))
             (partial / _COMPLETE_MARKER).write_text(release_id + "\n", encoding="utf-8")
             shutil.rmtree(target, ignore_errors=True)
             partial.replace(target)
         finally:
             shutil.rmtree(partial, ignore_errors=True)
+        reused = sum(1 for _, was_reused, _ in results if was_reused)
+        log.info(
+            "site of release %s: %d files reused, %d downloaded",
+            release_id,
+            reused,
+            len(results) - reused,
+        )
+        return frozenset(path for path, _, packed in results if packed)
 
     def _prune(self, *, keep_dir: Path) -> None:
         """Keep the active copy and the previous ones (in-flight requests may still read them)."""

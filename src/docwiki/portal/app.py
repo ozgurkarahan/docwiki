@@ -23,7 +23,7 @@ import logging
 import math
 import re
 from collections.abc import AsyncIterator, Awaitable, Callable, MutableMapping
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from starlette.applications import Starlette
@@ -34,7 +34,7 @@ from starlette.routing import Route
 from docwiki.portal.live_ask import LiveAsk, live_ask_routes
 from docwiki.portal.owner import OwnerConfig, process_routes
 from docwiki.portal.process import ProcessService
-from docwiki.portal.sync import SiteState, SiteSync, site_state_from_dir
+from docwiki.portal.sync import SiteState, SiteSync, gzip_path, site_state_from_dir
 
 __all__ = [
     "CONTENT_SECURITY_POLICY",
@@ -100,6 +100,33 @@ CONTENT_TYPES: dict[str, str] = {
 """Explicit types (Windows' registry-based guesses are unreliable); others are downloads."""
 
 CACHE_CONTROL = "private, no-cache"
+"""Revalidate every time: signed-in readers, non-public releases and language redirects."""
+PAGE_CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=600"
+"""Public pages and data files: a new release shows within about a minute."""
+ASSET_CACHE_CONTROL = "public, max-age=3600"
+"""Public styles, scripts, fonts and images. Quartz does not put content hashes in their names
+(``index.css``, ``postscript.js``), so they are cached for an hour, not forever."""
+ASSET_SUFFIXES = frozenset(
+    {
+        ".css",
+        ".js",
+        ".mjs",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".svg",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".webp",
+        ".ico",
+    }
+)
+PRINCIPAL_HEADERS = ("x-ms-client-principal", "x-ms-client-principal-id", "authorization")
+"""Built-in authentication adds the first two for a signed-in caller: their responses stay
+private (a portal behind sign-in, or the owner on the public portal)."""
+_MAX_ACCEPT_ENCODING = 512
 
 PAGE_ALIASES: dict[str, str] = {"/how-it-works": "/pipeline"}
 """Old page URLs that redirect permanently (ADR 0010 renamed the process page), also under a
@@ -243,16 +270,56 @@ def _is_safe(url_path: str) -> bool:
     return not any(part in (".", "..") or part.startswith(".") for part in parts)
 
 
+def _accepts_gzip(header: str | None) -> bool:
+    """Whether an ``Accept-Encoding`` header accepts gzip (``gzip``/``x-gzip`` or ``*``, q > 0)."""
+    if not header:
+        return False
+    gzip_q: float | None = None
+    star_q = 0.0
+    for item in header[:_MAX_ACCEPT_ENCODING].split(",")[:_MAX_ACCEPT_ITEMS]:
+        coding, *params = (part.strip() for part in item.split(";"))
+        q = 1.0
+        for param in params:
+            name, _, value = param.partition("=")
+            if name.strip().lower() == "q":
+                try:
+                    q = float(value.strip())
+                except ValueError:
+                    q = 0.0
+        if math.isnan(q):
+            q = 0.0
+        coding = coding.lower()
+        if coding in ("gzip", "x-gzip"):
+            gzip_q = max(gzip_q or 0.0, q)
+        elif coding == "*":
+            star_q = max(star_q, q)
+    return (gzip_q if gzip_q is not None else star_q) > 0.0
+
+
+def _etag_matches(header: str | None, etag: str) -> bool:
+    """``If-None-Match`` (weak comparison, lists and ``*``) against a quoted ETag."""
+    if not header:
+        return False
+    tags = [tag.strip() for tag in header.split(",")]
+    return any(tag == "*" or tag.removeprefix("W/") == etag for tag in tags)
+
+
+def _add_vary(current: str | None, name: str) -> str:
+    return f"{current}, {name}" if current else name
+
+
 class _Portal:
     def __init__(
         self,
         sync: SiteSync | None,
         static: SiteState | None,
         poll_seconds: float,
+        public_cache: bool | None = None,
     ) -> None:
         self.sync = sync
         self.static = static
         self.poll_seconds = poll_seconds
+        self.public_cache = public_cache
         self._languages: tuple[tuple[Path, str | None, str | None], tuple[str, ...]] | None = None
 
     @property
@@ -302,6 +369,22 @@ class _Portal:
             headers={"location": location, "cache-control": CACHE_CONTROL, **headers},
         )
 
+    def _shared(self, request: Request, state: SiteState) -> bool:
+        """Whether shared caches may keep the response: an anonymous request for a public site
+        (``public_cache``, or by default a release whose audience is ``public``)."""
+        if self.public_cache is False:
+            return False
+        if any(name in request.headers for name in PRINCIPAL_HEADERS):
+            return False
+        return self.public_cache is True or state.audience == "public"
+
+    def _cache_control(self, request: Request, state: SiteState, rel: str) -> str:
+        if not self._shared(request, state):
+            return CACHE_CONTROL
+        if PurePosixPath(rel).suffix.lower() in ASSET_SUFFIXES:
+            return ASSET_CACHE_CONTROL
+        return PAGE_CACHE_CONTROL
+
     def _respond(
         self,
         request: Request,
@@ -312,13 +395,28 @@ class _Portal:
         extra: dict[str, str] | None = None,
     ) -> Response:
         etag = state.hashes.get(rel)
-        headers = {"cache-control": CACHE_CONTROL, **(extra or {})}
+        headers = {"cache-control": self._cache_control(request, state, rel), **(extra or {})}
+        served = file
+        if rel in state.compressed:
+            headers["vary"] = _add_vary(headers.get("vary"), "Accept-Encoding")
+            packed = gzip_path(state.root, rel)
+            if (
+                _accepts_gzip(request.headers.get("accept-encoding"))
+                and "range" not in request.headers
+                and packed.is_file()
+            ):
+                served = packed
+                headers["content-encoding"] = "gzip"
+                etag = f"{etag}-gz" if etag else None
         if etag:
             headers["etag"] = f'"{etag}"'
-            if status == 200 and request.headers.get("if-none-match") == headers["etag"]:
+            if status == 200 and _etag_matches(
+                request.headers.get("if-none-match"), headers["etag"]
+            ):
+                headers.pop("content-encoding", None)
                 return Response(status_code=304, headers=headers)
         return FileResponse(
-            file, status_code=status, headers=headers, media_type=_content_type(file)
+            served, status_code=status, headers=headers, media_type=_content_type(file)
         )
 
     async def page(self, request: Request) -> Response:
@@ -397,16 +495,23 @@ def create_app(
     live_ask: LiveAsk | None = None,
     process: ProcessService | None = None,
     owner: OwnerConfig | None = None,
+    public_cache: bool | None = None,
 ) -> Starlette:
     """Portal ASGI app serving ``sync``'s current site (polled every ``poll_seconds``) or, for a
     local preview, an already built ``site_dir``. ``live_ask`` adds the visitors' questions to the
     Researcher; ``/api/ask/status`` reports whether it is enabled. ``process`` serves the live
     process view and, for the owners of ``owner``, the uploads (ADR 0009). A site that declares
-    mirror languages sends the readers who prefer one of them to its mirror pages (ADR 0012)."""
+    mirror languages sends the readers who prefer one of them to its mirror pages (ADR 0012).
+
+    Site files are cacheable by shared caches only for anonymous requests (no built-in
+    authentication principal) to a public site: by default when the release's audience is
+    ``public``; ``public_cache`` forces it on (still anonymous requests only) or off. Every other
+    response is ``private, no-cache``. Precompressed copies (:mod:`docwiki.portal.sync`) are sent
+    to clients that accept gzip."""
     if (sync is None) == (site_dir is None):
         raise ValueError("pass exactly one of sync or site_dir")
     static = site_state_from_dir(Path(site_dir)) if site_dir is not None else None
-    portal = _Portal(sync, static, poll_seconds)
+    portal = _Portal(sync, static, poll_seconds, public_cache)
     if live_ask is not None:
         live_ask.site_root = lambda: portal.state.root if portal.state else None
 

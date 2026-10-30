@@ -100,7 +100,7 @@ def test_portal_serves_the_current_site(storage: FolderStorage, tmp_path: Path) 
         assert home.headers["content-type"] == "text/html; charset=utf-8"
         assert b"<p>home</p>" in home.content
         assert_security_headers(home)
-        assert home.headers["cache-control"] == "private, no-cache"
+        assert home.headers["cache-control"] == "public, max-age=60, stale-while-revalidate=600"
 
         page = client.get("/sources/a")
         assert page.status_code == 200 and b"source a" in page.content
