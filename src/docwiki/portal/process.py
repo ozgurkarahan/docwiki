@@ -16,7 +16,7 @@ import threading
 import time
 import unicodedata
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Hashable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import PurePosixPath
@@ -93,6 +93,13 @@ not listed."""
 JUST_PUBLISHED_S = 15 * 60
 """The header chip says "In the wiki → <document>" this long after the release that added it."""
 CACHE_TTL_S = 4.0
+"""The view (release, runs, queue) is computed at most once per this many seconds, for every
+viewer together."""
+INVENTORY_TTL_S = 30.0
+"""The documents' inventory (the ``raw/`` listing and the source states) is read again after
+this long while no run is at work; sooner when the release, the latest run (its status or stage),
+the last finished run or the queue depth changes, or the owner uploads. While a run is at work it
+follows :data:`CACHE_TTL_S`."""
 MAX_PATH_CHARS = 200
 MAX_DEPTH = 6
 """Segments of an upload path: room for a scoped layout such as
@@ -237,6 +244,21 @@ def _clip(value: str | None, limit: int = 300) -> str | None:
     return value if len(value) <= limit else value[: limit - 1] + "…"
 
 
+class _Flight:
+    """One computation in progress; the callers that arrive meanwhile wait for its result."""
+
+    __slots__ = ("done", "error", "value")
+
+    def __init__(self) -> None:
+        self.done = threading.Event()
+        self.value: Any = None
+        self.error: BaseException | None = None
+
+
+Inventory = tuple[list[RawBlob], list[SourceState]]
+"""``raw/`` and the source states, as read together."""
+
+
 class ProcessService:
     """Reads for the process view and the owner's upload, over the shared :class:`Storage`."""
 
@@ -270,24 +292,60 @@ class ProcessService:
         self._uploads: dict[date, int] = {}
         self._lock = threading.Lock()
         self._catalog: tuple[str, Catalog] | None = None
-        self._cache: dict[str, tuple[float, Any]] = {}
+        self._cache: dict[str, tuple[float, Hashable, Any]] = {}
+        """``{key: (computed at, tag, value)}``: a value is reused while its tag is the same."""
+        self._flights: dict[tuple[str, Hashable], _Flight] = {}
+        self._generation = 0
+        """Bumped by :meth:`invalidate`: a computation started before is not cached."""
 
     # -- helpers -----------------------------------------------------------------------------
 
-    def _cached(self, key: str, factory: Callable[[], Any]) -> Any:
-        now = self._clock()
+    def _cached(
+        self,
+        key: str,
+        factory: Callable[[], Any],
+        *,
+        ttl: float = CACHE_TTL_S,
+        tag: Hashable = None,
+    ) -> Any:
+        """The value of ``key`` computed at most once per ``ttl`` (and per ``tag``) for every
+        caller: callers arriving while it is being computed wait for that computation instead
+        of starting their own (single flight)."""
         with self._lock:
             hit = self._cache.get(key)
-            if hit is not None and now - hit[0] < CACHE_TTL_S:
-                return hit[1]
-        value = factory()
-        with self._lock:
-            self._cache[key] = (self._clock(), value)
-        return value
+            if hit is not None and hit[1] == tag and self._clock() - hit[0] < ttl:
+                return hit[2]
+            flight = self._flights.get((key, tag))
+            leader = flight is None
+            if flight is None:
+                flight = self._flights[(key, tag)] = _Flight()
+            generation = self._generation
+        if not leader:
+            flight.done.wait()
+            if flight.error is not None:
+                raise flight.error
+            return flight.value
+        try:
+            flight.value = factory()
+        except BaseException as exc:
+            flight.error = exc
+            raise
+        finally:
+            with self._lock:
+                if self._flights.get((key, tag)) is flight:
+                    del self._flights[(key, tag)]
+                if flight.error is None and generation == self._generation:
+                    self._cache[key] = (self._clock(), tag, flight.value)
+            flight.done.set()
+        return flight.value
 
     def invalidate(self) -> None:
+        """Forget the view and the documents' inventory (after an upload or a rebuild): the next
+        read starts a new computation, even if one is in progress."""
         with self._lock:
             self._cache.clear()
+            self._flights.clear()
+            self._generation += 1
 
     def _list_raw_from_storage(self) -> list[RawBlob]:
         """``raw/`` from the storage (Azure uses an account listing for sizes and dates; a
@@ -354,6 +412,19 @@ class ProcessService:
             }
         reports, checks, history, seen_at = self._reports()
         running = reports[0] if reports and reports[0].status == "running" else None
+        queued = self._queued()
+        latest = reports[0] if reports else None
+        inventory = self._cached(
+            "inventory",
+            self._inventory,
+            ttl=CACHE_TTL_S if running is not None else INVENTORY_TTL_S,
+            tag=(
+                pointer.release_id if pointer is not None else None,
+                (latest.run_id, latest.status, latest.current_stage) if latest else None,
+                seen_at,
+                queued,
+            ),
+        )
         documents = self._documents(
             catalog,
             audience,
@@ -361,6 +432,7 @@ class ProcessService:
             released_at=pointer.created_at if pointer is not None else None,
             seen_at=seen_at,
             originals=self._published_originals(pointer.release_id) if pointer else {},
+            inventory=inventory,
         )
         counts = Counter(row["status"] for row in documents)
         states = Counter(row["state"] for row in documents)
@@ -371,7 +443,7 @@ class ProcessService:
             "release": release,
             "runs": runs,
             "checks": checks,
-            "queued": self._queued(),
+            "queued": queued,
             "documents": documents,
             "counts": {status: counts.get(status, 0) for status in DOCUMENT_STATUSES},
             "states": {state: states.get(state, 0) for state in DOCUMENT_STATES},
@@ -424,6 +496,13 @@ class ProcessService:
             log.warning("queue depth unavailable: %s", exc)
             return None
 
+    def _inventory(self) -> Inventory:
+        """``raw/`` and the source states: the slow-changing, costly part of the view (a listing
+        of every raw blob and a read of the state shards)."""
+        blobs = self._list_raw()
+        states, _broken = WorkStore(self.storage).source_states()
+        return blobs, states
+
     def _documents(
         self,
         catalog: Catalog | None,
@@ -433,9 +512,9 @@ class ProcessService:
         released_at: datetime | None = None,
         seen_at: datetime | None = None,
         originals: dict[str, str] | None = None,
+        inventory: Inventory | None = None,
     ) -> list[dict[str, Any]]:
-        blobs = self._list_raw()
-        states, _broken = WorkStore(self.storage).source_states()
+        blobs, states = inventory if inventory is not None else self._inventory()
         by_path: dict[str, SourceState] = {state.raw_path: state for state in states}
         pages = catalog.page_by_id() if catalog else {}
         released = {item.source_id: item.status for item in catalog.sources} if catalog else {}

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -25,6 +28,8 @@ from docwiki.contracts.storage import FolderStorage
 from docwiki.mcp.workstore import WorkStore
 from docwiki.portal.owner import OwnerConfig, OwnerConfigError, process_routes
 from docwiki.portal.process import (
+    CACHE_TTL_S,
+    INVENTORY_TTL_S,
     JUST_PUBLISHED_S,
     PathError,
     ProcessService,
@@ -333,13 +338,136 @@ def test_visitors_see_that_a_document_failed_but_not_why(storage: FolderStorage)
     assert visitor_rows[NEW_PATH]["failed"] is False
 
 
+class _Clock:
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
 def test_the_view_is_cached_briefly(storage: FolderStorage) -> None:
-    ticks = iter([0.0, 0.0, 1.0, 10.0, 10.0, 10.0, 10.0])
-    service = _service(storage, clock=lambda: next(ticks))
+    clock = _Clock()
+    depth = [0]
+    service = _service(storage, clock=clock, queue_depth=lambda: depth[0])
     first = service.process(owner=True)
     storage.write_bytes("raw/uploads/late.md", b"late")
+    clock.now = 1.0
     assert service.process(owner=True)["total"] == first["total"]
+    # The view is computed again, the documents' inventory is kept while nothing moves...
+    clock.now = 10.0
+    assert service.process(owner=True)["total"] == first["total"]
+    # ...until the queue says a file arrived (Event Grid queues every new raw blob)...
+    depth[0] = 1
+    clock.now = 15.0
     assert service.process(owner=True)["total"] == first["total"] + 1
+    # ...or the inventory is old enough.
+    storage.write_bytes("raw/uploads/later.md", b"later")
+    clock.now = 15.0 + INVENTORY_TTL_S + CACHE_TTL_S
+    assert service.process(owner=True)["total"] == first["total"] + 2
+
+
+def _write_run(storage: FolderStorage, run_id: str, **fields: Any) -> None:
+    newest = WorkStore(storage).run_ids()[-1]
+    report = {**json.loads(storage.read_bytes(f"work/runs/{newest}/report.json")), **fields}
+    report["run_id"] = run_id
+    storage.write_bytes(f"work/runs/{run_id}/report.json", json.dumps(report).encode("utf-8"))
+
+
+def test_the_inventory_follows_the_runs(storage: FolderStorage) -> None:
+    """A run that starts or finishes reads the documents again, however long the documents'
+    inventory may be kept: no status lags behind the runs."""
+    clock = _Clock()
+    service = _service(storage, clock=clock)
+    assert _rows(service.process(owner=True))[NEW_PATH]["state"] == "received"
+
+    # A whole run between two polls fails the new document.
+    broken = storage.read_bytes(f"work/state/sources/{source_id_for(BROKEN_PATH)}.json")
+    failed = {**json.loads(broken), "source_id": source_id_for(NEW_PATH), "raw_path": NEW_PATH}
+    storage.write_bytes(
+        f"work/state/sources/{source_id_for(NEW_PATH)}.json", json.dumps(failed).encode("utf-8")
+    )
+    new = [{"source_id": source_id_for(NEW_PATH), "path": NEW_PATH, "change": "new"}]
+    _write_run(storage, "run-29991231-235959-00000001", status="failed", documents=new)
+    clock.now = CACHE_TTL_S + 1
+    assert _rows(service.process(owner=True))[NEW_PATH]["state"] == "failed"
+
+    # A file dropped into raw/ and the run that takes it: it is listed as soon as the run starts.
+    late = "uploads/late.md"
+    storage.write_bytes(f"raw/{late}", b"late")
+    _write_run(
+        storage,
+        "run-29991231-235959-00000002",
+        status="running",
+        finished_at=None,
+        release_id=None,
+        current_stage="extract",
+        documents=[{"source_id": source_id_for(late), "path": late, "change": "new"}],
+        stages=[],
+    )
+    clock.now = 2 * (CACHE_TTL_S + 1)
+    row = _rows(service.process(owner=True))[late]
+    assert (row["state"], row["stage"]) == ("processing", "extract")
+
+
+def test_one_computation_serves_every_concurrent_viewer(storage: FolderStorage) -> None:
+    started = threading.Event()
+    release = threading.Event()
+    listings = []
+
+    def slow_list() -> list[RawBlob]:
+        listings.append(1)
+        started.set()
+        assert release.wait(5)
+        return [RawBlob(path=NEW_PATH)]
+
+    service = _service(storage, list_raw=slow_list)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        first = pool.submit(service.process, owner=True)
+        assert started.wait(5)
+        others = [pool.submit(service.status) for _ in range(6)]
+        others.append(pool.submit(service.process))
+        time.sleep(0.05)
+        release.set()
+        views = [first.result(5), *(item.result(5) for item in others)]
+    assert len(listings) == 1
+    assert NEW_PATH in _rows(views[0]) and views[-1]["total"] == views[0]["total"]
+    assert service.process(owner=True) is views[0]
+
+
+def test_a_failed_computation_is_not_cached(storage: FolderStorage) -> None:
+    calls = []
+
+    def flaky() -> list[RawBlob]:
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("listing failed")
+        return [RawBlob(path=NEW_PATH)]
+
+    service = _service(storage, list_raw=flaky)
+    with pytest.raises(RuntimeError):
+        service.process()
+    assert NEW_PATH in _rows(service.process(owner=True))
+    assert len(calls) == 2
+
+
+def test_an_upload_during_a_computation_is_not_hidden_by_it(storage: FolderStorage) -> None:
+    """A view computed while the owner uploads is not kept: the next read lists again."""
+    service = _service(storage)
+    listings = []
+    original = service._list_raw
+
+    def listing() -> list[RawBlob]:
+        listings.append(1)
+        blobs = original()
+        if len(listings) == 1:
+            service.upload("uploads/during.md", b"x")
+        return blobs
+
+    service._list_raw = listing
+    assert "uploads/during.md" not in _rows(service.process(owner=True))
+    assert "uploads/during.md" in _rows(service.process(owner=True))
+    assert len(listings) == 2
 
 
 # --- uploads ---------------------------------------------------------------------------------
