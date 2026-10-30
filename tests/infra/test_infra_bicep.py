@@ -23,7 +23,7 @@ from docwiki.contracts.layout import StorageKeys
 from docwiki.contracts.settings import SettingsKeys
 from docwiki.llm import settings as llm_settings
 from docwiki.orchestration import settings as orchestration_settings
-from docwiki.portal.live_ask import ENABLE_ENV
+from docwiki.portal.live_ask import ENABLE_ENV, STREAM_PROGRESS_ENV
 from docwiki.portal.owner import OWNERS_ENV
 from docwiki.site import build as site_build
 from docwiki.stages import agentkit
@@ -190,6 +190,7 @@ def test_container_settings_are_known_keys() -> None:
     names = set(re.findall(r"name: '(DOCWIKI_[A-Z0-9_]+)'", main_text()))
     assert names, "no DOCWIKI_* container settings found"
     known.add(ENABLE_ENV)  # the portal's live ask (docwiki.portal.live_ask)
+    known.add(STREAM_PROGRESS_ENV)  # its progress steps (docwiki.portal.live_ask)
     known.add(OWNERS_ENV)  # the portal's owners (docwiki.portal.owner, ADR 0009)
     assert names <= known, f"unknown settings: {sorted(names - known)}"
     for required in (

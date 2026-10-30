@@ -374,6 +374,8 @@ export interface Strings {
     tooShort: string
     tooLong: (max: number) => string
     waiting: (seconds: number) => string
+    /** What the live agent is doing, by step key of the portal (`tool:search`, `writing`…). */
+    liveSteps: Readonly<Record<string, string>>
     examples: readonly string[]
   }
 }

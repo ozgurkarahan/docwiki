@@ -512,9 +512,33 @@ export function refusalMessage(payload: unknown, t: Strings = en): string {
 }
 
 export type LivePoll =
-  | { state: "running"; elapsed: number }
+  | { state: "running"; elapsed: number; step: LiveStep | null }
   | { state: "answer"; status: "done" | "unverified"; answer: AskAnswer }
   | { state: "failed"; status: "error" | "busy"; message: string }
+
+/** Steps the portal reports while the agent works (fixed keys, never model or document text). */
+export const LIVE_STEPS = [
+  "tool:answer_context",
+  "tool:search",
+  "tool:read_page",
+  "tool:get_evidence",
+  "tool:query_table",
+  "tool:glossary",
+  "tool:get_links",
+  "tool:get_index",
+  "tool:list_skills",
+  "tool:get_skill",
+  "tool:recent_changes",
+  "tool",
+  "writing",
+] as const
+export type LiveStep = (typeof LIVE_STEPS)[number]
+
+function liveStep(value: unknown): LiveStep | null {
+  return typeof value === "string" && (LIVE_STEPS as readonly string[]).includes(value)
+    ? (value as LiveStep)
+    : null
+}
 
 /**
  * A poll reply of `GET /api/ask/{job_id}`. The reply is data: the answer goes through the same
@@ -529,7 +553,7 @@ export function parseLivePoll(payload: unknown, t: Strings = en): LivePoll {
     typeof payload.elapsed_s === "number" && payload.elapsed_s >= 0 ? payload.elapsed_s : 0
   switch (payload.status) {
     case "running":
-      return { state: "running", elapsed }
+      return { state: "running", elapsed, step: liveStep(payload.step) }
     case "error":
     case "busy":
       return { state: "failed", status: payload.status, message: message || table(t).ask.liveFailed }
@@ -561,9 +585,15 @@ export function parseLivePoll(payload: unknown, t: Strings = en): LivePoll {
   }
 }
 
-/** "The Researcher is reading the wiki… 12 s" */
-export function waitingLabel(elapsedSeconds: number, t: Strings = en): string {
-  return table(t).ask.waiting(Math.max(Math.floor(elapsedSeconds), 0))
+/** "The Researcher is reading the wiki… 12 s", or the current step: "Searching the wiki… 12 s" */
+export function waitingLabel(
+  elapsedSeconds: number,
+  t: Strings = en,
+  step: LiveStep | null = null,
+): string {
+  const seconds = Math.max(Math.floor(elapsedSeconds), 0)
+  const label = step ? (table(t).ask.liveSteps[step] ?? "") : ""
+  return label ? `${label}… ${seconds} s` : table(t).ask.waiting(seconds)
 }
 
 // ----- Drawer details: numbering, examples, the last live answers -----

@@ -180,6 +180,74 @@ async def test_no_headers_means_no_extra_headers_argument() -> None:
     assert "extra_headers" not in call
 
 
+class _Stream:
+    """An async iterator of Responses API stream events, like the SDK's stream."""
+
+    def __init__(self, *events: dict[str, Any]) -> None:
+        self.events = list(events)
+
+    def __aiter__(self) -> _Stream:
+        return self
+
+    async def __anext__(self) -> dict[str, Any]:
+        if not self.events:
+            raise StopAsyncIteration
+        return self.events.pop(0)
+
+
+async def test_with_progress_the_call_streams_and_reports_allowlisted_steps() -> None:
+    final = response(
+        mcp_call("answer_context", {"question": "windows"}, item_id="mcp_1"),
+        message(ANSWER_TEXT),
+    )
+    client = _client(
+        _Stream(
+            {"type": "response.created"},
+            {"type": "response.output_item.added", "item": {"type": "mcp_list_tools"}},
+            {
+                "type": "response.output_item.added",
+                "item": {"type": "mcp_call", "name": "answer_context"},
+            },
+            {
+                "type": "response.output_item.added",
+                "item": {"type": "mcp_call", "name": "evil name; drop"},
+            },
+            {"type": "response.output_item.added", "item": {"type": "message"}},
+            {"type": "response.output_text.delta", "delta": "secret text"},
+            {"type": "response.completed", "response": final},
+        )
+    )
+    steps: list[str] = []
+    answer = await client.ask(QUESTION, progress=steps.append)
+    (call,) = _calls(client)
+    assert call["stream"] is True
+    assert steps == ["tool:answer_context", "tool", "writing"]
+    assert answer.text == ANSWER_TEXT
+    assert [t.name for t in answer.tool_calls] == ["answer_context"]
+
+
+async def test_a_stream_without_a_final_response_is_an_error() -> None:
+    client = _client(_Stream({"type": "response.created"}))
+    with pytest.raises(AgentInvocationError, match="without a response"):
+        await client.ask(QUESTION, progress=lambda step: None)
+
+
+async def test_a_failing_progress_callback_never_breaks_the_answer() -> None:
+    final = response(message("Not found in the wiki."))
+    client = _client(
+        _Stream(
+            {"type": "response.output_item.added", "item": {"type": "message"}},
+            {"type": "response.completed", "response": final},
+        )
+    )
+
+    def broken(step: str) -> None:
+        raise RuntimeError("drawer gone")
+
+    answer = await client.ask(QUESTION, progress=broken)
+    assert answer.text == "Not found in the wiki."
+
+
 def _ingest_flow(*, approved_output: bool) -> tuple[Any, ...]:
     first = response(
         list_tools("ingest_start", "run_status"),

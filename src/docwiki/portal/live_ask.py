@@ -4,10 +4,12 @@ ADR 0008. The portal serves the wiki, so the drawer calls the same origin::
 
     GET  /api/ask/status    {"enabled": bool}                  (always 200)
     POST /api/ask           {"question": "..."}  ->  202 {"job_id": "..."}
-    GET  /api/ask/{job_id}  {"status", "elapsed_s", "answer"?, "message"?}
+    GET  /api/ask/{job_id}  {"status", "elapsed_s", "step"?, "answer"?, "message"?}
 
 A question runs :meth:`AgentClient.ask` in an asyncio task and the browser polls the job (no
-sign-in: the visitor is anonymous). The agent is
+sign-in: the visitor is anonymous). With ``DOCWIKI_LIVE_ASK_STREAM_PROGRESS=1`` the agent call
+streams and ``step`` names what the agent is doing (an allowlisted key, :data:`STEPS`). A verified
+answer is reused, in memory, for the same question on the same site for a few minutes. The agent is
 reached through a gateway that holds the real limits (per-visitor rate, token budgets, a daily
 cut-off); the guards here only protect the portal and tell the visitor early:
 
@@ -20,7 +22,11 @@ cut-off); the guards here only protect the portal and tell the visitor early:
 **Gate before display.** An answer is shown as verified only when every ``[n]`` of its text names
 a source that is an evidence sidecar path (``evidence/<source_id>/<locator>.md``) AND whose page
 exists in the site being served. Otherwise it is returned as ``unverified``: the text without its
-citations and a message that says so. The converter turns the answer into the drawer's
+citations and a message that says so. The checks of filed answers then run on a verified answer:
+every number of a cited sentence must appear in the text of the evidence page it cites (the same
+check as ``docwiki file-answer``; a miss adds a visible banner, as it adds a warning for the
+owner), and an injection canary (``DOCWIKI_CANARIES``) in the text is redacted and makes the
+answer unverified. The converter turns the answer into the drawer's
 ``AskAnswer`` shape (``docwiki.site.answers``) with ``live: true``; the drawer renders it with DOM
 nodes and ``textContent`` only. Exception text never reaches the visitor; it is logged. Questions
 may contain personal data: they are not logged above DEBUG, and visitors are logged hashed.
@@ -31,6 +37,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import hashlib
+import html
 import json
 import logging
 import os
@@ -38,7 +45,7 @@ import re
 import secrets
 import time
 import uuid
-from collections import deque
+from collections import OrderedDict, deque
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime
@@ -52,20 +59,24 @@ from starlette.routing import Route
 from docwiki.agents_client.citations import Source, inline_citations
 from docwiki.agents_client.client import AgentAnswer, AgentClient, AgentClientSettings
 from docwiki.agents_client.errors import AgentConfigurationError, AgentInvocationError
-from docwiki.answers.filing import NOT_FOUND_RE, tool_steps
+from docwiki.answers.filing import NOT_FOUND_RE, check_cited_numbers, tool_steps
 from docwiki.contracts.enums import badge_for
 from docwiki.contracts.safety import sanitize_markdown
+from docwiki.contracts.settings import SettingsKeys
 from docwiki.site.answers import markdown_paragraphs
 
 __all__ = [
     "BUSY_MESSAGE",
     "ENABLE_ENV",
     "LIVE_BANNER",
+    "NUMBERS_BANNER",
+    "STREAM_PROGRESS_ENV",
     "UNVERIFIED_MESSAGE",
     "VISITOR_HEADER",
     "LiveAsk",
     "LiveAskRefused",
     "LiveAskSettings",
+    "canaries_from_env",
     "live_answer",
     "live_ask_routes",
     "visitor_ip",
@@ -74,12 +85,18 @@ __all__ = [
 log = logging.getLogger("docwiki.portal.live_ask")
 
 ENABLE_ENV = "DOCWIKI_LIVE_ASK"
+STREAM_PROGRESS_ENV = f"{ENABLE_ENV}_STREAM_PROGRESS"
 VISITOR_HEADER = "X-Visitor-IP"
 """Header the gateway reads to rate-limit per visitor, and removes before the Foundry call."""
 LIVE_BANNER = "Live answer from the Researcher agent — not reviewed by the owner."
 UNVERIFIED_MESSAGE = (
     "This answer could not be checked against the sources, so it is not shown as verified."
 )
+NUMBERS_BANNER = (
+    "Check the numbers: {count} cited sentence{s} contain{verb} a number that is not in the "
+    "evidence it cites."
+)
+REDACTED = "[redacted]"
 BUSY_MESSAGE = (
     "The live agent has reached its limit for now. The answers below were reviewed and filed."
 )
@@ -91,6 +108,10 @@ HOME_SLUG = "index"
 _CITE_RE = re.compile(r"[ \t]*\[(\d{1,3})\](?![(:])")
 _EVIDENCE_SLUG = "evidence/{source_id}/{locator_key}"
 _MAX_IP_CHARS = 64
+_ARTICLE_RE = re.compile(r"<article\b[^>]*>(?P<body>.*?)</article>", re.DOTALL | re.IGNORECASE)
+_DROP_RE = re.compile(r"<(script|style|svg)\b.*?</\1>", re.DOTALL | re.IGNORECASE)
+_TAG_RE = re.compile(r"<[^>]+>")
+_MAX_EVIDENCE_BYTES = 2_000_000
 
 JobStatus = Literal["running", "done", "unverified", "error", "busy"]
 
@@ -117,6 +138,16 @@ class LiveAskSettings:
     max_running: int = 3
     timeout_s: float = 200.0
     result_ttl_s: float = 900.0
+    stream_progress: bool = False
+    """``DOCWIKI_LIVE_ASK_STREAM_PROGRESS=1``: stream the agent's calls to show its steps while it
+    works (off until the gateway is checked to pass streamed responses)."""
+    cache_ttl_s: float = 600.0
+    """A verified answer is given again, without a model call, to the same question on the same
+    site for this long (memory only: live answers are never filed or persisted)."""
+    cache_size: int = 100
+    busy_pause_s: float = 3600.0
+    """After the gateway refuses a question (limit or daily cut-off), cached answers are not
+    given either for this long: the filed answers are the fallback."""
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> LiveAskSettings:
@@ -145,15 +176,44 @@ class LiveAskSettings:
             max_running=number("MAX_RUNNING", defaults.max_running, int),
             timeout_s=number("TIMEOUT_SECONDS", defaults.timeout_s, float),
             result_ttl_s=number("RESULT_TTL_SECONDS", defaults.result_ttl_s, float),
+            stream_progress=(values.get(STREAM_PROGRESS_ENV) or "").strip() == "1",
+            cache_ttl_s=number("CACHE_SECONDS", defaults.cache_ttl_s, float),
+            cache_size=number("CACHE_SIZE", defaults.cache_size, int),
+            busy_pause_s=number("BUSY_PAUSE_SECONDS", defaults.busy_pause_s, float),
         )
 
 
 class Asker(Protocol):
     async def ask(
-        self, question: str, *, agent: str = ..., headers: Mapping[str, str] | None = ...
+        self,
+        question: str,
+        *,
+        agent: str = ...,
+        headers: Mapping[str, str] | None = ...,
+        progress: Callable[[str], None] | None = ...,
     ) -> AgentAnswer: ...
 
     async def aclose(self) -> None: ...
+
+
+STEPS = frozenset(
+    {
+        "tool:answer_context",
+        "tool:search",
+        "tool:read_page",
+        "tool:get_evidence",
+        "tool:query_table",
+        "tool:glossary",
+        "tool:get_links",
+        "tool:get_index",
+        "tool:list_skills",
+        "tool:get_skill",
+        "tool:recent_changes",
+        "writing",
+    }
+)
+"""Steps a visitor may see while the agent works: fixed keys the drawer translates, never text
+from the model or a document."""
 
 
 @dataclass
@@ -165,7 +225,13 @@ class LiveJob:
     answer: dict[str, Any] | None = None
     message: str | None = None
     finished: float | None = None
+    step: str | None = None
     task: asyncio.Task[None] | None = field(default=None, repr=False)
+
+    def report(self, step: str) -> None:
+        """Progress of the agent (allowlisted keys only; anything else reads as a tool call)."""
+        if self.status == "running":
+            self.step = step if step in STEPS else "tool"
 
 
 # ---------------------------------------------------------------------- the gate and converter
@@ -188,6 +254,35 @@ def _badge(provenance: str) -> str:
         return "paraphrase"
 
 
+def _evidence_text(site_root: Path, source: Source) -> str:
+    """Visible text of the cited evidence page (its ``<article>``, else the whole page)."""
+    page = site_root / "evidence" / source.source_id / f"{source.locator_key}.html"
+    try:
+        if page.stat().st_size > _MAX_EVIDENCE_BYTES:
+            return ""
+        markup = page.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    match = _ARTICLE_RE.search(markup)
+    body = _DROP_RE.sub(" ", match.group("body") if match else markup)
+    return html.unescape(_TAG_RE.sub(" ", body))
+
+
+def canaries_from_env(env: Mapping[str, str] | None = None) -> tuple[str, ...]:
+    """Injection canaries of ``DOCWIKI_CANARIES`` (comma-separated), as the gates read them."""
+    values = os.environ if env is None else env
+    raw = values.get(SettingsKeys.CANARIES) or ""
+    return tuple(dict.fromkeys(item.strip() for item in raw.split(",") if item.strip()))
+
+
+def _redact(text: str, canaries: tuple[str, ...]) -> tuple[str, int]:
+    count = 0
+    for canary in canaries:
+        text, hits = re.subn(re.escape(canary), REDACTED, text, flags=re.IGNORECASE)
+        count += hits
+    return text, count
+
+
 def live_answer(
     answer: AgentAnswer,
     *,
@@ -195,27 +290,53 @@ def live_answer(
     job_id: str,
     site_root: Path | None,
     today: date,
+    canaries: tuple[str, ...] = (),
 ) -> tuple[Literal["done", "unverified", "error"], dict[str, Any], str | None]:
     """``(status, AskAnswer, message)`` of a live answer, after the gate.
 
     ``done`` when every citation of the text resolves to an evidence page of the served site (or
-    the agent honestly found nothing); ``unverified`` with the citations removed otherwise;
-    ``error`` when no text is left.
+    the agent honestly found nothing); ``unverified`` with the citations removed otherwise, or
+    when the text held an injection canary (redacted); ``error`` when no text is left. A done
+    answer whose cited sentences hold numbers absent from their evidence carries
+    :data:`NUMBERS_BANNER`.
     """
-    body = sanitize_markdown(answer.body)[0].strip()
+    body, redacted = _redact(sanitize_markdown(answer.body)[0].strip(), canaries)
+    steps: list[str] = []
+    for step in tool_steps(answer.tool_calls):
+        shown, hits = _redact(step, canaries)
+        steps.append(shown)
+        redacted += hits
+    # the source list is model text too: its titles and labels become citation text
+    redacted += _redact(answer.text, canaries)[1] - _redact(answer.body, canaries)[1]
     used = inline_citations(body)
     listed = {source.n: source for source in answer.sources}
     valid = {n: source for n, source in listed.items() if _evidence_page(site_root, source)}
     abstains = not used and NOT_FOUND_RE.search(body) is not None
-    verified = abstains or (bool(used) and all(n in valid for n in used))
+    verified = not redacted and (abstains or (bool(used) and all(n in valid for n in used)))
     cites = set(used) if verified else set()
     text = _CITE_RE.sub(lambda match: f"[^c{match.group(1)}]", body)
     paragraphs = markdown_paragraphs(text, cites)
-    steps = tool_steps(answer.tool_calls)
+    banners = [LIVE_BANNER]
+    checked = 0
+    if verified and used and site_root is not None:
+        evidence = {n: _evidence_text(site_root, valid[n]) for n in used}
+        checked, missing = check_cited_numbers(text, evidence)
+        if missing:
+            count = len(missing)
+            banners.append(
+                NUMBERS_BANNER.format(
+                    count=count, s="" if count == 1 else "s", verb="s" if count == 1 else ""
+                )
+            )
     provenance = (
         f"Answered live by the Researcher agent ({answer.agent} version {answer.version or '?'}) "
         f"on {today.isoformat()}."
     )
+    if checked:
+        provenance += (
+            f" The numbers of {checked} cited sentence{'s' if checked > 1 else ''} were checked "
+            "against the evidence they cite."
+        )
     citations = [
         {
             "n": n,
@@ -234,7 +355,7 @@ def live_answer(
         "slug": HOME_SLUG,
         "question": question,
         "date": today.isoformat(),
-        "banners": [LIVE_BANNER],
+        "banners": banners,
         "paragraphs": paragraphs,
         "citations": citations,
         "steps": steps,
@@ -278,9 +399,11 @@ class LiveAsk:
         site_root: Callable[[], Path | None] = lambda: None,
         clock: Callable[[], float] = time.monotonic,
         today: Callable[[], date] = lambda: datetime.now(UTC).date(),
+        canaries: tuple[str, ...] = (),
     ) -> None:
         self.settings = settings
         self.site_root = site_root
+        self.canaries = canaries
         self._client_factory = client_factory
         self._client: Asker | None = None
         self._clock = clock
@@ -288,6 +411,8 @@ class LiveAsk:
         self._jobs: dict[str, LiveJob] = {}
         self._asked: dict[str, deque[float]] = {}
         self._salt = secrets.token_bytes(16)
+        self._cache: OrderedDict[tuple[str, str], tuple[float, dict[str, Any]]] = OrderedDict()
+        self._busy_since: float | None = None
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> LiveAsk | None:
@@ -302,7 +427,9 @@ class LiveAsk:
         except (ValueError, AgentConfigurationError) as exc:
             log.error("live ask is off: %s", exc)
             return None
-        return cls(settings, lambda: AgentClient(agent_settings))
+        return cls(
+            settings, lambda: AgentClient(agent_settings), canaries=canaries_from_env(values)
+        )
 
     # -- guards ------------------------------------------------------------------------------
 
@@ -347,12 +474,54 @@ class LiveAsk:
         asked.append(self._clock())
         job = LiveJob(id=uuid.uuid4().hex, ip=ip, started=self._clock())
         self._jobs[job.id] = job
+        cached = self._cached(text)
+        if cached is not None:
+            job.status, job.answer = "done", {**cached, "id": f"live:{job.id}"}
+            job.finished = self._clock()
+            log.info("live_ask.cached job=%s visitor=%s", job.id, self.hashed(ip))
+            return job
         log.info(
             "live_ask.start job=%s visitor=%s question_chars=%d", job.id, self.hashed(ip), len(text)
         )
         log.debug("live_ask.question job=%s text=%r", job.id, text)
         job.task = asyncio.get_running_loop().create_task(self._run(job, text))
         return job
+
+    # -- the answer cache --------------------------------------------------------------------
+
+    def _cache_key(self, question: str) -> tuple[str, str] | None:
+        root = self.site_root()
+        if root is None:
+            return None
+        normal = " ".join(question.casefold().split()).rstrip(" ?!.。？")
+        return str(root), normal
+
+    def _cached(self, question: str) -> dict[str, Any] | None:
+        """A verified answer to the same question on the same site, while it is fresh and the
+        gateway has not refused a question recently."""
+        now = self._clock()
+        if self._busy_since is not None:
+            if now - self._busy_since < self.settings.busy_pause_s:
+                return None
+            self._busy_since = None
+        key = self._cache_key(question)
+        entry = self._cache.get(key) if key is not None else None
+        if entry is None or key is None:
+            return None
+        if now - entry[0] > self.settings.cache_ttl_s:
+            del self._cache[key]
+            return None
+        self._cache.move_to_end(key)
+        return entry[1]
+
+    def _remember(self, question: str, item: dict[str, Any]) -> None:
+        key = self._cache_key(question)
+        if key is None:
+            return
+        self._cache[key] = (self._clock(), item)
+        self._cache.move_to_end(key)
+        while len(self._cache) > self.settings.cache_size:
+            self._cache.popitem(last=False)
 
     # -- running -----------------------------------------------------------------------------
 
@@ -364,9 +533,17 @@ class LiveAsk:
     async def _run(self, job: LiveJob, question: str) -> None:
         try:
             async with asyncio.timeout(self.settings.timeout_s):
-                answer = await self._get_client().ask(
-                    question, agent="researcher", headers={VISITOR_HEADER: job.ip}
-                )
+                if self.settings.stream_progress:
+                    answer = await self._get_client().ask(
+                        question,
+                        agent="researcher",
+                        headers={VISITOR_HEADER: job.ip},
+                        progress=job.report,
+                    )
+                else:
+                    answer = await self._get_client().ask(
+                        question, agent="researcher", headers={VISITOR_HEADER: job.ip}
+                    )
         except TimeoutError:
             job.status, job.message = "error", TIMEOUT_MESSAGE
             log.warning("live_ask.timeout job=%s", job.id)
@@ -374,6 +551,7 @@ class LiveAsk:
             # The gateway answers 429 for rate limits and 403 once a daily token quota is spent.
             if exc.status_code in (429, 403):
                 job.status, job.message = "busy", BUSY_MESSAGE
+                self._busy_since = self._clock()
             else:
                 job.status, job.message = "error", FAILED_MESSAGE
             log.warning("live_ask.failed job=%s http=%s error=%s", job.id, exc.status_code, exc)
@@ -391,12 +569,15 @@ class LiveAsk:
                     job_id=job.id,
                     site_root=self.site_root(),
                     today=self._today(),
+                    canaries=self.canaries,
                 )
             except Exception:
                 job.status, job.message = "error", FAILED_MESSAGE
                 log.exception("live_ask.gate_failed job=%s", job.id)
             else:
                 job.status, job.answer, job.message = status, item, message
+                if status == "done":
+                    self._remember(question, item)
                 log.info(
                     "live_ask.finish job=%s visitor=%s status=%s citations=%d tool_calls=%d "
                     "tokens=%d latency_s=%.1f",
@@ -419,6 +600,8 @@ class LiveAsk:
             return None
         end = job.finished if job.finished is not None else self._clock()
         payload: dict[str, Any] = {"status": job.status, "elapsed_s": round(end - job.started, 1)}
+        if job.status == "running" and job.step:
+            payload["step"] = job.step
         if job.answer is not None:
             payload["answer"] = job.answer
         if job.message:
