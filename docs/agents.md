@@ -20,7 +20,7 @@ runs in a Container Apps Job, and the agents read its results or ask it to run
 
 | Tool | Role | Approval (Librarian) | What it does |
 |---|---|---|---|
-| `answer_context` | Wiki.Read | none | The Researcher's first call: best sections and source blocks with their text and citations, the home index, the scope's hub and the computed views |
+| `answer_context` | Wiki.Read | none | The Researcher's first call: best sections and source blocks with their text and citations (spread across sources and, without `within`, across chantiers), the home index, the scope's hub, the chantiers the hits come from and the computed views |
 | `search` | Wiki.Read | none | Full-text search over page sections and raw source blocks, with glossary synonyms |
 | `read_page` | Wiki.Read | none | A page or one section, with frontmatter, links and one citation per footnote |
 | `get_index` | Wiki.Read | none | Home, sources, entities (by type), topics, queries, glossary or log index |

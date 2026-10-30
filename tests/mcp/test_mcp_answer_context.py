@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -13,7 +14,13 @@ from test_mcp_within import HUB, scoped  # noqa: F401 - the scoped release fixtu
 
 from docwiki.mcp.config import McpConfig
 from docwiki.mcp.source import FolderReleaseSource
-from docwiki.mcp.tools_read import ReadTools, ToolInputError, _dominant_scope
+from docwiki.mcp.tools_read import (
+    ReadTools,
+    ToolInputError,
+    _Candidate,
+    _dominant_scope,
+    _spread_hits,
+)
 
 Json = Callable[[str], dict[str, Any]]
 QUESTION = "date de livraison des fenêtres"
@@ -94,6 +101,18 @@ def test_within_keeps_one_scope_and_adds_its_hub(scoped: ReadTools, as_json: Jso
     company = as_json(scoped.answer_context("livraison des menuiseries", within="entreprise"))
     assert {hit["page_id"] for hit in company["hits"]} == {MINUTES}
     assert "hub" not in company, "the default scope has no hub here"
+    assert "scopes" not in data and "scopes" not in company, "one scope asked: no spread"
+
+
+def test_without_within_hits_of_several_scopes_are_listed(scoped: ReadTools, as_json: Json) -> None:  # noqa: F811
+    data = as_json(scoped.answer_context("livraison des menuiseries", limit=10))
+    scopes = {hit["scope"] for hit in data["hits"] if hit.get("scope")}
+    assert len(scopes) >= 2
+    listed = data["scopes"]
+    assert {item["scope"] for item in listed} == scopes
+    assert sum(item["hits"] for item in listed) == sum(1 for h in data["hits"] if h.get("scope"))
+    moreau = next(item for item in listed if item["scope"] == "moreau")
+    assert moreau["hub_path"].endswith(".md")
 
 
 def test_restricted_content_never_appears(reads: ReadTools, as_json: Json) -> None:
@@ -136,6 +155,51 @@ def test_dominant_scope_names_the_hub_to_add() -> None:
     assert _dominant_scope([{"scope": "a"}, {"scope": "b"}]) is None, "no majority"
     assert _dominant_scope([{"scope": "a"}, {}, {}, {}, {}]) is None, "one hit is not enough"
     assert _dominant_scope([{}, {}]) is None
+
+
+def _hit(name: str, score: float) -> SimpleNamespace:
+    return SimpleNamespace(name=name, score=score)
+
+
+def _candidates(*specs: tuple[str, float, str | None, str]) -> list[_Candidate]:
+    return [_Candidate(_hit(name, score), scope, group) for name, score, scope, group in specs]
+
+
+def _names(hits: list[Any]) -> list[str]:
+    return [hit.name for hit in hits]
+
+
+def test_one_source_gets_at_most_two_hits_before_the_others() -> None:
+    items = _candidates(
+        ("b1", 9, "x", "src:b"),
+        ("b2", 8, "x", "src:b"),
+        ("b3", 7, "x", "src:b"),
+        ("a1", 6, "x", "src:a"),
+        ("b4", 5, "x", "src:b"),
+    )
+    assert _names(_spread_hits(items, 3, by_scope=True)) == ["b1", "b2", "a1", "b3", "b4"]
+
+
+def test_without_within_every_strong_scope_gets_a_slot_in_the_window() -> None:
+    items = _candidates(
+        ("m1", 10, "moreau", "p1"),
+        ("m2", 9, "moreau", "p2"),
+        ("m3", 8, "moreau", "p3"),
+        ("e1", 7, None, "p4"),
+        ("n1", 6, "nacrines", "p5"),
+        ("s1", 2, "ecole", "p6"),  # too weak for a slot: under half of the top score
+    )
+    spread = _names(_spread_hits(items, 3, by_scope=True))
+    assert spread[:3] == ["m1", "m2", "n1"]
+    assert sorted(spread) == sorted(item.hit.name for item in items), "nothing is dropped"
+    assert _names(_spread_hits(items, 3, by_scope=False))[:3] == ["m1", "m2", "m3"]
+
+
+def test_one_scope_or_a_single_slot_keeps_the_ranking() -> None:
+    items = _candidates(("a", 3, "moreau", "p1"), ("b", 2, "moreau", "p2"), ("c", 1, None, "p3"))
+    assert _names(_spread_hits(items, 2, by_scope=True)) == ["a", "b", "c"]
+    two = _candidates(("a", 3, "moreau", "p1"), ("b", 2, "nacrines", "p2"))
+    assert _names(_spread_hits(two, 1, by_scope=True)) == ["a", "b"]
 
 
 def test_no_hits_suggests_abstaining(reads: ReadTools, as_json: Json) -> None:

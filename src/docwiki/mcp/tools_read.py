@@ -132,6 +132,63 @@ def _dominant_scope(rows: Sequence[dict[str, Any]]) -> str | None:
     return best if count >= 2 and count * 2 >= len(rows) else None
 
 
+MAX_CONTEXT_HITS_PER_SOURCE = 2
+"""Hits of one source or page in a row before the others get their turn (``answer_context``)."""
+SCOPE_SLOT_RATIO = 0.5
+"""A scope gets a slot in the window when its best hit scores at least this share of the top."""
+
+
+@dataclass(frozen=True)
+class _Candidate:
+    hit: Any
+    scope: str | None
+    group: str
+
+
+def _spread_hits(items: Sequence[_Candidate], window: int, *, by_scope: bool) -> list[Any]:
+    """Hits in answer order: at most :data:`MAX_CONTEXT_HITS_PER_SOURCE` of one source or page
+    before the rest, then (``by_scope``) the best hit of every scope that scores at least
+    :data:`SCOPE_SLOT_RATIO` of the top one inside the first ``window`` hits, replacing the lowest
+    hits of the scopes that have several. Deterministic; nothing is dropped, only reordered."""
+    counts: dict[str, int] = {}
+    kept: list[_Candidate] = []
+    deferred: list[_Candidate] = []
+    for item in items:
+        if counts.get(item.group, 0) < MAX_CONTEXT_HITS_PER_SOURCE:
+            counts[item.group] = counts.get(item.group, 0) + 1
+            kept.append(item)
+        else:
+            deferred.append(item)
+    ordered = kept + deferred
+    if not by_scope or not ordered or window < 2:
+        return [item.hit for item in ordered]
+    top = float(ordered[0].hit.score)
+    firsts: list[_Candidate] = []
+    seen: set[str] = set()
+    for item in ordered:
+        if item.scope and item.scope not in seen:
+            seen.add(item.scope)
+            if float(item.hit.score) >= top * SCOPE_SLOT_RATIO:
+                firsts.append(item)
+    chosen = ordered[:window]
+    if len(firsts) < 2:
+        return [item.hit for item in ordered]
+    for first in firsts:
+        if any(item is first for item in chosen):
+            continue
+        for index in range(len(chosen) - 1, -1, -1):
+            scope = chosen[index].scope
+            same = sum(1 for item in chosen if item.scope == scope)
+            if same > 1 and not any(item is chosen[index] for item in firsts):
+                del chosen[index]
+                chosen.append(first)
+                break
+    rank = {id(item): position for position, item in enumerate(ordered)}
+    chosen.sort(key=lambda item: rank[id(item)])
+    picked = {id(item) for item in chosen}
+    return [item.hit for item in chosen] + [item.hit for item in ordered if id(item) not in picked]
+
+
 def _norm(text: str) -> str:
     return " ".join(tokenize(text))
 
@@ -558,14 +615,15 @@ class ReadTools:
         language: str | None,
         wanted: int,
     ) -> list[Any]:
-        """Search hits for the question, one per section or per source locator, best first,
-        without content above the release's audience."""
+        """Search hits for the question, one per section or per source locator, without content
+        above the release's audience, in answer order (:func:`_spread_hits`: a few hits per
+        source, and every strong scope inside the window when no ``within`` is given)."""
         raw = snap.search.search(
             question, limit=min(max(wanted * 3, 20), 100), within=scope, lang=language
         )
         by_path, by_id = self._by_path(snap), self._by_id(snap)
         seen: set[tuple[str, str]] = set()
-        out: list[Any] = []
+        out: list[_Candidate] = []
         for hit in raw:
             if hit.kind == "source-block":
                 key = (f"src:{hit.source_id}", str(hit.locator_key))
@@ -579,8 +637,9 @@ class ReadTools:
             if entry.type in _CONTEXT_SKIPPED_TYPES:
                 continue
             seen.add(key)
-            out.append(hit)
-        return out
+            group = f"src:{hit.source_id}" if hit.source_id else hit.path
+            out.append(_Candidate(hit, entry.scope, group))
+        return _spread_hits(out, wanted, by_scope=scope is None)
 
     def _context_hit(self, snap: Snapshot, hit: Any) -> _ContextHit | None:
         """The hit row, the full text of its section or evidence and the citations of that text
@@ -725,6 +784,16 @@ class ReadTools:
             hub = self._hub_for(snap, hub_scope, language) if hub_scope else None
             if hub is not None:
                 context["hub"] = self._bounded_page(snap, hub, CONTEXT_HUB_CHARS)
+            hit_scopes = [part.row["scope"] for part in parts if part.row.get("scope")]
+            if scope is None and len(set(hit_scopes)) >= 2:
+                spread: list[dict[str, Any]] = []
+                for value in sorted(set(hit_scopes), key=lambda s: (-hit_scopes.count(s), s)):
+                    item: dict[str, Any] = {"scope": value, "hits": hit_scopes.count(value)}
+                    scope_hub = self._hub_for(snap, value, language)
+                    if scope_hub is not None:
+                        item["hub_path"] = scope_hub.path
+                    spread.append(item)
+                context["scopes"] = spread
             context["views"] = [
                 {
                     "page_id": page.id,
