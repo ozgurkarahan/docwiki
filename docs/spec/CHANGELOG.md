@@ -193,3 +193,11 @@ Performance and trust of the live demo (plan of 2026-10-30).
 | Portal | Anonymous requests to a public-audience release are cacheable (`public, max-age=60, stale-while-revalidate=600` for pages, `max-age=3600` for assets); signed-in or non-public responses stay `private, no-cache`. Text files of 1 KB or more are gzipped at sync time and served with `Content-Encoding: gzip` and their own ETag. A new release reuses the verified unchanged files of the active one (hard link or copy) and downloads only the others (site.md §5). | Every request revalidated and travelled uncompressed; every release downloaded the whole site again. |
 | Releases | `upload_release` uploads in parallel (8 workers by default); the manifest and `current.json` are written only after every file succeeded. | Serial uploads dominated publish time. |
 | Pipeline page | One shared status computation for all viewers; the raw inventory is kept 30 s unless the release, a run or the queue changes, and an owner upload invalidates it at once; the page polls every 5 s while work runs, 15 s after three identical replies, and not while hidden. | Each poll listed every raw blob. |
+
+## v1.10
+
+Words and meaning search (hybrid retrieval plan of 2026-10-31).
+
+| Area | Change | Why |
+|---|---|---|
+| Evals | Researcher records keep the hit ids of each `search` and `answer_context` call (never text); `evals/retrieval_bench.py` measures candidate and served recall@k of `answer_context` on a release without an LLM and labels a run's missed citations (`absent`, `candidate_cut`, `served_unused`). Baseline on the served release, dev (104 required citations): candidate recall@10 44.7 %, @50 67.9 %; served recall@5 19.0 %, @10 10.6 %; of the ten 2026-10-27 misses, every missed citation of nine was among the first 50 candidates (not served or not cited), and one (q018) also missed a citation absent from them. | Measure retrieval before changing it: the misses were blamed on search without a number. |

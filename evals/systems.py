@@ -42,7 +42,7 @@ from evals.corpus import CorpusFile
 from evals.locators import compact_keys
 from evals.metrics import is_abstention
 from evals.questions import GoldenQuestion
-from evals.records import Answer, Citation, ToolCallRecord, Usage
+from evals.records import Answer, Citation, ToolCallRecord, Usage, tool_hits
 
 __all__ = [
     "LONG_CONTEXT_PROMPT_VERSION",
@@ -209,6 +209,7 @@ class ResearcherSystem(EvalSystem):
                     server_label=call.server_label,
                     arguments=call.arguments,
                     error=call.error,
+                    hits=tool_hits(call.name, call.output) if call.status == "completed" else None,
                 )
                 for call in result.tool_calls
             ],
