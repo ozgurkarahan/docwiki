@@ -2,7 +2,8 @@
 
 The "Ask this wiki" drawer can let an anonymous visitor ask the Researcher agent a question. The
 answer appears in the drawer with its numbered citations, and is shown as verified only when every
-citation opens an evidence page of the wiki being served. The design is
+citation opens an evidence page of the wiki being served; the numbers of each cited sentence are
+then checked against that evidence. The design is
 [ADR 0008](adr/0008-one-experience-live-agent-in-the-wiki.md); this page is the setup.
 
 ```text
@@ -96,6 +97,8 @@ the Ask form.
 | Portal | questions per visitor and window | 3 per 300 s | `DOCWIKI_LIVE_ASK_QUESTIONS_PER_IP`, `DOCWIKI_LIVE_ASK_IP_WINDOW_SECONDS` |
 | Portal | time to answer | 200 s | `DOCWIKI_LIVE_ASK_TIMEOUT_SECONDS` |
 | Portal | a finished job stays readable | 900 s | `DOCWIKI_LIVE_ASK_RESULT_TTL_SECONDS` |
+| Portal | a verified answer is given again to the same question on the same release, without a model call | 600 s, 100 questions, memory only | `DOCWIKI_LIVE_ASK_CACHE_SECONDS`, `DOCWIKI_LIVE_ASK_CACHE_SIZE` |
+| Portal | no cached answer after the gateway refused a question | 3,600 s | `DOCWIKI_LIVE_ASK_BUSY_PAUSE_SECONDS` |
 | Gateway | questions per visitor | 3 per 300 s (`rate-limit-by-key`; 300 s is the longest window the v2 tiers accept) | policy |
 | Gateway | tokens per visitor | 20,000 per minute, 60,000 per day | policy |
 | Gateway | tokens for everyone | 1,500,000 per day: the daily cost cut-off | policy |
@@ -112,12 +115,27 @@ limit for now. The answers below were reviewed and filed." The filed answers kee
 
 ## What a visitor sees
 
+- While the agent works, "The Researcher is reading the wiki… 12 s". With
+  `DOCWIKI_LIVE_ASK_STREAM_PROGRESS=1` the portal streams the agent's Responses API calls and the
+  drawer names the current step instead ("Searching the wiki… 4 s", "Opening the evidence… 9 s",
+  "Writing the answer… 15 s"). Steps are fixed keys the drawer translates (`tool:<name>`,
+  `writing`), never text from the model or a document, and the answer itself is still shown only
+  after the gate below. Keep it off until the gateway is checked to pass streamed responses and
+  to count their tokens (one question, then the gateway's token metric).
 - A **verified** answer: its text, numbered citations that open the evidence beside the drawer,
   the agent's steps and the banner "Live answer from the Researcher agent — not reviewed by the
-  owner." The citation badges never say "quote verified": the live quote is not checked.
+  owner." Before it is shown, the portal runs the checks of filed answers on it: every number of
+  a cited sentence must appear in the evidence page it cites; a sentence that fails adds the banner
+  "Check the numbers: 1 cited sentence contains a number that is not in the evidence it cites."
+  The citation badges never say "quote verified": a live answer paraphrases, its quotes are not
+  matched.
 - An **unverified** answer (a citation is missing from the source list, is not an evidence path, or
-  has no page in this site): the text with its citations removed and "This answer could not be
-  checked against the sources, so it is not shown as verified."
+  has no page in this site, or the text held an injection canary of `DOCWIKI_CANARIES`, which is
+  redacted): the text with its citations removed and "This answer could not be checked against
+  the sources, so it is not shown as verified."
+- The same question again on the same release, within ten minutes: the verified answer is given
+  again at once, without a model call (the visitor limits still count it). Unverified answers are
+  never reused, and nothing is reused while the gateway refuses questions.
 - No "Open as a page" link: live answers are not filed. The owner can ask the same question with
   `docwiki file-answer`, review it and file it ([agents](agents.md#filing-an-answer-into-the-wiki)).
 
@@ -134,7 +152,10 @@ without the three settings, `GET /api/ask/status` answers `{"enabled": false}`, 
 
 - The visitor key can be forged when the ingress does not overwrite `X-Forwarded-For`; the gateway's
   global daily quota is what bounds the spend either way.
-- The citation gate proves that each cited evidence page exists in the site, not that the quoted
-  text is in it. Filed answers go through quote verification before they are published.
+- The citation gate proves that each cited evidence page exists in the site and holds the numbers
+  of the sentence that cites it, not that a paraphrase says what the evidence says. Filed answers
+  are reviewed by the owner before they are published.
+- The canary check reads `DOCWIKI_CANARIES` on the portal (the pack's `canaries.txt` is not in the
+  portal image); gate G08 already keeps canaries out of the release the agent reads.
 - The Researcher's MCP connection and its model deployment are the ones of the owner's agent: size
   the global quota with the cost of one answer in mind (about 0.12 USD, [cost.md](cost.md)).

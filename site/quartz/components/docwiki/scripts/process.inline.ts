@@ -5,8 +5,9 @@
 // storage, so they are rendered with DOM nodes and textContent only, and the only links are the
 // platform's sign-in pages and site-absolute wiki pages. The owner adds a document or rebuilds the
 // wiki with a PUT (the platform's sign-in refuses signed-in POSTs). Polling is fast while
-// something is in the pipeline, slow otherwise, pauses on a hidden tab and stops when Quartz
-// navigates away (window.addCleanup).
+// something is in the pipeline (slower once a few replies in a row are the same, fast again when
+// one changes), slow otherwise, pauses on a hidden tab (and asks again as soon as it is shown)
+// and stops when Quartz navigates away (window.addCleanup).
 //
 // Each document row has its four-phase bar and a "Follow this document" disclosure (its journey).
 // A poll updates the document rows by key: unchanged rows stay as they are, so focus, open
@@ -69,8 +70,24 @@ const PROCESS_PATH = "api/process"
 const UPLOAD_PATH = "api/owner/documents"
 const REBUILD_PATH = "api/owner/runs"
 const OWNER_HEADER = "X-DocWiki-Owner"
+// --- poll pacing (start): pure, run by tests/site/test_process_poll.py
+/** Polling while something is in the pipeline and the replies change. */
 const FAST_MS = 5_000
+/** Polling while something is in the pipeline but the last replies were all the same. */
+const BUSY_SLOW_MS = 15_000
+/** Polling while nothing is in the pipeline. */
 const SLOW_MS = 30_000
+/** Identical busy replies in a row before the polling slows from FAST_MS to BUSY_SLOW_MS. */
+const UNCHANGED_BEFORE_BACKOFF = 3
+
+/** The delay before the next poll: fast while the owner follows an upload or a rebuild and while
+ * busy replies change, slower after a few identical busy replies, slow when nothing is at work. */
+function pollDelay(busy: boolean, following: boolean, unchanged: number): number {
+  if (following) return FAST_MS
+  if (!busy) return SLOW_MS
+  return unchanged >= UNCHANGED_BEFORE_BACKOFF ? BUSY_SLOW_MS : FAST_MS
+}
+// --- poll pacing (end)
 /** An upload or a rebuild keeps the fast polling this long, until its pages appear. */
 const FOLLOW_MS = 10 * 60_000
 /** Rebuilds a day (the portal's limit; it says how many are left). */
@@ -1272,8 +1289,21 @@ document.addEventListener("nav", () => {
     if (alive && !document.hidden) timer = window.setTimeout(() => void poll(), ms)
   }
 
+  /** The last reply as received, and how many replies in a row were the same as it. */
+  let lastReply: string | null = null
+  let unchanged = 0
+  let polling = false
+  let again = false
+
   const poll = async () => {
     if (!alive) return
+    if (polling) {
+      // One request at a time: an upload, a rebuild or a visible tab asks for a fresh reply.
+      again = true
+      return
+    }
+    polling = true
+    window.clearTimeout(timer)
     try {
       const { status, payload } = await getJson(PROCESS_PATH)
       if (!alive) return
@@ -1281,6 +1311,9 @@ document.addEventListener("nav", () => {
       if (status === 404 && view === null) return
       const parsed = status === 200 ? parseView(payload) : null
       if (!parsed) throw new Error(`HTTP ${status}`)
+      const reply = JSON.stringify(payload)
+      unchanged = reply === lastReply ? unchanged + 1 : 0
+      lastReply = reply
       const first = view === null
       view = parsed
       note.hidden = true
@@ -1293,10 +1326,18 @@ document.addEventListener("nav", () => {
       }
     } catch (error) {
       if (!alive) return
+      unchanged += 1
       console.warn("DocWiki: the process status could not be read", error)
       note.hidden = false
+    } finally {
+      polling = false
     }
-    schedule(busy(view) ? FAST_MS : SLOW_MS)
+    if (again) {
+      again = false
+      void poll()
+      return
+    }
+    schedule(pollDelay(busy(view), Date.now() < followUntil, unchanged))
   }
 
   const onVisibility = () => {

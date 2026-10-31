@@ -4,6 +4,7 @@ retention, rollback and local materialisation of a release."""
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -72,17 +73,35 @@ def swap_current_pointer(
 
 
 def upload_release(
-    storage: Storage, staged: StagedRelease, *, prefix: str = StorageKeys.RELEASES
+    storage: Storage,
+    staged: StagedRelease,
+    *,
+    prefix: str = StorageKeys.RELEASES,
+    workers: int = 8,
 ) -> None:
-    """Copy a staged release to ``<prefix>/<release_id>/``; ``manifest.json`` is written last."""
+    """Copy a staged release to ``<prefix>/<release_id>/``; ``manifest.json`` is written last.
+
+    Files are uploaded by up to ``workers`` threads. The first failure cancels the uploads not
+    yet started, waits for the running ones and is raised; the manifest is then never written, so
+    the release stays incomplete and no pointer can name it.
+    """
     release_id = staged.release_id
     manifest_key = _key(prefix, release_id, ReleaseFiles.MANIFEST)
     if storage.exists(manifest_key):
         raise FileExistsError(f"release {release_id} already exists")
-    for rel_path in staged.manifest.files:
+
+    def put(rel_path: str) -> None:
         storage.write_bytes(
             _key(prefix, release_id, rel_path), (staged.root / rel_path).read_bytes()
         )
+
+    pool = ThreadPoolExecutor(max_workers=max(workers, 1), thread_name_prefix="docwiki-upload")
+    try:
+        futures = [pool.submit(put, rel_path) for rel_path in staged.manifest.files]
+        for future in as_completed(futures):
+            future.result()
+    finally:
+        pool.shutdown(wait=True, cancel_futures=True)
     manifest_bytes = (staged.root / ReleaseFiles.MANIFEST).read_bytes()
     if sha256_hex(manifest_bytes) != staged.manifest_sha256:
         raise ReleaseIntegrityError("staged manifest changed after finalize")
@@ -163,17 +182,20 @@ def publish_release(
     prefix: str = StorageKeys.RELEASES,
     keep: int | None = 10,
     now: datetime | None = None,
+    workers: int = 8,
 ) -> CurrentPointer:
-    """Upload, swap ``current.json`` atomically (ETag-guarded), then apply retention.
+    """Upload (``workers`` parallel uploads), swap ``current.json`` atomically (ETag-guarded),
+    then apply retention.
 
-    Refuses releases whose manifest records a failing blocking gate. Retention is best effort
+    Refuses releases whose manifest records a failing blocking gate. The pointer is swapped only
+    after every file and the manifest were uploaded. Retention is best effort
     (:func:`try_retention`) once the pointer is swapped; ``keep=None`` leaves it to the caller.
     """
     failing = staged.manifest.blocking_failures
     if failing:
         raise ValueError("blocking gates failed: " + ", ".join(gate.gate for gate in failing))
     current = read_current_pointer(storage, prefix)
-    upload_release(storage, staged, prefix=prefix)
+    upload_release(storage, staged, prefix=prefix, workers=workers)
     pointer = CurrentPointer(
         release_id=staged.release_id,
         created_at=(now or datetime.now(UTC)).replace(microsecond=0),

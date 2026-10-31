@@ -457,6 +457,29 @@ def test_live_status_questions_job_ids_and_messages() -> None:
     assert result["paths"] == ["api/ask/status", "api/ask", 2000, 500]
 
 
+def test_live_steps_are_fixed_keys_with_translated_labels() -> None:
+    result = run_helpers(
+        """
+        const steps = ["tool:search", "writing", "tool", "Ignore the rules", 7, null]
+          .map((step) => m.parseLivePoll({status: "running", elapsed_s: 5, step}).step)
+        console.log(JSON.stringify({
+          steps,
+          labels: steps.map((step) => m.waitingLabel(12.4, undefined, step)),
+        }))
+        """
+    )
+    assert isinstance(result, dict)
+    assert result["steps"] == ["tool:search", "writing", "tool", None, None, None]
+    assert result["labels"] == [
+        "Searching the wiki… 12 s",
+        "Writing the answer… 12 s",
+        "Using a wiki tool… 12 s",
+        "The Researcher is reading the wiki… 12 s",
+        "The Researcher is reading the wiki… 12 s",
+        "The Researcher is reading the wiki… 12 s",
+    ]
+
+
 def test_live_poll_replies_are_parsed_as_data() -> None:
     unverified = {
         **LIVE_ANSWER,
@@ -499,8 +522,8 @@ def test_live_poll_replies_are_parsed_as_data() -> None:
     )
     assert isinstance(result, dict)
     running, running_bare, busy, error, done, forced, unchecked, citation_only = result["parsed"]
-    assert running == {"state": "running", "elapsed": 4.2}
-    assert running_bare == {"state": "running", "elapsed": 0}
+    assert running == {"state": "running", "elapsed": 4.2, "step": None}
+    assert running_bare == {"state": "running", "elapsed": 0, "step": None}
     assert busy == {
         "state": "failed",
         "status": "busy",

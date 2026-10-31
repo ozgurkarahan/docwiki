@@ -44,6 +44,10 @@
   Blob (on start and when `current.json` changes), sets security headers (CSP `default-src 'self'`,
   `frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`) and
   runs behind ACA built-in auth with interactive Entra sign-in.
+- (v1.9) A new release reuses the verified unchanged files of the active one and downloads only
+  the others; text files are gzipped at sync time. Responses to anonymous requests for a
+  public-audience release are cacheable (pages 60 s with `stale-while-revalidate`, assets 1 h);
+  every other response stays `private, no-cache`.
 - Disabled by default (`enablePortal=false`).
 
 ## 6. Site security checks

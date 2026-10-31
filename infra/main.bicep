@@ -114,6 +114,9 @@ param enableLiveAsk bool = false
 @description('Gateway URL that proxies the Foundry project endpoint for the live ask (DOCWIKI_LIVE_ASK_ENDPOINT), e.g. https://<gateway>/<path>/api/projects/<project>. Passed in, never created here; the live ask stays off while empty.')
 param liveAskEndpoint string = ''
 
+@description('Show the live agent\'s steps while it answers (DOCWIKI_LIVE_ASK_STREAM_PROGRESS, docs/live-ask.md): the portal streams the Responses API calls through the gateway. Turn it on only after checking that the gateway passes streamed responses and counts their tokens.')
+param liveAskStreamProgress bool = false
+
 @description('Wake the ingest job from the queue (KEDA); false makes it a manually started job.')
 param enableEventTrigger bool = true
 
@@ -731,6 +734,10 @@ var liveAskEnv = liveAskEnabled
       {
         name: 'DOCWIKI_FOUNDRY_PROJECT_ENDPOINT'
         value: liveAskEndpoint
+      }
+      {
+        name: 'DOCWIKI_LIVE_ASK_STREAM_PROGRESS'
+        value: liveAskStreamProgress ? '1' : '0'
       }
     ]
   : []

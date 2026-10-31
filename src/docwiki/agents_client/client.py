@@ -22,6 +22,7 @@ openai 3.28):
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import importlib
 import inspect
 import json
@@ -56,6 +57,7 @@ __all__ = [
     "ApprovalCallback",
     "ApprovalDecision",
     "ApprovalRequest",
+    "ProgressCallback",
     "ToolCall",
     "ask",
     "format_answer",
@@ -134,6 +136,9 @@ class AgentAnswer(BaseModel):
 
 
 ApprovalCallback = Callable[[ApprovalRequest], bool | Awaitable[bool]]
+ProgressCallback = Callable[[str], None]
+"""Called with a step key while an answer streams: ``tool:<name>`` when the agent calls an MCP tool,
+``writing`` when it starts its answer. Keys carry no document text or tool argument."""
 
 
 @dataclass(frozen=True)
@@ -288,6 +293,7 @@ class AgentClient:
         approve: ApprovalCallback | None = None,
         version: str | None = None,
         headers: Mapping[str, str] | None = None,
+        progress: ProgressCallback | None = None,
     ) -> AgentAnswer:
         """Ask a deployed agent (``researcher``, ``librarian`` or a Foundry agent name).
 
@@ -296,7 +302,9 @@ class AgentClient:
         version; by default the latest version is resolved and pinned (reused for
         ``VERSION_CACHE_S``; a cached version that has disappeared is resolved again once).
         ``headers`` are extra HTTP headers of every Responses API call of this question (a
-        gateway reads them, for example to rate-limit per visitor).
+        gateway reads them, for example to rate-limit per visitor). With ``progress``, every
+        Responses API call streams and ``progress`` receives the step keys of
+        :data:`ProgressCallback` as they happen; the answer returned is the same.
         """
         if not question.strip():
             raise ValueError("the question is empty")
@@ -321,13 +329,13 @@ class AgentClient:
             return request
 
         try:
-            response = await self._create(openai, name, first_request(version))
+            response = await self._create(openai, name, first_request(version), progress)
         except AgentNotFoundError:
             if not from_cache:
                 raise
             self._latest.pop(name, None)
             version, definition_sha256, _ = await self._cached_latest_version(name)
-            response = await self._create(openai, name, first_request(version))
+            response = await self._create(openai, name, first_request(version), progress)
         reference = {"type": "agent_reference", "name": name, "version": version}
         responses = [response]
         approvals: list[ApprovalDecision] = []
@@ -379,7 +387,7 @@ class AgentClient:
             }
             if headers:
                 follow_up["extra_headers"] = dict(headers)
-            response = await self._create(openai, name, follow_up)
+            response = await self._create(openai, name, follow_up, progress)
             responses.append(response)
             tool_calls.extend(_tool_calls(response))
         text = "\n\n".join(chunk for item in responses for chunk in _message_texts(item))
@@ -398,9 +406,20 @@ class AgentClient:
             definition_sha256=definition_sha256,
         )
 
-    async def _create(self, openai: Any, name: str, request: dict[str, Any]) -> Any:
+    async def _create(
+        self,
+        openai: Any,
+        name: str,
+        request: dict[str, Any],
+        progress: ProgressCallback | None = None,
+    ) -> Any:
         try:
-            response = await openai.responses.create(**request)
+            if progress is None:
+                response = await openai.responses.create(**request)
+            else:
+                response = await _streamed(openai, name, request, progress)
+        except AgentInvocationError:
+            raise
         except Exception as exc:
             error = _openai_error(exc, name)
             if error is None:
@@ -408,6 +427,37 @@ class AgentClient:
             raise error from exc
         _check_response(response, name)
         return response
+
+
+async def _streamed(
+    openai: Any, name: str, request: dict[str, Any], progress: ProgressCallback
+) -> Any:
+    """The final response of a streamed Responses API call, reporting steps to ``progress``."""
+    stream = await openai.responses.create(**request, stream=True)
+    final: Any = None
+    async for event in stream:
+        kind = _get(event, "type")
+        if kind == "response.output_item.added":
+            item = _get(event, "item")
+            item_type = _get(item, "type")
+            if item_type == "mcp_call":
+                tool = str(_get(item, "name") or "")
+                _report(progress, f"tool:{tool}" if tool.isidentifier() else "tool")
+            elif item_type == "message":
+                _report(progress, "writing")
+        elif kind in ("response.completed", "response.failed", "response.incomplete"):
+            final = _get(event, "response")
+        elif kind == "error":
+            raise AgentInvocationError(f"{name} stream failed: {_get(event, 'message') or kind}")
+    if final is None:
+        raise AgentInvocationError(f"{name} stream ended without a response")
+    return final
+
+
+def _report(progress: ProgressCallback, step: str) -> None:
+    """A progress callback never breaks the answer."""
+    with contextlib.suppress(Exception):
+        progress(step)
 
 
 async def ask(

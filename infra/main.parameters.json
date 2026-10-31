@@ -23,6 +23,7 @@
     "portalCertificateName": { "value": "${DOCWIKI_PORTAL_CERTIFICATE_NAME}" },
     "enableLiveAsk": { "value": "${DOCWIKI_ENABLE_LIVE_ASK}" },
     "liveAskEndpoint": { "value": "${DOCWIKI_LIVE_ASK_ENDPOINT}" },
+    "liveAskStreamProgress": { "value": "${DOCWIKI_LIVE_ASK_STREAM_PROGRESS}" },
     "enableEventTrigger": { "value": "${DOCWIKI_ENABLE_EVENT_TRIGGER}" },
     "reconcileCron": { "value": "${DOCWIKI_RECONCILE_CRON}" },
     "audience": { "value": "${DOCWIKI_AUDIENCE}" },

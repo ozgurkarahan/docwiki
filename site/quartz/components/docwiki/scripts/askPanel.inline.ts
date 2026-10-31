@@ -7,7 +7,12 @@
 // page open the drawer on a question with the `ASK_EVENT` ("docwiki:ask") hook of docwiki-text.
 // Its words are in the page's language (i18n/en.ts, i18n/fr.ts); its wiki page links lead to the
 // pages of that language (`data-source-pages`); evidence is shared by every language.
-import type { AskAnswer, AskCitation, AskState } from "../../../plugins/transformers/docwiki-text"
+import type {
+  AskAnswer,
+  AskCitation,
+  AskState,
+  LiveStep,
+} from "../../../plugins/transformers/docwiki-text"
 import {
   ASK_EVENT,
   ASK_STATE_KEY,
@@ -79,6 +84,8 @@ interface LiveRun {
   timer: number
   /** Polls that failed in a row. */
   failures: number
+  /** What the agent is doing, when the portal streams its steps. */
+  step: LiveStep | null
 }
 
 /** The question in flight (module state: the drawer is rebuilt on every page navigation). */
@@ -339,7 +346,8 @@ function liveForm(body: HTMLElement) {
   status.setAttribute("aria-live", "polite")
   status.tabIndex = -1
   status.dataset.focusKey = "live-status"
-  if (liveRun) status.textContent = waitingLabel((Date.now() - liveRun.started) / 1000, t)
+  if (liveRun)
+    status.textContent = waitingLabel((Date.now() - liveRun.started) / 1000, t, liveRun.step)
   form.append(label, input, submit, status)
   if (liveMessage) {
     const problem = element("p", "docwiki-ask-live-error", liveMessage)
@@ -415,7 +423,11 @@ function onAskEvent(event: Event) {
 function waiting() {
   const status = document.querySelector<HTMLElement>(`#${PANEL_ID} .docwiki-ask-live-status`)
   if (status && liveRun) {
-    status.textContent = waitingLabel((Date.now() - liveRun.started) / 1000, clientStrings())
+    status.textContent = waitingLabel(
+      (Date.now() - liveRun.started) / 1000,
+      clientStrings(),
+      liveRun.step,
+    )
   }
 }
 
@@ -457,6 +469,7 @@ async function pollLive(run: LiveRun) {
     const result = parseLivePoll(await response.json(), clientStrings())
     run.failures = 0
     if (result.state === "running") {
+      run.step = result.step
       waiting()
       run.timer = window.setTimeout(() => void pollLive(run), LIVE_POLL_MS)
     } else if (result.state === "answer") {
@@ -487,6 +500,7 @@ async function startLive() {
     jobId: null,
     timer: 0,
     failures: 0,
+    step: null,
   }
   liveRun = run
   paint("live-status")

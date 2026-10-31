@@ -13,7 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -49,6 +49,7 @@ __all__ = [
     "ReleaseLookup",
     "StorageRelease",
     "build_query_page",
+    "check_cited_numbers",
     "query_slug",
     "tool_steps",
 ]
@@ -461,13 +462,24 @@ def _ends_with_abbreviation(text: str) -> bool:
 
 
 def _check_numbers(markdown: str, citations: Sequence[_Citation]) -> tuple[int, list[str]]:
-    """``(cited sentences checked, warnings)``: every number of a cited sentence must appear in
-    the evidence it cites (the same number parsing as citation verification)."""
+    """Numbers of a filed answer's cited sentences, see :func:`check_cited_numbers`."""
     if not citations:
         return 0, []
-    available = {
-        citation.label: unsigned_values([citation.evidence.body]) for citation in citations
-    }
+    return check_cited_numbers(
+        markdown, {citation.label: citation.evidence.body for citation in citations}
+    )
+
+
+def check_cited_numbers(markdown: str, evidence: Mapping[int, str]) -> tuple[int, list[str]]:
+    """``(cited sentences checked, warnings)``: every number of a sentence citing ``[^cN]`` must
+    appear in the text of the evidence ``N`` (the same number parsing as citation verification).
+
+    Shared by filed answers and the live gate of the portal (ADR 0008), so both check numbers
+    the same way.
+    """
+    if not evidence:
+        return 0, []
+    available = {label: unsigned_values([text]) for label, text in evidence.items()}
     checked = 0
     warnings: list[str] = []
     for sentence in _sentences(markdown):

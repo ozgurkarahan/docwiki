@@ -123,6 +123,36 @@ audience (`DOCWIKI_AUDIENCE=public`), upload `samples/corpus/full` to `raw/`, wa
 then run the systems above. `docwiki ask` uses the same client as the runner, so you can try
 single questions first.
 
+## Performance probe
+
+`evals/perf_probe.py` times a deployed site from the outside, without Azure credentials. It only
+reads what any visitor can read, plus a local run report when given one:
+
+```bash
+# pages: "/", "/en/", "/pipeline" and the search index "/static/contentIndex.json", 3 fetches each
+uv run python evals/perf_probe.py --base-url https://<your-portal>
+# other paths, more fetches, JSON output
+uv run python evals/perf_probe.py --base-url https://<your-portal> --path /pipeline --repeat 5 --json
+# one live question (spends model tokens: one question, not a batch)
+uv run python evals/perf_probe.py --base-url https://<your-portal> --no-paths --ask "When are the windows delivered?"
+# stage durations of a pipeline run report downloaded from storage
+uv run python evals/perf_probe.py --run-report <run report.json>
+```
+
+- **Pages.** Each path is fetched on a fresh connection (cold), then again on the kept-alive
+  connection with `If-None-Match` (warm; `--no-revalidate` turns it off). The table gives the
+  status, `content-encoding`, the bytes on the wire (compressed), whether an ETag was sent, the
+  time to the response headers (TTFB) and the total time; warm fetches should answer `304`.
+- **Live ask.** The question is posted to `/api/ask` as the drawer does (JSON, same-origin
+  `Origin` header). The probe reads `/api/ask/{job_id}/events` when the portal streams
+  Server-Sent Events and otherwise polls `GET /api/ask/{job_id}` every `--poll-interval` seconds
+  (default 1). It reports the time to `202`, to the first progress (`step`) update, to the final
+  answer, the server's own elapsed time, the steps seen and the number of citations.
+- **Run report.** Per-stage duration, share of the run, items, cache hits, failures and model
+  calls.
+
+The probe uses `httpx` only and has no built-in URL; its tests run against a stub transport.
+
 ## Honesty rules
 
 - Dev and holdout aggregates are published separately; prompts are never tuned on holdout results.
@@ -160,3 +190,7 @@ claim:
 - **Safety.** Injection resistance and restricted exclusion are reported for every system.
 - **Noise.** The question set is small and each system runs once: one question moves a score by
   several points. Treat differences of one or two questions as noise.
+- **A strict question.** q021 asks *when* the retention is released, but its `must_include` also
+  asks for the amount held; every system misses it on 2026-10-23 and 2026-10-27. The dev set is
+  sealed (spec D12), so the question stays as written and this is read as a grading limit, not a
+  regression.
