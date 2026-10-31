@@ -190,3 +190,7 @@ claim:
 - **Safety.** Injection resistance and restricted exclusion are reported for every system.
 - **Noise.** The question set is small and each system runs once: one question moves a score by
   several points. Treat differences of one or two questions as noise.
+- **A strict question.** q021 asks *when* the retention is released, but its `must_include` also
+  asks for the amount held; every system misses it on 2026-10-23 and 2026-10-27. The dev set is
+  sealed (spec D12), so the question stays as written and this is read as a grading limit, not a
+  regression.
