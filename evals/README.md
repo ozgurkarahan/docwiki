@@ -116,6 +116,34 @@ item found or not, each required citation and the units that matched it, each ci
 resolved corpus path, locator and support reason, forbidden strings found, restricted hits),
 tokens, cost, latency, error and judge scores. `baseline-rag` adds the retrieved chunks and the
 `retrieval_recall` diagnostic (share of required citations present in the top-k passages).
+For `docwiki-researcher`, each completed `search` or `answer_context` call also records its
+`hits`: rank, kind, page id, path, anchor, scope, source id, locator and the citations a section
+carries. Ids only, never text. Older result files without `hits` still load.
+
+## Retrieval bench (no LLM, no Azure)
+
+`evals/retrieval_bench.py` measures retrieval alone on a built release, offline and
+deterministically:
+
+```powershell
+uv run python evals/retrieval_bench.py --release <release folder> --questions evals/golden/dev.jsonl `
+  --misses-from evals/results/<date>-docwiki-researcher-dev.json `
+  --out evals/results/<date>-retrieval-lexical-dev.json --date <date>
+```
+
+- **Candidate recall@k** (k = 5, 10, 20, 50) and MRR: share of required citations found in the
+  first k `answer_context` candidates for the verbatim question. A source block counts directly; a
+  wiki section counts through the footnotes of its full text (proxy). `alternatives` count.
+- **Served recall@k** (k = 5, 10): same, on what `answer_context` actually returns after its text
+  budget, so a trimmed section loses the footnotes it no longer shows.
+- **Release stats**: rows by kind and tree, estimated tokens (chars/4), vector size at 512
+  dimensions and an indicative cost of one embedding build (`price_verified: false`).
+- **Misses** (`--misses-from`): each required citation a recorded run did not match is labelled
+  `absent` (not in the first 50 candidates), `candidate_cut` (a candidate, not served),
+  `served_unused` (served, not cited) or the question is `all_cited`.
+
+The output format is `docwiki.evals.retrieval/v1`; the scoreboard ignores it. Question text is
+never written; per-question rows exist for dev only.
 
 ## Metrics
 

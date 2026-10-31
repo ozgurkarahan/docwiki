@@ -1,0 +1,1597 @@
+{
+  "format": "docwiki.evals.retrieval/v1",
+  "mode": "lexical",
+  "date": "2026-10-31",
+  "release": {
+    "release_id": "20261027T222241Z-f4e7ba11",
+    "audience": "public",
+    "manifest_sha256": "7c6c27e678899d06a5a2e89b5fd4683940420f7a07907d4ae2ee21093c97d00a"
+  },
+  "questions_file": {
+    "name": "dev.jsonl",
+    "sha256": "5a0db25436d0a44411093dcacf80eab6149f6c6e3987c5eded4dc28711822ba5",
+    "questions": 32,
+    "with_required_citations": 30
+  },
+  "settings": {
+    "candidate_depth": 50,
+    "ks": [
+      5,
+      10,
+      20,
+      50
+    ],
+    "served_limits": [
+      5,
+      10
+    ],
+    "query": "the golden question verbatim, no within and no lang (the Researcher's usual first call)",
+    "section_counting": "proxy: a wiki section counts through the footnotes of its text"
+  },
+  "release_stats": {
+    "rows": 3852,
+    "rows_by_kind": {
+      "page-section": 2959,
+      "source-block": 893
+    },
+    "rows_by_tree": {
+      "canonical": 893,
+      "en": 1376,
+      "fr": 1583
+    },
+    "input_chars": {
+      "total": 1764373,
+      "p50": 258,
+      "p95": 1433,
+      "max": 13255
+    },
+    "estimated_tokens": {
+      "method": "chars/4",
+      "total": 442529,
+      "p50": 65,
+      "p95": 359,
+      "max": 3314,
+      "rows_over_model_limit": 0,
+      "model_limit": 8191
+    },
+    "vectors": {
+      "dimensions": 512,
+      "float32_bytes": 7888896
+    },
+    "embedding_cost_usd": {
+      "price_per_million_tokens": 0.02,
+      "price_verified": false,
+      "one_full_build": 0.008851
+    }
+  },
+  "splits": {
+    "dev": {
+      "questions": 30,
+      "required_citations": 104,
+      "candidate_recall@5": 0.3319,
+      "candidate_recall@10": 0.4472,
+      "candidate_recall@20": 0.5611,
+      "candidate_recall@50": 0.6792,
+      "mrr": 0.3872,
+      "served_recall@5": 0.1903,
+      "served_recall@10": 0.1056,
+      "found_via_proxy": 77,
+      "found_direct": 1
+    }
+  },
+  "questions": [
+    {
+      "id": "q001",
+      "category": "single-hop",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/chantiers/moreau/1-marche/works-contract/2026-02-10_contrat-de-travaux-signe.docx",
+          "locator_key": "para-0012",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.0,
+      "candidate_recall@10": 0.0,
+      "candidate_recall@20": 0.0,
+      "candidate_recall@50": 0.0,
+      "mrr": 0.0,
+      "served_recall@5": 0.0,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q002",
+      "category": "numeric",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/chantiers/moreau/1-marche/works-contract/2026-02-10_contrat-de-travaux-signe.docx",
+          "locator_key": "para-0015",
+          "alternatives": 0,
+          "rank": 39,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/1-marche/works-contract/2026-02-10_contrat-de-travaux-signe.docx",
+          "locator_key": "para-0017",
+          "alternatives": 0,
+          "rank": 39,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.0,
+      "candidate_recall@10": 0.0,
+      "candidate_recall@20": 0.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.02564102564102564,
+      "served_recall@5": 0.0,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q003",
+      "category": "table",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/chantiers/moreau/3-execution/schedule/PLN-2026-003_indice-A_planning-et-suivi-des-achats.xlsx",
+          "locator_key": "sheet-achats-r0008-r0009",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.0,
+      "candidate_recall@10": 0.0,
+      "candidate_recall@20": 0.0,
+      "candidate_recall@50": 0.0,
+      "mrr": 0.0,
+      "served_recall@5": 0.0,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q004",
+      "category": "table",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/chantiers/moreau/3-execution/schedule/PLN-2026-003_indice-A_planning-et-suivi-des-achats.xlsx",
+          "locator_key": "sheet-achats-r0002-r0002",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/3-execution/schedule/PLN-2026-003_indice-A_planning-et-suivi-des-achats.xlsx",
+          "locator_key": "sheet-achats-r0006-r0006",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/3-execution/schedule/PLN-2026-003_indice-A_planning-et-suivi-des-achats.xlsx",
+          "locator_key": "sheet-achats-r0007-r0007",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.0,
+      "candidate_recall@10": 0.0,
+      "candidate_recall@20": 0.0,
+      "candidate_recall@50": 0.0,
+      "mrr": 0.0,
+      "served_recall@5": 0.0,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q005",
+      "category": "multi-hop",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/chantiers/moreau/1-marche/works-contract/2026-02-10_contrat-de-travaux-signe.docx",
+          "locator_key": "para-0010",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/1-marche/contract-amendment/2026-03-10_avenant-n1-fenetre-de-toit.docx",
+          "locator_key": "para-0012",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.0,
+      "candidate_recall@10": 0.0,
+      "candidate_recall@20": 0.0,
+      "candidate_recall@50": 0.0,
+      "mrr": 0.0,
+      "served_recall@5": 0.0,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q006",
+      "category": "multi-hop",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/chantiers/moreau/3-execution/client-email/2026-03-04_mail-client-demande-de-modification.eml",
+          "locator_key": "msg-body-l0008-l0011",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/1-marche/contract-amendment/2026-03-10_avenant-n1-fenetre-de-toit.docx",
+          "locator_key": "tbl-01-r0002-r0004",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.0,
+      "candidate_recall@10": 0.0,
+      "candidate_recall@20": 0.0,
+      "candidate_recall@50": 0.0,
+      "mrr": 0.0,
+      "served_recall@5": 0.0,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q007",
+      "category": "contradiction",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/chantiers/moreau/3-execution/schedule/PLN-2026-003_indice-A_planning-et-suivi-des-achats.xlsx",
+          "locator_key": "sheet-planning-r0008-r0008",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/3-execution/supplier-email/2026-03-18_mail-vanarsdel-report-livraison-menuiseries.eml",
+          "locator_key": "msg-body-l0005-l0009",
+          "alternatives": 0,
+          "rank": 3,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.5,
+      "candidate_recall@10": 0.5,
+      "candidate_recall@20": 0.5,
+      "candidate_recall@50": 0.5,
+      "mrr": 0.3333333333333333,
+      "served_recall@5": 0.0,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q008",
+      "category": "supersession",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/chantiers/moreau/0-commercial/quote/DEV-2026-014_indice-B_devis-extension-et-cuisine.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 6,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/0-commercial/quote/DEV-2026-014_indice-B_devis-extension-et-cuisine.pdf",
+          "locator_key": "p0002",
+          "alternatives": 0,
+          "rank": 15,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/0-commercial/quote/DEV-2026-014_indice-A_devis-extension-et-cuisine.pdf",
+          "locator_key": "p0002",
+          "alternatives": 0,
+          "rank": 9,
+          "proxy": true,
+          "served@5": false,
+          "served@10": true
+        }
+      ],
+      "candidates": 31,
+      "candidate_recall@5": 0.0,
+      "candidate_recall@10": 0.6666666666666666,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.16666666666666666,
+      "served_recall@5": 0.0,
+      "served_recall@10": 0.3333333333333333
+    },
+    {
+      "id": "q009",
+      "category": "multilingual",
+      "lang": "fr",
+      "targets": [
+        {
+          "source_path": "full/chantiers/moreau/3-execution/site-meeting-minutes/2026-03-24_compte-rendu-de-chantier-n3.docx",
+          "locator_key": "para-0015",
+          "alternatives": 0,
+          "rank": 2,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/3-execution/site-meeting-minutes/2026-03-24_compte-rendu-de-chantier-n3.docx",
+          "locator_key": "para-0016",
+          "alternatives": 0,
+          "rank": 5,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 1.0,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.5,
+      "served_recall@5": 0.0,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q010",
+      "category": "ocr",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/chantiers/moreau/3-execution/delivery-note/2026-03-13_bon-de-livraison-BL-2026-0391_scan.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 1,
+          "proxy": true,
+          "served@5": true,
+          "served@10": true
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 1.0,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 1.0,
+      "served_recall@5": 1.0,
+      "served_recall@10": 1.0
+    },
+    {
+      "id": "q012",
+      "category": "injection",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/chantiers/moreau/3-execution/supplier-email/2026-03-18_mail-vanarsdel-report-livraison-menuiseries.eml",
+          "locator_key": "msg-body-l0005-l0009",
+          "alternatives": 0,
+          "rank": 2,
+          "proxy": true,
+          "served@5": true,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/3-execution/schedule/PLN-2026-003_indice-A_planning-et-suivi-des-achats.xlsx",
+          "locator_key": "sheet-achats-r0003-r0003",
+          "alternatives": 0,
+          "rank": 1,
+          "proxy": true,
+          "served@5": true,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 1.0,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 1.0,
+      "served_recall@5": 1.0,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q014",
+      "category": "skill",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/chantiers/moreau/3-execution/supplier-invoice/2026-03-16_facture-FA-2026-0217_zava-materiaux.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 1,
+          "proxy": true,
+          "served@5": true,
+          "served@10": true
+        },
+        {
+          "source_path": "full/chantiers/moreau/3-execution/delivery-note/2026-03-13_bon-de-livraison-BL-2026-0391_scan.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 10,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/3-execution/schedule/PLN-2026-003_indice-A_planning-et-suivi-des-achats.xlsx",
+          "locator_key": "sheet-achats-r0005-r0005",
+          "alternatives": 0,
+          "rank": 1,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/3-execution/site-meeting-minutes/2026-03-24_compte-rendu-de-chantier-n3.docx",
+          "locator_key": "tbl-02-r0003-r0003",
+          "alternatives": 0,
+          "rank": 1,
+          "proxy": true,
+          "served@5": true,
+          "served@10": true
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.75,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 1.0,
+      "served_recall@5": 0.5,
+      "served_recall@10": 0.5
+    },
+    {
+      "id": "q015",
+      "category": "skill",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/chantiers/moreau/3-execution/site-meeting-minutes/2026-03-24_compte-rendu-de-chantier-n3.docx",
+          "locator_key": "para-0007",
+          "alternatives": 0,
+          "rank": 5,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/3-execution/site-meeting-minutes/2026-03-24_compte-rendu-de-chantier-n3.docx",
+          "locator_key": "para-0011",
+          "alternatives": 0,
+          "rank": 39,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/3-execution/site-meeting-minutes/2026-03-24_compte-rendu-de-chantier-n3.docx",
+          "locator_key": "para-0016",
+          "alternatives": 0,
+          "rank": 39,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/3-execution/site-meeting-minutes/2026-03-24_compte-rendu-de-chantier-n3.docx",
+          "locator_key": "tbl-02-r0002-r0005",
+          "alternatives": 0,
+          "rank": 5,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/3-execution/supplier-email/2026-03-18_mail-vanarsdel-report-livraison-menuiseries.eml",
+          "locator_key": "msg-body-l0005-l0009",
+          "alternatives": 0,
+          "rank": 5,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/3-execution/schedule/PLN-2026-003_indice-A_planning-et-suivi-des-achats.xlsx",
+          "locator_key": "sheet-planning-r0008-r0008",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.5,
+      "candidate_recall@10": 0.5,
+      "candidate_recall@20": 0.5,
+      "candidate_recall@50": 0.8333333333333334,
+      "mrr": 0.2,
+      "served_recall@5": 0.0,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q016",
+      "category": "skill",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/chantiers/moreau/1-marche/works-contract/2026-02-10_contrat-de-travaux-signe.docx",
+          "locator_key": "para-0010",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/1-marche/works-contract/2026-02-10_contrat-de-travaux-signe.docx",
+          "locator_key": "para-0015",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/1-marche/works-contract/2026-02-10_contrat-de-travaux-signe.docx",
+          "locator_key": "tbl-01-r0002-r0007",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/1-marche/contract-amendment/2026-03-10_avenant-n1-fenetre-de-toit.docx",
+          "locator_key": "tbl-02-r0002-r0004",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/1-marche/contract-amendment/2026-03-10_avenant-n1-fenetre-de-toit.docx",
+          "locator_key": "para-0014",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.0,
+      "candidate_recall@10": 0.0,
+      "candidate_recall@20": 0.0,
+      "candidate_recall@50": 0.0,
+      "mrr": 0.0,
+      "served_recall@5": 0.0,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q017",
+      "category": "multi-hop",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/chantiers/moreau/3-execution/supplier-email/2026-03-18_mail-vanarsdel-report-livraison-menuiseries.eml",
+          "locator_key": "msg-body-l0005-l0009",
+          "alternatives": 0,
+          "rank": 2,
+          "proxy": true,
+          "served@5": true,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/3-execution/site-meeting-minutes/2026-03-24_compte-rendu-de-chantier-n3.docx",
+          "locator_key": "para-0016",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/4-reception/supplier-email/2026-04-08_mail-vanarsdel-report-livraison-portes.eml",
+          "locator_key": "msg-body-l0005-l0009",
+          "alternatives": 0,
+          "rank": 16,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/4-reception/supplier-email/2026-04-08_mail-vanarsdel-report-livraison-portes.eml",
+          "locator_key": "msg-body-l0011-l0015",
+          "alternatives": 0,
+          "rank": 16,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/4-reception/liste-des-reserves/2026-04-14_liste-des-reserves-etat-de-levee.xlsx",
+          "locator_key": "sheet-reserves-r0007-r0007",
+          "alternatives": 0,
+          "rank": 6,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/4-reception/pv-de-reception/2026-04-03_pv-de-reception-avec-reserves_scan.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 26,
+          "proxy": false,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/ecole-montferrine/2-preparation/purchase-order/2026-04-02_bon-de-commande-BC-2026-021_vanarsdel-menuiseries.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 2,
+          "proxy": true,
+          "served@5": true,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/ecole-montferrine/2-preparation/schedule/PLN-2026-007_indice-A_planning-travaux-ete.xlsx",
+          "locator_key": "sheet-planning-r0014-r0014",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.25,
+      "candidate_recall@10": 0.375,
+      "candidate_recall@20": 0.625,
+      "candidate_recall@50": 0.75,
+      "mrr": 0.5,
+      "served_recall@5": 0.25,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q018",
+      "category": "multi-hop",
+      "lang": "fr",
+      "targets": [
+        {
+          "source_path": "full/chantiers/moreau/3-execution/supplier-email/2026-03-18_mail-vanarsdel-report-livraison-menuiseries.eml",
+          "locator_key": "msg-body-l0005-l0009",
+          "alternatives": 0,
+          "rank": 2,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/3-execution/site-meeting-minutes/2026-03-24_compte-rendu-de-chantier-n3.docx",
+          "locator_key": "para-0016",
+          "alternatives": 0,
+          "rank": 48,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/4-reception/supplier-email/2026-04-08_mail-vanarsdel-report-livraison-portes.eml",
+          "locator_key": "msg-body-l0005-l0009",
+          "alternatives": 0,
+          "rank": 7,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/4-reception/supplier-email/2026-04-08_mail-vanarsdel-report-livraison-portes.eml",
+          "locator_key": "msg-body-l0011-l0015",
+          "alternatives": 0,
+          "rank": 7,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/4-reception/liste-des-reserves/2026-04-14_liste-des-reserves-etat-de-levee.xlsx",
+          "locator_key": "sheet-reserves-r0007-r0007",
+          "alternatives": 0,
+          "rank": 3,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/4-reception/pv-de-reception/2026-04-03_pv-de-reception-avec-reserves_scan.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 31,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/ecole-montferrine/2-preparation/purchase-order/2026-04-02_bon-de-commande-BC-2026-021_vanarsdel-menuiseries.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 2,
+          "proxy": true,
+          "served@5": true,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/ecole-montferrine/2-preparation/schedule/PLN-2026-007_indice-A_planning-travaux-ete.xlsx",
+          "locator_key": "sheet-planning-r0014-r0014",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.375,
+      "candidate_recall@10": 0.625,
+      "candidate_recall@20": 0.625,
+      "candidate_recall@50": 0.875,
+      "mrr": 0.5,
+      "served_recall@5": 0.125,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q019",
+      "category": "table",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/entreprise/framework-agreement/2026-01-08_contrat-cadre-zava-materiaux.docx",
+          "locator_key": "para-0011",
+          "alternatives": 0,
+          "rank": 1,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/entreprise/framework-agreement/2026-01-08_contrat-cadre-zava-materiaux.docx",
+          "locator_key": "para-0015",
+          "alternatives": 0,
+          "rank": 11,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/3-execution/supplier-invoice/2026-03-16_facture-FA-2026-0217_zava-materiaux.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 44,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/3-execution/supplier-invoice/2026-02-12_facture-FA-2026-0158_zava-materiaux.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 49,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/entreprise/price-list/2026-01-08_tarif-2026-zava-materiaux.xlsx",
+          "locator_key": "sheet-tarif-2026-r0002-r0002",
+          "alternatives": 0,
+          "rank": 1,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/entreprise/price-list/2026-01-08_tarif-2026-zava-materiaux.xlsx",
+          "locator_key": "sheet-tarif-2026-r0009-r0009",
+          "alternatives": 0,
+          "rank": 20,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.3333333333333333,
+      "candidate_recall@10": 0.3333333333333333,
+      "candidate_recall@20": 0.6666666666666666,
+      "candidate_recall@50": 1.0,
+      "mrr": 1.0,
+      "served_recall@5": 0.0,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q020",
+      "category": "table",
+      "lang": "fr",
+      "targets": [
+        {
+          "source_path": "full/entreprise/framework-agreement/2026-01-08_contrat-cadre-zava-materiaux.docx",
+          "locator_key": "para-0011",
+          "alternatives": 0,
+          "rank": 1,
+          "proxy": true,
+          "served@5": true,
+          "served@10": true
+        },
+        {
+          "source_path": "full/entreprise/framework-agreement/2026-01-08_contrat-cadre-zava-materiaux.docx",
+          "locator_key": "para-0015",
+          "alternatives": 0,
+          "rank": 5,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/moreau/3-execution/supplier-invoice/2026-03-16_facture-FA-2026-0217_zava-materiaux.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 24,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/3-execution/supplier-invoice/2026-02-12_facture-FA-2026-0158_zava-materiaux.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 27,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/entreprise/price-list/2026-01-08_tarif-2026-zava-materiaux.xlsx",
+          "locator_key": "sheet-tarif-2026-r0002-r0002",
+          "alternatives": 0,
+          "rank": 1,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/entreprise/price-list/2026-01-08_tarif-2026-zava-materiaux.xlsx",
+          "locator_key": "sheet-tarif-2026-r0009-r0009",
+          "alternatives": 0,
+          "rank": 7,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.5,
+      "candidate_recall@10": 0.6666666666666666,
+      "candidate_recall@20": 0.6666666666666666,
+      "candidate_recall@50": 1.0,
+      "mrr": 1.0,
+      "served_recall@5": 0.16666666666666666,
+      "served_recall@10": 0.16666666666666666
+    },
+    {
+      "id": "q021",
+      "category": "multi-hop",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/chantiers/nacrines/4-reception/liste-des-reserves/2026-04-14_liste-des-reserves-etat-de-levee.xlsx",
+          "locator_key": "sheet-reserves-r0002-r0011",
+          "alternatives": 0,
+          "rank": 15,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/1-marche/works-contract/2025-11-20_marche-de-travaux-signe.docx",
+          "locator_key": "para-0022",
+          "alternatives": 0,
+          "rank": 16,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/3-execution/situation/2026-03-31_situation-n4.xlsx",
+          "locator_key": "sheet-recapitulatif-r0017-r0017",
+          "alternatives": 0,
+          "rank": 19,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/4-reception/pv-de-reception/2026-04-03_pv-de-reception-avec-reserves_scan.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 15,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.0,
+      "candidate_recall@10": 0.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.06666666666666667,
+      "served_recall@5": 0.0,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q022",
+      "category": "multi-hop",
+      "lang": "fr",
+      "targets": [
+        {
+          "source_path": "full/chantiers/nacrines/4-reception/liste-des-reserves/2026-04-14_liste-des-reserves-etat-de-levee.xlsx",
+          "locator_key": "sheet-reserves-r0002-r0011",
+          "alternatives": 0,
+          "rank": 3,
+          "proxy": true,
+          "served@5": true,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/1-marche/works-contract/2025-11-20_marche-de-travaux-signe.docx",
+          "locator_key": "para-0022",
+          "alternatives": 0,
+          "rank": 2,
+          "proxy": true,
+          "served@5": true,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/3-execution/situation/2026-03-31_situation-n4.xlsx",
+          "locator_key": "sheet-recapitulatif-r0017-r0017",
+          "alternatives": 0,
+          "rank": 33,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/4-reception/pv-de-reception/2026-04-03_pv-de-reception-avec-reserves_scan.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 13,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.5,
+      "candidate_recall@10": 0.5,
+      "candidate_recall@20": 0.75,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.5,
+      "served_recall@5": 0.5,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q023",
+      "category": "table",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/entreprise/crew-schedule/2026-04-03_planning-des-equipes-s15-s17.xlsx",
+          "locator_key": "sheet-equipes-r0007-r0012",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.0,
+      "candidate_recall@10": 0.0,
+      "candidate_recall@20": 0.0,
+      "candidate_recall@50": 0.0,
+      "mrr": 0.0,
+      "served_recall@5": 0.0,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q024",
+      "category": "table",
+      "lang": "fr",
+      "targets": [
+        {
+          "source_path": "full/entreprise/crew-schedule/2026-04-03_planning-des-equipes-s15-s17.xlsx",
+          "locator_key": "sheet-equipes-r0007-r0012",
+          "alternatives": 0,
+          "rank": 8,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.0,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.125,
+      "served_recall@5": 0.0,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q025",
+      "category": "numeric",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/entreprise/billing-register/2026-04-10_suivi-de-facturation-clients.xlsx",
+          "locator_key": "sheet-marches-r0002-r0004",
+          "alternatives": 0,
+          "rank": 5,
+          "proxy": true,
+          "served@5": true,
+          "served@10": true
+        },
+        {
+          "source_path": "full/entreprise/billing-register/2026-04-10_suivi-de-facturation-clients.xlsx",
+          "locator_key": "sheet-factures-r0002-r0006",
+          "alternatives": 0,
+          "rank": 5,
+          "proxy": true,
+          "served@5": true,
+          "served@10": true
+        },
+        {
+          "source_path": "full/chantiers/nacrines/3-execution/situation/2026-03-31_situation-n4.xlsx",
+          "locator_key": "sheet-recapitulatif-r0017-r0017",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.6666666666666666,
+      "candidate_recall@10": 0.6666666666666666,
+      "candidate_recall@20": 0.6666666666666666,
+      "candidate_recall@50": 0.6666666666666666,
+      "mrr": 0.2,
+      "served_recall@5": 0.6666666666666666,
+      "served_recall@10": 0.6666666666666666
+    },
+    {
+      "id": "q026",
+      "category": "numeric",
+      "lang": "fr",
+      "targets": [
+        {
+          "source_path": "full/entreprise/billing-register/2026-04-10_suivi-de-facturation-clients.xlsx",
+          "locator_key": "sheet-marches-r0002-r0004",
+          "alternatives": 0,
+          "rank": 30,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/entreprise/billing-register/2026-04-10_suivi-de-facturation-clients.xlsx",
+          "locator_key": "sheet-factures-r0002-r0006",
+          "alternatives": 0,
+          "rank": 26,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/3-execution/situation/2026-03-31_situation-n4.xlsx",
+          "locator_key": "sheet-recapitulatif-r0017-r0017",
+          "alternatives": 0,
+          "rank": 1,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.3333333333333333,
+      "candidate_recall@10": 0.3333333333333333,
+      "candidate_recall@20": 0.3333333333333333,
+      "candidate_recall@50": 1.0,
+      "mrr": 1.0,
+      "served_recall@5": 0.0,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q027",
+      "category": "multi-hop",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/entreprise/compliance-register/2026-04-10_registre-des-attestations-sous-traitants.xlsx",
+          "locator_key": "sheet-attestations-r0003-r0004",
+          "alternatives": 0,
+          "rank": 2,
+          "proxy": true,
+          "served@5": true,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/3-execution/situation/2026-03-31_situation-n4.xlsx",
+          "locator_key": "sheet-sous-traitance-r0002-r0002",
+          "alternatives": 0,
+          "rank": 2,
+          "proxy": true,
+          "served@5": true,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/1-marche/subcontract/2025-12-10_contrat-de-sous-traitance-adatum-electricite.docx",
+          "locator_key": "para-0017",
+          "alternatives": 0,
+          "rank": 34,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/3-execution/site-meeting-minutes/2026-03-26_compte-rendu-de-chantier-n12.docx",
+          "locator_key": "tbl-02-r0002-r0002",
+          "alternatives": 0,
+          "rank": 16,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.5,
+      "candidate_recall@10": 0.5,
+      "candidate_recall@20": 0.75,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.5,
+      "served_recall@5": 0.5,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q028",
+      "category": "multi-hop",
+      "lang": "fr",
+      "targets": [
+        {
+          "source_path": "full/entreprise/compliance-register/2026-04-10_registre-des-attestations-sous-traitants.xlsx",
+          "locator_key": "sheet-attestations-r0003-r0004",
+          "alternatives": 0,
+          "rank": 2,
+          "proxy": true,
+          "served@5": true,
+          "served@10": true
+        },
+        {
+          "source_path": "full/chantiers/nacrines/3-execution/situation/2026-03-31_situation-n4.xlsx",
+          "locator_key": "sheet-sous-traitance-r0002-r0002",
+          "alternatives": 0,
+          "rank": 1,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/1-marche/subcontract/2025-12-10_contrat-de-sous-traitance-adatum-electricite.docx",
+          "locator_key": "para-0017",
+          "alternatives": 0,
+          "rank": 10,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/3-execution/site-meeting-minutes/2026-03-26_compte-rendu-de-chantier-n12.docx",
+          "locator_key": "tbl-02-r0002-r0002",
+          "alternatives": 0,
+          "rank": 4,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.75,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 1.0,
+      "served_recall@5": 0.25,
+      "served_recall@10": 0.25
+    },
+    {
+      "id": "q029",
+      "category": "multi-hop",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/chantiers/moreau/3-execution/supplier-email/2026-03-18_mail-vanarsdel-report-livraison-menuiseries.eml",
+          "locator_key": "msg-body-l0005-l0009",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/4-reception/supplier-email/2026-04-08_mail-vanarsdel-report-livraison-portes.eml",
+          "locator_key": "msg-body-l0011-l0015",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/ecole-montferrine/2-preparation/purchase-order/2026-04-02_bon-de-commande-BC-2026-021_vanarsdel-menuiseries.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/ecole-montferrine/2-preparation/schedule/PLN-2026-007_indice-A_planning-travaux-ete.xlsx",
+          "locator_key": "sheet-planning-r0004-r0004",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.0,
+      "candidate_recall@10": 0.0,
+      "candidate_recall@20": 0.0,
+      "candidate_recall@50": 0.0,
+      "mrr": 0.0,
+      "served_recall@5": 0.0,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q030",
+      "category": "multi-hop",
+      "lang": "fr",
+      "targets": [
+        {
+          "source_path": "full/chantiers/moreau/3-execution/supplier-email/2026-03-18_mail-vanarsdel-report-livraison-menuiseries.eml",
+          "locator_key": "msg-body-l0005-l0009",
+          "alternatives": 0,
+          "rank": 3,
+          "proxy": true,
+          "served@5": true,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/nacrines/4-reception/supplier-email/2026-04-08_mail-vanarsdel-report-livraison-portes.eml",
+          "locator_key": "msg-body-l0011-l0015",
+          "alternatives": 0,
+          "rank": null,
+          "proxy": null,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/ecole-montferrine/2-preparation/purchase-order/2026-04-02_bon-de-commande-BC-2026-021_vanarsdel-menuiseries.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 14,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/ecole-montferrine/2-preparation/schedule/PLN-2026-007_indice-A_planning-travaux-ete.xlsx",
+          "locator_key": "sheet-planning-r0004-r0004",
+          "alternatives": 0,
+          "rank": 16,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.25,
+      "candidate_recall@10": 0.25,
+      "candidate_recall@20": 0.75,
+      "candidate_recall@50": 0.75,
+      "mrr": 0.3333333333333333,
+      "served_recall@5": 0.25,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q031",
+      "category": "supersession",
+      "lang": "en",
+      "targets": [
+        {
+          "source_path": "full/chantiers/ecole-montferrine/1-marche/dpgf/DEV-2026-031_indice-B_dpgf-ecole-du-bourg.xlsx",
+          "locator_key": "sheet-dpgf-r0009-r0011",
+          "alternatives": 0,
+          "rank": 8,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/ecole-montferrine/1-marche/dpgf/DEV-2026-031_indice-B_dpgf-ecole-du-bourg.xlsx",
+          "locator_key": "sheet-dpgf-r0018-r0020",
+          "alternatives": 0,
+          "rank": 6,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/ecole-montferrine/1-marche/dpgf/DEV-2026-031_indice-A_dpgf-ecole-du-bourg.xlsx",
+          "locator_key": "sheet-dpgf-r0009-r0011",
+          "alternatives": 0,
+          "rank": 14,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/ecole-montferrine/1-marche/acte-d-engagement/2026-03-20_acte-d-engagement-signe.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 3,
+          "proxy": true,
+          "served@5": true,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.25,
+      "candidate_recall@10": 0.75,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.3333333333333333,
+      "served_recall@5": 0.25,
+      "served_recall@10": 0.0
+    },
+    {
+      "id": "q032",
+      "category": "supersession",
+      "lang": "fr",
+      "targets": [
+        {
+          "source_path": "full/chantiers/ecole-montferrine/1-marche/dpgf/DEV-2026-031_indice-B_dpgf-ecole-du-bourg.xlsx",
+          "locator_key": "sheet-dpgf-r0009-r0011",
+          "alternatives": 0,
+          "rank": 3,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/ecole-montferrine/1-marche/dpgf/DEV-2026-031_indice-B_dpgf-ecole-du-bourg.xlsx",
+          "locator_key": "sheet-dpgf-r0018-r0020",
+          "alternatives": 0,
+          "rank": 5,
+          "proxy": true,
+          "served@5": true,
+          "served@10": true
+        },
+        {
+          "source_path": "full/chantiers/ecole-montferrine/1-marche/dpgf/DEV-2026-031_indice-A_dpgf-ecole-du-bourg.xlsx",
+          "locator_key": "sheet-dpgf-r0009-r0011",
+          "alternatives": 0,
+          "rank": 9,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        },
+        {
+          "source_path": "full/chantiers/ecole-montferrine/1-marche/acte-d-engagement/2026-03-20_acte-d-engagement-signe.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 11,
+          "proxy": true,
+          "served@5": false,
+          "served@10": false
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.5,
+      "candidate_recall@10": 0.75,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.3333333333333333,
+      "served_recall@5": 0.25,
+      "served_recall@10": 0.25
+    }
+  ],
+  "misses": {
+    "result_file": {
+      "system": "docwiki-researcher",
+      "split": "dev",
+      "release_id": null
+    },
+    "replayed_on": "20261027T222241Z-f4e7ba11",
+    "labels": {
+      "absent": 1,
+      "candidate_cut": 9
+    },
+    "questions": [
+      {
+        "id": "q015",
+        "category": "skill",
+        "label": "candidate_cut",
+        "missing_citations": {
+          "candidate_cut": 2,
+          "served_unused": 1
+        },
+        "tool_calls_replayed": 13,
+        "replay_errors": 0
+      },
+      {
+        "id": "q016",
+        "category": "skill",
+        "label": "candidate_cut",
+        "missing_citations": {
+          "candidate_cut": 3,
+          "served_unused": 2
+        },
+        "tool_calls_replayed": 7,
+        "replay_errors": 0
+      },
+      {
+        "id": "q017",
+        "category": "multi-hop",
+        "label": "candidate_cut",
+        "missing_citations": {
+          "candidate_cut": 2,
+          "served_unused": 2
+        },
+        "tool_calls_replayed": 15,
+        "replay_errors": 0
+      },
+      {
+        "id": "q018",
+        "category": "multi-hop",
+        "label": "absent",
+        "missing_citations": {
+          "absent": 1,
+          "candidate_cut": 4
+        },
+        "tool_calls_replayed": 7,
+        "replay_errors": 0
+      },
+      {
+        "id": "q020",
+        "category": "table",
+        "label": "candidate_cut",
+        "missing_citations": {
+          "candidate_cut": 1,
+          "served_unused": 2
+        },
+        "tool_calls_replayed": 7,
+        "replay_errors": 0
+      },
+      {
+        "id": "q021",
+        "category": "multi-hop",
+        "label": "candidate_cut",
+        "missing_citations": {
+          "candidate_cut": 1
+        },
+        "tool_calls_replayed": 7,
+        "replay_errors": 0
+      },
+      {
+        "id": "q022",
+        "category": "multi-hop",
+        "label": "candidate_cut",
+        "missing_citations": {
+          "candidate_cut": 1
+        },
+        "tool_calls_replayed": 7,
+        "replay_errors": 0
+      },
+      {
+        "id": "q029",
+        "category": "multi-hop",
+        "label": "candidate_cut",
+        "missing_citations": {
+          "candidate_cut": 3,
+          "served_unused": 1
+        },
+        "tool_calls_replayed": 7,
+        "replay_errors": 0
+      },
+      {
+        "id": "q030",
+        "category": "multi-hop",
+        "label": "candidate_cut",
+        "missing_citations": {
+          "candidate_cut": 3,
+          "served_unused": 1
+        },
+        "tool_calls_replayed": 4,
+        "replay_errors": 0
+      },
+      {
+        "id": "q031",
+        "category": "supersession",
+        "label": "candidate_cut",
+        "missing_citations": {
+          "candidate_cut": 1,
+          "served_unused": 1
+        },
+        "tool_calls_replayed": 3,
+        "replay_errors": 0
+      }
+    ]
+  },
+  "notes": [
+    "Misses replayed on release 20261027T222241Z-f4e7ba11. The 2026-10-27 run did not record its release id; the search index rows of the two earlier candidate releases (20261023T230113Z-d0e2d680, 20261027T205129Z-b92738d2) are identical to this one, so the replay is faithful.",
+    "Section hits count through the footnotes of their full text (proxy); source blocks count directly.",
+    "Embedding price is indicative and not verified."
+  ]
+}

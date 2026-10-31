@@ -29,6 +29,10 @@
   with per-question records (answer, citations, tool calls, metrics, tokens, cost, versions).
 - `evals/scoreboard.py` → `evals/results/latest.json` and a Markdown table injected into the README
   between `<!-- scoreboard:start -->` and `<!-- scoreboard:end -->`.
+- `evals/retrieval_bench.py` → `evals/results/<date>-retrieval-<mode>-<split>.json`
+  (`docwiki.evals.retrieval/v1`): offline candidate and served recall@k of `answer_context` on a
+  release, with no LLM call, and the classification of a recorded run's missed citations. Search
+  tool calls in Researcher records keep their hit ids (never text) for this purpose.
 - Versions recorded: DocWiki git SHA, release id, model deployments and versions, prompt versions,
   evaluator versions.
 - The deterministic citation checker and metric functions are unit-tested and run in PR CI on
