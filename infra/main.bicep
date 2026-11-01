@@ -185,7 +185,7 @@ param budgetAmount int = 50
 @description('Comma-separated budget alert e-mail addresses (azd env BUDGET_CONTACT_EMAILS, never committed).')
 param budgetContactEmails string = ''
 
-@description('Budget start date: first day of the current month.')
+@description('Budget start date (yyyy-MM-dd), first day of a month. Defaults to the current month; azd pins it after the first provision (output DOCWIKI_BUDGET_START_DATE) because Azure cannot change the start date of an existing budget.')
 param budgetStartDate string = '${utcNow('yyyy-MM')}-01'
 
 // ---------------------------------------------------------------------------
@@ -955,6 +955,7 @@ output DOCWIKI_EMBED_MODEL_VERSION string = embedModelVersion
 output DOCWIKI_EMBED_CAPACITY int = embedCapacity
 output DOCWIKI_EMBED_DIMENSIONS int = embedDimensions
 output DOCWIKI_DEPLOYMENT_SKU string = deploymentSku
+output DOCWIKI_BUDGET_START_DATE string = budgetStartDate
 output DOCWIKI_ENABLE_ROUTINE bool = enableRoutine
 output DOCWIKI_ENABLE_FOUNDRY_SKILLS_PREVIEW bool = enableFoundrySkillsPreview
 

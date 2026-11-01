@@ -40,6 +40,7 @@
     "allowedIpRanges": { "value": "${DOCWIKI_ALLOWED_IP_RANGES}" },
     "budgetAmount": { "value": "${DOCWIKI_BUDGET_AMOUNT}" },
     "budgetContactEmails": { "value": "${BUDGET_CONTACT_EMAILS}" },
+    "budgetStartDate": { "value": "${DOCWIKI_BUDGET_START_DATE}" },
     "mcpApiClientId": { "value": "${DOCWIKI_MCP_API_CLIENT_ID}" },
     "mcpAllowedClientIds": { "value": "${DOCWIKI_MCP_ALLOWED_CLIENT_IDS}" },
     "mcpConnectionName": { "value": "${DOCWIKI_MCP_CONNECTION}" },

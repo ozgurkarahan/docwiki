@@ -160,6 +160,16 @@ def test_zero_secret_resource_settings() -> None:
     assert re.search(r"^param retentionInDays int = 30$", monitoring, re.MULTILINE)
 
 
+def test_budget_start_date_is_pinned_after_the_first_provision() -> None:
+    """Azure refuses to change the start date of an existing budget: a default that follows
+    the current month would break every provision in a later month."""
+    main = main_text()
+    assert re.search(r"^param budgetStartDate string = '\$\{utcNow\('yyyy-MM'\)\}-01'$", main, re.M)
+    assert re.search(r"^output DOCWIKI_BUDGET_START_DATE string = budgetStartDate$", main, re.M)
+    mapped = json.loads((INFRA / "main.parameters.json").read_text(encoding="utf-8"))
+    assert mapped["parameters"]["budgetStartDate"]["value"] == "${DOCWIKI_BUDGET_START_DATE}"
+
+
 def test_embedding_deployment_is_bounded_and_optional() -> None:
     """ADR 0014: a low explicit capacity is the hard bound on embedding spend; 0 = none."""
     foundry = (INFRA / "modules" / "foundry.bicep").read_text(encoding="utf-8")
