@@ -1,9 +1,12 @@
-"""``FoundryEmbeddingClient``: the Foundry project's OpenAI ``embeddings`` endpoint, Entra auth.
+"""``FoundryEmbeddingClient``: the Foundry resource's OpenAI ``embeddings`` endpoint, Entra auth.
 
-Same connection, retry, rate-limit and concurrency rules as
-:class:`~docwiki.llm.foundry.FoundryLlmClient`: ``DefaultAzureCredential`` (never keys), the
-``AsyncOpenAI`` client from ``AIProjectClient.get_openai_client()`` with SDK retries disabled,
-Retry-After honoured, one token-bucket limiter for the embedding deployment.
+Same retry, rate-limit and concurrency rules as :class:`~docwiki.llm.foundry.FoundryLlmClient`:
+``DefaultAzureCredential`` (never keys), SDK retries disabled, Retry-After honoured, one
+token-bucket limiter for the embedding deployment. The project-scoped ``/openai/v1`` route that
+the Responses client uses answers 404 for ``embeddings``, so the vectors come from the
+``/openai/v1`` route of the Foundry resource that hosts the project (same host, token scope
+``https://cognitiveservices.azure.com/.default``, role Cognitive Services User). The project
+client still describes the deployment.
 """
 
 from __future__ import annotations
@@ -13,7 +16,9 @@ import functools
 import logging
 import random
 import time
+from collections.abc import Awaitable, Callable
 from typing import Any, ClassVar
+from urllib.parse import urlsplit
 
 from docwiki import __version__
 from docwiki.llm.embeddings import (
@@ -47,6 +52,24 @@ from docwiki.llm.settings import ENV_EMBED_DEPLOYMENT, ENV_TIMEOUT, LlmSettings
 from docwiki.llm.types import EMBED_ROLE, LlmUsage, Origin, split_model_version
 
 logger = logging.getLogger("docwiki.llm")
+
+RESOURCE_TOKEN_SCOPE = "https://cognitiveservices.azure.com/.default"
+
+
+def resource_openai_base_url(project_endpoint: str) -> str:
+    """``https://<resource host>/openai/v1`` for a ``https://<resource host>/api/projects/<p>``
+    Foundry project endpoint."""
+    parts = urlsplit(project_endpoint)
+    if parts.scheme != "https" or not parts.netloc:
+        raise LlmConfigurationError("the Foundry project endpoint must be an https:// URL")
+    return f"https://{parts.netloc}/openai/v1"
+
+
+def _token_provider(credential: Any) -> Callable[[], Awaitable[str]]:
+    async def token() -> str:
+        return (await credential.get_token(RESOURCE_TOKEN_SCOPE)).token
+
+    return token
 
 
 class FoundryEmbeddingClient(BaseEmbeddingClient):
@@ -219,8 +242,8 @@ class FoundryEmbeddingClient(BaseEmbeddingClient):
         if failure.kind == "auth":
             return LlmAuthError(
                 f"Entra authentication failed for {where} ({status}){detail}. Make sure "
-                "DefaultAzureCredential can get a token and that the identity has the Azure AI "
-                "User role on the Foundry project",
+                "DefaultAzureCredential can get a token and that the identity has the Cognitive "
+                "Services User role on the Foundry resource",
                 **context,
             )
         if failure.kind == "content_filter":
@@ -240,12 +263,16 @@ class FoundryEmbeddingClient(BaseEmbeddingClient):
             message = f"{where} rejected the request ({status}){detail}"
         return LlmServiceError(message, code=failure.code, **context)
 
+    def _ensure_credential(self) -> Any:
+        if self._credential is None:
+            identity_aio = _require("azure.identity.aio")
+            self._credential = identity_aio.DefaultAzureCredential(**_azure_transport())
+        return self._credential
+
     def _ensure_project(self) -> Any:
         if self._project is None:
             projects_aio = _require("azure.ai.projects.aio")
-            if self._credential is None:
-                identity_aio = _require("azure.identity.aio")
-                self._credential = identity_aio.DefaultAzureCredential(**_azure_transport())
+            self._ensure_credential()
             self._project = projects_aio.AIProjectClient(
                 endpoint=self.settings.project_endpoint,
                 credential=self._credential,
@@ -257,12 +284,25 @@ class FoundryEmbeddingClient(BaseEmbeddingClient):
     def _ensure_openai(self) -> Any:
         loop = asyncio.get_running_loop()
         if self._openai is None or self._openai_loop is not loop:
-            options: dict[str, Any] = {"max_retries": 0, "timeout": self.settings.timeout_s}
+            openai = _require("openai")
+            options: dict[str, Any] = {
+                "base_url": resource_openai_base_url(_endpoint(self.settings)),
+                "api_key": _token_provider(self._ensure_credential()),
+                "max_retries": 0,
+                "timeout": self.settings.timeout_s,
+                "default_headers": {"User-Agent": f"docwiki/{__version__}"},
+            }
             if self._http_client is not None:
                 options["http_client"] = self._http_client
-            self._openai = self._ensure_project().get_openai_client(**options)
+            self._openai = openai.AsyncOpenAI(**options)
             self._openai_loop = loop
         return self._openai
+
+
+def _endpoint(settings: LlmSettings) -> str:
+    if not settings.project_endpoint:
+        raise LlmConfigurationError("the Foundry project endpoint is not set")
+    return settings.project_endpoint
 
 
 def _batch(

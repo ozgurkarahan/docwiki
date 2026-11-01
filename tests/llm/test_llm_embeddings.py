@@ -37,6 +37,7 @@ from docwiki.llm import (
     fake_vector,
 )
 from docwiki.llm.embeddings import embed_fixture_path
+from docwiki.llm.foundry_embeddings import RESOURCE_TOKEN_SCOPE, resource_openai_base_url
 
 SECRET_TEXT = "Kestrel turbine torque note"
 
@@ -284,9 +285,7 @@ async def test_foundry_embeds_in_batches_and_prices_the_input_tokens(
     client = make_embedder(script)
     result = await client.embed(["one", "two", "three"], "document", "embed-input-v1")
 
-    assert [request.url.path for request in script.requests] == [
-        "/api/projects/demo/openai/v1/embeddings"
-    ] * 2
+    assert [request.url.path for request in script.requests] == ["/openai/v1/embeddings"] * 2
     first = script.bodies[0]
     assert first == {
         "model": "embed-deployment",
@@ -423,3 +422,25 @@ def test_run_report_contract_accepts_the_embed_role() -> None:
         role="embed", deployment="embed-deployment", model="text-embedding-3-small", calls=2
     )
     assert usage.role == "embed" and usage.output_tokens == 0
+
+
+async def test_foundry_embeddings_use_the_resource_route_and_cognitive_services_scope(
+    make_embedder: Callable[..., FoundryEmbeddingClient], credential: StaticCredential
+) -> None:
+    script = Script(embed_ok(1))
+    await make_embedder(script).embed(["one"], "query", "query-verbatim-v1")
+
+    request = script.requests[0]
+    assert str(request.url).startswith(resource_openai_base_url(TEST_ENDPOINT))
+    assert request.url.path == "/openai/v1/embeddings"
+    assert request.headers["authorization"] == "Bearer unit-test-token"
+    assert credential.scopes == [(RESOURCE_TOKEN_SCOPE,)]
+
+
+def test_resource_base_url_drops_the_project_path() -> None:
+    assert (
+        resource_openai_base_url("https://example.services.ai.azure.com/api/projects/demo")
+        == "https://example.services.ai.azure.com/openai/v1"
+    )
+    with pytest.raises(LlmConfigurationError):
+        resource_openai_base_url(TEST_ENDPOINT.replace("https://", "http://"))
