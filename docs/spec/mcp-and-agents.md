@@ -14,7 +14,7 @@
 
 | Tool | Parameters | Returns |
 |---|---|---|
-| `answer_context` (v1.8) | `question: str`, `within?: str`, `lang?: str`, `limit: int = 5` (≤ 10), `offset: int = 0` | `{hits: [{rank, origin, kind, page_id, path, title, section, anchor, status?, scope?, lang, source_id?, locator_key?, text, text_truncated, citations: [...]}], home_index?, hub?, views?, truncated, next_offset, hint}` |
+| `answer_context` (v1.8) | `question: str`, `within?: str`, `lang?: str`, `limit: int = 5` (≤ 10), `offset: int = 0` | `{hits: [{rank, origin, kind, page_id, path, title, section, anchor, status?, scope?, lang, source_id?, locator_key?, text, text_truncated, citations: [...]}], home_index?, hub?, views?, truncated, next_offset, hint, coverage?, gaps?}` |
 | `search` | `query: str`, `kinds?: [page-section, source-block]`, `types?: [source, entity, topic, hub, ...]`, `entity?: str`, `topic?: str`, `within?: str`, `lang?: str`, `limit: int = 10` | ranked hits `{page_id, path, title, section, anchor, snippet, source_id?, locator_key?, scope?, lang, score}` (synonym-expanded) |
 | `read_page` | `page: str` (id or path), `section?: str`, `lang?: str` | frontmatter + markdown (or one section), outgoing links, `lang` (and `translation_of` on a mirror page) |
 | `get_index` | `scope: str = "home"` (`home`, `sources`, `entities`, `entities/<type>`, `topics`, `glossary`, `log`, `hubs/<folder>`), `within?: str`, `lang?: str` | index markdown, `lang` (and `languages` on the first window of a multi-language wiki) |
@@ -45,6 +45,37 @@ the output budget; when even that does not fit, hits are dropped and `truncated`
 `next_offset` say where to continue. Pages above the release's audience are never returned
 (defence in depth: the release gates already keep them out). An empty question is
 `invalid_argument`; `within` and `lang` fail as in `search`.
+
+**`answer_context` coverage and gaps (v1.10, F3, flag `DOCWIKI_ANSWER_CONTEXT_COVERAGE`).** With
+the flag `on` (default `off`; any other value is a configuration error at start-up), a call
+without `within`, on the first window, on a release with scope values, adds two keys after
+`hint`; the serialized `hits` and every other key are byte-identical to the flag-off result, and
+with the flag `off` the whole result is unchanged. Chantiers named in the question are detected
+by code, never by a model and never from the candidates: a scope is nameable when it has a hub
+and an entity page `<scope_type>:<scope>`; its phrases are the hub and entity titles (every
+language), the entity aliases, the code split on `-` (two words or more) and the single code
+words of four letters or more written as proper nouns in a title; matching is accent- and
+case-insensitive on whole tokens, longest phrase first, and phrases shared by two scopes are
+dropped. `coverage` lists, per scope found among the ranked candidates (the first
+max(3 × `limit`, 20) results) or named in the question, `{scope, hits, best_rank, candidates,
+hub, named_as?}`: `hits` and `best_rank` (or `null`) count the returned hits, `candidates` the
+ranked candidates, `hub` the hub path (or `null`) and `named_as` the question words that named
+it; items are sorted by best rank (none last), then candidates. `gaps` lists each named scope
+with no returned hit, `{scope, named_as, in_scope_matches, hint}`: for the first 4 gaps a count
+query runs the same retrieval as `answer_context(within=scope)` (capped at 20), so a gap is
+either "matches in scope, call `answer_context(within=…)`" or "no section or block of this scope
+matches the question's words" (never a claim that the chantier is absent from the wiki); later
+gaps carry `in_scope_matches: null` and say they were not checked. When the question names no
+chantier, or several, every nameable scope (at most 6) is also searched on its own with the same
+retrieval as `answer_context(within=scope)`: its `coverage` item gets `in_scope_matches` (capped
+at 20) and `top`, the identifiers of its best match (`page_id`, `title`, `section`, and
+`source_id`/`locator_key` for a source block; never text), and the result gets a
+`coverage_hint` telling the agent to answer for each chantier that may be concerned; named gaps
+reuse these searches. The keys use a reserved
+budget of at most 3,000 characters outside the hits budget (so the result is at most
+`max_chars` + 3,000): coverage items are dropped from the end first (`coverage_truncated: true`),
+then gaps (`gaps_truncated: true`), then the hint. Production keeps the flag `off` until the F3 evaluation
+gate passes; the evaluation MCP app turns it on.
 
 **Scopes (v1.7, [ADR 0011](../adr/0011-company-wide-wiki.md)).** `search.db` (schema 2) records
 each page's scope value in `docs.scope` and `pages.scope`: the frontmatter `scope` of source pages
@@ -149,7 +180,10 @@ agents/
    written, with their gloss.
 10. When the wiki has scopes (chantiers): name the chantier in every answer; when a question
     could concern several chantiers (two chantiers ordered windows), say so and answer per
-    chantier or ask which one; use `within` to search one chantier.
+    chantier or ask which one; use `within` to search one chantier. For a question that names
+    or compares several chantiers or asks which ones (v1.10, F3): `get_index('hubs/chantiers')`,
+    then `answer_context` with `within` per chantier, at most 4 such calls; a `gaps` entry with
+    in-scope matches needs that `within` call.
 11. Date the answer "as of" the most recent current source it cites ("per planning indice B of
     27/03/2026").
 
