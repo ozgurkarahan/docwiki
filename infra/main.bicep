@@ -64,6 +64,24 @@ param smartModelVersion string = '2026-04-24'
 @description('Capacity of the `smart` deployment in units of 1,000 tokens per minute.')
 param smartCapacity int = 100
 
+@description('Model of the `embed` deployment (hybrid retrieval, ADR 0014).')
+param embedModel string = 'text-embedding-3-small'
+
+param embedModelVersion string = '1'
+
+@minValue(0)
+@description('Capacity of the `embed` deployment in units of 1,000 tokens per minute. It is the hard Azure bound on embedding spend (ADR 0014: 50 units = 72M tokens a day at most, 1.44 USD a day); 0 = no embedding deployment.')
+param embedCapacity int = 50
+
+@allowed([
+  256
+  512
+  1024
+  1536
+])
+@description('Vector size requested from the embedding model.')
+param embedDimensions int = 512
+
 @allowed([
   'GlobalStandard'
   'DataZoneStandard'
@@ -290,6 +308,9 @@ var mcpAllowedApplications = filter(map(split(mcpAllowedClientIds, ','), id => t
 // per capacity unit (the per-unit rate limits reported by `az cognitiveservices model list`).
 var fastTokensPerMinute = fastCapacity * 1000
 var smartTokensPerMinute = smartCapacity * 1000
+// Embedding models allow 1 request per 10 s per unit in GlobalStandard, 1 per 60 s otherwise.
+var embedTokensPerMinute = embedCapacity * 1000
+var embedRequestsPerMinute = deploymentSku == 'GlobalStandard' ? embedCapacity * 6 : embedCapacity
 
 // ---------------------------------------------------------------------------
 // Resources
@@ -422,6 +443,9 @@ module foundry 'modules/foundry.bicep' = {
     smartModel: smartModel
     smartModelVersion: smartModelVersion
     smartCapacity: smartCapacity
+    embedModel: embedModel
+    embedModelVersion: embedModelVersion
+    embedCapacity: embedCapacity
     deploymentSku: deploymentSku
     runtimePrincipalId: identity.outputs.principalId
     deployerPrincipalId: deployerPrincipalId
@@ -583,6 +607,30 @@ var pipelineEnv = concat(
       value: contentUnderstanding ? 'true' : 'false'
     }
   ],
+  embedCapacity > 0
+    ? [
+        {
+          name: 'DOCWIKI_EMBED_DEPLOYMENT'
+          value: foundry.outputs.embedDeploymentName
+        }
+        {
+          name: 'DOCWIKI_EMBED_MODEL'
+          value: embedModel
+        }
+        {
+          name: 'DOCWIKI_EMBED_DIMENSIONS'
+          value: string(embedDimensions)
+        }
+        {
+          name: 'DOCWIKI_EMBED_TPM'
+          value: string(embedTokensPerMinute)
+        }
+        {
+          name: 'DOCWIKI_EMBED_RPM'
+          value: string(embedRequestsPerMinute)
+        }
+      ]
+    : [],
   enablePortal
     ? [
         {
@@ -901,6 +949,11 @@ output DOCWIKI_FAST_CAPACITY int = fastCapacity
 output DOCWIKI_SMART_MODEL string = smartModel
 output DOCWIKI_SMART_MODEL_VERSION string = smartModelVersion
 output DOCWIKI_SMART_CAPACITY int = smartCapacity
+output DOCWIKI_EMBED_DEPLOYMENT string = foundry.outputs.embedDeploymentName
+output DOCWIKI_EMBED_MODEL string = embedModel
+output DOCWIKI_EMBED_MODEL_VERSION string = embedModelVersion
+output DOCWIKI_EMBED_CAPACITY int = embedCapacity
+output DOCWIKI_EMBED_DIMENSIONS int = embedDimensions
 output DOCWIKI_DEPLOYMENT_SKU string = deploymentSku
 output DOCWIKI_ENABLE_ROUTINE bool = enableRoutine
 output DOCWIKI_ENABLE_FOUNDRY_SKILLS_PREVIEW bool = enableFoundrySkillsPreview

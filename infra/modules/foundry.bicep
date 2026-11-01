@@ -1,7 +1,7 @@
 // Microsoft Foundry: AIServices account (Entra-only, custom subdomain, project management), the
 // `docwiki` project (pipeline calls and both agents, each agent with its own Entra agent
-// identity, ADR 0003), the `fast` and `smart` model deployments, the Application Insights
-// tracing connection and the Foundry role assignments of architecture.md §6.
+// identity, ADR 0003), the `fast`, `smart` and optional `embed` model deployments, the
+// Application Insights tracing connection and the Foundry role assignments of architecture.md §6.
 
 import { roleIds } from 'roles.bicep'
 
@@ -18,6 +18,14 @@ param fastCapacity int
 param smartModel string
 param smartModelVersion string
 param smartCapacity int
+
+@description('Model of the `embed` deployment (hybrid retrieval, ADR 0014).')
+param embedModel string = 'text-embedding-3-small'
+param embedModelVersion string = '1'
+
+@minValue(0)
+@description('Capacity of the `embed` deployment in units of 1,000 tokens per minute: the hard daily cost bound of ADR 0014; 0 = no embedding deployment.')
+param embedCapacity int = 0
 
 @allowed([
   'DataZoneStandard'
@@ -47,6 +55,8 @@ param appInsightsConnectionString string
 
 var fastDeploymentName = 'fast'
 var smartDeploymentName = 'smart'
+var embedDeploymentName = 'embed'
+var deployEmbed = embedCapacity > 0
 var grantDeployer = !empty(deployerPrincipalId)
 
 resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
@@ -129,6 +139,28 @@ resource smartDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-
   ]
 }
 
+// Embeddings for hybrid retrieval (ADR 0014). The low explicit capacity is the hard Azure bound
+// on embedding spend; it is not created when the capacity is 0.
+resource embedDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = if (deployEmbed) {
+  parent: account
+  name: embedDeploymentName
+  sku: {
+    name: deploymentSku
+    capacity: embedCapacity
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: embedModel
+      version: embedModelVersion
+    }
+    versionUpgradeOption: 'OnceCurrentVersionExpired'
+  }
+  dependsOn: [
+    smartDeployment
+  ]
+}
+
 // Server-side tracing of the agents: Application Insights connection of the project.
 resource tracingConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01' = if (enableTracing) {
   parent: project
@@ -207,3 +239,4 @@ output projectEndpoint string = foundryProjectEndpoint
 output projectPrincipalId string = project.identity.principalId
 output fastDeploymentName string = fastDeployment.name
 output smartDeploymentName string = smartDeployment.name
+output embedDeploymentName string = deployEmbed ? embedDeploymentName : ''

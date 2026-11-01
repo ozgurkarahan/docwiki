@@ -15,5 +15,6 @@
 | [0011](0011-company-wide-wiki.md) | A company-wide wiki: scopes and three classification axes |
 | [0012](0012-french-canonical-and-locked-vocabulary.md) | French canonical with an English mirror; a locked trade vocabulary |
 | [0013](0013-index-first-researcher.md) | Index-first Researcher: one `answer_context` call, then at most two targeted calls |
+| [0014](0014-hybrid-retrieval.md) | Words and meaning: hybrid retrieval (proposed; cost bound of the embedding deployment) |
 
 The full decision log with rationale is in [`docs/spec/README.md`](../spec/README.md#4-decision-log-v1).
