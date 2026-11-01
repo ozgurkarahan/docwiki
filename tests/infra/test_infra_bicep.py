@@ -77,6 +77,10 @@ def test_spec_parameters_and_defaults() -> None:
         "enableFoundrySkillsPreview": "false",
         "enableRoutine": "false",
         "deploymentSku": "'GlobalStandard'",
+        "embedModel": "'text-embedding-3-small'",
+        "embedModelVersion": "'1'",
+        "embedCapacity": "50",
+        "embedDimensions": "512",
         "budgetContactEmails": "''",
     }
     for name, default in expected.items():
@@ -154,6 +158,48 @@ def test_zero_secret_resource_settings() -> None:
     assert "destination: 'azure-monitor'" in environment, "no Log Analytics shared key"
     monitoring = (INFRA / "modules" / "monitoring.bicep").read_text(encoding="utf-8")
     assert re.search(r"^param retentionInDays int = 30$", monitoring, re.MULTILINE)
+
+
+def test_budget_start_date_is_pinned_after_the_first_provision() -> None:
+    """Azure refuses to change the start date of an existing budget: a default that follows
+    the current month would break every provision in a later month."""
+    main = main_text()
+    assert re.search(r"^param budgetStartDate string = '\$\{utcNow\('yyyy-MM'\)\}-01'$", main, re.M)
+    assert re.search(r"^output DOCWIKI_BUDGET_START_DATE string = budgetStartDate$", main, re.M)
+    mapped = json.loads((INFRA / "main.parameters.json").read_text(encoding="utf-8"))
+    assert mapped["parameters"]["budgetStartDate"]["value"] == "${DOCWIKI_BUDGET_START_DATE}"
+
+
+def test_embedding_deployment_is_bounded_and_optional() -> None:
+    """ADR 0014: a low explicit capacity is the hard bound on embedding spend; 0 = none."""
+    foundry = (INFRA / "modules" / "foundry.bicep").read_text(encoding="utf-8")
+    block = foundry[foundry.index("resource embedDeployment") :]
+    assert "= if (deployEmbed) {" in block.splitlines()[0]
+    assert "capacity: embedCapacity" in block
+    assert "name: embedModel" in block and "version: embedModelVersion" in block
+    assert "versionUpgradeOption: 'OnceCurrentVersionExpired'" in block
+    assert re.search(r"^var deployEmbed = embedCapacity > 0$", foundry, re.MULTILINE)
+    assert re.search(r"^param embedCapacity int = 0$", foundry, re.MULTILINE)
+    main = main_text()
+    assert re.search(r"@minValue\(0\)\s*@description\([^\n]*\)\s*param embedCapacity", main)
+    assert "var embedTokensPerMinute = embedCapacity * 1000" in main
+    assert (
+        "var embedRequestsPerMinute = deploymentSku == 'GlobalStandard' ? embedCapacity * 6 "
+        ": embedCapacity" in main
+    )
+    pipeline = main[main.index("var pipelineEnv") : main.index("module ingestJob")]
+    embed_env = pipeline[pipeline.index("embedCapacity > 0") :]
+    for name in (
+        "DOCWIKI_EMBED_DEPLOYMENT",
+        "DOCWIKI_EMBED_MODEL",
+        "DOCWIKI_EMBED_DIMENSIONS",
+        "DOCWIKI_EMBED_TPM",
+        "DOCWIKI_EMBED_RPM",
+    ):
+        assert f"name: '{name}'" in embed_env, name
+    # The MCP app gets no embedding setting or role before slice S6.
+    mcp = main[main.index("module mcpApp") : main.index("module portalApp")]
+    assert "EMBED" not in mcp
 
 
 def test_job_run_control_matches_the_architecture() -> None:

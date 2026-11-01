@@ -124,6 +124,8 @@ azd env set DOCWIKI_MCP_MIN_REPLICAS 0
 | `AZURE_LOCATION` | `swedencentral` | Region (allowed: `swedencentral`, `eastus2`, `westeurope`) |
 | `DOCWIKI_FAST_MODEL` / `DOCWIKI_FAST_MODEL_VERSION` / `DOCWIKI_FAST_CAPACITY` | `gpt-5.4-mini` / `2026-03-17` / `100` | `fast` deployment (capacity in 1,000 tokens per minute) |
 | `DOCWIKI_SMART_MODEL` / `DOCWIKI_SMART_MODEL_VERSION` / `DOCWIKI_SMART_CAPACITY` | `gpt-5.5` / `2026-04-24` / `100` | `smart` deployment (pipeline compilation and both agents) |
+| `DOCWIKI_EMBED_MODEL` / `DOCWIKI_EMBED_MODEL_VERSION` / `DOCWIKI_EMBED_CAPACITY` | `text-embedding-3-small` / `1` / `50` | `embed` deployment for hybrid retrieval; the capacity is the hard bound on embedding spend (50 = 1.44 USD a day at most, [ADR 0014](docs/adr/0014-hybrid-retrieval.md)); `0` = no embedding deployment |
+| `DOCWIKI_EMBED_DIMENSIONS` | `512` | Vector size requested from the embedding model (`256`, `512`, `1024` or `1536`) |
 | `DOCWIKI_DEPLOYMENT_SKU` | `GlobalStandard` | Or `DataZoneStandard` to keep model processing in the EU or US data zone (smaller quota, about 10 % higher list price) |
 | `DOCWIKI_MCP_MIN_REPLICAS` | `0` | `1` keeps the MCP server warm for demos (from zero, a cold start adds about 30 s to an agent turn) |
 | `DOCWIKI_ENABLE_PORTAL` | `false` | Portal Container App serving the current release's site (Entra sign-in by default) |
@@ -146,6 +148,7 @@ azd env set DOCWIKI_MCP_MIN_REPLICAS 0
 | `DOCWIKI_MCP_TOKEN_VALIDATION` | `required` | The MCP server validates the bearer token forwarded by built-in auth; `off` only after Step 12 showed that the platform does not forward it |
 | `DOCWIKI_SKIP_AGENTS` | unset | `true` skips the MCP connection and agent deployment in the `postprovision` hook |
 | `DOCWIKI_BUDGET_AMOUNT` / `BUDGET_CONTACT_EMAILS` | `50` / empty | Monthly budget; no budget is created without contacts |
+| `DOCWIKI_BUDGET_START_DATE` | written by the first provision | First day of the budget's first month; pinned because Azure cannot change the start date of an existing budget |
 | `DOCWIKI_CU_DEFAULTS` | unset | `true` sets Content Understanding model defaults (not needed for `prebuilt-layout`) |
 | `DOCWIKI_NETWORK_PERIMETER` | `false` | `true` secures the storage account with a network security perimeter (`publicNetworkAccess` `SecuredByPerimeter`: managed identities of the subscription and `DOCWIKI_ALLOWED_IP_RANGES` only) instead of open public access; required where a policy turns public network access off on storage accounts (Step 8). Event Grid cannot create its subscription inside the perimeter: provision once without the perimeter (the subscription then keeps delivering), or rely on the reconcile schedule, a manual job start or an ingest message |
 | `DOCWIKI_ALLOWED_IP_RANGES` | unset | With the perimeter: comma-separated public CIDR ranges allowed to reach storage (the workstation that uploads to `raw/`; the address Azure sees is `SourceIpAddress` in the `NSPAccessLogs` table); never commit them |
@@ -183,7 +186,8 @@ blocking the name.
 
 ON_FAIL: Apply the `fix:` line printed under each failed check. Typical fixes:
 
-- `quota:*` — lower `DOCWIKI_FAST_CAPACITY` / `DOCWIKI_SMART_CAPACITY`, choose
+- `quota:*` — lower `DOCWIKI_FAST_CAPACITY` / `DOCWIKI_SMART_CAPACITY` /
+  `DOCWIKI_EMBED_CAPACITY`, choose
   `DOCWIKI_DEPLOYMENT_SKU GlobalStandard` (with the owner's agreement), or request quota.
 - `model-*` — pick a model and version listed by the check (with the owner's agreement).
 - `resource-providers` — run the printed `az provider register` commands and wait until

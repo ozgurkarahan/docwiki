@@ -46,6 +46,7 @@ MODELS = [
     model_entry("gpt-5.5", "2026-04-24"),  # the CLI lists some models twice
     model_entry("gpt-4o-mini", "2024-07-18", lifecycle="Deprecating"),
     model_entry("gpt-5-pro", "2025-10-06", skus=("GlobalStandard",)),
+    model_entry("text-embedding-3-small", "1", retires="2028-02-09T00:00:00+00:00"),
 ]
 
 
@@ -220,6 +221,9 @@ def test_settings_default_to_the_bicep_parameters() -> None:
     assert defaults["smartModel"] == "gpt-5.5"
     assert defaults["location"] == "swedencentral"
     assert defaults["deploymentSku"] == "GlobalStandard"
+    assert defaults["embedModel"] == "text-embedding-3-small"
+    assert defaults["embedModelVersion"] == "1"
+    assert defaults["embedCapacity"] == "50"
     assert "budgetStartDate" not in defaults, "expressions are not literal defaults"
 
 
@@ -256,6 +260,8 @@ def healthy(runner: FakeRunner, *, roles: tuple[str, ...] = ("Owner",)) -> FakeR
             usage("OpenAI.GlobalStandard.gpt-5.5", 0, 1000),
             usage("OpenAI.DataZoneStandard.gpt-5.4-mini", 0, 1000),
             usage("OpenAI.DataZoneStandard.gpt-5.5", 0, 333),
+            usage("OpenAI.GlobalStandard.text-embedding-3-small", 0, 1000),
+            usage("OpenAI.DataZoneStandard.text-embedding-3-small", 0, 1000),
         ],
     )
     runner.on(r"^az role assignment list", [{"roleDefinitionName": role} for role in roles])
@@ -319,6 +325,33 @@ def test_json_output_and_quota_capacity(runner: FakeRunner, tmp_path: Path) -> N
     checks = {item["name"]: item for item in json.loads(text)}
     assert checks["quota:OpenAI.DataZoneStandard.gpt-5.5"]["status"] == FAIL
     assert checks["model-smart"]["status"] == OK
+
+
+def test_embedding_deployment_is_checked_unless_disabled(
+    runner: FakeRunner, tmp_path: Path
+) -> None:
+    code, text = run(healthy(runner), tmp_path, "--json")
+    assert code == 0, text
+    checks = {item["name"]: item for item in json.loads(text)}
+    assert checks["model-embed"]["status"] == OK
+    assert "text-embedding-3-small 1 (GlobalStandard)" in checks["model-embed"]["detail"]
+    quota = checks["quota:OpenAI.GlobalStandard.text-embedding-3-small"]
+    assert quota["status"] == OK and "need 50" in quota["detail"]
+    code, text = run(healthy(FakeRunner()), tmp_path, "--json", DOCWIKI_EMBED_CAPACITY="0")
+    names = {item["name"] for item in json.loads(text)}
+    assert "model-embed" not in names
+    assert not any("text-embedding" in name for name in names)
+
+
+def test_embedding_quota_shortfall_names_the_embed_capacity(
+    runner: FakeRunner, tmp_path: Path
+) -> None:
+    code, text = run(healthy(runner), tmp_path, "--json", DOCWIKI_EMBED_CAPACITY="2000")
+    assert code == 1
+    checks = {item["name"]: item for item in json.loads(text)}
+    quota = checks["quota:OpenAI.GlobalStandard.text-embedding-3-small"]
+    assert quota["status"] == FAIL
+    assert "DOCWIKI_EMBED_CAPACITY" in (quota["remediation"] or "")
 
 
 def test_disallowed_region_fails_without_model_lookup(runner: FakeRunner, tmp_path: Path) -> None:

@@ -124,6 +124,13 @@ class Settings:
 
         env_name = tools.get("AZURE_ENV_NAME") or None
         contacts = [item.strip() for item in tools.get("BUDGET_CONTACT_EMAILS").split(",")]
+        embed = ModelChoice(
+            "embed",
+            value("DOCWIKI_EMBED_MODEL", "embedModel"),
+            value("DOCWIKI_EMBED_MODEL_VERSION", "embedModelVersion"),
+            capacity("DOCWIKI_EMBED_CAPACITY", "embedCapacity"),
+            "DOCWIKI_EMBED",
+        )
         return cls(
             env_name=env_name,
             subscription_id=tools.get("AZURE_SUBSCRIPTION_ID") or None,
@@ -147,6 +154,8 @@ class Settings:
                     capacity("DOCWIKI_SMART_CAPACITY", "smartCapacity"),
                     "DOCWIKI_SMART",
                 ),
+                # The embedding deployment is optional (capacity 0 = none, ADR 0014).
+                *([embed] if embed.capacity > 0 else []),
             ],
             budget_contacts=[item for item in contacts if item],
         )
@@ -327,8 +336,8 @@ def evaluate_quota(
                     f"quota:{name}",
                     FAIL,
                     detail,
-                    "Lower the capacity (azd env set DOCWIKI_FAST_CAPACITY or "
-                    "DOCWIKI_SMART_CAPACITY "
+                    "Lower the capacity (azd env set DOCWIKI_FAST_CAPACITY, "
+                    "DOCWIKI_SMART_CAPACITY or DOCWIKI_EMBED_CAPACITY "
                     f"<units>), free quota in {location}, or request more at {QUOTA_REQUEST_URL}",
                 )
             )
