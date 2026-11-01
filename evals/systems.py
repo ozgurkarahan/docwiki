@@ -130,6 +130,10 @@ class ResearcherSystem(EvalSystem):
     identity with the Foundry User role). The agent version is resolved once and pinned for the
     whole run. Cost is estimated from the agent's token usage with the ``smart`` price row
     (``DOCWIKI_SMART_DEPLOYMENT`` / ``DOCWIKI_SMART_MODEL``); MCP server costs are not included.
+
+    ``agent`` is the logical key ``researcher`` (Foundry agent ``docwiki-researcher``) or another
+    Foundry agent name, such as the evaluation Researcher ``docwiki-researcher-eval``; any other
+    agent becomes the system name, so its results never overwrite the production Researcher's.
     """
 
     name = "docwiki-researcher"
@@ -145,6 +149,8 @@ class ResearcherSystem(EvalSystem):
         self._client = client
         self._owns_client = False
         self.agent = agent
+        if agent not in ("researcher", ResearcherSystem.name):
+            self.name = agent
         self._env = env
         self._prices = prices
         self._version: str | None = None

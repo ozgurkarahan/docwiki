@@ -3,6 +3,8 @@
     uv run python agents/deploy.py --dry-run          # exact request bodies, no Azure call
     uv run python agents/deploy.py                    # new agent versions only when changed
     uv run python agents/deploy.py --routine enable   # also the daily Librarian routine
+    uv run python agents/deploy.py --eval             # evaluation Researcher, eval MCP app
+    uv run python agents/deploy.py --eval --delete    # remove it after the gates
 
 The implementation lives in ``docwiki.agents_client.deploy`` so that it is tested with the package.
 """

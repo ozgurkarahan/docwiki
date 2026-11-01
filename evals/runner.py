@@ -91,12 +91,15 @@ BASELINES = ("baseline-rag", "baseline-long-context")
 """Systems that index the documents of ``--scope`` (the Researcher answers over its release)."""
 MAX_CONTEXT_CHARS = 30_000
 _SPLIT_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
+_AGENT_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
+DEFAULT_AGENT = "researcher"
 
 
 @dataclass
 class RunOptions:
     system: str
     questions: Path
+    agent: str = DEFAULT_AGENT
     split: str = PUBLIC_SPLIT
     limit: int | None = None
     corpus: Path = REPO_ROOT / "samples" / "corpus"
@@ -257,7 +260,7 @@ def build_system(options: RunOptions, corpus: CorpusContext) -> EvalSystem:
     """The system under test. The baselines index the documents of ``options.scope`` that the
     audience may see; an empty selection raises ``ValueError``."""
     if options.system == "docwiki-researcher":
-        return ResearcherSystem(env=options.env)
+        return ResearcherSystem(agent=options.agent, env=options.env)
     if options.system == "baseline-rag":
         return BaselineRagSystem(
             docs=corpus.docs,
@@ -586,6 +589,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--system", required=True, choices=SYSTEMS)
     parser.add_argument("--questions", required=True, type=Path, help="golden set (JSONL)")
     parser.add_argument(
+        "--agent",
+        default=DEFAULT_AGENT,
+        help="agent of --system docwiki-researcher: 'researcher' (docwiki-researcher, default) or "
+        "a Foundry agent name such as docwiki-researcher-eval, which then also names the results",
+    )
+    parser.add_argument(
         "--split-name",
         "--split",
         dest="split",
@@ -648,6 +657,15 @@ def _summary_lines(result: Mapping[str, Any]) -> list[str]:
 async def _main(options: RunOptions) -> int:
     if not _SPLIT_RE.match(options.split):
         print("--split-name must be lower-case letters, digits and '-'", file=sys.stderr)
+        return 2
+    if not _AGENT_RE.match(options.agent):
+        print(
+            "--agent must be a Foundry agent name (lower-case letters, digits, '-')",
+            file=sys.stderr,
+        )
+        return 2
+    if options.agent != DEFAULT_AGENT and options.system != "docwiki-researcher":
+        print("--agent only applies to --system docwiki-researcher", file=sys.stderr)
         return 2
     try:
         if options.private_out is not None:
@@ -722,6 +740,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     options = RunOptions(
         system=args.system,
         questions=args.questions,
+        agent=args.agent,
         split=args.split,
         limit=args.limit,
         corpus=args.corpus,

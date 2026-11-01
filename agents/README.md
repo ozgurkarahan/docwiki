@@ -99,6 +99,33 @@ uv run python agents/deploy.py --agent researcher  # one agent
 SDK calls (`azure-ai-projects` 2.9, async): `agents.get`, `agents.create_version(name, body)`,
 `connections.get`, `beta.routines.create_or_update`.
 
+## Evaluation agent (optional)
+
+The optional evaluation environment (`enableEvalMcp`,
+[`docs/spec/infra-ops-security.md`](../docs/spec/infra-ops-security.md) §1) adds a second MCP app
+with the feature under evaluation switched on. `--eval` deploys an evaluation Researcher
+`docwiki-researcher-eval` that is identical to the production one (same instructions file, model,
+tools, approvals and auth strategy) except its name and its MCP endpoint: it reads
+`DOCWIKI_EVAL_MCP_URL` and `DOCWIKI_EVAL_MCP_CONNECTION` (the `azd` outputs of the evaluation
+environment) instead of `DOCWIKI_MCP_URL` and `DOCWIKI_MCP_CONNECTION`, never falling back to the
+production ones. The production agents are not touched.
+
+```powershell
+azd env set DOCWIKI_ENABLE_EVAL_MCP true; azd provision    # the evaluation app and connection
+uv run python agents/deploy.py --eval --dry-run            # exact body of docwiki-researcher-eval
+uv run python agents/deploy.py --eval --json               # deploy it; note identity_client_id
+azd env set DOCWIKI_EVAL_MCP_ALLOWED_CLIENT_IDS <identity_client_id>; azd provision
+# then grant Wiki.Read on the MCP API to that identity (the hook does it for production agents only)
+uv run python evals/run.py --system docwiki-researcher --agent docwiki-researcher-eval `
+    --questions evals/golden/dev.jsonl --catalog <release folder or its catalog.json>
+```
+
+The evaluation agent has its own Entra agent identity: the evaluation MCP app accepts it in
+addition to the production agents, the production app does not. After the gates, remove it with
+`uv run python agents/deploy.py --eval --delete` (`--dry-run` shows the `DELETE` it would send; it
+only deletes names ending in `-eval`), delete the evaluation app and connection (a provision with
+the flag off leaves them in place), and set `DOCWIKI_ENABLE_EVAL_MCP` back to `false`.
+
 ## Invoke
 
 ```powershell

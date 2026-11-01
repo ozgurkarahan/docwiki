@@ -22,7 +22,7 @@ from evals.runner import (
     run_evaluation,
     write_results,
 )
-from evals.systems import SystemNotConfigured, SystemSkipped
+from evals.systems import ResearcherSystem, SystemNotConfigured, SystemSkipped
 from evals_testkit import (
     HELD_BACK,
     MAIL,
@@ -513,6 +513,35 @@ def test_cli_rejects_bad_inputs(tmp_path: Path, mocked_cli: dict[str, Any]) -> N
             ["--system", "baseline-rag", "--questions", str(questions), "--split-name", "Hold Out"]
         )
         == 2
+    )
+    for argv in (
+        ["--system", "baseline-rag", "--agent", "docwiki-researcher-eval"],
+        ["--system", "docwiki-researcher", "--agent", "Researcher Eval"],
+    ):
+        assert runner.main([*argv, "--questions", str(questions)]) == 2
+    assert "system" not in mocked_cli
+
+
+def test_researcher_system_targets_the_eval_agent(corpus: CorpusContext) -> None:
+    production = build_system(
+        RunOptions(system="docwiki-researcher", questions=Path("dev.jsonl"), env={}), corpus
+    )
+    assert isinstance(production, ResearcherSystem)
+    assert (production.agent, production.name) == ("researcher", "docwiki-researcher")
+    evaluated = build_system(
+        RunOptions(
+            system="docwiki-researcher",
+            questions=Path("dev.jsonl"),
+            agent="docwiki-researcher-eval",
+            env={},
+        ),
+        corpus,
+    )
+    assert isinstance(evaluated, ResearcherSystem)
+    assert evaluated.agent == "docwiki-researcher-eval"
+    assert evaluated.name == "docwiki-researcher-eval"
+    assert result_name(evaluated.name, "dev", "2026-11-02", limit=None, complete=True) == (
+        "2026-11-02-docwiki-researcher-eval-dev.json"
     )
 
 

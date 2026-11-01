@@ -71,6 +71,7 @@ stops before any question with exit code 2 and a message naming the missing sett
 | Option | Default | Meaning |
 |---|---|---|
 | `--system` | (required) | `docwiki-researcher`, `baseline-rag` or `baseline-long-context` |
+| `--agent` | `researcher` | Agent answering for `docwiki-researcher`: `docwiki-researcher-eval` targets the evaluation Researcher ([`agents/README.md`](../agents/README.md#evaluation-agent-optional)); the system, file and scoreboard row then take that name |
 | `--questions` | (required) | Golden set (JSONL) |
 | `--split-name` (`--split`) | `dev` | Any other name writes aggregates only (see "Holdout privacy") |
 | `--limit N` | all | First N questions |

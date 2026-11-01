@@ -3,6 +3,14 @@
     uv run python agents/deploy.py --dry-run          # exact request bodies, no Azure call
     uv run python agents/deploy.py                    # create agent versions that changed
     uv run python agents/deploy.py --routine enable   # also upsert the daily routine, enabled
+    uv run python agents/deploy.py --eval             # evaluation Researcher (eval MCP app)
+    uv run python agents/deploy.py --eval --delete    # remove it after the gates
+
+``--eval`` deploys an evaluation variant of the selected agents (the Researcher by default): the
+same definition, instructions and metadata, named ``<name>-eval``, whose MCP tools read
+``DOCWIKI_EVAL_MCP_URL`` and ``DOCWIKI_EVAL_MCP_CONNECTION`` instead of ``DOCWIKI_MCP_URL`` and
+``DOCWIKI_MCP_CONNECTION`` (the optional evaluation MCP app, Bicep ``enableEvalMcp``). Production
+agents are never touched by ``--eval``, and ``--delete`` only accepts evaluation agents.
 
 Every agent version carries ``docwiki_definition_sha256`` in its metadata: the SHA-256 of the
 resolved request body (name, description, model, instructions, tools and YAML metadata, after the
@@ -44,6 +52,7 @@ from docwiki.agents_client.definitions import (
     HASH_METADATA_KEY,
     ROLES_METADATA_KEY,
     VERSION_METADATA_KEY,
+    AgentDefinition,
     LoadedAgent,
     LoadedRoutine,
     default_agents_dir,
@@ -58,6 +67,8 @@ from docwiki.agents_client.errors import (
 )
 
 __all__ = [
+    "EVAL_AGENT_SUFFIX",
+    "EVAL_ENV_PREFIX",
     "PROJECT_ENDPOINT_ENV",
     "ROUTINE_FEATURE_HEADER",
     "AgentPayload",
@@ -67,13 +78,19 @@ __all__ = [
     "build_agent_payload",
     "build_routine_body",
     "definition_hash",
+    "delete_agent",
     "deploy_agent",
     "deploy_routine",
+    "eval_agent",
+    "eval_env_name",
     "main",
     "verify_connection",
 ]
 
 PROJECT_ENDPOINT_ENV = "DOCWIKI_FOUNDRY_PROJECT_ENDPOINT"
+EVAL_AGENT_SUFFIX = "-eval"
+EVAL_ENV_PREFIX = "DOCWIKI_EVAL_"
+EVAL_DEFAULT_AGENTS: tuple[str, ...] = ("researcher",)
 ROUTINE_FEATURE_HEADER = {"Foundry-Features": "Routines=V2Preview"}
 _UNHASHED_METADATA = (HASH_METADATA_KEY, VERSION_METADATA_KEY)
 _SECRET_AUTH_TYPES = frozenset({"", "apikey", "customkeys", "sas", "none", "oauth2"})
@@ -180,6 +197,30 @@ def definition_hash(agent_name: str, body: Mapping[str, Any]) -> str:
         separators=(",", ":"),
     )
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def eval_env_name(name: str) -> str:
+    """Evaluation counterpart of a ``DOCWIKI_*`` variable (``DOCWIKI_MCP_URL`` ->
+    ``DOCWIKI_EVAL_MCP_URL``)."""
+    return EVAL_ENV_PREFIX + name.removeprefix("DOCWIKI_")
+
+
+def eval_agent(agent: LoadedAgent) -> LoadedAgent:
+    """The evaluation variant of an agent: identical except its name (``<name>-eval``) and the
+    environment variables naming its MCP endpoints and project connections."""
+    definition = agent.definition
+    data = definition.model_dump()
+    data["name"] = definition.name + EVAL_AGENT_SUFFIX
+    for tool in data["tools"]:
+        tool["server_url_env"] = eval_env_name(tool["server_url_env"])
+        tool["auth"]["connection_env"] = eval_env_name(tool["auth"]["connection_env"])
+    try:
+        variant = AgentDefinition.model_validate(data)
+    except ValueError as exc:
+        raise AgentDefinitionError(f"{agent.name}: no valid evaluation variant: {exc}") from None
+    return LoadedAgent(
+        key=agent.key, path=agent.path, definition=variant, instructions=agent.instructions
+    )
 
 
 def build_agent_payload(
@@ -399,6 +440,18 @@ async def deploy_agent(project: Any, payload: AgentPayload) -> DeployResult:
     )
 
 
+async def delete_agent(project: Any, agent_name: str) -> bool:
+    """Delete an agent and all its versions; ``False`` when it does not exist."""
+    if not agent_name.endswith(EVAL_AGENT_SUFFIX):
+        raise AgentConfigurationError(f"refusing to delete {agent_name}: not an evaluation agent")
+    errors = _azure_exceptions()
+    try:
+        await project.agents.delete(agent_name)
+    except errors.ResourceNotFoundError:
+        return False
+    return True
+
+
 async def deploy_routine(project: Any, routine: LoadedRoutine, *, enabled: bool) -> RoutineResult:
     """Create or replace the routine (idempotent ``PUT``) with the requested enabled state."""
     body = build_routine_body(routine, enabled=enabled)
@@ -510,6 +563,25 @@ async def _deploy(
                 raise DeployError(f"routine {routine.name}: {_azure_message(exc)}") from exc
 
 
+async def _delete(
+    names: Sequence[str],
+    env: Mapping[str, str],
+    *,
+    project_client: Any | None,
+    report: Callable[[str, bool], None],
+) -> None:
+    endpoint = (env.get(PROJECT_ENDPOINT_ENV) or "").strip()
+    if not endpoint and project_client is None:
+        raise AgentConfigurationError(f"environment variable {PROJECT_ENDPOINT_ENV} is not set")
+    errors = _azure_exceptions()
+    async with _project_client(endpoint, project_client) as project:
+        for name in names:
+            try:
+                report(name, await delete_agent(project, name))
+            except errors.AzureError as exc:
+                raise DeployError(f"{name}: {_azure_message(exc)}") from exc
+
+
 def _azure_message(exc: Exception) -> str:
     status = getattr(exc, "status_code", None)
     message = getattr(exc, "message", None) or str(exc)
@@ -572,7 +644,47 @@ def _parser(agents_dir: Path) -> argparse.ArgumentParser:
         help="do not read the MCP project connection before deploying",
     )
     parser.add_argument("--json", action="store_true", help="print the results as JSON")
+    parser.add_argument(
+        "--eval",
+        action="store_true",
+        help="deploy the evaluation variant (<name>-eval, DOCWIKI_EVAL_MCP_URL and "
+        "DOCWIKI_EVAL_MCP_CONNECTION) of the selected agents, the Researcher by default",
+    )
+    parser.add_argument(
+        "--delete",
+        action="store_true",
+        help="with --eval: delete the evaluation agents instead of deploying them",
+    )
     return parser
+
+
+def _main_delete(
+    names: Sequence[str],
+    env: Mapping[str, str],
+    args: argparse.Namespace,
+    project_client: Any | None,
+) -> int:
+    if args.dry_run:
+        plan = {
+            "dry_run": True,
+            "delete": [
+                {"agent": name, "operation": "agents.delete", "http": f"DELETE /agents/{name}"}
+                for name in names
+            ],
+        }
+        print(json.dumps(plan, indent=2, ensure_ascii=False))
+        return 0
+    outcome: dict[str, list[str]] = {"deleted": [], "absent": []}
+
+    def report(name: str, deleted: bool) -> None:
+        outcome["deleted" if deleted else "absent"].append(name)
+        if not args.json:
+            print(f"{name}: {'deleted' if deleted else 'not found (nothing to delete)'}")
+
+    asyncio.run(_delete(names, env, project_client=project_client, report=report))
+    if args.json:
+        print(json.dumps(outcome, indent=2, ensure_ascii=False))
+    return 0
 
 
 def main(
@@ -591,8 +703,17 @@ def main(
         collected.append if args.json else _print_result
     )
     try:
+        if args.delete and not args.eval:
+            raise AgentConfigurationError("--delete only removes evaluation agents: add --eval")
+        if args.eval and args.routine:
+            raise AgentConfigurationError("--eval deploys agents only: drop --routine")
         agents = load_agents(args.agents_dir)
-        selected = _select(agents, args.agent)
+        wanted = args.agent or (list(EVAL_DEFAULT_AGENTS) if args.eval else None)
+        selected = _select(agents, wanted)
+        if args.eval:
+            selected = [eval_agent(agent) for agent in selected]
+        if args.delete:
+            return _main_delete([agent.name for agent in selected], values, args, project_client)
         routines = load_routines(agents, args.agents_dir) if args.routine else []
         if args.dry_run:
             plan = _dry_run(selected, routines, values, enable_routine=args.routine == "enable")
