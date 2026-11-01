@@ -3,12 +3,25 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pytest
 from evals.records import ToolCallRecord, tool_hits
-from evals.retrieval_bench import Bench, load_bench_questions, main, release_stats, run
+from evals.retrieval_bench import (
+    Bench,
+    SemanticLane,
+    _row_inputs,
+    _text_key,
+    load_bench_questions,
+    main,
+    release_stats,
+    run,
+)
+
+from docwiki.llm.embeddings import FakeEmbeddingClient
 
 MINUTES = (
     "full/chantiers/moreau/3-execution/site-meeting-minutes/"
@@ -333,3 +346,136 @@ def test_cli_writes_the_report(repo_root: Path, golden: Path, tmp_path: Path) ->
     report = json.loads(out.read_text(encoding="utf-8"))
     assert report["format"] == "docwiki.evals.retrieval/v1"
     assert report["release"]["release_id"] == "20260401T090000Z-8a41b109"
+
+
+# ------------------------------------------------------------------------------ hybrid
+
+
+def _mock_db(repo_root: Path) -> Path:
+    root = repo_root / "samples/fixtures/mock-release/releases"
+    release_id = json.loads((root / "current.json").read_text(encoding="utf-8"))["release_id"]
+    return root / release_id / "search.db"
+
+
+def _lane_towards(
+    repo_root: Path, question: str, locator_key: str, others: tuple[str, ...] = ()
+) -> SemanticLane:
+    """A lane whose question vector points exactly at the source block ``locator_key``."""
+    db = _mock_db(repo_root)
+    ids, _ = _row_inputs(db)
+    rng = np.random.default_rng(7)
+    matrix = rng.normal(size=(len(ids), 16)).astype(np.float32)
+    matrix /= np.linalg.norm(matrix, axis=1, keepdims=True)
+    conn = sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True)
+    try:
+        (target,) = conn.execute(
+            "SELECT rowid FROM docs WHERE kind = 'source-block' AND locator_key = ?",
+            (locator_key,),
+        ).fetchone()
+    finally:
+        conn.close()
+    rowids = np.asarray(ids, dtype=np.int64)
+    queries = {_text_key(text): matrix[0].copy() for text in others}
+    queries[_text_key(question)] = matrix[ids.index(target)].copy()
+    return SemanticLane(rowids, matrix, queries, model="test", dimensions=16, usage={})
+
+
+def test_hybrid_brings_back_a_row_the_lexical_search_misses(repo_root: Path) -> None:
+    question = "zzqx qqvv wwkk"
+    lexical = Bench(repo_root / "samples/fixtures/mock-release", repo_root / "samples/corpus")
+    assert lexical.candidates(question) == []
+    hybrid = Bench(
+        repo_root / "samples/fixtures/mock-release",
+        repo_root / "samples/corpus",
+        semantic=_lane_towards(repo_root, question, "para-0007"),
+    )
+    found = hybrid.candidates(question)
+    assert found[0].kind == "source-block"
+    assert found[0].locator_key == "para-0007"
+    assert found[0].lanes == "semantic"
+    assert len(found) <= hybrid.lane_depth
+    assert hybrid.candidates(question) == found
+
+
+def test_hybrid_fusion_keeps_lexical_hits_and_marks_both_lanes(repo_root: Path) -> None:
+    lexical = Bench(repo_root / "samples/fixtures/mock-release", repo_root / "samples/corpus")
+    hybrid = Bench(
+        repo_root / "samples/fixtures/mock-release",
+        repo_root / "samples/corpus",
+        semantic=_lane_towards(repo_root, WALLS, "para-0007"),
+    )
+    plain = {(c.kind, c.path, c.anchor, c.locator_key) for c in lexical.candidates(WALLS)}
+    fused = hybrid.candidates(WALLS)
+    assert plain <= {(c.kind, c.path, c.anchor, c.locator_key) for c in fused}
+    top = next(c for c in fused if c.locator_key == "para-0007")
+    assert top.lanes == "both"
+    assert top.rank == 1
+
+
+def test_hybrid_semantic_lane_uses_the_lexical_filters(
+    repo_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    question = "zzqx qqvv wwkk"
+    hybrid = Bench(
+        repo_root / "samples/fixtures/mock-release",
+        repo_root / "samples/corpus",
+        semantic=_lane_towards(repo_root, question, "para-0007"),
+    )
+    calls: list[tuple[Any, ...]] = []
+
+    def no_target(*args: Any) -> tuple[str, list[object]]:
+        calls.append(args)
+        return " AND d.locator_key IS NOT 'para-0007'", []
+
+    monkeypatch.setattr(hybrid.snap.search, "_filters", no_target)
+    found = hybrid.candidates(question)
+    assert calls and calls[0][4:] == (None, None)
+    assert found and all(c.locator_key != "para-0007" for c in found)
+
+
+def test_hybrid_report_has_no_served_recall_and_records_lanes(
+    repo_root: Path, golden: Path
+) -> None:
+    hybrid = Bench(
+        repo_root / "samples/fixtures/mock-release",
+        repo_root / "samples/corpus",
+        semantic=_lane_towards(
+            repo_root, WALLS, "para-0007", (WINDOWS, "Secret holdout phrasing about walls")
+        ),
+    )
+    report = _report(hybrid, golden)
+    assert report["mode"] == "hybrid"
+    assert report["settings"]["served_limits"] == []
+    assert report["settings"]["hybrid"]["rrf_k"] == 60
+    assert report["settings"]["hybrid"]["lane_depth"] == 50
+    dev = report["splits"]["dev"]
+    assert "served_recall@5" not in dev
+    assert dev["found_by_lanes"]["both"] >= 1
+    first = report["questions"][0]["targets"][0]
+    assert first["lanes"] == "both"
+    paired = dev["paired_vs_lexical_hit_all@10"]
+    lexical = _report(
+        Bench(repo_root / "samples/fixtures/mock-release", repo_root / "samples/corpus"), golden
+    )
+    assert "paired_vs_lexical_hit_all@10" not in lexical["splits"]["dev"]
+    assert paired["lexical"] == lexical["splits"]["dev"]["questions_hit_all@10"]
+    assert paired["lexical"] + paired["gained"] - paired["lost"] == dev["questions_hit_all@10"]
+
+
+def test_semantic_lane_build_caches_vectors_without_question_text(
+    repo_root: Path, tmp_path: Path
+) -> None:
+    db = _mock_db(repo_root)
+    question = "Quand les fenêtres sont-elles livrées ?"
+    first = SemanticLane.build(db, [question], FakeEmbeddingClient(dimensions=32), tmp_path)
+    assert first.usage["rows_embedded"] == first.matrix.shape[0] > 0
+    assert first.usage["billed_tokens"]["rows"] > 0
+    assert first.usage["billed_tokens"]["questions"] > 0
+    assert np.allclose(np.linalg.norm(first.matrix, axis=1), 1.0, atol=1e-5)
+    again = SemanticLane.build(db, [question], FakeEmbeddingClient(dimensions=32), tmp_path)
+    assert again.usage["billed_tokens"] == {"rows": 0, "questions": 0}
+    assert np.array_equal(again.matrix, first.matrix)
+    assert np.array_equal(again.query(question), first.query(question))
+    for file in tmp_path.iterdir():
+        if file.suffix == ".json":
+            assert "fenêtres" not in file.read_text(encoding="utf-8")
