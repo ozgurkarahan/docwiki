@@ -15,7 +15,22 @@
   default; `DataZoneStandard` for data residency), `mcpMinReplicas` (0; set 1 for demos), `enablePortal` (false),
   `enableEventTrigger` (true), `reconcileCron` (`0 */6 * * *`), `budgetAmount` (monthly, USD),
   `budgetContactEmails` (passed at deploy time, never committed), `audience` (`internal`),
-  `domainPack` (`batiment`), `enableFoundrySkillsPreview` (false), `enableRoutine` (false).
+  `domainPack` (`batiment`), `enableFoundrySkillsPreview` (false), `enableRoutine` (false),
+  `enableEvalMcp` (false).
+- Optional evaluation environment (`enableEvalMcp`, azd value `DOCWIKI_ENABLE_EVAL_MCP`, off by
+  default): a second MCP app `ca-mcp-eval-<token>` built like the production one (same image,
+  release, storage settings, managed identity, Entra built-in auth and token validation), at zero
+  replicas at rest, with the feature under evaluation switched on through its environment
+  (`DOCWIKI_ANSWER_CONTEXT_COVERAGE=on`), and its own project connection
+  `<mcpConnectionName>-eval`. An evaluation Researcher `docwiki-researcher-eval`
+  (`agents/deploy.py --eval`), identical to the production one except its name and MCP
+  connection, answers through it, so a feature is A/B evaluated against production without
+  touching production resources. It needs a provisioned environment (`mcpApiClientId`); the
+  evaluation agent's identity is allowed by the evaluation app only
+  (`DOCWIKI_EVAL_MCP_ALLOWED_CLIENT_IDS`) and is granted `Wiki.Read` by hand (the hooks manage the
+  production agents only). Both are removed after the gates: `agents/deploy.py --eval --delete`,
+  then delete the app and the connection (turning the flag off does not delete them: provisions
+  are incremental) and set the flag back to false.
 - Preflight script (`scripts/preflight.py`): azd/az versions, logged-in account, region allowed,
   model availability and quota in the region, deployer roles (Owner or Contributor + User Access
   Administrator; Entra Application Developer), Python and Node versions. Never switches region or

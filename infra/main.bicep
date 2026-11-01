@@ -105,6 +105,9 @@ param mcpMinReplicas int = 0
 @description('Bearer-token validation by the MCP server behind built-in auth (DOCWIKI_MCP_TOKEN_VALIDATION). off trusts the platform principal header alone: only for a platform that does not forward the Authorization header (src/docwiki/mcp/README.md).')
 param mcpTokenValidation string = 'required'
 
+@description('Deploy the evaluation-only MCP app (ca-mcp-eval-<token>) and its project connection (<mcpConnectionName>-eval) beside the production ones: same image, release, identity and Entra built-in auth, zero replicas at rest, with the feature under evaluation switched on (DOCWIKI_ANSWER_CONTEXT_COVERAGE=on). Needs a provisioned environment (mcpApiClientId). Turning it off does not delete them: remove them after the gates (docs/spec/infra-ops-security.md section 1).')
+param enableEvalMcp bool = false
+
 @description('Deploy the optional portal (Entra sign-in, or no sign-in for a public-audience build: portalAccess).')
 param enablePortal bool = false
 
@@ -198,6 +201,9 @@ param mcpApiClientId string = ''
 @description('Comma-separated client IDs of the agent identities allowed through the MCP app built-in auth and by the server itself (DOCWIKI_MCP_ALLOWED_CLIENT_IDS, written by the postprovision hook; empty rejects every agent at the built-in auth).')
 param mcpAllowedClientIds string = ''
 
+@description('Comma-separated client IDs of the evaluation agent identities (docwiki-researcher-eval), allowed only by the evaluation MCP app in addition to mcpAllowedClientIds (DOCWIKI_EVAL_MCP_ALLOWED_CLIENT_IDS, set by the operator; agents/README.md).')
+param evalMcpAllowedClientIds string = ''
+
 @minLength(3)
 @maxLength(33)
 @description('Name of the Foundry project connection used by the agents\' MCP tool (DOCWIKI_MCP_CONNECTION).')
@@ -253,6 +259,7 @@ var names = {
   ingestJob: 'caj-ingest-${resourceToken}'
   reconcileJob: 'caj-reconcile-${resourceToken}'
   mcpApp: 'ca-mcp-${resourceToken}'
+  mcpEvalApp: 'ca-mcp-eval-${resourceToken}'
   portalApp: 'ca-portal-${resourceToken}'
   actionGroup: 'ag-docwiki-${resourceToken}'
   budget: 'budget-docwiki-${resourceToken}'
@@ -911,6 +918,123 @@ module budget 'modules/budget.bicep' = if (deployBudget) {
 }
 
 // ---------------------------------------------------------------------------
+// Evaluation environment (enableEvalMcp, off by default; removed after the gates)
+// A second MCP app built exactly like mcpApp (same image, release, identity, Entra built-in
+// auth and token validation) with the feature under evaluation switched on, and its own project
+// connection for the evaluation Researcher (agents/deploy.py --eval). It has no azd service tag:
+// `azd deploy` only updates the production app; `azd provision` gives the eval app the image of
+// SERVICE_MCP_IMAGE_NAME. It needs the MCP API app registration of a provisioned environment
+// (mcpApiClientId); before that the flag deploys nothing. Production resources do not change.
+// ---------------------------------------------------------------------------
+
+var evalMcpEnabled = enableEvalMcp && mcpPublic
+var evalMcpConnectionName = '${take(mcpConnectionName, 28)}-eval'
+var evalMcpUrl = 'https://${names.mcpEvalApp}.${containerAppsEnvironment.outputs.defaultDomain}/mcp'
+var evalMcpAllowedApplications = union(
+  mcpAllowedApplications,
+  filter(map(split(evalMcpAllowedClientIds, ','), id => trim(id)), id => !empty(id))
+)
+
+module mcpEvalApp 'modules/container-app.bicep' = if (evalMcpEnabled) {
+  name: 'mcpEvalApp'
+  scope: rg
+  params: {
+    location: location
+    tags: tags
+    name: names.mcpEvalApp
+    containerName: 'mcp'
+    environmentId: containerAppsEnvironment.outputs.id
+    workloadProfileName: containerAppsEnvironment.outputs.workloadProfileName
+    identityResourceId: mcpIdentity.outputs.resourceId
+    registryServer: registry.outputs.loginServer
+    image: !empty(resolvedMcpImage) ? resolvedMcpImage : placeholderAppImage
+    env: concat(
+      sharedEnv,
+      [
+        {
+          name: 'AZURE_CLIENT_ID'
+          value: mcpIdentity.outputs.clientId
+        }
+        {
+          name: 'DOCWIKI_AUTH_MODE'
+          value: 'easyauth'
+        }
+        {
+          name: 'DOCWIKI_MCP_TENANT_ID'
+          value: tenant().tenantId
+        }
+        {
+          name: 'DOCWIKI_MCP_TOKEN_VALIDATION'
+          value: mcpTokenValidation
+        }
+        {
+          name: 'OTEL_SERVICE_NAME'
+          value: 'docwiki-mcp-eval'
+        }
+        {
+          name: 'DOCWIKI_MCP_AUDIENCE'
+          value: 'api://${mcpApiClientId},${mcpApiClientId}'
+        }
+      ],
+      empty(evalMcpAllowedApplications)
+        ? []
+        : [
+            {
+              name: 'DOCWIKI_MCP_ALLOWED_CLIENT_IDS'
+              value: join(evalMcpAllowedApplications, ',')
+            }
+          ],
+      [
+        // F3 (coverage of every chantier in answer_context), evaluated before production.
+        {
+          name: 'DOCWIKI_ANSWER_CONTEXT_COVERAGE'
+          value: 'on'
+        }
+      ]
+    )
+    cpu: '0.5'
+    memory: '1Gi'
+    minReplicas: 0
+    maxReplicas: 3
+    ingressMode: 'external'
+    targetPort: 8080
+    tcpProbes: true
+  }
+}
+
+module mcpEvalAuth 'modules/app-auth.bicep' = if (evalMcpEnabled) {
+  name: 'mcpEvalAuth'
+  scope: rg
+  dependsOn: [
+    mcpEvalApp
+  ]
+  params: {
+    containerAppName: names.mcpEvalApp
+    clientId: mcpApiClientId
+    allowedAudiences: [
+      'api://${mcpApiClientId}'
+    ]
+    unauthenticatedClientAction: 'Return401'
+    excludedPaths: [
+      '/healthz'
+    ]
+    allowedApplications: evalMcpAllowedApplications
+  }
+}
+
+module mcpEvalConnection 'modules/mcp-connection.bicep' = if (evalMcpEnabled) {
+  name: 'mcpEvalConnection'
+  scope: rg
+  params: {
+    accountName: foundry.outputs.accountName
+    projectName: foundry.outputs.projectName
+    connectionName: evalMcpConnectionName
+    mcpUrl: evalMcpUrl
+    audience: 'api://${mcpApiClientId}'
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Outputs (azd writes them to .azure/<env>/.env; the hooks and BOOTSTRAP.md read them).
 // ARM caps a template at 64 outputs (Bicep rule max-outputs): add one only when something reads it.
 // ---------------------------------------------------------------------------
@@ -938,7 +1062,6 @@ output DOCWIKI_FOUNDRY_ACCOUNT_NAME string = foundry.outputs.accountName
 output DOCWIKI_FOUNDRY_ACCOUNT_ENDPOINT string = foundry.outputs.accountEndpoint
 output DOCWIKI_FOUNDRY_PROJECT_NAME string = foundry.outputs.projectName
 output DOCWIKI_FOUNDRY_PROJECT_ENDPOINT string = foundry.outputs.projectEndpoint
-output DOCWIKI_FOUNDRY_PROJECT_PRINCIPAL_ID string = foundry.outputs.projectPrincipalId
 output DOCWIKI_FAST_DEPLOYMENT string = foundry.outputs.fastDeploymentName
 output DOCWIKI_SMART_DEPLOYMENT string = foundry.outputs.smartDeploymentName
 // The deployed model settings are echoed so that the azd environment pins them: a newer
@@ -976,6 +1099,9 @@ output DOCWIKI_MCP_APP_NAME string = mcpApp.outputs.name
 output DOCWIKI_MCP_FQDN string = mcpFqdn
 output DOCWIKI_MCP_URL string = mcpUrl
 output DOCWIKI_MCP_CONNECTION string = mcpConnectionName
+// The evaluation environment (enableEvalMcp): empty when it is off.
+output DOCWIKI_EVAL_MCP_URL string = evalMcpEnabled ? evalMcpUrl : ''
+output DOCWIKI_EVAL_MCP_CONNECTION string = evalMcpEnabled ? evalMcpConnectionName : ''
 output DOCWIKI_PORTAL_APP_NAME string = portalApp.outputs.name
 output DOCWIKI_ENABLE_PORTAL bool = enablePortal
 output DOCWIKI_PORTAL_ANONYMOUS bool = portalAnonymous
@@ -983,6 +1109,5 @@ output DOCWIKI_PORTAL_URL string = enablePortal ? portalUrl : ''
 output DOCWIKI_CONTAINER_APPS_DEFAULT_DOMAIN string = containerAppsEnvironment.outputs.defaultDomain
 
 output DOCWIKI_LOG_ANALYTICS_WORKSPACE_ID string = monitoring.outputs.logAnalyticsWorkspaceCustomerId
-output DOCWIKI_LOG_ANALYTICS_WORKSPACE_NAME string = monitoring.outputs.logAnalyticsWorkspaceName
 output DOCWIKI_APPINSIGHTS_NAME string = monitoring.outputs.appInsightsName
 output APPLICATIONINSIGHTS_CONNECTION_STRING string = monitoring.outputs.appInsightsConnectionString

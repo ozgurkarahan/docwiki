@@ -314,6 +314,25 @@ def test_researcher_needs_the_foundry_endpoint() -> None:
         run(system.setup())
 
 
+@pytest.mark.parametrize(
+    ("agent", "name"),
+    [
+        ("researcher", "docwiki-researcher"),
+        ("docwiki-researcher", "docwiki-researcher"),
+        ("docwiki-researcher-eval", "docwiki-researcher-eval"),
+    ],
+)
+def test_researcher_system_name_follows_the_agent(agent: str, name: str) -> None:
+    client = FakeAgentClient({question().question: RESEARCHER_TEXT})
+    system = ResearcherSystem(client=client, agent=agent, env={}, prices=PRICES)
+    assert system.name == name
+    run(system.setup())
+    run(system.answer(question()))
+    assert client.calls[0]["agent"] == agent
+    assert run(system.versions())["agent"] == agent
+    assert ResearcherSystem.name == "docwiki-researcher"
+
+
 def test_researcher_closes_only_its_own_client() -> None:
     client = FakeAgentClient({})
     system = ResearcherSystem(client=client, env={})

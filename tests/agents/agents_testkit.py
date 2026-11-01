@@ -186,6 +186,7 @@ class FakeAgents:
         self.versions: dict[str, list[dict[str, Any]]] = versions or {}
         self.get_calls: list[str] = []
         self.created: list[tuple[str, dict[str, Any]]] = []
+        self.deleted: list[str] = []
         self.create_error: BaseException | None = None
         self.get_error: BaseException | None = None
         self.version_identity = True  # False: only the agent object carries instance_identity
@@ -227,6 +228,13 @@ class FakeAgents:
             created["instance_identity"] = self.identity(agent_name)
         versions.append(created)
         return created
+
+    async def delete(self, agent_name: str) -> dict[str, Any]:
+        self.deleted.append(agent_name)
+        if agent_name not in self.versions:
+            raise ResourceNotFoundError(f"agent {agent_name} not found")
+        del self.versions[agent_name]
+        return {"object": "agent.deleted", "name": agent_name, "deleted": True}
 
 
 def connection(
