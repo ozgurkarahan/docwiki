@@ -116,7 +116,7 @@ ANSWER_CONTEXT_EMPTY_HINT = (
     "No hits: try other words or the glossary; if the wiki has no answer, say 'Not found in the "
     "wiki.'"
 )
-COVERAGE_MAX_CHARS = 2000
+COVERAGE_MAX_CHARS = 3000
 """Reserved budget of ``coverage`` and ``gaps`` (``DOCWIKI_ANSWER_CONTEXT_COVERAGE=on``): they are
 appended after the hits payload, which keeps its own ``max_chars`` budget, so a result is at most
 ``max_chars + COVERAGE_MAX_CHARS`` characters. Coverage items, then gaps, are dropped from the end
@@ -125,6 +125,14 @@ MAX_GAP_CHECKS = 4
 """Named scopes without hits checked by a count query restricted to their scope (the others get
 ``in_scope_matches: null``)."""
 GAP_COUNT_CAP = 20
+MAX_FANOUT_SCOPES = 6
+"""Chantiers searched one by one when a question names none or several (``coverage`` gets
+``in_scope_matches`` and ``top`` for each)."""
+FANOUT_HINT = (
+    "the question names no single chantier: each chantier was searched on its own "
+    "(in_scope_matches, top). If the subject can concern several chantiers, answer for each one "
+    "with matches (answer_context with within=<scope>, or read its top) and say which have none."
+)
 """A gap's count query stops at this many in-scope candidates (its hint then says "at least")."""
 MIN_SCOPE_TOKEN_CHARS = 4
 """A lone word of a scope code names the scope only from this length (and only when it is written
@@ -874,6 +882,22 @@ class ReadTools:
                 i += 1
         return found
 
+    def _nameable_scopes(self, snap: Snapshot) -> list[str]:
+        """Scopes a question can name (chantiers with an entity page), sorted by code."""
+        return sorted(set(self._scope_phrases(snap).values()))
+
+    @staticmethod
+    def _top_of(hit: Any) -> dict[str, Any]:
+        """Identifiers of a scope's best match, enough for one ``read_page`` or
+        ``get_evidence`` call (no text: the text stays in ``hits``)."""
+        top: dict[str, Any] = {"page_id": hit.page_id, "title": clip(hit.title, 80)}
+        if hit.section:
+            top["section"] = clip(hit.section, 80)
+        if hit.kind == "source-block" and hit.source_id and hit.locator_key:
+            top["source_id"] = hit.source_id
+            top["locator_key"] = hit.locator_key
+        return top
+
     def _candidate_scope(self, snap: Snapshot, hit: Any) -> str | None:
         entry = self._by_path(snap).get(hit.path) or self._by_id(snap).get(hit.page_id)
         return entry.scope if entry is not None else None
@@ -912,6 +936,26 @@ class ReadTools:
                     item["best_rank"] = row["rank"]
         for scope in named:
             stat(scope)
+        found_in: dict[str, list[Any]] = {}
+
+        def in_scope(scope: str) -> list[Any]:
+            if scope not in found_in:
+                found_in[scope] = self._context_candidates(
+                    snap, question, scope, language, GAP_COUNT_CAP
+                )
+            return found_in[scope]
+
+        # A question naming no chantier, or several, may concern every chantier whose documents
+        # match it (a supplier, a lot, a building element): each one is searched on its own, so
+        # a chantier crowded out of the global ranking still shows up with its best match.
+        fanout = len(named) != 1
+        if fanout:
+            for scope in self._nameable_scopes(snap)[:MAX_FANOUT_SCOPES]:
+                found = in_scope(scope)
+                item = stat(scope)
+                item["in_scope_matches"] = min(len(found), GAP_COUNT_CAP)
+                if found:
+                    item["top"] = self._top_of(found[0])
         coverage: list[dict[str, Any]] = []
         for scope, item in stats.items():
             hub = self._hub_for(snap, scope, language)
@@ -927,6 +971,7 @@ class ReadTools:
                 c["best_rank"] is None,
                 c["best_rank"] or 0,
                 -c["candidates"],
+                -c.get("in_scope_matches", 0),
                 c["scope"],
             )
         )
@@ -935,14 +980,14 @@ class ReadTools:
             if stats[scope]["hits"]:
                 continue
             gap: dict[str, Any] = {"scope": scope, "named_as": named_as}
-            if len(gaps) >= MAX_GAP_CHECKS:
+            if scope not in found_in and len(gaps) >= MAX_GAP_CHECKS:
                 gap["in_scope_matches"] = None
                 gap["hint"] = (
                     f"not checked (only {MAX_GAP_CHECKS} named scopes are): call "
                     f"answer_context(within='{scope}')"
                 )
             else:
-                found = self._context_candidates(snap, question, scope, language, GAP_COUNT_CAP)
+                found = in_scope(scope)
                 count = min(len(found), GAP_COUNT_CAP)
                 gap["in_scope_matches"] = count
                 if count:
@@ -959,6 +1004,8 @@ class ReadTools:
                     )
             gaps.append(gap)
         meta: dict[str, Any] = {"coverage": coverage, "gaps": gaps}
+        if fanout and any(c.get("in_scope_matches") for c in coverage):
+            meta["coverage_hint"] = FANOUT_HINT
 
         def tail() -> str:
             return "," + dumps(meta)[1:]
@@ -970,6 +1017,8 @@ class ReadTools:
             elif meta["gaps"]:
                 meta["gaps"] = meta["gaps"][:-1]
                 meta["gaps_truncated"] = True
+            elif "coverage_hint" in meta:
+                del meta["coverage_hint"]
             else:  # pragma: no cover - two empty lists and two flags always fit
                 raise ResultTooLargeError("coverage does not fit in its reserved budget")
         return out[:-1] + tail()

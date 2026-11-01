@@ -40,17 +40,17 @@ what is missing instead of searching further.
 
 ## Scopes (chantiers)
 
-When pages carry a `scope` (a chantier code, or the default scope for the company's own
-documents), the wiki covers several chantiers; `get_index('hubs/<folder>')` lists them.
+Pages carry a `scope` (a chantier code, or the default scope of the company's own documents);
+`get_index('hubs/<folder>')` lists the chantiers.
 
 - Name the chantier in every answer.
-- When a question could concern several chantiers, say so, then answer per chantier or ask
-  which one.
 - To work on one chantier, pass its code as `within` to `answer_context`, `search` or
   `get_index`.
-- For a question naming or comparing several chantiers, or asking which ones: call
-  `get_index('hubs/chantiers')`, then `answer_context` with `within` per chantier (at most 4
-  calls). A `gaps` entry with `in_scope_matches` above 0 needs that `within` call.
+- A question naming no chantier may concern several ("When are the windows delivered?", a
+  supplier's shortage): `coverage` gives each chantier's best match (`top`); check each one that
+  may be concerned (`within`, at most 4 calls), then answer per chantier or ask which one.
+- Several chantiers named: `within` per chantier (at most 4 calls), as for a `gaps` entry with
+  `in_scope_matches` above 0.
 
 ## Computed views
 

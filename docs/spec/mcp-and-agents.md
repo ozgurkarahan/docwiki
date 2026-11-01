@@ -65,10 +65,16 @@ with no returned hit, `{scope, named_as, in_scope_matches, hint}`: for the first
 query runs the same retrieval as `answer_context(within=scope)` (capped at 20), so a gap is
 either "matches in scope, call `answer_context(within=…)`" or "no section or block of this scope
 matches the question's words" (never a claim that the chantier is absent from the wiki); later
-gaps carry `in_scope_matches: null` and say they were not checked. The two keys use a reserved
-budget of at most 2,000 characters outside the hits budget (so the result is at most
-`max_chars` + 2,000): coverage items are dropped from the end first (`coverage_truncated: true`),
-then gaps (`gaps_truncated: true`). Production keeps the flag `off` until the F3 evaluation
+gaps carry `in_scope_matches: null` and say they were not checked. When the question names no
+chantier, or several, every nameable scope (at most 6) is also searched on its own with the same
+retrieval as `answer_context(within=scope)`: its `coverage` item gets `in_scope_matches` (capped
+at 20) and `top`, the identifiers of its best match (`page_id`, `title`, `section`, and
+`source_id`/`locator_key` for a source block; never text), and the result gets a
+`coverage_hint` telling the agent to answer for each chantier that may be concerned; named gaps
+reuse these searches. The keys use a reserved
+budget of at most 3,000 characters outside the hits budget (so the result is at most
+`max_chars` + 3,000): coverage items are dropped from the end first (`coverage_truncated: true`),
+then gaps (`gaps_truncated: true`), then the hint. Production keeps the flag `off` until the F3 evaluation
 gate passes; the evaluation MCP app turns it on.
 
 **Scopes (v1.7, [ADR 0011](../adr/0011-company-wide-wiki.md)).** `search.db` (schema 2) records

@@ -25,7 +25,9 @@ from docwiki.mcp.config import McpConfig
 from docwiki.mcp.source import FolderReleaseSource
 from docwiki.mcp.tools_read import (
     COVERAGE_MAX_CHARS,
+    FANOUT_HINT,
     GAP_COUNT_CAP,
+    MAX_FANOUT_SCOPES,
     MAX_GAP_CHECKS,
     ReadTools,
 )
@@ -335,6 +337,7 @@ def test_only_the_first_named_gaps_are_checked(
         return original(self, snap, question, scope, *rest)
 
     monkeypatch.setattr("docwiki.mcp.tools_read.MAX_GAP_CHECKS", 1)
+    monkeypatch.setattr("docwiki.mcp.tools_read.MAX_FANOUT_SCOPES", 0)
     monkeypatch.setattr(ReadTools, "_context_candidates", counted)
     question = "Montferrine et Les Nacrines"
     result = as_json(on.answer_context(question, limit=1))
@@ -365,3 +368,52 @@ def test_coverage_is_json_after_the_unchanged_keys(on: ReadTools, off: ReadTools
     before = json.loads(off.answer_context(QUESTIONS[1]))
     assert list(after)[: len(before)] == list(before)
     assert list(after)[len(before) :] == ["coverage", "gaps"]
+
+
+# --- fan-out: questions naming no chantier, or several ---------------------------------------
+
+
+def test_a_question_naming_no_chantier_searches_every_chantier(
+    on: ReadTools, off: ReadTools, as_json: Json
+) -> None:
+    question = QUESTIONS[0]
+    assert _named(on, question) == {}
+    result = as_json(on.answer_context(question, limit=2))
+    assert dumps(result["hits"]) == dumps(as_json(off.answer_context(question, limit=2))["hits"])
+    by_scope = {item["scope"]: item for item in result["coverage"]}
+    nameable = on._nameable_scopes(on.snapshot())
+    assert nameable and set(nameable) <= set(by_scope)
+    for scope in nameable:
+        item = by_scope[scope]
+        scoped = as_json(on.answer_context(question, within=scope, limit=1))
+        assert (item["in_scope_matches"] > 0) == bool(scoped["hits"])
+        assert item["in_scope_matches"] <= GAP_COUNT_CAP
+        if scoped["hits"]:
+            assert item["top"]["page_id"] == scoped["hits"][0]["page_id"]
+            assert "text" not in item["top"]
+        else:
+            assert "top" not in item
+    if any(item.get("in_scope_matches") for item in result["coverage"]):
+        assert result["coverage_hint"] == FANOUT_HINT
+
+
+def test_a_question_naming_one_chantier_is_not_fanned_out(on: ReadTools, as_json: Json) -> None:
+    result = as_json(on.answer_context(QUESTIONS[1]))
+    assert "coverage_hint" not in result
+    assert all("in_scope_matches" not in item for item in result["coverage"])
+
+
+def test_fan_out_searches_each_chantier_once(
+    on: ReadTools, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str | None] = []
+    original = ReadTools._context_candidates
+
+    def counted(self: ReadTools, snap: Any, question: str, scope: Any, *rest: Any) -> Any:
+        calls.append(scope)
+        return original(self, snap, question, scope, *rest)
+
+    monkeypatch.setattr(ReadTools, "_context_candidates", counted)
+    on.answer_context(QUESTIONS[2], limit=1)  # names two chantiers: fan-out and gaps
+    scoped = [scope for scope in calls if scope]
+    assert len(scoped) == len(set(scoped)) <= MAX_FANOUT_SCOPES
