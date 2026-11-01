@@ -1,0 +1,228 @@
+{
+  "format": "docwiki.evals.result/v1",
+  "system": "docwiki-researcher",
+  "split": "blind",
+  "status": "ok",
+  "skipped": null,
+  "run": {
+    "started_at": "2026-11-01T15:36:48Z",
+    "finished_at": "2026-11-01T15:42:13Z",
+    "date": "2026-11-01",
+    "duration_s": 325.629,
+    "questions": 6,
+    "questions_total": 6,
+    "complete": true,
+    "limit": null,
+    "concurrency": 1
+  },
+  "questions_file": {
+    "file": "blind-multi-chantier.jsonl",
+    "sha256": "604c61519acca07377af6d0d80b329fd37eea538d9b9d7a8893e1022cd20a4ee",
+    "questions": 6,
+    "seal": null
+  },
+  "config": {
+    "system": {
+      "agent": "researcher"
+    },
+    "audience": "public",
+    "scope": null,
+    "extract_mode": "local",
+    "catalog": true,
+    "judge": false
+  },
+  "versions": {
+    "docwiki": "0.1.0",
+    "git_sha": "75b1df0bca119f25a262874dcdf929f3ca009fbb",
+    "git_dirty": false,
+    "metrics": "evals-metrics-v1",
+    "release_id": "20261027T222241Z-f4e7ba11",
+    "release_audience": "public",
+    "corpus_manifest_sha256": "9b1a7ade30a6e1ea02cc447d85023e53e63cf3b0619b6594781c483e47efdb4d",
+    "extraction": "local-1.0.0",
+    "extractors": {
+      "local": "1.0.0",
+      "content-understanding": "1.0.0+cu.2025-11-01",
+      "pypdfium2": "5.14.0",
+      "python-docx": "1.2.0",
+      "openpyxl": "3.1.5",
+      "python-pptx": "1.0.2",
+      "pillow": "13.0.0"
+    },
+    "system": {
+      "agent": "researcher",
+      "agent_version": "10",
+      "agent_definition_sha256": "932f30dab658515020bb9587cb04c368d21028e09f6dbceae0b15bca7e89194d",
+      "model_deployment": "smart",
+      "price_table": {
+        "name": "prices.yaml (packaged)",
+        "sha256": "bc555ff45ff165670716855dcb89974d911b0cde33878b5aa0b260426fbd0f07",
+        "verified": false,
+        "source": "placeholder - verify at https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/"
+      }
+    },
+    "judge": null
+  },
+  "aggregates": {
+    "overall": {
+      "questions": 6,
+      "errors": 1,
+      "answer_accuracy": {
+        "value": 0.6667,
+        "n": 6,
+        "passed": 4
+      },
+      "must_include_coverage": {
+        "value": 0.7778,
+        "n": 6,
+        "passed": 4
+      },
+      "numeric_exactness": {
+        "value": 0.0,
+        "n": 1,
+        "passed": 0
+      },
+      "citation_precision": {
+        "value": 0.9143,
+        "n": 5,
+        "passed": 4
+      },
+      "citation_recall": {
+        "value": 0.6111,
+        "n": 6,
+        "passed": 2
+      },
+      "abstention_accuracy": {
+        "value": 0.8333,
+        "n": 6,
+        "passed": 5
+      },
+      "injection_resistance": {
+        "value": null,
+        "n": 0,
+        "passed": 0
+      },
+      "restricted_exclusion": {
+        "value": 0.8333,
+        "n": 6,
+        "passed": 5
+      }
+    },
+    "by_category": {
+      "multi-hop": {
+        "questions": 5,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.8,
+          "n": 5,
+          "passed": 4
+        },
+        "must_include_coverage": {
+          "value": 0.9333,
+          "n": 5,
+          "passed": 4
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 0.9143,
+          "n": 5,
+          "passed": 4
+        },
+        "citation_recall": {
+          "value": 0.7333,
+          "n": 5,
+          "passed": 2
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 5,
+          "passed": 5
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 5,
+          "passed": 5
+        }
+      },
+      "table": {
+        "questions": 1,
+        "errors": 1,
+        "answer_accuracy": {
+          "value": 0.0,
+          "n": 1,
+          "passed": 0
+        },
+        "must_include_coverage": {
+          "value": 0.0,
+          "n": 1,
+          "passed": 0
+        },
+        "numeric_exactness": {
+          "value": 0.0,
+          "n": 1,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_recall": {
+          "value": 0.0,
+          "n": 1,
+          "passed": 0
+        },
+        "abstention_accuracy": {
+          "value": 0.0,
+          "n": 1,
+          "passed": 0
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 0.0,
+          "n": 1,
+          "passed": 0
+        }
+      }
+    }
+  },
+  "cost": {
+    "currency": "USD",
+    "input_tokens": 109901,
+    "cached_input_tokens": 17408,
+    "output_tokens": 8222,
+    "reasoning_tokens": 5074,
+    "estimated_cost_usd": 0.717829,
+    "per_question_usd": 0.143566,
+    "priced_questions": 5,
+    "prices_verified": false,
+    "receipt_totals": null
+  },
+  "latency": {
+    "mean_s": 51.739,
+    "p50_s": 34.117,
+    "p95_s": 158.316,
+    "max_s": 158.316,
+    "total_s": 310.433
+  },
+  "judge": {
+    "enabled": false,
+    "notice": null,
+    "notices": [],
+    "summary": null
+  },
+  "privacy": "aggregates only: per-question records of non-dev splits are written to --private-out"
+}
