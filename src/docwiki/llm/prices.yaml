@@ -64,5 +64,10 @@ models:
     input: 1.10
     cached_input: 0.275
     output: 4.40
+  # Embeddings: input tokens only. text-embedding-3-small Global list price observed in October
+  # 2026 (0.02 USD per 1M tokens); verify before relying on receipts.
+  text-embedding-3-small:
+    input: 0.02
+    output: 0.0
 # Optional mapping from deployment name to model id (deployment names are environment specific).
 deployments: {}

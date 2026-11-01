@@ -10,17 +10,21 @@ from typing import Final, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from docwiki.llm.prices import PriceTable, PriceTableInfo, ResolvedPrice
-from docwiki.llm.types import LlmUsage, MetadataValue, Origin, Tier
+from docwiki.llm.types import LlmUsage, MetadataValue, Origin, UsageRole
 
 RECEIPT_FORMAT: Final = "docwiki.llm.receipt/v1"
 
 
 class CallRecord(BaseModel):
-    """What the ledger keeps about one ``structured`` call (successful or not)."""
+    """What the ledger keeps about one model call (successful or not).
+
+    ``tier`` is the usage role: ``fast``/``smart`` for ``structured`` calls, ``embed`` for one
+    embedding batch (``schema_name`` is then ``embed-<purpose>`` and ``prompt_version`` the input
+    rule version)."""
 
     model_config = ConfigDict(frozen=True)
 
-    tier: Tier
+    tier: UsageRole
     deployment: str
     model: str | None = None
     model_version: str | None = None
@@ -62,7 +66,7 @@ class ReceiptTotals(BaseModel):
 class ReceiptLine(ReceiptTotals):
     """Totals of one tier/deployment pair."""
 
-    tier: Tier
+    tier: UsageRole
     deployment: str
     models: list[str] = Field(default_factory=list)
     model_versions: list[str] = Field(default_factory=list)
@@ -75,7 +79,7 @@ class ReceiptLine(ReceiptTotals):
 class PromptUsage(BaseModel):
     schema_name: str
     prompt_version: str
-    tier: Tier
+    tier: UsageRole
     calls: int
 
 
@@ -190,9 +194,9 @@ class UsageLedger:
     def receipt(self) -> LlmReceipt:
         records = self.records()
         total = _Accumulator()
-        lines: dict[tuple[Tier, str], _Accumulator] = {}
+        lines: dict[tuple[UsageRole, str], _Accumulator] = {}
         stages: dict[str, _Accumulator] = {}
-        prompts: Counter[tuple[str, str, Tier]] = Counter()
+        prompts: Counter[tuple[str, str, UsageRole]] = Counter()
         for record in records:
             price = self.price_for(record)
             total.add(record, price)

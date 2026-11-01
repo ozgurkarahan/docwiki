@@ -84,6 +84,11 @@ deterministic placeholders.
 | `DOCWIKI_LLM_PRICE_TABLE` | packaged `prices.yaml` | Price table used by receipts |
 | `DOCWIKI_LLM_MODE` | `foundry` | `foundry` (live), `replay` (fixtures only) or `record` (live + write fixtures) |
 | `DOCWIKI_LLM_FIXTURES` | — | Fixtures directory for `replay` and `record` |
+| `DOCWIKI_EMBED_DEPLOYMENT` | — | Embedding deployment (`text-embedding-3-small`); unset = no live embeddings |
+| `DOCWIKI_EMBED_MODEL` | — | Optional embedding model id, used only for pricing |
+| `DOCWIKI_EMBED_DIMENSIONS` | `512` | Vector size requested from the model (1–3072) |
+| `DOCWIKI_EMBED_BATCH_SIZE` | `64` | Texts per embedding call (1–2048); replay must use the recording's value |
+| `DOCWIKI_EMBED_TPM` / `DOCWIKI_EMBED_RPM` | `100000` / `600` | Client-side limits of the embedding deployment (`0` = off) |
 
 Set the TPM/RPM values to the capacity of each deployment (Azure counts the estimated prompt
 tokens plus `max_output_tokens` per request; RPM is enforced over short windows, so the request
@@ -141,6 +146,38 @@ already billed.
 | `LlmInvalidOutput` / `LlmOutputTruncated` | Output invalid after one repair (`errors`, `raw_output`) / truncated |
 | `LlmReplayMissing` | Replay has no fixture for the request (`fixture`) |
 | `LlmFakeHandlerMissing` | `FakeLlmClient` has no handler for the schema |
+
+## Embeddings
+
+`LlmClient` stays structured-outputs only; vectors go through the separate `EmbeddingClient`
+protocol (`embeddings.py`), built by `create_embedding_client()` with the same modes:
+
+```python
+from docwiki.llm import EMBED_INPUT_VERSION, build_embed_input, create_embedding_client
+
+shaped = build_embed_input(title, section_heading, body)          # rule embed-input-v1
+async with create_embedding_client() as client:                    # or FakeEmbeddingClient()
+    result = await client.embed([shaped.text], "document", EMBED_INPUT_VERSION)
+vectors = result.vectors                                           # unit length, input order
+```
+
+- **`embed-input-v1`** (`embed_input.py`): title, section heading, blank line, body; whitespace
+  normalised; cut deterministically at 8 000 characters on a word boundary (under the model's
+  8 191-token limit even at one token per character). `EmbedInput.truncated` lets callers count
+  the cuts. Changing the rule means a new version and new vectors.
+- **`purpose`** is `document` (indexed rows) or `query` (questions); it is part of the request
+  hash and of the ledger's prompt name (`embed-document`, `embed-query`).
+- **Batches** of `DOCWIKI_EMBED_BATCH_SIZE`: one model call, one ledger line, one log line and one
+  `docwiki.llm.embed` span per batch. Texts must be non-empty and at most 8 000 characters
+  (`ValueError` before any call).
+- **Checked output.** A wrong vector count, size, index set or a non-finite value is an
+  `LlmServiceError`; nothing is padded or dropped.
+- **Accounting.** Usage role `embed`: input tokens only, priced from the `text-embedding-3-small`
+  row of the price table; run reports carry it as an `LlmUsage` with `role: "embed"`.
+- **Fake, record and replay.** `FakeEmbeddingClient` returns SHA-256-derived unit vectors (same
+  text → same vector; no semantics). Recording writes one fixture per batch to
+  `<fixtures>/embed-<purpose>/<request_hash>.json`; replay needs the same batch size and
+  dimensions and raises `LlmReplayMissing` otherwise.
 
 ## Usage ledger and cost receipt
 
