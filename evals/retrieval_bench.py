@@ -15,8 +15,11 @@ Two measures per question with ``required_citations`` (docs/spec/evals.md §8):
   ``answer_context(question, limit=k)`` after the 12 K-character budget.
 
 A required citation may list ``alternatives`` (other ``{source_path, locator_key}`` pairs that
-carry the same fact); any of them counts. Per-question rows are written for the ``dev`` split
-only, never the question text; other splits get aggregates only.
+carry the same fact); any of them counts. A probe (``evals/golden/probes.py``) runs with its own
+``within`` and ``lang``; its candidates are also checked for scope, language-tree and audience
+violations, and its results are aggregated per probe kind. Per-question rows are written for the
+``dev`` and ``retrieval-tune`` splits only, never the question text; other splits (the blind
+decision set, the holdout) get aggregates only.
 
 ``--misses-from`` replays the read-tool calls of a result file on the same release and classifies
 the required citations each failed answer did not cite: ``absent`` (not in the candidates),
@@ -65,8 +68,12 @@ CANDIDATE_DEPTH = 50
 """Candidates ranked per question (``answer_context`` caps its raw search at 100 rows)."""
 KS = (5, 10, 20, 50)
 SERVED_LIMITS = (5, 10)
-DETAIL_SPLITS = frozenset({"dev"})
-"""Splits whose per-question rows are written; the others get aggregates only."""
+DETAIL_SPLITS = frozenset({"dev", "retrieval-tune"})
+"""Splits whose per-question rows are written; the others (``retrieval-blind``, the holdout)
+get aggregates only."""
+QUESTION_K = 10
+"""A question is found at ``QUESTION_K`` when its required citations rank in the first
+``QUESTION_K`` candidates (``hit_all``: every one; ``hit_any``: at least one)."""
 EMBED_DIMENSIONS = 512
 EMBED_TOKEN_LIMIT = 8191
 """Input limit of text-embedding-3-small, in tokens."""
@@ -104,6 +111,17 @@ class Target:
 class BenchQuestion:
     question: GoldenQuestion
     targets: tuple[Target, ...]
+    probe: str | None = None
+    """The probe kind (``evals/golden/probes.py``); ``None`` for a golden question."""
+    within: str | None = None
+
+    @property
+    def arguments(self) -> dict[str, str | None]:
+        """The ``answer_context`` filters: a probe's ``within`` and ``lang``; none for a golden
+        question (the Researcher's usual first call)."""
+        if self.probe is None:
+            return {"within": None, "lang": None}
+        return {"within": self.within, "lang": self.question.lang}
 
 
 def _targets(raw: Mapping[str, Any]) -> tuple[Target, ...]:
@@ -130,7 +148,19 @@ def load_bench_questions(path: Path) -> tuple[list[BenchQuestion], str]:
             continue
         try:
             data = json.loads(line)
-            questions.append(BenchQuestion(GoldenQuestion.model_validate(data), _targets(data)))
+            probe, within = data.get("probe"), data.get("within")
+            if not (probe is None or isinstance(probe, str)) or not (
+                within is None or isinstance(within, str)
+            ):
+                raise TypeError("probe and within are strings or null")
+            questions.append(
+                BenchQuestion(
+                    GoldenQuestion.model_validate(data),
+                    _targets(data),
+                    probe=probe,
+                    within=within if probe is not None else None,
+                )
+            )
         except (ValueError, KeyError, TypeError) as exc:
             # never chain: messages could quote the (possibly private) input
             raise QuestionSetError(
@@ -250,10 +280,22 @@ class Candidate:
     rank: int
     kind: str
     cited: tuple[tuple[str, str], ...]
+    path: str = ""
+    anchor: str | None = None
+    locator_key: str | None = None
 
     @property
     def proxy(self) -> bool:
         return self.kind != "source-block"
+
+
+@dataclass(frozen=True)
+class RowFacts:
+    """What the index records about a candidate's row: its scope, tree and sensitivity."""
+
+    scope: str | None
+    tree: str | None
+    sensitivity: str | None
 
 
 class Bench:
@@ -265,6 +307,7 @@ class Bench:
         self.snap: Snapshot = self.reads.snapshot()
         catalog = ReleaseCatalog.load(self.release_dir / "catalog.json")
         self.resolver = SourceResolver(CorpusManifest.load(Path(corpus)), catalog)
+        self._facts: dict[tuple[str, str, str | None, str | None], list[RowFacts]] = {}
 
     def path_of(self, source_id: str) -> str | None:
         return self.resolver.path_for_id(source_id)
@@ -285,9 +328,10 @@ class Bench:
         for rank, hit in enumerate(
             reads._context_candidates(snap, question, scope, language, depth)[:depth], 1
         ):
+            where = {"path": hit.path, "anchor": hit.anchor, "locator_key": hit.locator_key}
             if hit.kind == "source-block":
                 cited = ((hit.source_id, hit.locator_key),) if hit.locator_key else ()
-                out.append(Candidate(rank, hit.kind, cited))
+                out.append(Candidate(rank, hit.kind, cited, **where))
                 continue
             part = reads._context_hit(snap, hit)
             if part is None:
@@ -295,8 +339,61 @@ class Bench:
             pairs = _pairs(part.fixed) + _pairs(
                 [part.by_label[x] for x in reads._refs_in(part.text) if x in part.by_label]
             )
-            out.append(Candidate(rank, hit.kind, tuple(dict.fromkeys(pairs))))
+            out.append(Candidate(rank, hit.kind, tuple(dict.fromkeys(pairs)), **where))
         return out
+
+    def facts(self, candidate: Candidate) -> list[RowFacts]:
+        """The index rows behind a candidate (one per chunk; they share their facts)."""
+        key = (candidate.kind, candidate.path, candidate.anchor, candidate.locator_key)
+        cached = self._facts.get(key)
+        if cached is not None:
+            return cached
+        db = self.release_dir / "search.db"
+        conn = sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True)
+        try:
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(docs)")}
+            scope = "scope" if "scope" in columns else "NULL"
+            tree = "tree" if "tree" in columns else "NULL"
+            if candidate.kind == "source-block":
+                clause, value = "COALESCE(locator_key, '') = ?", candidate.locator_key or ""
+            else:
+                clause, value = "COALESCE(anchor, '') = ?", candidate.anchor or ""
+            rows = conn.execute(
+                f"SELECT DISTINCT {scope}, {tree}, sensitivity FROM docs "
+                f"WHERE kind = ? AND path = ? AND {clause}",
+                (candidate.kind, candidate.path, value),
+            ).fetchall()
+        finally:
+            conn.close()
+        found = [RowFacts(*row) for row in rows]
+        self._facts[key] = found
+        return found
+
+    def violations(
+        self,
+        candidates: Sequence[Candidate],
+        *,
+        within: str | None,
+        lang: str | None,
+    ) -> dict[str, int]:
+        """Candidates that break the call's filters: another scope than ``within``, a tree other
+        than the requested language's or the canonical one, or content above ``public``."""
+        languages = list(self.snap.catalog.wiki_languages)
+        canonical = languages[0] if languages else None
+        wanted = self.reads._lang(self.snap, lang) or canonical
+        counts = {"scope": 0, "lang": 0, "audience": 0, "unknown_row": 0}
+        for candidate in candidates:
+            rows = self.facts(candidate)
+            if not rows:
+                counts["unknown_row"] += 1
+                continue
+            if within is not None and any(row.scope != within for row in rows):
+                counts["scope"] += 1
+            if any(row.tree not in (None, wanted, canonical) for row in rows):
+                counts["lang"] += 1
+            if any(row.sensitivity != "public" for row in rows):
+                counts["audience"] += 1
+        return counts
 
     def served(self, question: str, limit: int, **arguments: Any) -> list[tuple[str, str]]:
         """The citation pairs left in the serialized ``answer_context`` output."""
@@ -319,8 +416,9 @@ class Bench:
 
     def measure(self, item: BenchQuestion) -> dict[str, Any]:
         question = item.question
-        candidates = self.candidates(question.question)
-        served = {k: self.served(question.question, k) for k in SERVED_LIMITS}
+        arguments = item.arguments
+        candidates = self.candidates(question.question, **arguments)
+        served = {k: self.served(question.question, k, **arguments) for k in SERVED_LIMITS}
         rows: list[dict[str, Any]] = []
         for target in item.targets:
             first = self.first_rank(target, candidates)
@@ -336,11 +434,14 @@ class Bench:
             )
         ranks = [row["rank"] for row in rows if row["rank"] is not None]
         total = len(rows)
+        top = [row["rank"] is not None and row["rank"] <= QUESTION_K for row in rows]
         return {
             "id": question.id,
             "split": question.split,
             "category": question.category,
             "lang": question.lang,
+            "probe": item.probe,
+            "within": arguments["within"],
             "targets": rows,
             "candidates": len(candidates),
             **{
@@ -351,6 +452,9 @@ class Bench:
                 f"served_recall@{k}": sum(1 for row in rows if row[f"served@{k}"]) / total
                 for k in SERVED_LIMITS
             },
+            f"hit_all@{QUESTION_K}": all(top),
+            f"hit_any@{QUESTION_K}": any(top),
+            "violations": self.violations(candidates, **arguments),
         }
 
     # ------------------------------------------------------------------------------ misses
@@ -455,12 +559,24 @@ def aggregate(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     found = [target for target in targets if target["rank"] is not None]
     keys = [f"candidate_recall@{k}" for k in KS] + ["mrr"]
     keys += [f"served_recall@{k}" for k in SERVED_LIMITS]
+    violations: Counter[str] = Counter()
+    for row in rows:
+        violations.update(row.get("violations") or {})
     return {
         "questions": len(rows),
         "required_citations": len(targets),
         **{key: _mean(row[key] for row in rows) for key in keys},
+        **{
+            f"questions_{name}@{QUESTION_K}": sum(
+                1 for row in rows if row.get(f"{name}@{QUESTION_K}")
+            )
+            for name in ("hit_all", "hit_any")
+        },
         "found_via_proxy": sum(1 for target in found if target["proxy"]),
         "found_direct": sum(1 for target in found if not target["proxy"]),
+        "violations": {
+            name: violations[name] for name in ("scope", "lang", "audience", "unknown_row")
+        },
     }
 
 
@@ -498,8 +614,11 @@ def run(
             "candidate_depth": CANDIDATE_DEPTH,
             "ks": list(KS),
             "served_limits": list(SERVED_LIMITS),
-            "query": "the golden question verbatim, no within and no lang (the Researcher's "
-            "usual first call)",
+            "query": "the question verbatim; no within and no lang for a golden question (the "
+            "Researcher's usual first call), the probe's within and lang for a probe",
+            "question_k": QUESTION_K,
+            "violations": "candidates outside within, in a tree other than the requested "
+            "language's or the canonical one, or not public",
             "section_counting": "proxy: a wiki section counts through the footnotes of its text",
         },
         "release_stats": release_stats(
@@ -512,6 +631,12 @@ def run(
             if row["split"] in DETAIL_SPLITS
         ],
     }
+    by_probe: dict[str, list[dict[str, Any]]] = {}
+    for row in measured:
+        if row["probe"] is not None:
+            by_probe.setdefault(f"{row['split']}/{row['probe']}", []).append(row)
+    if by_probe:
+        out["probes"] = {name: aggregate(rows) for name, rows in sorted(by_probe.items())}
     if misses_from is not None:
         by_id = {item.question.id: item for item in questions}
         out["misses"] = bench.classify_misses(misses_from, by_id)

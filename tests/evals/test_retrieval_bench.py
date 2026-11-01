@@ -200,6 +200,119 @@ def test_old_tool_call_records_are_unchanged() -> None:
     assert "hits" not in record.model_dump(exclude_none=True)
 
 
+def _probe(qid: str, split: str, probe: str, within: str | None, lang: str = "fr") -> str:
+    record = json.loads(
+        _question(qid, WALLS, [{"source_path": MINUTES, "locator_key": "para-0007"}], split)
+    )
+    record.update({"lang": lang, "probe": probe, "within": within, "audience": "public"})
+    return json.dumps(record, ensure_ascii=False)
+
+
+@pytest.fixture
+def probes(tmp_path: Path) -> Path:
+    lines = [
+        _probe("t001", "retrieval-tune", "paraphrase-fr", "moreau"),
+        _probe("t002", "retrieval-tune", "en-to-fr", None, lang="en"),
+        _probe("x001", "retrieval-blind", "lexical-control", None),
+        _question("b001", WALLS, [{"source_path": MINUTES, "locator_key": "para-0007"}]),
+    ]
+    path = tmp_path / "probes.jsonl"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+def test_probes_run_with_their_within_and_lang(
+    bench: Bench, probes: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[tuple[str, dict[str, Any]]] = []
+    original = Bench.candidates
+
+    def candidates(self: Bench, question: str, **kwargs: Any) -> list[Any]:
+        calls.append(("candidates", kwargs))
+        return original(self, question)
+
+    def served(self: Bench, question: str, limit: int, **kwargs: Any) -> list[tuple[str, str]]:
+        calls.append(("served", kwargs))
+        return []
+
+    monkeypatch.setattr(Bench, "candidates", candidates)
+    monkeypatch.setattr(Bench, "served", served)
+    monkeypatch.setattr(Bench, "violations", lambda self, candidates, **kwargs: {})
+    report = _report(bench, probes)
+    filters = [kwargs for _, kwargs in calls]
+    assert {"within": "moreau", "lang": "fr"} in filters
+    assert {"within": None, "lang": "en"} in filters
+    assert {"within": None, "lang": None} in filters  # the golden question
+    assert {(name, json.dumps(kwargs)) for name, kwargs in calls} >= {
+        ("served", json.dumps({"within": "moreau", "lang": "fr"}))
+    }
+    assert _row(report, "t001")["within"] == "moreau"
+    assert _row(report, "b001")["probe"] is None
+
+
+def test_probe_report_details_tune_and_aggregates_blind(
+    bench: Bench, probes: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = Bench.candidates
+    monkeypatch.setattr(
+        Bench, "candidates", lambda self, question, **kwargs: original(self, question)
+    )
+    monkeypatch.setattr(Bench, "served", lambda self, question, limit, **kwargs: [])
+    zero = {"scope": 0, "lang": 0, "audience": 0, "unknown_row": 0}
+    monkeypatch.setattr(Bench, "violations", lambda self, candidates, **kwargs: dict(zero))
+    report = _report(bench, probes)
+    assert {row["id"] for row in report["questions"]} == {"t001", "t002", "b001"}
+    assert set(report["probes"]) == {
+        "retrieval-blind/lexical-control",
+        "retrieval-tune/en-to-fr",
+        "retrieval-tune/paraphrase-fr",
+    }
+    blind = report["probes"]["retrieval-blind/lexical-control"]
+    assert blind["questions"] == 1
+    assert blind["questions_hit_all@10"] == 1 and blind["questions_hit_any@10"] == 1
+    assert blind["violations"] == {"scope": 0, "lang": 0, "audience": 0, "unknown_row": 0}
+    assert "x001" not in json.dumps(report)
+    assert WALLS not in json.dumps(report, ensure_ascii=False)
+
+
+def test_row_facts_come_from_the_index(bench: Bench) -> None:
+    candidates = bench.candidates(WALLS)
+    assert candidates and all(candidate.path for candidate in candidates)
+    for candidate in candidates[:5]:
+        facts = bench.facts(candidate)
+        assert facts and all(row.sensitivity == "public" for row in facts)
+    assert bench.violations(candidates, within=None, lang=None) == {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0,
+    }
+
+
+def test_violations_count_scope_tree_and_audience(
+    bench: Bench, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from evals.retrieval_bench import Candidate, RowFacts
+
+    canonical = next(iter(bench.snap.catalog.wiki_languages), None)
+    rows = {
+        "a": [RowFacts("moreau", canonical, "public")],
+        "b": [RowFacts("nacrines", canonical, "public")],
+        "c": [RowFacts("moreau", "xx", "public")],
+        "d": [RowFacts("moreau", None, "internal")],
+        "e": [],
+    }
+    monkeypatch.setattr(Bench, "facts", lambda self, candidate: rows[candidate.path])
+    candidates = [Candidate(i, "page-section", (), path=name) for i, name in enumerate(rows, 1)]
+    assert bench.violations(candidates, within="moreau", lang=None) == {
+        "scope": 1,
+        "lang": 1,
+        "audience": 1,
+        "unknown_row": 1,
+    }
+    assert bench.violations(candidates, within=None, lang=None)["scope"] == 0
+
+
 def test_cli_writes_the_report(repo_root: Path, golden: Path, tmp_path: Path) -> None:
     out = tmp_path / "bench.json"
     code = main(
