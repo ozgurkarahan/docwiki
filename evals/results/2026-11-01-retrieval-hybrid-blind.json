@@ -1,0 +1,227 @@
+{
+  "format": "docwiki.evals.retrieval/v1",
+  "mode": "hybrid",
+  "date": "2026-11-01",
+  "release": {
+    "release_id": "20261027T222241Z-f4e7ba11",
+    "audience": "public",
+    "manifest_sha256": "7c6c27e678899d06a5a2e89b5fd4683940420f7a07907d4ae2ee21093c97d00a"
+  },
+  "questions_file": {
+    "name": "retrieval-blind.jsonl",
+    "sha256": "68ae4bcca3cef3846926792ed8c22e16fda1b2e87b8d2411c46d540d2563052c",
+    "questions": 30,
+    "with_required_citations": 30
+  },
+  "settings": {
+    "candidate_depth": 50,
+    "ks": [
+      5,
+      10,
+      20,
+      50
+    ],
+    "served_limits": [],
+    "query": "the question verbatim; no within and no lang for a golden question (the Researcher's usual first call), the probe's within and lang for a probe",
+    "question_k": 10,
+    "violations": "candidates outside within, in a tree other than the requested language's or the canonical one, or not public",
+    "section_counting": "proxy: a wiki section counts through the footnotes of its text",
+    "hybrid": {
+      "embed_model": "text-embedding-3-small",
+      "dimensions": 512,
+      "row_input": "embed-input-v1",
+      "question_input": "the question verbatim",
+      "search": "brute-force cosine over the rows passing the lexical filters, then the answer_context candidate rules",
+      "fusion": "reciprocal rank fusion",
+      "rrf_k": 60,
+      "lane_depth": 50
+    }
+  },
+  "release_stats": {
+    "rows": 3852,
+    "rows_by_kind": {
+      "page-section": 2959,
+      "source-block": 893
+    },
+    "rows_by_tree": {
+      "canonical": 893,
+      "en": 1376,
+      "fr": 1583
+    },
+    "input_chars": {
+      "total": 1764373,
+      "p50": 258,
+      "p95": 1433,
+      "max": 13255
+    },
+    "estimated_tokens": {
+      "method": "chars/4",
+      "total": 442529,
+      "p50": 65,
+      "p95": 359,
+      "max": 3314,
+      "rows_over_model_limit": 0,
+      "model_limit": 8191
+    },
+    "vectors": {
+      "dimensions": 512,
+      "float32_bytes": 7888896
+    },
+    "embedding_cost_usd": {
+      "price_per_million_tokens": 0.02,
+      "price_verified": false,
+      "one_full_build": 0.008851
+    }
+  },
+  "splits": {
+    "retrieval-blind": {
+      "questions": 30,
+      "required_citations": 38,
+      "candidate_recall@5": 0.9611,
+      "candidate_recall@10": 0.9722,
+      "candidate_recall@20": 0.9722,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.7278,
+      "questions_hit_all@10": 28,
+      "questions_hit_any@10": 30,
+      "found_via_proxy": 35,
+      "found_direct": 3,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "found_by_lanes": {
+        "both": 36,
+        "semantic": 2
+      },
+      "paired_vs_lexical_hit_all@10": {
+        "lexical": 22,
+        "gained": 6,
+        "lost": 0
+      }
+    }
+  },
+  "questions": [],
+  "embedding_usage": {
+    "rows_embedded": 3852,
+    "rows_tokens": 556675,
+    "billed_tokens": {
+      "rows": 0,
+      "questions": 883
+    },
+    "billed_usd": 1.8e-05
+  },
+  "probes": {
+    "retrieval-blind/en-to-fr": {
+      "questions": 8,
+      "required_citations": 8,
+      "candidate_recall@5": 1.0,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.8125,
+      "questions_hit_all@10": 8,
+      "questions_hit_any@10": 8,
+      "found_via_proxy": 8,
+      "found_direct": 0,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "found_by_lanes": {
+        "both": 8
+      },
+      "paired_vs_lexical_hit_all@10": {
+        "lexical": 8,
+        "gained": 0,
+        "lost": 0
+      }
+    },
+    "retrieval-blind/lexical-control": {
+      "questions": 8,
+      "required_citations": 8,
+      "candidate_recall@5": 1.0,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.7292,
+      "questions_hit_all@10": 8,
+      "questions_hit_any@10": 8,
+      "found_via_proxy": 6,
+      "found_direct": 2,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "found_by_lanes": {
+        "both": 8
+      },
+      "paired_vs_lexical_hit_all@10": {
+        "lexical": 8,
+        "gained": 0,
+        "lost": 0
+      }
+    },
+    "retrieval-blind/multi-chantier": {
+      "questions": 6,
+      "required_citations": 14,
+      "candidate_recall@5": 0.8056,
+      "candidate_recall@10": 0.8611,
+      "candidate_recall@20": 0.8611,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.6944,
+      "questions_hit_all@10": 4,
+      "questions_hit_any@10": 6,
+      "found_via_proxy": 14,
+      "found_direct": 0,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "found_by_lanes": {
+        "both": 12,
+        "semantic": 2
+      },
+      "paired_vs_lexical_hit_all@10": {
+        "lexical": 0,
+        "gained": 4,
+        "lost": 0
+      }
+    },
+    "retrieval-blind/paraphrase-fr": {
+      "questions": 8,
+      "required_citations": 8,
+      "candidate_recall@5": 1.0,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.6667,
+      "questions_hit_all@10": 8,
+      "questions_hit_any@10": 8,
+      "found_via_proxy": 7,
+      "found_direct": 1,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "found_by_lanes": {
+        "both": 8
+      },
+      "paired_vs_lexical_hit_all@10": {
+        "lexical": 6,
+        "gained": 2,
+        "lost": 0
+      }
+    }
+  }
+}
