@@ -1,9 +1,13 @@
 # ADR 0014 — Words and meaning: hybrid retrieval
 
-- Status: Proposed 2026-11-01 (slice S3: embedding deployment and its cost bound). Accepted or
-  rejected after the offline pilot (gate A) and the paired evaluation (gate B); completed in
-  slice S9.
-- Amends (if accepted): [ADR 0001](0001-compiled-wiki-over-vector-index.md), "no vector index by
+- Status: **Rejected** 2026-11-01 at gate A (offline pilot, criteria committed before the run):
+  on the blind decision set the semantic lane found 2 more paraphrase and English-to-French
+  questions in the first 10 candidates, 3 were required, with 0 control lost and 0 filter
+  violation ([results](../../evals/experiments/2026-11-01-gate-a.md)). F1 (vectors in the
+  release) and F2 (hybrid search) were not built. The optional `embed` deployment and the
+  `EmbeddingClient` of slices S2 and S3 remain available, off the serving path; removing the
+  deployment is an owner decision. Proposed 2026-11-01 (slice S3).
+- Would have amended: [ADR 0001](0001-compiled-wiki-over-vector-index.md), "no vector index by
   default"
 - Spec: v1.10
 
