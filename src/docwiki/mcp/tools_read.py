@@ -10,6 +10,7 @@ provenance; compiled wiki text comes with the citations it carries.
 from __future__ import annotations
 
 import difflib
+import json
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -30,12 +31,19 @@ from docwiki.contracts.markdown import (
     split_sections,
     strip_backlinks_block,
 )
-from docwiki.mcp.bounds import ResultTooLargeError, clip, fit_items, fit_text, result_json
+from docwiki.mcp.bounds import (
+    ResultTooLargeError,
+    clip,
+    dumps,
+    fit_items,
+    fit_text,
+    result_json,
+)
 from docwiki.mcp.config import McpConfig
 from docwiki.mcp.errors import ToolFailure
 from docwiki.mcp.source import ReleaseSource, Snapshot
 from docwiki.release import TableQueryError
-from docwiki.search.text import tokenize
+from docwiki.search.text import token_spans, tokenize
 
 __all__ = [
     "ANSWER_CONTEXT_HITS",
@@ -108,6 +116,20 @@ ANSWER_CONTEXT_EMPTY_HINT = (
     "No hits: try other words or the glossary; if the wiki has no answer, say 'Not found in the "
     "wiki.'"
 )
+COVERAGE_MAX_CHARS = 2000
+"""Reserved budget of ``coverage`` and ``gaps`` (``DOCWIKI_ANSWER_CONTEXT_COVERAGE=on``): they are
+appended after the hits payload, which keeps its own ``max_chars`` budget, so a result is at most
+``max_chars + COVERAGE_MAX_CHARS`` characters. Coverage items, then gaps, are dropped from the end
+(``coverage_truncated`` / ``gaps_truncated``) when they do not fit."""
+MAX_GAP_CHECKS = 4
+"""Named scopes without hits checked by a count query restricted to their scope (the others get
+``in_scope_matches: null``)."""
+GAP_COUNT_CAP = 20
+"""A gap's count query stops at this many in-scope candidates (its hint then says "at least")."""
+MIN_SCOPE_TOKEN_CHARS = 4
+"""A lone word of a scope code names the scope only from this length (and only when it is written
+as a proper noun in the scope's names)."""
+MAX_NAMED_AS_CHARS = 80
 
 
 @dataclass
@@ -130,6 +152,14 @@ def _dominant_scope(rows: Sequence[dict[str, Any]]) -> str | None:
     best = max(sorted(set(scopes)), key=scopes.count)
     count = scopes.count(best)
     return best if count >= 2 and count * 2 >= len(rows) else None
+
+
+def _proper_noun(label: str, word: str) -> bool:
+    """Whether ``label`` writes the search token ``word`` capitalised, not as its first word."""
+    return any(
+        index > 0 and token == word and label[start].isupper()
+        for index, (token, start, _) in enumerate(token_spans(label))
+    )
 
 
 def _norm(text: str) -> str:
@@ -755,9 +785,194 @@ class ReadTools:
             rows = hit_rows(budget)
             out = result_json(build(rows, False))
             if len(out) <= self.max_chars:
-                return out
-        out, _ = fit_items(rows, build, self.max_chars)
+                break
+        else:
+            out, _ = fit_items(rows, build, self.max_chars)
+        if self.config.answer_context_coverage and scope is None and offset == 0:
+            out = self._with_coverage(snap, question, language, candidates, out)
         return out
+
+    # --- coverage and gaps of answer_context (DOCWIKI_ANSWER_CONTEXT_COVERAGE) -------------
+
+    def _scope_phrases(self, snap: Snapshot) -> dict[tuple[str, ...], str]:
+        """Token sequences that name a scope value in a question, built by code from the release.
+
+        A scope can be named when it has a hub (``scope_type``, ``scope``) and an entity page
+        ``<scope_type>:<scope>`` (a registry entry such as a chantier); the default scope of the
+        company has no entity page and is never named. Its names are the hub and entity titles
+        (every language) and the entity aliases; its code also names it when it has several words
+        (``ecole-montferrine``), and so does a single word of the code of at least
+        ``MIN_SCOPE_TOKEN_CHARS`` letters that one of its names writes as a proper noun
+        (capitalised, not first: ``Moreau`` in "Chantier Moreau", never ``école``). Tokens are
+        accent- and case-insensitive (the search tokenizer); a phrase shared by two scopes is
+        ambiguous and dropped.
+        """
+
+        def build() -> dict[tuple[str, ...], str]:
+            entities: dict[str, list[CatalogPage]] = {}
+            for page in snap.catalog.pages:
+                if page.type == "entity" and self._allowed(snap, page.sensitivity):
+                    entities.setdefault(page.id, []).append(page)
+            names: dict[str, set[str]] = {}
+            for hub in snap.catalog.pages:
+                if hub.type != "hub" or not hub.scope or not self._allowed(snap, hub.sensitivity):
+                    continue
+                scope_type = getattr(self._page_parts(snap, hub)[0], "scope_type", None)
+                pages = entities.get(f"{scope_type}:{hub.scope}") if scope_type else None
+                if not pages:
+                    continue
+                labels = names.setdefault(hub.scope, set())
+                labels.add(hub.title)
+                for page in pages:
+                    labels.add(page.title)
+                    aliases = getattr(self._page_parts(snap, page)[0], "aliases", [])
+                    labels.update(alias.text for alias in aliases)
+            owners: dict[tuple[str, ...], set[str]] = {}
+            for scope, labels in names.items():
+                phrases = {tuple(tokenize(label)) for label in labels}
+                code = tuple(scope.split("-"))
+                if len(code) >= 2:
+                    phrases.add(code)
+                for word in code:
+                    if (
+                        len(word) >= MIN_SCOPE_TOKEN_CHARS
+                        and not word.isdigit()
+                        and any(_proper_noun(label, word) for label in labels)
+                    ):
+                        phrases.add((word,))
+                for phrase in phrases:
+                    if phrase:
+                        owners.setdefault(phrase, set()).add(scope)
+            return {
+                phrase: next(iter(scopes))
+                for phrase, scopes in sorted(owners.items())
+                if len(scopes) == 1
+            }
+
+        return snap.cached("scope-phrases", build)
+
+    def _named_scopes(self, snap: Snapshot, question: str) -> dict[str, str]:
+        """Scopes the question names, in order of first mention, with the words that named them
+        (longest phrase first, whole words, no overlap)."""
+        phrases = self._scope_phrases(snap)
+        if not phrases:
+            return {}
+        longest = max(len(phrase) for phrase in phrases)
+        spans = list(token_spans(question))
+        tokens = [token for token, _, _ in spans]
+        found: dict[str, str] = {}
+        i = 0
+        while i < len(tokens):
+            for n in range(min(longest, len(tokens) - i), 0, -1):
+                scope = phrases.get(tuple(tokens[i : i + n]))
+                if scope is not None:
+                    text = question[spans[i][1] : spans[i + n - 1][2]]
+                    found.setdefault(scope, clip(text, MAX_NAMED_AS_CHARS) or text)
+                    i += n
+                    break
+            else:
+                i += 1
+        return found
+
+    def _candidate_scope(self, snap: Snapshot, hit: Any) -> str | None:
+        entry = self._by_path(snap).get(hit.path) or self._by_id(snap).get(hit.page_id)
+        return entry.scope if entry is not None else None
+
+    def _with_coverage(
+        self,
+        snap: Snapshot,
+        question: str,
+        language: str | None,
+        candidates: Sequence[Any],
+        out: str,
+    ) -> str:
+        """``out`` with ``coverage`` and ``gaps`` appended after its last key.
+
+        The JSON text of ``out`` (hits, home index, hub...) is kept byte for byte; the appended
+        text is at most ``COVERAGE_MAX_CHARS`` characters. A release without scopes is unchanged.
+        """
+        if not self._scope_values(snap):
+            return out
+        named = self._named_scopes(snap, question)
+        stats: dict[str, dict[str, Any]] = {}
+
+        def stat(scope: str) -> dict[str, Any]:
+            return stats.setdefault(
+                scope, {"scope": scope, "hits": 0, "best_rank": None, "candidates": 0}
+            )
+
+        for hit in candidates:
+            if scope := self._candidate_scope(snap, hit):
+                stat(scope)["candidates"] += 1
+        for row in json.loads(out)["hits"]:
+            if row.get("scope"):
+                item = stat(row["scope"])
+                item["hits"] += 1
+                if item["best_rank"] is None or row["rank"] < item["best_rank"]:
+                    item["best_rank"] = row["rank"]
+        for scope in named:
+            stat(scope)
+        coverage: list[dict[str, Any]] = []
+        for scope, item in stats.items():
+            hub = self._hub_for(snap, scope, language)
+            coverage.append(
+                {
+                    **item,
+                    "hub": hub.path if hub is not None else None,
+                    **({"named_as": named[scope]} if scope in named else {}),
+                }
+            )
+        coverage.sort(
+            key=lambda c: (
+                c["best_rank"] is None,
+                c["best_rank"] or 0,
+                -c["candidates"],
+                c["scope"],
+            )
+        )
+        gaps: list[dict[str, Any]] = []
+        for scope, named_as in named.items():
+            if stats[scope]["hits"]:
+                continue
+            gap: dict[str, Any] = {"scope": scope, "named_as": named_as}
+            if len(gaps) >= MAX_GAP_CHECKS:
+                gap["in_scope_matches"] = None
+                gap["hint"] = (
+                    f"not checked (only {MAX_GAP_CHECKS} named scopes are): call "
+                    f"answer_context(within='{scope}')"
+                )
+            else:
+                found = self._context_candidates(snap, question, scope, language, GAP_COUNT_CAP)
+                count = min(len(found), GAP_COUNT_CAP)
+                gap["in_scope_matches"] = count
+                if count:
+                    least = "at least " if count >= GAP_COUNT_CAP else ""
+                    gap["hint"] = (
+                        f"{least}{count} sections or blocks of this scope match the question but "
+                        f"none is in these hits: call answer_context(within='{scope}')"
+                    )
+                else:
+                    gap["hint"] = (
+                        "no section or block of this scope matches the question's words (it may "
+                        f"use other words): try search with other words and within='{scope}', or "
+                        "read its hub"
+                    )
+            gaps.append(gap)
+        meta: dict[str, Any] = {"coverage": coverage, "gaps": gaps}
+
+        def tail() -> str:
+            return "," + dumps(meta)[1:]
+
+        while len(tail()) > COVERAGE_MAX_CHARS:
+            if meta["coverage"]:
+                meta["coverage"] = meta["coverage"][:-1]
+                meta["coverage_truncated"] = True
+            elif meta["gaps"]:
+                meta["gaps"] = meta["gaps"][:-1]
+                meta["gaps_truncated"] = True
+            else:  # pragma: no cover - two empty lists and two flags always fit
+                raise ResultTooLargeError("coverage does not fit in its reserved budget")
+        return out[:-1] + tail()
 
     def read_page(
         self, page: str, section: str | None = None, offset: int = 0, lang: str | None = None

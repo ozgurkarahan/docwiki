@@ -113,6 +113,10 @@ class McpConfig:
     token_validation: TokenValidation = "required"
     """``required``: in ``easyauth`` mode every HTTP call needs a valid bearer token; ``off``:
     trust the platform's principal header alone (explicit opt-out)."""
+    answer_context_coverage: bool = False
+    """``DOCWIKI_ANSWER_CONTEXT_COVERAGE=on``: ``answer_context`` without ``within`` adds
+    ``coverage`` and ``gaps`` (per-scope counts, named scopes without hits); ``off`` (default)
+    keeps its output unchanged."""
 
     def __post_init__(self) -> None:
         if self.auth_mode not in ("none", "easyauth"):
@@ -201,6 +205,12 @@ class McpConfig:
         if mode not in ("local", "azure"):
             raise ValueError(f"unknown {SettingsKeys.MODE}: {mode!r}")
         tenant = get(SettingsKeys.MCP_TENANT_ID)
+        coverage = (get(SettingsKeys.ANSWER_CONTEXT_COVERAGE, "off") or "off").lower()
+        if coverage not in ("on", "off"):
+            raise ValueError(
+                f"{SettingsKeys.ANSWER_CONTEXT_COVERAGE} must be 'on' or 'off', "
+                f"got {source.get(SettingsKeys.ANSWER_CONTEXT_COVERAGE)!r}"
+            )
         return cls(
             auth_mode=(get(SettingsKeys.AUTH_MODE, "none") or "none").lower(),  # type: ignore[arg-type]
             max_chars=int(number(SettingsKeys.MCP_MAX_CHARS, "12000")),
@@ -219,4 +229,5 @@ class McpConfig:
             token_validation=(
                 get(SettingsKeys.MCP_TOKEN_VALIDATION, "required") or "required"
             ).lower(),  # type: ignore[arg-type]
+            answer_context_coverage=coverage == "on",
         )
