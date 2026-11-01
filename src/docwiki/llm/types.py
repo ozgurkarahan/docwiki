@@ -15,6 +15,10 @@ from docwiki.llm.hashing import normalize_newlines, sha256_hex
 type Tier = Literal["fast", "smart"]
 TIERS: tuple[Tier, ...] = get_args(Tier.__value__)
 
+type UsageRole = Literal["fast", "smart", "embed"]
+"""Who billed the tokens in the usage ledger: a chat tier or the embedding deployment."""
+EMBED_ROLE: Literal["embed"] = "embed"
+
 type Origin = Literal["foundry", "fake", "replay"]
 """Where a result came from: the live Foundry service, a fake handler or a replayed fixture."""
 

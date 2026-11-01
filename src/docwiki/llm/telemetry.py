@@ -14,6 +14,7 @@ from typing import Any
 from docwiki import __version__
 
 SPAN_NAME = "docwiki.llm.structured"
+EMBED_SPAN_NAME = "docwiki.llm.embed"
 _ATTRIBUTE_TYPES = (str, bool, int, float)
 
 
@@ -52,16 +53,19 @@ def get_tracer(tracer_provider: Any | None = None) -> Any | None:
 
 @contextlib.contextmanager
 def llm_span(
-    attributes: Mapping[str, Any], *, tracer_provider: Any | None = None
+    attributes: Mapping[str, Any],
+    *,
+    tracer_provider: Any | None = None,
+    name: str = SPAN_NAME,
 ) -> Iterator[SpanRecorder]:
-    """Context manager wrapping one ``structured`` call in a ``docwiki.llm.structured`` span."""
+    """Context manager wrapping one model call in a ``name`` span (``structured`` by default)."""
     tracer = get_tracer(tracer_provider)
     if tracer is None:
         yield SpanRecorder()
         return
     from opentelemetry.trace import SpanKind
 
-    with tracer.start_as_current_span(SPAN_NAME, kind=SpanKind.CLIENT) as span:
+    with tracer.start_as_current_span(name, kind=SpanKind.CLIENT) as span:
         recorder = SpanRecorder(span)
         recorder.set_attributes(attributes)
         yield recorder

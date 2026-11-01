@@ -53,9 +53,13 @@ class VersionInfo(ContractModel):
 
 
 class LlmUsage(ContractModel):
-    """Token usage of one deployment during a run; prices are USD per 1M tokens."""
+    """Token usage of one deployment during a run; prices are USD per 1M tokens.
 
-    role: Literal["fast", "smart"]
+    ``role`` is the chat tier (``fast``/``smart``) or ``embed`` for the embedding deployment
+    (``calls`` then counts embedding batches and ``output_tokens`` stays 0).
+    """
+
+    role: Literal["fast", "smart", "embed"]
     deployment: NonEmptyStr
     model: NonEmptyStr
     model_version: str | None = None
