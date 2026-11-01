@@ -141,9 +141,15 @@ uv run python evals/retrieval_bench.py --release <release folder> --questions ev
 - **Misses** (`--misses-from`): each required citation a recorded run did not match is labelled
   `absent` (not in the first 50 candidates), `candidate_cut` (a candidate, not served),
   `served_unused` (served, not cited) or the question is `all_cited`.
+- **Probes** (`--questions evals/golden/retrieval-tune.jsonl`, see `evals/golden/README.md`): each
+  probe runs with its `within` and `lang`. Per kind: `questions_hit_all@10` and
+  `questions_hit_any@10` (questions with all, or at least one, required citation in the first 10
+  candidates), the recall metrics above and `violations`: candidates outside `within`, in a
+  language tree other than the requested or canonical one, or not public (must stay 0).
 
 The output format is `docwiki.evals.retrieval/v1`; the scoreboard ignores it. Question text is
-never written; per-question rows exist for dev only.
+never written; per-question rows exist for dev and the tune set only, never for the blind decision
+set or the holdout.
 
 ## Metrics
 

@@ -32,7 +32,9 @@
 - `evals/retrieval_bench.py` → `evals/results/<date>-retrieval-<mode>-<split>.json`
   (`docwiki.evals.retrieval/v1`): offline candidate and served recall@k of `answer_context` on a
   release, with no LLM call, and the classification of a recorded run's missed citations. Search
-  tool calls in Researcher records keep their hit ids (never text) for this purpose.
+  tool calls in Researcher records keep their hit ids (never text) for this purpose. Retrieval
+  probe sets (`evals/golden/probes.py`: a visible tune set and a blind decision set whose sha256 is
+  committed before the code it judges) add per-kind hit counts and filter violations.
 - Versions recorded: DocWiki git SHA, release id, model deployments and versions, prompt versions,
   evaluator versions.
 - The deterministic citation checker and metric functions are unit-tested and run in PR CI on
