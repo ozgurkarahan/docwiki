@@ -1,0 +1,668 @@
+{
+  "format": "docwiki.evals.retrieval/v1",
+  "mode": "hybrid",
+  "date": "2026-11-01",
+  "release": {
+    "release_id": "20261027T222241Z-f4e7ba11",
+    "audience": "public",
+    "manifest_sha256": "7c6c27e678899d06a5a2e89b5fd4683940420f7a07907d4ae2ee21093c97d00a"
+  },
+  "questions_file": {
+    "name": "retrieval-tune.jsonl",
+    "sha256": "507516d412f78bfae5fb33fb86e1f28bdbc2f5490d54d57a5f70f2ee5fda59cc",
+    "questions": 12,
+    "with_required_citations": 12
+  },
+  "settings": {
+    "candidate_depth": 50,
+    "ks": [
+      5,
+      10,
+      20,
+      50
+    ],
+    "served_limits": [],
+    "query": "the question verbatim; no within and no lang for a golden question (the Researcher's usual first call), the probe's within and lang for a probe",
+    "question_k": 10,
+    "violations": "candidates outside within, in a tree other than the requested language's or the canonical one, or not public",
+    "section_counting": "proxy: a wiki section counts through the footnotes of its text",
+    "hybrid": {
+      "embed_model": "text-embedding-3-small",
+      "dimensions": 512,
+      "row_input": "embed-input-v1",
+      "question_input": "the question verbatim",
+      "search": "brute-force cosine over the rows passing the lexical filters, then the answer_context candidate rules",
+      "fusion": "reciprocal rank fusion",
+      "rrf_k": 60,
+      "lane_depth": 50
+    }
+  },
+  "release_stats": {
+    "rows": 3852,
+    "rows_by_kind": {
+      "page-section": 2959,
+      "source-block": 893
+    },
+    "rows_by_tree": {
+      "canonical": 893,
+      "en": 1376,
+      "fr": 1583
+    },
+    "input_chars": {
+      "total": 1764373,
+      "p50": 258,
+      "p95": 1433,
+      "max": 13255
+    },
+    "estimated_tokens": {
+      "method": "chars/4",
+      "total": 442529,
+      "p50": 65,
+      "p95": 359,
+      "max": 3314,
+      "rows_over_model_limit": 0,
+      "model_limit": 8191
+    },
+    "vectors": {
+      "dimensions": 512,
+      "float32_bytes": 7888896
+    },
+    "embedding_cost_usd": {
+      "price_per_million_tokens": 0.02,
+      "price_verified": false,
+      "one_full_build": 0.008851
+    }
+  },
+  "splits": {
+    "retrieval-tune": {
+      "questions": 12,
+      "required_citations": 19,
+      "candidate_recall@5": 0.875,
+      "candidate_recall@10": 0.9028,
+      "candidate_recall@20": 0.9722,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.8611,
+      "questions_hit_all@10": 9,
+      "questions_hit_any@10": 12,
+      "found_via_proxy": 18,
+      "found_direct": 1,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "found_by_lanes": {
+        "both": 16,
+        "semantic": 3
+      },
+      "paired_vs_lexical_hit_all@10": {
+        "lexical": 8,
+        "gained": 1,
+        "lost": 0
+      }
+    }
+  },
+  "questions": [
+    {
+      "id": "t001",
+      "category": "numeric",
+      "lang": "fr",
+      "probe": "paraphrase-fr",
+      "within": "ecole-montferrine",
+      "targets": [
+        {
+          "source_path": "full/chantiers/ecole-montferrine/1-marche/ccap/2026-01-26_ccap-extrait.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 1,
+          "proxy": true,
+          "lanes": "both"
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 1.0,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 1.0,
+      "hit_all@10": true,
+      "hit_any@10": true,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "lexical_hit_all@10": true
+    },
+    {
+      "id": "t002",
+      "category": "numeric",
+      "lang": "fr",
+      "probe": "paraphrase-fr",
+      "within": "nacrines",
+      "targets": [
+        {
+          "source_path": "full/chantiers/nacrines/3-execution/ordre-de-service/2026-02-16_ordre-de-service-n1-nez-de-balcons.docx",
+          "locator_key": "tbl-01-r0002-r0002",
+          "alternatives": 0,
+          "rank": 2,
+          "proxy": true,
+          "lanes": "both"
+        },
+        {
+          "source_path": "full/chantiers/nacrines/3-execution/ordre-de-service/2026-02-16_ordre-de-service-n1-nez-de-balcons.docx",
+          "locator_key": "para-0013",
+          "alternatives": 0,
+          "rank": 2,
+          "proxy": true,
+          "lanes": "both"
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 1.0,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.5,
+      "hit_all@10": true,
+      "hit_any@10": true,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "lexical_hit_all@10": false
+    },
+    {
+      "id": "t003",
+      "category": "single-hop",
+      "lang": "fr",
+      "probe": "paraphrase-fr",
+      "within": "ecole-montferrine",
+      "targets": [
+        {
+          "source_path": "full/chantiers/ecole-montferrine/2-preparation/site-meeting-minutes/2026-04-16_compte-rendu-de-reunion-de-preparation-n1.docx",
+          "locator_key": "para-0013",
+          "alternatives": 0,
+          "rank": 2,
+          "proxy": true,
+          "lanes": "both"
+        },
+        {
+          "source_path": "full/chantiers/ecole-montferrine/2-preparation/site-meeting-minutes/2026-04-16_compte-rendu-de-reunion-de-preparation-n1.docx",
+          "locator_key": "para-0014",
+          "alternatives": 0,
+          "rank": 2,
+          "proxy": true,
+          "lanes": "both"
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 1.0,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.5,
+      "hit_all@10": true,
+      "hit_any@10": true,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "lexical_hit_all@10": true
+    },
+    {
+      "id": "t004",
+      "category": "single-hop",
+      "lang": "en",
+      "probe": "en-to-fr",
+      "within": "entreprise",
+      "targets": [
+        {
+          "source_path": "full/entreprise/organisation-chart/2026-01-05_organigramme.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 1,
+          "proxy": true,
+          "lanes": "both"
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 1.0,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 1.0,
+      "hit_all@10": true,
+      "hit_any@10": true,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "lexical_hit_all@10": true
+    },
+    {
+      "id": "t005",
+      "category": "table",
+      "lang": "en",
+      "probe": "en-to-fr",
+      "within": null,
+      "targets": [
+        {
+          "source_path": "full/entreprise/equipment-register/2026-04-10_registre-du-materiel.xlsx",
+          "locator_key": "sheet-materiel-r0005-r0005",
+          "alternatives": 0,
+          "rank": 1,
+          "proxy": true,
+          "lanes": "both"
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 1.0,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 1.0,
+      "hit_all@10": true,
+      "hit_any@10": true,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "lexical_hit_all@10": true
+    },
+    {
+      "id": "t006",
+      "category": "single-hop",
+      "lang": "en",
+      "probe": "en-to-fr",
+      "within": "ecole-montferrine",
+      "targets": [
+        {
+          "source_path": "full/chantiers/ecole-montferrine/2-preparation/client-email/2026-04-21_mail-client-mairie-accueil-de-loisirs.eml",
+          "locator_key": "msg-body-l0005-l0013",
+          "alternatives": 0,
+          "rank": 1,
+          "proxy": true,
+          "lanes": "both"
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 1.0,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 1.0,
+      "hit_all@10": true,
+      "hit_any@10": true,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "lexical_hit_all@10": true
+    },
+    {
+      "id": "t007",
+      "category": "table",
+      "lang": "fr",
+      "probe": "lexical-control",
+      "within": "entreprise",
+      "targets": [
+        {
+          "source_path": "full/entreprise/equipment-register/2026-04-10_registre-du-materiel.xlsx",
+          "locator_key": "sheet-materiel-r0007-r0007",
+          "alternatives": 0,
+          "rank": 1,
+          "proxy": true,
+          "lanes": "both"
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 1.0,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 1.0,
+      "hit_all@10": true,
+      "hit_any@10": true,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "lexical_hit_all@10": true
+    },
+    {
+      "id": "t008",
+      "category": "numeric",
+      "lang": "en",
+      "probe": "lexical-control",
+      "within": null,
+      "targets": [
+        {
+          "source_path": "full/chantiers/ecole-montferrine/2-preparation/purchase-order/2026-04-02_bon-de-commande-BC-2026-021_vanarsdel-menuiseries.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 1,
+          "proxy": false,
+          "lanes": "both"
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 1.0,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 1.0,
+      "hit_all@10": true,
+      "hit_any@10": true,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "lexical_hit_all@10": true
+    },
+    {
+      "id": "t009",
+      "category": "table",
+      "lang": "fr",
+      "probe": "lexical-control",
+      "within": "nacrines",
+      "targets": [
+        {
+          "source_path": "full/chantiers/nacrines/3-execution/supplier-invoice/2026-02-12_facture-FA-2026-0158_zava-materiaux.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 1,
+          "proxy": true,
+          "lanes": "both"
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 1.0,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 1.0,
+      "hit_all@10": true,
+      "hit_any@10": true,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "lexical_hit_all@10": true
+    },
+    {
+      "id": "t010",
+      "category": "multi-hop",
+      "lang": "fr",
+      "probe": "multi-chantier",
+      "within": null,
+      "targets": [
+        {
+          "source_path": "full/chantiers/ecole-montferrine/1-marche/ccap/2026-01-26_ccap-extrait.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 1,
+          "proxy": true,
+          "lanes": "both"
+        },
+        {
+          "source_path": "full/chantiers/nacrines/1-marche/works-contract/2025-11-20_marche-de-travaux-signe.docx",
+          "locator_key": "para-0022",
+          "alternatives": 0,
+          "rank": 9,
+          "proxy": true,
+          "lanes": "semantic"
+        },
+        {
+          "source_path": "full/chantiers/moreau/1-marche/works-contract/2026-02-10_contrat-de-travaux-signe.docx",
+          "locator_key": "para-0017",
+          "alternatives": 0,
+          "rank": 12,
+          "proxy": true,
+          "lanes": "semantic"
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.3333333333333333,
+      "candidate_recall@10": 0.6666666666666666,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 1.0,
+      "hit_all@10": false,
+      "hit_any@10": true,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "lexical_hit_all@10": false
+    },
+    {
+      "id": "t011",
+      "category": "multi-hop",
+      "lang": "fr",
+      "probe": "multi-chantier",
+      "within": null,
+      "targets": [
+        {
+          "source_path": "full/chantiers/nacrines/1-marche/subcontract/2025-12-10_contrat-de-sous-traitance-adatum-electricite.docx",
+          "locator_key": "para-0007",
+          "alternatives": 0,
+          "rank": 27,
+          "proxy": true,
+          "lanes": "semantic"
+        },
+        {
+          "source_path": "full/chantiers/moreau/1-marche/works-contract/2026-02-10_contrat-de-travaux-signe.docx",
+          "locator_key": "para-0019",
+          "alternatives": 0,
+          "rank": 3,
+          "proxy": true,
+          "lanes": "both"
+        },
+        {
+          "source_path": "full/chantiers/ecole-montferrine/2-preparation/site-meeting-minutes/2026-04-16_compte-rendu-de-reunion-de-preparation-n1.docx",
+          "locator_key": "para-0010",
+          "alternatives": 0,
+          "rank": 3,
+          "proxy": true,
+          "lanes": "both"
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.6666666666666666,
+      "candidate_recall@10": 0.6666666666666666,
+      "candidate_recall@20": 0.6666666666666666,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.3333333333333333,
+      "hit_all@10": false,
+      "hit_any@10": true,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "lexical_hit_all@10": false
+    },
+    {
+      "id": "t012",
+      "category": "multi-hop",
+      "lang": "fr",
+      "probe": "multi-chantier",
+      "within": null,
+      "targets": [
+        {
+          "source_path": "full/chantiers/ecole-montferrine/1-marche/ccap/2026-01-26_ccap-extrait.pdf",
+          "locator_key": "p0001",
+          "alternatives": 0,
+          "rank": 1,
+          "proxy": true,
+          "lanes": "both"
+        },
+        {
+          "source_path": "full/chantiers/nacrines/1-marche/works-contract/2025-11-20_marche-de-travaux-signe.docx",
+          "locator_key": "para-0020",
+          "alternatives": 0,
+          "rank": 13,
+          "proxy": true,
+          "lanes": "both"
+        }
+      ],
+      "candidates": 50,
+      "candidate_recall@5": 0.5,
+      "candidate_recall@10": 0.5,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 1.0,
+      "hit_all@10": false,
+      "hit_any@10": true,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "lexical_hit_all@10": false
+    }
+  ],
+  "embedding_usage": {
+    "rows_embedded": 3852,
+    "rows_tokens": 556675,
+    "billed_tokens": {
+      "rows": 556675,
+      "questions": 423
+    },
+    "billed_usd": 0.011142
+  },
+  "probes": {
+    "retrieval-tune/en-to-fr": {
+      "questions": 3,
+      "required_citations": 3,
+      "candidate_recall@5": 1.0,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 1.0,
+      "questions_hit_all@10": 3,
+      "questions_hit_any@10": 3,
+      "found_via_proxy": 3,
+      "found_direct": 0,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "found_by_lanes": {
+        "both": 3
+      },
+      "paired_vs_lexical_hit_all@10": {
+        "lexical": 3,
+        "gained": 0,
+        "lost": 0
+      }
+    },
+    "retrieval-tune/lexical-control": {
+      "questions": 3,
+      "required_citations": 3,
+      "candidate_recall@5": 1.0,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 1.0,
+      "questions_hit_all@10": 3,
+      "questions_hit_any@10": 3,
+      "found_via_proxy": 2,
+      "found_direct": 1,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "found_by_lanes": {
+        "both": 3
+      },
+      "paired_vs_lexical_hit_all@10": {
+        "lexical": 3,
+        "gained": 0,
+        "lost": 0
+      }
+    },
+    "retrieval-tune/multi-chantier": {
+      "questions": 3,
+      "required_citations": 8,
+      "candidate_recall@5": 0.5,
+      "candidate_recall@10": 0.6111,
+      "candidate_recall@20": 0.8889,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.7778,
+      "questions_hit_all@10": 0,
+      "questions_hit_any@10": 3,
+      "found_via_proxy": 8,
+      "found_direct": 0,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "found_by_lanes": {
+        "both": 5,
+        "semantic": 3
+      },
+      "paired_vs_lexical_hit_all@10": {
+        "lexical": 0,
+        "gained": 0,
+        "lost": 0
+      }
+    },
+    "retrieval-tune/paraphrase-fr": {
+      "questions": 3,
+      "required_citations": 5,
+      "candidate_recall@5": 1.0,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.6667,
+      "questions_hit_all@10": 3,
+      "questions_hit_any@10": 3,
+      "found_via_proxy": 5,
+      "found_direct": 0,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      },
+      "found_by_lanes": {
+        "both": 5
+      },
+      "paired_vs_lexical_hit_all@10": {
+        "lexical": 2,
+        "gained": 1,
+        "lost": 0
+      }
+    }
+  }
+}

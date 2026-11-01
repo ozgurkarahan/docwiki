@@ -1,0 +1,179 @@
+{
+  "format": "docwiki.evals.retrieval/v1",
+  "mode": "lexical",
+  "date": "2026-11-01",
+  "release": {
+    "release_id": "20261027T222241Z-f4e7ba11",
+    "audience": "public",
+    "manifest_sha256": "7c6c27e678899d06a5a2e89b5fd4683940420f7a07907d4ae2ee21093c97d00a"
+  },
+  "questions_file": {
+    "name": "retrieval-blind.jsonl",
+    "sha256": "68ae4bcca3cef3846926792ed8c22e16fda1b2e87b8d2411c46d540d2563052c",
+    "questions": 30,
+    "with_required_citations": 30
+  },
+  "settings": {
+    "candidate_depth": 50,
+    "ks": [
+      5,
+      10,
+      20,
+      50
+    ],
+    "served_limits": [
+      5,
+      10
+    ],
+    "query": "the question verbatim; no within and no lang for a golden question (the Researcher's usual first call), the probe's within and lang for a probe",
+    "question_k": 10,
+    "violations": "candidates outside within, in a tree other than the requested language's or the canonical one, or not public",
+    "section_counting": "proxy: a wiki section counts through the footnotes of its text"
+  },
+  "release_stats": {
+    "rows": 3852,
+    "rows_by_kind": {
+      "page-section": 2959,
+      "source-block": 893
+    },
+    "rows_by_tree": {
+      "canonical": 893,
+      "en": 1376,
+      "fr": 1583
+    },
+    "input_chars": {
+      "total": 1764373,
+      "p50": 258,
+      "p95": 1433,
+      "max": 13255
+    },
+    "estimated_tokens": {
+      "method": "chars/4",
+      "total": 442529,
+      "p50": 65,
+      "p95": 359,
+      "max": 3314,
+      "rows_over_model_limit": 0,
+      "model_limit": 8191
+    },
+    "vectors": {
+      "dimensions": 512,
+      "float32_bytes": 7888896
+    },
+    "embedding_cost_usd": {
+      "price_per_million_tokens": 0.02,
+      "price_verified": false,
+      "one_full_build": 0.008851
+    }
+  },
+  "splits": {
+    "retrieval-blind": {
+      "questions": 30,
+      "required_citations": 38,
+      "candidate_recall@5": 0.5556,
+      "candidate_recall@10": 0.8333,
+      "candidate_recall@20": 0.9444,
+      "candidate_recall@50": 0.9722,
+      "mrr": 0.5138,
+      "served_recall@5": 0.3833,
+      "served_recall@10": 0.4278,
+      "questions_hit_all@10": 22,
+      "questions_hit_any@10": 28,
+      "found_via_proxy": 33,
+      "found_direct": 3,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      }
+    }
+  },
+  "questions": [],
+  "probes": {
+    "retrieval-blind/en-to-fr": {
+      "questions": 8,
+      "required_citations": 8,
+      "candidate_recall@5": 0.625,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.6181,
+      "served_recall@5": 0.375,
+      "served_recall@10": 0.5,
+      "questions_hit_all@10": 8,
+      "questions_hit_any@10": 8,
+      "found_via_proxy": 8,
+      "found_direct": 0,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      }
+    },
+    "retrieval-blind/lexical-control": {
+      "questions": 8,
+      "required_citations": 8,
+      "candidate_recall@5": 0.875,
+      "candidate_recall@10": 1.0,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.599,
+      "served_recall@5": 0.625,
+      "served_recall@10": 0.625,
+      "questions_hit_all@10": 8,
+      "questions_hit_any@10": 8,
+      "found_via_proxy": 7,
+      "found_direct": 1,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      }
+    },
+    "retrieval-blind/multi-chantier": {
+      "questions": 6,
+      "required_citations": 14,
+      "candidate_recall@5": 0.2778,
+      "candidate_recall@10": 0.5,
+      "candidate_recall@20": 0.7222,
+      "candidate_recall@50": 0.8611,
+      "mrr": 0.3627,
+      "served_recall@5": 0.0833,
+      "served_recall@10": 0.1389,
+      "questions_hit_all@10": 0,
+      "questions_hit_any@10": 6,
+      "found_via_proxy": 12,
+      "found_direct": 0,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      }
+    },
+    "retrieval-blind/paraphrase-fr": {
+      "questions": 8,
+      "required_citations": 8,
+      "candidate_recall@5": 0.375,
+      "candidate_recall@10": 0.75,
+      "candidate_recall@20": 1.0,
+      "candidate_recall@50": 1.0,
+      "mrr": 0.4376,
+      "served_recall@5": 0.375,
+      "served_recall@10": 0.375,
+      "questions_hit_all@10": 6,
+      "questions_hit_any@10": 6,
+      "found_via_proxy": 6,
+      "found_direct": 2,
+      "violations": {
+        "scope": 0,
+        "lang": 0,
+        "audience": 0,
+        "unknown_row": 0
+      }
+    }
+  }
+}

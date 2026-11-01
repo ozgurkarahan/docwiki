@@ -30,6 +30,7 @@ call, not cited by the answer).
 from __future__ import annotations
 
 import argparse
+import asyncio
 import hashlib
 import inspect
 import json
@@ -43,12 +44,17 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from docwiki.llm.embed_input import EMBED_INPUT_VERSION, build_embed_input
+from docwiki.llm.embeddings import EmbeddingClient
 from docwiki.mcp.config import McpConfig
 from docwiki.mcp.source import FolderReleaseSource, Snapshot
-from docwiki.mcp.tools_read import ReadTools
+from docwiki.mcp.tools_read import _CONTEXT_SKIPPED_TYPES, ReadTools
+from docwiki.search.index import SearchIndex
 from evals.corpus import CorpusManifest, ReleaseCatalog, SourceResolver
 from evals.locators import keys_match
 from evals.questions import GoldenQuestion, QuestionSetError
@@ -57,6 +63,7 @@ from evals.records import tool_hits
 __all__ = [
     "BENCH_FORMAT",
     "Bench",
+    "SemanticLane",
     "Target",
     "load_bench_questions",
     "main",
@@ -82,6 +89,10 @@ CHARS_PER_TOKEN = 4.0
 DEFAULT_EMBED_PRICE = 0.02
 """Indicative USD per million input tokens, to be verified on the official pricing page."""
 REPLAYED_TOOLS = frozenset({"answer_context", "search", "read_page", "get_evidence"})
+RRF_K = 60
+"""Reciprocal rank fusion constant of the hybrid mode (Gate A pilot)."""
+LANE_DEPTH = 50
+"""Candidates each lane (lexical, semantic) brings to the fusion."""
 
 
 # ------------------------------------------------------------------------------ questions
@@ -275,6 +286,135 @@ def _pairs(value: Any) -> list[tuple[str, str]]:
     return list(dict.fromkeys(found))
 
 
+class SemanticLane:
+    """Brute-force cosine search over the embedded rows of one ``search.db`` (Gate A pilot).
+
+    Every row is embedded with ``embed-input-v1``; the questions are embedded verbatim, all
+    before the bench runs (one event loop). Vectors are cached under ``cache_dir`` by the SHA-256
+    of the database, the model and the dimensions; question vectors by the SHA-256 of the
+    question, never its text.
+    """
+
+    def __init__(
+        self,
+        rowids: np.ndarray,
+        matrix: np.ndarray,
+        queries: Mapping[str, np.ndarray],
+        *,
+        model: str,
+        dimensions: int,
+        usage: Mapping[str, Any],
+    ) -> None:
+        self.rowids = rowids
+        self.matrix = matrix
+        self.position = {int(rowid): index for index, rowid in enumerate(rowids)}
+        self._queries = dict(queries)
+        self.model = model
+        self.dimensions = dimensions
+        self.usage = dict(usage)
+
+    def query(self, text: str) -> np.ndarray:
+        return self._queries[_text_key(text)]
+
+    @classmethod
+    def build(
+        cls,
+        db: Path,
+        questions: Sequence[str],
+        client: EmbeddingClient,
+        cache_dir: Path,
+        *,
+        price_per_million: float = DEFAULT_EMBED_PRICE,
+    ) -> SemanticLane:
+        return asyncio.run(
+            cls._build(db, questions, client, cache_dir, price_per_million=price_per_million)
+        )
+
+    @classmethod
+    async def _build(
+        cls,
+        db: Path,
+        questions: Sequence[str],
+        client: EmbeddingClient,
+        cache_dir: Path,
+        *,
+        price_per_million: float,
+    ) -> SemanticLane:
+        try:
+            info = await client.describe()
+            model = info.model_name or info.deployment
+            dims = info.dimensions
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            digest = hashlib.sha256(db.read_bytes()).hexdigest()[:16]
+            rows_file = cache_dir / f"rows-{digest}-{model}-{dims}-{EMBED_INPUT_VERSION}.npz"
+            billed = {"rows": 0, "questions": 0}
+            if rows_file.is_file():
+                cached = np.load(rows_file)
+                rowids, matrix = cached["rowids"], cached["matrix"]
+                rows_tokens = int(cached["tokens"])
+            else:
+                ids, texts = _row_inputs(db)
+                result = await client.embed(texts, "document", EMBED_INPUT_VERSION)
+                rowids = np.asarray(ids, dtype=np.int64)
+                matrix = np.asarray(result.vectors, dtype=np.float32)
+                rows_tokens = billed["rows"] = result.usage.input_tokens
+                tmp = rows_file.with_suffix(".tmp.npz")
+                np.savez(tmp, rowids=rowids, matrix=matrix, tokens=np.int64(rows_tokens))
+                tmp.replace(rows_file)
+            queries_file = cache_dir / f"queries-{model}-{dims}.json"
+            stored: dict[str, list[float]] = (
+                json.loads(queries_file.read_text(encoding="utf-8"))
+                if queries_file.is_file()
+                else {}
+            )
+            missing = list(dict.fromkeys(q for q in questions if _text_key(q) not in stored))
+            if missing:
+                result = await client.embed(missing, "query", "query-verbatim-v1")
+                billed["questions"] = result.usage.input_tokens
+                for text, vector in zip(missing, result.vectors, strict=True):
+                    stored[_text_key(text)] = [float(x) for x in vector]
+                queries_file.write_text(json.dumps(stored), encoding="utf-8", newline="\n")
+        finally:
+            await client.aclose()
+        queries = {key: np.asarray(vec, dtype=np.float32) for key, vec in stored.items()}
+        tokens = billed["rows"] + billed["questions"]
+        usage = {
+            "rows_embedded": len(rowids),
+            "rows_tokens": rows_tokens,
+            "billed_tokens": billed,
+            "billed_usd": round(tokens * price_per_million / 1_000_000, 6),
+        }
+        return cls(rowids, matrix, queries, model=model, dimensions=dims, usage=usage)
+
+
+def _text_key(text: str) -> str:
+    return hashlib.sha256(text.strip().encode("utf-8")).hexdigest()
+
+
+def _row_inputs(db: Path) -> tuple[list[int], list[str]]:
+    conn = sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True)
+    try:
+        records = conn.execute("SELECT rowid, title, section, text FROM docs ORDER BY rowid")
+        ids: list[int] = []
+        texts: list[str] = []
+        for rowid, title, section, text in records:
+            try:
+                shaped = build_embed_input(title, section, text)
+            except ValueError:
+                continue
+            ids.append(int(rowid))
+            texts.append(shaped.text)
+    finally:
+        conn.close()
+    return ids, texts
+
+
+def _hit_key(hit: Any) -> tuple[str, str]:
+    if hit.kind == "source-block":
+        return (f"src:{hit.source_id}", str(hit.locator_key))
+    return (hit.path, str(hit.anchor or ""))
+
+
 @dataclass(frozen=True)
 class Candidate:
     rank: int
@@ -283,6 +423,8 @@ class Candidate:
     path: str = ""
     anchor: str | None = None
     locator_key: str | None = None
+    lanes: str = "lexical"
+    """The lanes that ranked the row: ``lexical``, ``semantic`` or ``both`` (hybrid mode)."""
 
     @property
     def proxy(self) -> bool:
@@ -301,16 +443,122 @@ class RowFacts:
 class Bench:
     """The retrieval measures of one release."""
 
-    def __init__(self, release: Path, corpus: Path) -> None:
+    def __init__(
+        self,
+        release: Path,
+        corpus: Path,
+        *,
+        semantic: SemanticLane | None = None,
+        rrf_k: int = RRF_K,
+        lane_depth: int = LANE_DEPTH,
+    ) -> None:
         self.release_dir = _release_dir(Path(release))
         self.reads = ReadTools(FolderReleaseSource(self.release_dir), McpConfig())
         self.snap: Snapshot = self.reads.snapshot()
         catalog = ReleaseCatalog.load(self.release_dir / "catalog.json")
         self.resolver = SourceResolver(CorpusManifest.load(Path(corpus)), catalog)
         self._facts: dict[tuple[str, str, str | None, str | None], list[RowFacts]] = {}
+        self.semantic = semantic
+        self.rrf_k = rrf_k
+        self.lane_depth = lane_depth
+        self._eligible: dict[tuple[str | None, str | None], np.ndarray] = {}
+
+    @property
+    def mode(self) -> str:
+        return "lexical" if self.semantic is None else "hybrid"
+
+    @property
+    def served_limits(self) -> tuple[int, ...]:
+        """Served recall runs the deployed ``answer_context``: lexical mode only."""
+        return SERVED_LIMITS if self.semantic is None else ()
 
     def path_of(self, source_id: str) -> str | None:
         return self.resolver.path_for_id(source_id)
+
+    def _dedupe(self, hits: Iterable[Any], limit: int) -> list[Any]:
+        """The ``answer_context`` candidate rules: one row per section or source locator, nothing
+        above the release's audience, no index, log or meta page."""
+        reads, snap = self.reads, self.snap
+        by_path, by_id = reads._by_path(snap), reads._by_id(snap)
+        seen: set[tuple[str, str]] = set()
+        out: list[Any] = []
+        for hit in hits:
+            key = _hit_key(hit)
+            if key in seen:
+                continue
+            entry = by_path.get(hit.path) or by_id.get(hit.page_id)
+            if entry is None or not reads._allowed(snap, entry.sensitivity):
+                continue
+            if entry.type in _CONTEXT_SKIPPED_TYPES:
+                continue
+            seen.add(key)
+            out.append(hit)
+            if len(out) >= limit:
+                break
+        return out
+
+    def _semantic_hits(
+        self, question: str, scope: str | None, language: str | None, limit: int
+    ) -> list[Any]:
+        """Rows by cosine similarity, under the same filters as the lexical search."""
+        lane = self.semantic
+        assert lane is not None
+        index = self.snap.search
+        eligible = self._eligible.get((scope, language))
+        if eligible is None:
+            where, params = index._filters(None, None, None, None, scope, language)
+            sql = f"SELECT d.rowid FROM docs d WHERE 1 = 1{where}"
+            allowed = {rowid for (rowid,) in index._conn.execute(sql, params)}
+            eligible = np.asarray(
+                sorted(lane.position[r] for r in allowed if r in lane.position), dtype=np.int64
+            )
+            self._eligible[(scope, language)] = eligible
+        if not len(eligible):
+            return []
+        scores = lane.matrix[eligible] @ lane.query(question)
+        rowids = lane.rowids[eligible]
+        order = np.lexsort((rowids, -scores))
+        _, rows = index._load_corpus()
+        hits = (SearchIndex._hit(rows[int(rowids[i])], float(scores[i]), []) for i in order)
+        return self._dedupe(hits, limit)
+
+    def _ranked(
+        self,
+        question: str,
+        scope: str | None,
+        language: str | None,
+        depth: int,
+        lexical_only: bool = False,
+    ) -> list[tuple[Any, str]]:
+        """The ranked hits and the lanes behind each: lexical alone, or the RRF fusion."""
+        reads, snap = self.reads, self.snap
+        if self.semantic is None or lexical_only:
+            lexical = reads._context_candidates(snap, question, scope, language, depth)[:depth]
+            return [(hit, "lexical") for hit in lexical]
+        lanes = (
+            reads._context_candidates(snap, question, scope, language, self.lane_depth)[
+                : self.lane_depth
+            ],
+            self._semantic_hits(question, scope, language, self.lane_depth),
+        )
+        table: dict[tuple[str, str], dict[str, Any]] = {}
+        for lane, hits in enumerate(lanes):
+            for rank, hit in enumerate(hits, 1):
+                entry = table.setdefault(
+                    _hit_key(hit), {"hit": hit, "score": 0.0, "best": rank, "lanes": set()}
+                )
+                entry["score"] += 1.0 / (self.rrf_k + rank)
+                entry["best"] = min(entry["best"], rank)
+                entry["lanes"].add(lane)
+        ordered = sorted(
+            table.items(),
+            key=lambda item: (-item[1]["score"], item[1]["best"], min(item[1]["lanes"]), item[0]),
+        )
+        names = {frozenset({0}): "lexical", frozenset({1}): "semantic"}
+        return [
+            (entry["hit"], names.get(frozenset(entry["lanes"]), "both"))
+            for _, entry in ordered[:depth]
+        ]
 
     def candidates(
         self,
@@ -319,16 +567,21 @@ class Bench:
         within: str | None = None,
         lang: str | None = None,
         depth: int = CANDIDATE_DEPTH,
+        lexical_only: bool = False,
     ) -> list[Candidate]:
         """The raw ``answer_context`` ranking with the citations each row would carry."""
         reads, snap = self.reads, self.snap
         scope = reads._within(snap, within)
         language = reads._lang(snap, lang)
         out: list[Candidate] = []
-        for rank, hit in enumerate(
-            reads._context_candidates(snap, question, scope, language, depth)[:depth], 1
-        ):
-            where = {"path": hit.path, "anchor": hit.anchor, "locator_key": hit.locator_key}
+        ranked = self._ranked(question, scope, language, depth, lexical_only)
+        for rank, (hit, lanes) in enumerate(ranked, 1):
+            where = {
+                "path": hit.path,
+                "anchor": hit.anchor,
+                "locator_key": hit.locator_key,
+                "lanes": lanes,
+            }
             if hit.kind == "source-block":
                 cited = ((hit.source_id, hit.locator_key),) if hit.locator_key else ()
                 out.append(Candidate(rank, hit.kind, cited, **where))
@@ -418,20 +671,21 @@ class Bench:
         question = item.question
         arguments = item.arguments
         candidates = self.candidates(question.question, **arguments)
-        served = {k: self.served(question.question, k, **arguments) for k in SERVED_LIMITS}
+        served = {k: self.served(question.question, k, **arguments) for k in self.served_limits}
         rows: list[dict[str, Any]] = []
         for target in item.targets:
             first = self.first_rank(target, candidates)
-            rows.append(
-                {
-                    "source_path": target.source_path,
-                    "locator_key": target.locator_key,
-                    "alternatives": len(target.options) - 1,
-                    "rank": first.rank if first else None,
-                    "proxy": first.proxy if first else None,
-                    **{f"served@{k}": self._matched(target, served[k]) for k in SERVED_LIMITS},
-                }
-            )
+            row: dict[str, Any] = {
+                "source_path": target.source_path,
+                "locator_key": target.locator_key,
+                "alternatives": len(target.options) - 1,
+                "rank": first.rank if first else None,
+                "proxy": first.proxy if first else None,
+                **{f"served@{k}": self._matched(target, served[k]) for k in self.served_limits},
+            }
+            if self.semantic is not None:
+                row["lanes"] = first.lanes if first else None
+            rows.append(row)
         ranks = [row["rank"] for row in rows if row["rank"] is not None]
         total = len(rows)
         top = [row["rank"] is not None and row["rank"] <= QUESTION_K for row in rows]
@@ -444,18 +698,29 @@ class Bench:
             "within": arguments["within"],
             "targets": rows,
             "candidates": len(candidates),
-            **{
-                f"candidate_recall@{k}": sum(1 for r in ranks if r <= k) / total for k in KS
-            },
+            **{f"candidate_recall@{k}": sum(1 for r in ranks if r <= k) / total for k in KS},
             "mrr": 1.0 / min(ranks) if ranks else 0.0,
             **{
                 f"served_recall@{k}": sum(1 for row in rows if row[f"served@{k}"]) / total
-                for k in SERVED_LIMITS
+                for k in self.served_limits
             },
             f"hit_all@{QUESTION_K}": all(top),
             f"hit_any@{QUESTION_K}": any(top),
             "violations": self.violations(candidates, **arguments),
+            **self._paired(item),
         }
+
+    def _paired(self, item: BenchQuestion) -> dict[str, Any]:
+        """In hybrid mode, the same question ranked by the lexical lane alone, so a run can
+        count the questions the fusion gains and loses without writing any question out."""
+        if self.semantic is None:
+            return {}
+        lexical = self.candidates(item.question.question, **item.arguments, lexical_only=True)
+        found = []
+        for target in item.targets:
+            first = self.first_rank(target, lexical)
+            found.append(first is not None and first.rank <= QUESTION_K)
+        return {f"lexical_hit_all@{QUESTION_K}": all(found)}
 
     # ------------------------------------------------------------------------------ misses
 
@@ -558,10 +823,13 @@ def aggregate(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     targets = [target for row in rows for target in row["targets"]]
     found = [target for target in targets if target["rank"] is not None]
     keys = [f"candidate_recall@{k}" for k in KS] + ["mrr"]
-    keys += [f"served_recall@{k}" for k in SERVED_LIMITS]
+    keys += [
+        f"served_recall@{k}" for k in SERVED_LIMITS if rows and f"served_recall@{k}" in rows[0]
+    ]
     violations: Counter[str] = Counter()
     for row in rows:
         violations.update(row.get("violations") or {})
+    lanes = Counter(target.get("lanes") for target in found if target.get("lanes"))
     return {
         "questions": len(rows),
         "required_citations": len(targets),
@@ -577,6 +845,22 @@ def aggregate(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "violations": {
             name: violations[name] for name in ("scope", "lang", "audience", "unknown_row")
         },
+        **({"found_by_lanes": dict(sorted(lanes.items()))} if lanes else {}),
+        **_paired_counts(rows),
+    }
+
+
+def _paired_counts(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    key = f"lexical_hit_all@{QUESTION_K}"
+    if not rows or key not in rows[0]:
+        return {}
+    pairs = [(bool(row[key]), bool(row[f"hit_all@{QUESTION_K}"])) for row in rows]
+    return {
+        f"paired_vs_lexical_hit_all@{QUESTION_K}": {
+            "lexical": sum(1 for lex, _ in pairs if lex),
+            "gained": sum(1 for lex, hyb in pairs if hyb and not lex),
+            "lost": sum(1 for lex, hyb in pairs if lex and not hyb),
+        }
     }
 
 
@@ -597,7 +881,7 @@ def run(
     snap = bench.snap
     out: dict[str, Any] = {
         "format": BENCH_FORMAT,
-        "mode": "lexical",
+        "mode": bench.mode,
         "date": date,
         "release": {
             "release_id": snap.release_id,
@@ -613,7 +897,7 @@ def run(
         "settings": {
             "candidate_depth": CANDIDATE_DEPTH,
             "ks": list(KS),
-            "served_limits": list(SERVED_LIMITS),
+            "served_limits": list(bench.served_limits),
             "query": "the question verbatim; no within and no lang for a golden question (the "
             "Researcher's usual first call), the probe's within and lang for a probe",
             "question_k": QUESTION_K,
@@ -632,6 +916,20 @@ def run(
         ],
     }
     by_probe: dict[str, list[dict[str, Any]]] = {}
+    lane = bench.semantic
+    if lane is not None:
+        out["settings"]["hybrid"] = {
+            "embed_model": lane.model,
+            "dimensions": lane.dimensions,
+            "row_input": EMBED_INPUT_VERSION,
+            "question_input": "the question verbatim",
+            "search": "brute-force cosine over the rows passing the lexical filters, then the "
+            "answer_context candidate rules",
+            "fusion": "reciprocal rank fusion",
+            "rrf_k": bench.rrf_k,
+            "lane_depth": bench.lane_depth,
+        }
+        out["embedding_usage"] = lane.usage
     for row in measured:
         if row["probe"] is not None:
             by_probe.setdefault(f"{row['split']}/{row['probe']}", []).append(row)
@@ -656,6 +954,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--date", help="date written in the output (default: today, UTC)")
     parser.add_argument("--price-per-million", type=float, default=DEFAULT_EMBED_PRICE)
     parser.add_argument(
+        "--mode",
+        choices=("lexical", "hybrid"),
+        default="lexical",
+        help="hybrid: fuse a semantic lane (needs the DOCWIKI_EMBED_* and Foundry settings)",
+    )
+    parser.add_argument("--rrf-k", type=int, default=RRF_K)
+    parser.add_argument("--lane-depth", type=int, default=LANE_DEPTH)
+    parser.add_argument(
+        "--cache-dir",
+        type=Path,
+        default=Path(".local/retrieval-bench"),
+        help="vector cache of the hybrid mode (keep it out of git)",
+    )
+    parser.add_argument(
         "--note", action="append", default=[], help="a note written in the output (repeatable)"
     )
     return parser
@@ -664,10 +976,22 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     questions, sha256 = load_bench_questions(args.questions)
-    bench = Bench(args.release, args.corpus)
-    misses = (
-        json.loads(args.misses_from.read_text(encoding="utf-8")) if args.misses_from else None
+    semantic = None
+    if args.mode == "hybrid":
+        from docwiki.llm.factory import create_embedding_client
+
+        db = _release_dir(args.release) / "search.db"
+        semantic = SemanticLane.build(
+            db,
+            [item.question.question for item in questions if item.targets],
+            create_embedding_client(),
+            args.cache_dir,
+            price_per_million=args.price_per_million,
+        )
+    bench = Bench(
+        args.release, args.corpus, semantic=semantic, rrf_k=args.rrf_k, lane_depth=args.lane_depth
     )
+    misses = json.loads(args.misses_from.read_text(encoding="utf-8")) if args.misses_from else None
     report = run(
         bench,
         questions,
