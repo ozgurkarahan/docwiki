@@ -30,6 +30,7 @@ JUDGE_LLM_FORMAT = "docwiki.evals.judge-llm/v1"
 JUDGE_PROMPT_VERSION = "knowledge-access-judge-v1"
 JUDGE_SCHEMA_NAME = "eval_knowledge_access_judge"
 DEFAULT_EVIDENCE_CHARS = 6000
+DEFAULT_MAX_OUTPUT_TOKENS = 3000  # reasoning tokens count against it
 
 
 class JudgeOutput(BaseModel):
@@ -191,6 +192,7 @@ async def judge_result(
     tier: str,
     concurrency: int,
     max_evidence_chars: int,
+    max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
 ) -> dict[str, Any]:
     if result.get("format") != RESULT_FORMAT:
         raise ValueError(f"{result_path.name} is not a {RESULT_FORMAT} file")
@@ -220,7 +222,7 @@ async def judge_result(
                     output=JudgeOutput,
                     schema_name=JUDGE_SCHEMA_NAME,
                     prompt_version=JUDGE_PROMPT_VERSION,
-                    max_output_tokens=300,
+                    max_output_tokens=max_output_tokens,
                     metadata={"stage": "eval-judge-llm", "question_id": qid},
                 )
             except Exception as exc:
@@ -345,6 +347,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--tier", choices=("fast", "smart"), default="smart")
     parser.add_argument("--concurrency", type=int, default=3)
     parser.add_argument("--max-evidence-chars", type=int, default=DEFAULT_EVIDENCE_CHARS)
+    parser.add_argument(
+        "--max-output-tokens",
+        type=int,
+        default=DEFAULT_MAX_OUTPUT_TOKENS,
+        help="output token cap of each judgement (reasoning tokens count against it)",
+    )
     return parser
 
 
@@ -398,6 +406,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     tier=args.tier,
                     concurrency=args.concurrency,
                     max_evidence_chars=args.max_evidence_chars,
+                    max_output_tokens=args.max_output_tokens,
                 )
                 done.append((destination, judged))
             return done
