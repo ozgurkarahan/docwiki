@@ -319,6 +319,21 @@ artifact. It needs the repository secret `DOCWIKI_FOUNDRY_PROJECT_ENDPOINT`, the
 trusts only runs of `main` of this repository, and no password or key is stored. Commit dev
 results and the regenerated scoreboard through a reviewed pull request.
 
+## A3 plugin arm: `wiki-long-context`
+
+`evals/systems_wiki_lc.py` registers `wiki-long-context` (`register_system(..., indexes_documents=False)`).
+It answers from a compiled release wiki (`--catalog` must point to a release folder containing
+`wiki/`) with one structured `smart` call:
+
+- context order: `wiki/index.md`, `wiki/chantiers/*.md`, `wiki/views/*.md`, `wiki/topics/**`,
+  `wiki/sources/*.md` (source frontmatter subset + body), then entity pages;
+- only canonical wiki content (no `wiki/en/`, no `.agents`/`.claude`/`.github`, no `_meta`);
+- budget rule (default `--budget-tokens 120000`, ~4 chars/token, output reserved): include whole
+  pages in order; stop a non-mandatory group at the first page that does not fit; `views` and
+  `topics` always appear, with proportional body truncation when needed;
+- context accounting is explicit in `config()` and per-answer `info`: included/excluded
+  pages/chars per group, plus `truncated_pages`.
+
 ## Honesty rules
 
 From `docs/spec/evals.md` §4, enforced by the tooling where possible:
