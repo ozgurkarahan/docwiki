@@ -14,7 +14,9 @@ structured outputs and no tools, through ``docwiki.llm``.
 
 from __future__ import annotations
 
+import asyncio
 import os
+import random
 import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping, Sequence
@@ -65,6 +67,11 @@ SYSTEMS = ("docwiki-researcher", "baseline-rag", "baseline-long-context")
 RAG_PROMPT_VERSION = "baseline-rag-v1"
 LONG_CONTEXT_PROMPT_VERSION = "baseline-long-context-v1"
 DEFAULT_MAX_OUTPUT_TOKENS = 6000  # reasoning tokens count against it
+RATE_LIMIT_RETRIES = 8
+RATE_LIMIT_BASE_DELAY_S = 10.0
+RATE_LIMIT_MAX_DELAY_S = 120.0
+RETRY_WAIT_KEY = "rate_limit_wait_s"
+"""``Answer.info`` key: seconds spent waiting for a rate limit, removed from the latency."""
 
 
 class SystemNotConfigured(RuntimeError):
@@ -121,6 +128,14 @@ def _price_table(env: Mapping[str, str] | None) -> PriceTable:
 
 
 # ---------------------------------------------------------------------------- researcher
+
+
+def _rate_limited(exc: Exception) -> bool:
+    """A 429 from the model deployment inside an agent turn: an infrastructure limit, not an
+    answer, so the question is asked again after a back-off instead of scoring 0."""
+    status = getattr(exc, "status_code", None)
+    text = str(exc).lower()
+    return status == 429 or "rate_limit" in text or "429" in text
 
 
 class ResearcherSystem(EvalSystem):
@@ -180,11 +195,27 @@ class ResearcherSystem(EvalSystem):
             raise SystemNotConfigured(f"docwiki-researcher cannot run: {exc}") from None
 
     async def answer(self, question: GoldenQuestion) -> Answer:
-        from docwiki.agents_client import ask
+        from docwiki.agents_client import AgentInvocationError, ask
 
-        result = await ask(
-            question.question, agent=self.agent, version=self._version, client=self._client
-        )
+        waited = 0.0
+        attempt = 0
+        while True:
+            try:
+                result = await ask(
+                    question.question,
+                    agent=self.agent,
+                    version=self._version,
+                    client=self._client,
+                )
+                break
+            except AgentInvocationError as exc:
+                if not _rate_limited(exc) or attempt >= RATE_LIMIT_RETRIES:
+                    raise
+                delay = min(RATE_LIMIT_MAX_DELAY_S, RATE_LIMIT_BASE_DELAY_S * 2**attempt)
+                delay *= 1 + random.random() * 0.25
+                attempt += 1
+                waited += delay
+                await asyncio.sleep(delay)
         citations = [
             Citation(
                 source_id=source.source_id,
@@ -225,6 +256,8 @@ class ResearcherSystem(EvalSystem):
                 "agent_version": result.version,
                 "agent_latency_s": result.latency_s,
                 "approvals": len(result.approvals),
+                "rate_limit_retries": attempt,
+                RETRY_WAIT_KEY: round(waited, 3),
             },
         )
 
