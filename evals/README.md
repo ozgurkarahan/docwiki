@@ -356,7 +356,6 @@ Known limitations, stated rather than hidden:
 - The restricted-value check is a heuristic fingerprint (distinctive numbers and codes); the
   `restricted` category's `forbidden` strings are exact.
 
-<<<<<<< HEAD
 ## Knowledge-access study helpers
 
 The knowledge-access experiment (`evals/experiments/2026-11-10-knowledge-access.md`) adds three
@@ -368,7 +367,7 @@ utilities:
   and virtual routed/oracle result arms (`apply`, `oracle`).
 - `evals/judge_llm.py`: blind structured LLM judge over result files (never sees arm names),
   with cited-evidence snippets and private-output handling for non-dev splits.
-=======
+
 ## Search arms: `rag-plus` and `foundry-iq` (knowledge-access study, A1 and A8)
 
 `evals/systems_search.py` registers two systems over an Azure AI Search index of the same chunks
@@ -424,4 +423,3 @@ Limits: both arms depend on Azure AI Search (the knowledge base on a preview API
 the knowledge base sees the index, not the question's audience, so the index must be built with
 the run's `--scope` and `--audience` (the parity check enforces it). Local extraction has no OCR,
 as for the baselines.
->>>>>>> 85d4ff8 (evals: rag-plus and foundry-iq search arms on Azure AI Search (A1, A8))
