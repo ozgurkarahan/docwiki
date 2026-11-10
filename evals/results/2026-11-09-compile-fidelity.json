@@ -1,0 +1,529 @@
+{
+  "format": "docwiki.evals.compile-fidelity/v1",
+  "date": "2026-11-09",
+  "release_id": "20261027T222241Z-f4e7ba11",
+  "spec": {
+    "path": "evals/golden/compile-fidelity.yaml",
+    "sha256": "sha256:00385b69f73e8bb2b72d09af940409f38868095b1caa2b35469020023f3972a0"
+  },
+  "bible_sha256": "sha256:831ce2177f40625acfcbad6d991ec9505715b3f5c89e592829b64b26c0c05303",
+  "aggregates": {
+    "revisions": {
+      "passed": 7,
+      "total": 7,
+      "share": 1.0
+    },
+    "facts_synthesised": {
+      "passed": 26,
+      "total": 30,
+      "share": 0.8667
+    },
+    "facts_compiled": {
+      "passed": 30,
+      "total": 30,
+      "share": 1.0
+    },
+    "facts_synthesised_by_scope": {
+      "ecole-montferrine": {
+        "passed": 5,
+        "total": 5,
+        "share": 1.0
+      },
+      "entreprise": {
+        "passed": 4,
+        "total": 5,
+        "share": 0.8
+      },
+      "moreau": {
+        "passed": 12,
+        "total": 13,
+        "share": 0.9231
+      },
+      "nacrines": {
+        "passed": 5,
+        "total": 7,
+        "share": 0.7143
+      }
+    },
+    "cross": {
+      "passed": 2,
+      "total": 5,
+      "share": 0.4
+    },
+    "scope_absent": {
+      "passed": 1,
+      "total": 1,
+      "share": 1.0
+    },
+    "forbidden_found": 0,
+    "stamp_as_content": {
+      "pages": 12,
+      "of": 199
+    }
+  },
+  "revisions": [
+    {
+      "id": "S1-quote-a",
+      "scenario": "S1",
+      "passed": true,
+      "page": "wiki/sources/dev-2026-014-indice-a-devis-extension-et-cuisine.md",
+      "status": "superseded"
+    },
+    {
+      "id": "S1-quote-b",
+      "scenario": "S1",
+      "passed": true,
+      "page": "wiki/sources/dev-2026-014-indice-b-devis-extension-et-cuisine.md",
+      "status": "current"
+    },
+    {
+      "id": "S3-contract",
+      "scenario": "S3",
+      "passed": true,
+      "page": "wiki/sources/2026-02-10-contrat-de-travaux-signe.md",
+      "status": "current"
+    },
+    {
+      "id": "S3-amendment",
+      "scenario": "S3",
+      "passed": true,
+      "page": "wiki/sources/2026-03-10-avenant-n1-fenetre-de-toit.md",
+      "status": "current"
+    },
+    {
+      "id": "S10-planning-a",
+      "scenario": "S10",
+      "passed": true,
+      "page": "wiki/sources/pln-2026-003-indice-a-planning-et-suivi-des-achats.md",
+      "status": "current"
+    },
+    {
+      "id": "S19-dpgf-a",
+      "scenario": "S19",
+      "passed": true,
+      "page": "wiki/sources/dev-2026-031-indice-a-dpgf-ecole-du-bourg.md",
+      "status": "superseded"
+    },
+    {
+      "id": "S19-dpgf-b",
+      "scenario": "S19",
+      "passed": true,
+      "page": "wiki/sources/dev-2026-031-indice-b-dpgf-ecole-du-bourg.md",
+      "status": "current"
+    }
+  ],
+  "facts": [
+    {
+      "id": "S1-current-quote",
+      "scenario": "S1",
+      "scope": "moreau",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/moreau/marche-et-avenants.md",
+        "section": "Vue d'ensemble"
+      }
+    },
+    {
+      "id": "S1-quote-a-total",
+      "scenario": "S1",
+      "scope": "moreau",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/moreau/marche-et-avenants.md",
+        "section": "Informations remplacées"
+      }
+    },
+    {
+      "id": "S1-bay-window",
+      "scenario": "S1",
+      "scope": "moreau",
+      "synthesised": false,
+      "compiled": true,
+      "where": {
+        "page": "wiki/sources/dev-2026-014-indice-b-devis-extension-et-cuisine.md",
+        "section": "Décomposition des prix"
+      }
+    },
+    {
+      "id": "S2-contract-dates",
+      "scenario": "S2",
+      "scope": "moreau",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/moreau/marche-et-avenants.md",
+        "section": "Marché initial"
+      }
+    },
+    {
+      "id": "S2-deposit",
+      "scenario": "S2",
+      "scope": "moreau",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/moreau/marche-et-avenants.md",
+        "section": "Échéancier et retenue de garantie"
+      }
+    },
+    {
+      "id": "S2-retention",
+      "scenario": "S2",
+      "scope": "moreau",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/moreau/marche-et-avenants.md",
+        "section": "Échéancier et retenue de garantie"
+      }
+    },
+    {
+      "id": "S3-amendment-amount",
+      "scenario": "S3",
+      "scope": "moreau",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/moreau/marche-et-avenants.md",
+        "section": "Avenant n°1"
+      }
+    },
+    {
+      "id": "S3-new-total",
+      "scenario": "S3",
+      "scope": "moreau",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/moreau/marche-et-avenants.md",
+        "section": "Vue d'ensemble"
+      }
+    },
+    {
+      "id": "S4-window-delivery",
+      "scenario": "S4",
+      "scope": "moreau",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/moreau/achats.md",
+        "section": "Commandes suivies au planning des achats"
+      }
+    },
+    {
+      "id": "S4-window-installation",
+      "scenario": "S4",
+      "scope": "moreau",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/moreau/achats.md",
+        "section": "Commandes suivies au planning des achats"
+      }
+    },
+    {
+      "id": "S5-invoice-blocks",
+      "scenario": "S5",
+      "scope": "moreau",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/moreau/achats.md",
+        "section": "Vue d'ensemble"
+      }
+    },
+    {
+      "id": "S5-missing-pallets",
+      "scenario": "S5",
+      "scope": "moreau",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/moreau/achats.md",
+        "section": "Vue d'ensemble"
+      }
+    },
+    {
+      "id": "S6-purchases",
+      "scenario": "S6",
+      "scope": "moreau",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/moreau/achats.md",
+        "section": "Vue d'ensemble"
+      }
+    },
+    {
+      "id": "S12-doors-postponed",
+      "scenario": "S12",
+      "scope": "nacrines",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/nacrines/planning.md",
+        "section": "Vue d'ensemble"
+      }
+    },
+    {
+      "id": "S12-reserve-r06",
+      "scenario": "S12",
+      "scope": "nacrines",
+      "synthesised": false,
+      "compiled": true,
+      "where": {
+        "page": "wiki/entities/building-element/portes-halls-nacrines.md",
+        "section": "Faits"
+      }
+    },
+    {
+      "id": "S14-open-reserves",
+      "scenario": "S14",
+      "scope": "nacrines",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/nacrines/planning.md",
+        "section": "Voir aussi"
+      }
+    },
+    {
+      "id": "S14-retention",
+      "scenario": "S14",
+      "scope": "nacrines",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/nacrines/situations-et-paiements.md",
+        "section": "Situation n°4 au 31/03/2026"
+      }
+    },
+    {
+      "id": "S14-retention-release",
+      "scenario": "S14",
+      "scope": "nacrines",
+      "synthesised": false,
+      "compiled": true,
+      "where": {
+        "page": "wiki/entities/chantier/moreau.md",
+        "section": "Chantier Moreau"
+      }
+    },
+    {
+      "id": "S16-nacrines-total",
+      "scenario": "S16",
+      "scope": "nacrines",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/nacrines/marche-et-avenants.md",
+        "section": "Vue d'ensemble"
+      }
+    },
+    {
+      "id": "S20-os1-completion",
+      "scenario": "S20",
+      "scope": "nacrines",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/nacrines/marche-et-avenants.md",
+        "section": "Vue d'ensemble"
+      }
+    },
+    {
+      "id": "S12-school-windows",
+      "scenario": "S12",
+      "scope": "ecole-montferrine",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/ecole-montferrine/planning.md",
+        "section": "Vue d'ensemble"
+      }
+    },
+    {
+      "id": "S12-school-reception",
+      "scenario": "S12",
+      "scope": "ecole-montferrine",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/ecole-montferrine/marche-et-avenants.md",
+        "section": "Calendrier contractuel"
+      }
+    },
+    {
+      "id": "S19-dpgf-current",
+      "scenario": "S19",
+      "scope": "ecole-montferrine",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/ecole-montferrine/marche-et-avenants.md",
+        "section": "Vue d'ensemble"
+      }
+    },
+    {
+      "id": "S19-dpgf-previous",
+      "scenario": "S19",
+      "scope": "ecole-montferrine",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/ecole-montferrine/marche-et-avenants.md",
+        "section": "Informations remplacées"
+      }
+    },
+    {
+      "id": "S20-day-camp",
+      "scenario": "S20",
+      "scope": "ecole-montferrine",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/ecole-montferrine/planning.md",
+        "section": "Vue d'ensemble"
+      }
+    },
+    {
+      "id": "S13-moreau-price-gap",
+      "scenario": "S13",
+      "scope": "entreprise",
+      "synthesised": false,
+      "compiled": true,
+      "where": {
+        "page": "wiki/entities/material/zm-20450.md",
+        "section": "Faits"
+      }
+    },
+    {
+      "id": "S13-nacrines-price-gap",
+      "scenario": "S13",
+      "scope": "entreprise",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/fournisseurs-et-contrat-cadre.md",
+        "section": "Tarif net 2026 Zava Matériaux"
+      }
+    },
+    {
+      "id": "S15-double-booking",
+      "scenario": "S15",
+      "scope": "entreprise",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/entreprise/planning.md",
+        "section": "Résidence Les Nacrines"
+      }
+    },
+    {
+      "id": "S17-attestation",
+      "scenario": "S17",
+      "scope": "entreprise",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/sous-traitance-et-conformite.md",
+        "section": "Attestations de vigilance et assurances"
+      }
+    },
+    {
+      "id": "S20-nacelle-vgp",
+      "scenario": "S20",
+      "scope": "entreprise",
+      "synthesised": true,
+      "compiled": true,
+      "where": {
+        "page": "wiki/topics/equipes-et-materiel.md",
+        "section": "Vue d'ensemble"
+      }
+    }
+  ],
+  "cross": [
+    {
+      "id": "S12-aluminium-shortage",
+      "scenario": "S12",
+      "passed": true,
+      "where": {
+        "page": "wiki/topics/fournisseurs-et-contrat-cadre.md",
+        "section": "Livraisons VanArsdel Menuiseries"
+      }
+    },
+    {
+      "id": "S12-shortage-with-school",
+      "scenario": "S12",
+      "passed": false,
+      "where": {
+        "page": "wiki/topics/fournisseurs-et-contrat-cadre.md",
+        "section": "Livraisons VanArsdel Menuiseries",
+        "missing": [
+          "BC-2026-021"
+        ]
+      }
+    },
+    {
+      "id": "S13-two-credit-notes",
+      "scenario": "S13",
+      "passed": false,
+      "where": {
+        "page": "wiki/topics/moreau/achats.md",
+        "section": "Vue d'ensemble",
+        "missing": [
+          "FA-2026-0158"
+        ]
+      }
+    },
+    {
+      "id": "S16-financial-position",
+      "scenario": "S16",
+      "passed": true,
+      "where": {
+        "page": "wiki/topics/entreprise/situations-et-paiements.md",
+        "section": "Marchés suivis au 10/04/2026"
+      }
+    },
+    {
+      "id": "S18-windows-both-chantiers",
+      "scenario": "S18",
+      "passed": false,
+      "where": {
+        "page": "wiki/topics/ecole-montferrine/marche-et-avenants.md",
+        "section": "Calendrier contractuel",
+        "missing": [
+          "2026-04-20"
+        ]
+      }
+    }
+  ],
+  "scope_absent": [
+    {
+      "id": "S11-no-architect-on-moreau",
+      "scenario": "S11",
+      "passed": true,
+      "pages": []
+    }
+  ],
+  "forbidden": {
+    "checked": 22,
+    "found": {}
+  },
+  "stamp_as_content": [
+    "wiki/sources/2026-01-05-organigramme.md",
+    "wiki/sources/2026-01-26-ccap-extrait.md",
+    "wiki/sources/2026-02-12-facture-fa-2026-0158-zava-materiaux.md",
+    "wiki/sources/2026-03-04-mail-client-demande-de-modification.md",
+    "wiki/sources/2026-03-12-photo-dalle-coulee.md",
+    "wiki/sources/2026-03-13-photo-palettes-livrees.md",
+    "wiki/sources/2026-03-18-mail-vanarsdel-report-livraison-menuiseries.md",
+    "wiki/sources/2026-04-03-pv-de-reception-avec-reserves-scan.md",
+    "wiki/sources/2026-04-08-mail-vanarsdel-report-livraison-portes.md",
+    "wiki/sources/2026-04-24-ppsps-lamna-batiment.md",
+    "wiki/topics/moreau/achats.md",
+    "wiki/topics/moreau/suivi-de-chantier.md"
+  ]
+}

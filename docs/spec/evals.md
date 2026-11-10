@@ -38,6 +38,13 @@
   tool calls in Researcher records keep their hit ids (never text) for this purpose. Retrieval
   probe sets (`evals/golden/probes.py`: a visible tune set and a blind decision set whose sha256 is
   committed before the code it judges) add per-kind hit counts and filter violations.
+- `evals/compile_fidelity.py` → `evals/results/<date>-compile-fidelity.json`
+  (`docwiki.evals.compile-fidelity/v1`): what the compiled wiki states, checked on a release with
+  no LLM call against `evals/golden/compile-fidelity.yaml`, whose expectations come from the
+  fictional world (`samples/fiction/bible.yaml`) and only use values printed in a public document.
+  Revision statuses, facts synthesised on a topic or view page of their scope (and compiled on any
+  page), cross-chantier syntheses, abstain facts, the bible's forbidden strings in the wiki,
+  evidence and catalog, and the pages that state the document stamp.
 - Versions recorded: DocWiki git SHA, release id, model deployments and versions, prompt versions,
   evaluator versions.
 - The deterministic citation checker and metric functions are unit-tested and run in PR CI on
