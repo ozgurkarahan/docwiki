@@ -70,3 +70,48 @@ One small fictional corpus (39 public documents), one model family: the conclusi
 corpus, model and workload; general guidance is labelled as hypothesis. W1 and R1 use instructions
 written for the wiki; v2 instructions are tool-neutral. A1 and A8 depend on a preview Azure
 service; if A8 cannot run, it is published as not measured.
+
+## Freeze addendum, part 1 (2026-11-10, before any blind run)
+
+Code: `public/main` at `e8bbd14` (every arm merged: #70 to #79). Nothing below changes after this
+commit; the blind results are under embargo until every arm has run.
+
+- **Release** `20261027T222241Z-f4e7ba11` (the served release of 2026-10-27), pinned on every
+  evaluation MCP app (`DOCWIKI_MCP_PIN_RELEASE`); the one-shot arms read the same corpus manifest
+  and the same release folder.
+- **Evaluation MCP apps** `wiki`, `raw`, `wiki2`, `raw2` on one image digest
+  (`docwiki/mcp-eval@sha256:b7df12e8...6b02`, built from `807bdb2`, which includes the dense
+  query normalisation fix #76); production apps and the production Researcher are not used.
+- **Vectors** of the dense lane: `text-embedding-3-small`, 512 dimensions, `embed-input-v1`,
+  3,852 rows, artifact sha256 `ffb888ab25cd6920...3119b2`; query embeddings through the `embed`
+  deployment (capacity 500).
+- **Agents** (version 1 each, definition sha256): `docwiki-researcher-w1` `4fc8878d...`,
+  `-r1` `68b9b1fe...`, `-w2` `e9481a76...`, `-r2` `56941a37...`, `-w2high` `92f97ee5...`. W1 and R1
+  use the production instructions; W2, R2 and W2-high use `agents/variants/v2/instructions.md`;
+  W2-high has reasoning effort `high`, the others the production default.
+- **One-shot arms**: `baseline-rag` (`baseline-rag-v1`), `baseline-long-context`
+  (`baseline-long-context-v1`, 120,000-token budget), `wiki-long-context`
+  (`wiki-long-context-v1`, 120,000 tokens: hubs, views and topics, topics truncated
+  proportionally, sources and entities excluded), `rag-plus` (`rag-plus-decompose-v1`, Azure AI
+  Search `2026-04-01`, hybrid + semantic ranker, top 8), `foundry-iq` (knowledge base API
+  `2026-08-01-preview`, planner `gpt-5.4-mini`, reasoning effort `low`, extractive, top 8).
+- **Model**: every arm answers with `gpt-5.5` version `2026-04-24`. Deviation from the plan: no
+  separate `smart-eval` deployment could be created (the subscription's GlobalStandard quota for
+  this model is used by `smart`). Agents answer through `smart` (GlobalStandard, 1M tokens per
+  minute, shared with the public demo, whose traffic is small); the one-shot arms answer through
+  `smart-dz` (DataZoneStandard, same model and version, 333k tokens per minute) so that the
+  long-context arms do not throttle the agents. Latencies are therefore compared within each
+  group, not across groups.
+- **Retries**: a model rate limit (HTTP 429) inside an agent turn is retried up to 8 times with
+  back-off and the wait is removed from the latency (#77); one-shot calls use the `docwiki.llm`
+  retry policy (`DOCWIKI_LLM_MAX_RETRIES=10` for the blind runs). A question that still fails is
+  scored 0 and reported with its error.
+- **Metrics** `evals-metrics-v1`; abstention reported in v1 and v2 (`evals/compare.py`); **judge**
+  `knowledge-access-judge-v2` (`smart-dz`, 3,000 output tokens), validated on two dev runs
+  (agreement with deterministic accuracy 27/32 and 26/32, every disagreement a judge "partial"
+  on a missing key fact).
+- **Router**: classifier `knowledge-access-router-v1` (`fast`, three classes); the routing table
+  is fitted on dev only and committed in part 2 of this addendum before it is applied to the blind
+  results. Blind classes (counts only): aggregate-or-cross 40, lookup 52, revision-or-absent 28.
+- **Blind runs**: 3 repetitions of every arm (`--run-label r1..r3`), per-question details written
+  outside the repository; only aggregates are committed until the blind file is published.
