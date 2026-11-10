@@ -19,6 +19,7 @@ import sys
 import tempfile
 from collections.abc import Callable
 from datetime import date
+from functools import partial, wraps
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
@@ -292,7 +293,21 @@ _ANNOTATIONS: dict[str, dict[str, bool]] = {
 }
 
 
-def _tool(fn: Callable[..., Any], name: str, config: McpConfig) -> Tool:
+def _tool(
+    fn: Callable[..., Any], name: str, config: McpConfig, *, dense_limiter: Any = None
+) -> Tool:
+    if config.dense and name in ("answer_context", "search"):
+        import anyio.to_thread
+
+        sync_fn = fn
+
+        @wraps(sync_fn)
+        async def threaded(**arguments: Any) -> Any:
+            return await anyio.to_thread.run_sync(
+                partial(sync_fn, **arguments), limiter=dense_limiter
+            )
+
+        fn = threaded
     tool = GuardedTool.from_function(
         fn,
         name=name,
@@ -410,7 +425,15 @@ def _read_tools(reads: ReadTools, config: McpConfig) -> list[Tool]:
         "list_skills": list_skills,
         "recent_changes": recent_changes,
     }
-    return [_tool(functions[name], name, config) for name in READ_TOOLS]
+    dense_limiter = None
+    if config.dense:
+        import anyio
+
+        # Dense requests must not consume the default pool's /healthz capacity.
+        dense_limiter = anyio.CapacityLimiter(8)
+    return [
+        _tool(functions[name], name, config, dense_limiter=dense_limiter) for name in READ_TOOLS
+    ]
 
 
 def _ops_tools(ops: OpsTools, config: McpConfig) -> list[Tool]:
@@ -518,7 +541,9 @@ def make_source(
 ) -> ReleaseSource:
     """Folder source for ``--release``; Blob (``mode=azure``) or ``<work_dir>`` otherwise."""
     if release:
-        return FolderReleaseSource(release, ttl_s=config.pointer_ttl_s)
+        return FolderReleaseSource(
+            release, ttl_s=config.pointer_ttl_s, pin_release=config.pin_release
+        )
     if config.mode == "azure":
         from docwiki.mcp.blob import AzureBlobStorage
 
@@ -527,9 +552,14 @@ def make_source(
             containers={"work": config.work_container, "releases": config.releases_container},
         )
         return StorageReleaseSource(
-            storage, cache_dir or DEFAULT_CACHE_DIR, ttl_s=config.pointer_ttl_s
+            storage,
+            cache_dir or DEFAULT_CACHE_DIR,
+            ttl_s=config.pointer_ttl_s,
+            pin_release=config.pin_release,
         )
-    return FolderReleaseSource(config.work_dir, ttl_s=config.pointer_ttl_s)
+    return FolderReleaseSource(
+        config.work_dir, ttl_s=config.pointer_ttl_s, pin_release=config.pin_release
+    )
 
 
 def make_ops(source: ReleaseSource, config: McpConfig) -> OpsTools:

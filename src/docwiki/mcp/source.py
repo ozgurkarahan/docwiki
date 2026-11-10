@@ -238,16 +238,30 @@ class FolderReleaseSource(ReleaseSource):
         *,
         ttl_s: float = 30.0,
         clock: Callable[[], float] = time.monotonic,
+        pin_release: str | None = None,
     ) -> None:
         super().__init__(ttl_s=ttl_s, clock=clock)
         self.path = Path(path)
+        if pin_release is not None and not RELEASE_ID_RE.fullmatch(pin_release):
+            raise ValueError("invalid pinned release id")
+        self.pin_release = pin_release
+
+    def _served_path(self) -> Path:
+        if self.pin_release is None or ReleaseLayout.detect(self.path) is not None:
+            return self.path
+        for root in (self.path, self.path / StorageKeys.RELEASES):
+            target = root / self.pin_release
+            if (target / ReleaseFiles.MANIFEST).is_file():
+                return target
+        raise ReleaseUnavailableError(f"pinned release {self.pin_release} does not exist")
 
     def _shape(self) -> _FolderShape:
-        layout = ReleaseLayout.detect(self.path)
+        served = self._served_path()
+        layout = ReleaseLayout.detect(served)
         if layout is not None and layout.portable:
             return _FolderShape("portable", layout.manifest_path, None)
         if layout is not None:
-            return _FolderShape("release", layout.manifest_path, self.path.parent)
+            return _FolderShape("release", layout.manifest_path, served.parent)
         for releases in (self.path, self.path / StorageKeys.RELEASES):
             pointer = releases / POINTER_FILE
             if pointer.is_file():
@@ -263,7 +277,11 @@ class FolderReleaseSource(ReleaseSource):
         return f"{shape.kind}:{sha256_hex(shape.version_file.read_bytes())}"
 
     def _load(self) -> Snapshot:
-        reader = ReleaseReader.open(self.path)
+        reader = ReleaseReader.open(self._served_path())
+        if self.pin_release is not None and reader.release_id != self.pin_release:
+            raise ReleaseUnavailableError(
+                f"pinned release {self.pin_release} does not match the release folder"
+            )
         if reader.pointer is not None and reader.manifest_sha256 != reader.pointer.manifest_sha256:
             raise ReleaseIntegrityError(
                 f"manifest of {reader.release_id} does not match current.json"
@@ -310,13 +328,22 @@ class StorageReleaseSource(ReleaseSource):
         prefix: str = StorageKeys.RELEASES,
         ttl_s: float = 30.0,
         clock: Callable[[], float] = time.monotonic,
+        pin_release: str | None = None,
     ) -> None:
         super().__init__(ttl_s=ttl_s, clock=clock)
         self.storage = storage
         self.cache_dir = Path(cache_dir)
         self.prefix = prefix.rstrip("/")
+        if pin_release is not None and not RELEASE_ID_RE.fullmatch(pin_release):
+            raise ValueError("invalid pinned release id")
+        self.pin_release = pin_release
 
     def _probe(self) -> str:
+        if self.pin_release is not None:
+            etag = self.storage.etag(f"{self.prefix}/{self.pin_release}/{ReleaseFiles.MANIFEST}")
+            if etag is None:
+                raise ReleaseUnavailableError(f"pinned release {self.pin_release} does not exist")
+            return etag
         etag = self.storage.etag(f"{self.prefix}/current.json")
         if etag is None:
             raise ReleaseUnavailableError("no release has been published yet (no current.json)")
@@ -345,6 +372,11 @@ class StorageReleaseSource(ReleaseSource):
         return target
 
     def _load(self) -> Snapshot:
+        if self.pin_release is not None:
+            manifest, digest = read_manifest(self.storage, self.pin_release, prefix=self.prefix)
+            if manifest.release_id != self.pin_release:
+                raise ReleaseIntegrityError("pinned release does not match its manifest")
+            return Snapshot(ReleaseReader(self._materialize(self.pin_release, digest)))
         found = read_current_pointer(self.storage, self.prefix)
         if found is None:
             raise ReleaseUnavailableError("no release has been published yet (no current.json)")
