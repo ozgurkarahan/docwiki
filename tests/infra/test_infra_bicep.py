@@ -30,8 +30,8 @@ from docwiki.stages import agentkit
 
 INFRA = REPO_ROOT / "infra"
 MAIN = INFRA / "main.bicep"
-# The S8 feature switched on by the evaluation MCP app only (enableEvalMcp).
-EVAL_FEATURE_ENV = "DOCWIKI_ANSWER_CONTEXT_COVERAGE"
+# The feature under evaluation, set on the evaluation MCP app only (enableEvalMcp).
+EVAL_FEATURE_ENV = "DOCWIKI_MCP_WIKI_ABLATION"
 GUID = re.compile(
     r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
 )
@@ -924,13 +924,15 @@ def test_eval_mcp_is_off_by_default_and_needs_the_production_auth() -> None:
     mapped = json.loads((INFRA / "main.parameters.json").read_text(encoding="utf-8"))["parameters"]
     assert mapped["enableEvalMcp"] == {"value": "${DOCWIKI_ENABLE_EVAL_MCP}"}
     assert mapped["evalMcpAllowedClientIds"] == {"value": "${DOCWIKI_EVAL_MCP_ALLOWED_CLIENT_IDS}"}
+    assert mapped["evalMcpWikiAblation"] == {"value": "${DOCWIKI_EVAL_MCP_WIKI_ABLATION}"}
+    assert re.search(r"^param evalMcpWikiAblation string = 'off'$", main, re.MULTILINE)
     for module in ("mcpEvalApp", "mcpEvalAuth", "mcpEvalConnection"):
         assert re.search(rf"^module {module} '[^']+' = if \(evalMcpEnabled\) \{{", main, re.M)
     # Production is untouched: nothing outside the evaluation section names it.
     production = main[: main.index("// Evaluation environment")]
-    assert "evalMcp" not in production.replace("param enableEvalMcp", "").replace(
-        "param evalMcpAllowedClientIds", ""
-    )
+    for declared in ("param enableEvalMcp", "param evalMcpAllowedClientIds", "param evalMcpWiki"):
+        production = production.replace(declared, "")
+    assert "evalMcp" not in production
     assert "mcpEvalApp: 'ca-mcp-eval-${resourceToken}'" in main
     assert "var evalMcpConnectionName = '${take(mcpConnectionName, 28)}-eval'" in main
     assert "output DOCWIKI_EVAL_MCP_URL string = evalMcpEnabled ? evalMcpUrl : ''" in main
@@ -967,7 +969,7 @@ def test_eval_mcp_app_mirrors_production_with_the_feature_on() -> None:
         "tags": "tags",
     }, "zero replicas at rest; no azd service tag (azd deploy updates production only)"
     prod_env, eval_env = _env(prod), _env(app)
-    assert eval_env.pop(EVAL_FEATURE_ENV) == "'on'"
+    assert eval_env.pop(EVAL_FEATURE_ENV) == "evalMcpWikiAblation == 'raw' ? 'raw' : 'off'"
     assert eval_env.pop("OTEL_SERVICE_NAME") == "'docwiki-mcp-eval'"
     assert prod_env.pop("OTEL_SERVICE_NAME") == "'docwiki-mcp'"
     assert eval_env.pop("DOCWIKI_MCP_ALLOWED_CLIENT_IDS") == "join(evalMcpAllowedApplications, ',')"

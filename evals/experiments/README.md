@@ -1,8 +1,9 @@
-# Retrieval experiments
+# Evaluation experiments
 
-Decision records of the words and meaning search plan (spec CHANGELOG v1.10). Each gate's
-criteria are committed here **before** the run they judge; results are published even when a gate
-fails.
+Decision records of the words and meaning search plan (spec CHANGELOG v1.10) and of later
+measurements such as the wiki ablation (`2026-11-09-wiki-ablation.md`, v1.11: the same agent with
+and without the compiled wiki). Each experiment's criteria are committed here **before** the run
+they judge; results are published even when a gate fails.
 
 ## Blind decision set
 

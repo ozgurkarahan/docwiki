@@ -21,7 +21,8 @@
   default): a second MCP app `ca-mcp-eval-<token>` built like the production one (same image,
   release, storage settings, managed identity, Entra built-in auth and token validation), at zero
   replicas at rest, with the feature under evaluation switched on through its environment
-  (`DOCWIKI_ANSWER_CONTEXT_COVERAGE=on`), and its own project connection
+  (`evalMcpWikiAblation`, azd value `DOCWIKI_EVAL_MCP_WIKI_ABLATION`: `raw` sets
+  `DOCWIKI_MCP_WIKI_ABLATION=raw`, the agent without the wiki), and its own project connection
   `<mcpConnectionName>-eval`. An evaluation Researcher `docwiki-researcher-eval`
   (`agents/deploy.py --eval`), identical to the production one except its name and MCP
   connection, answers through it, so a feature is A/B evaluated against production without

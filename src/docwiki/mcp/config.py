@@ -32,6 +32,7 @@ __all__ = [
 AuthMode = Literal["none", "easyauth"]
 Level = Literal["read", "operate"]
 TokenValidation = Literal["required", "off"]
+WikiAblation = Literal["off", "raw"]
 
 _TENANT_ID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
@@ -113,6 +114,10 @@ class McpConfig:
     token_validation: TokenValidation = "required"
     """``required``: in ``easyauth`` mode every HTTP call needs a valid bearer token; ``off``:
     trust the platform's principal header alone (explicit opt-out)."""
+    wiki_ablation: WikiAblation = "off"
+    """``raw``: an evaluation-only server that hides the compiled wiki and serves only the
+    documents' extracted blocks, their evidence and their tables (the "agent without the wiki"
+    arm of an ablation). Never set on a production server."""
 
     def __post_init__(self) -> None:
         if self.auth_mode not in ("none", "easyauth"):
@@ -135,6 +140,11 @@ class McpConfig:
         if self.tenant_id is not None and not _TENANT_ID.fullmatch(self.tenant_id):
             raise ValueError(
                 f"{SettingsKeys.MCP_TENANT_ID} must be a tenant ID (a lower-case GUID)"
+            )
+        if self.wiki_ablation not in ("off", "raw"):
+            raise ValueError(
+                f"{SettingsKeys.MCP_WIKI_ABLATION} must be 'off' or 'raw', "
+                f"got {self.wiki_ablation!r}"
             )
 
     @property
@@ -219,4 +229,5 @@ class McpConfig:
             token_validation=(
                 get(SettingsKeys.MCP_TOKEN_VALIDATION, "required") or "required"
             ).lower(),  # type: ignore[arg-type]
+            wiki_ablation=(get(SettingsKeys.MCP_WIKI_ABLATION, "off") or "off").lower(),  # type: ignore[arg-type]
         )

@@ -45,6 +45,7 @@
     "mcpApiClientId": { "value": "${DOCWIKI_MCP_API_CLIENT_ID}" },
     "mcpAllowedClientIds": { "value": "${DOCWIKI_MCP_ALLOWED_CLIENT_IDS}" },
     "evalMcpAllowedClientIds": { "value": "${DOCWIKI_EVAL_MCP_ALLOWED_CLIENT_IDS}" },
+    "evalMcpWikiAblation": { "value": "${DOCWIKI_EVAL_MCP_WIKI_ABLATION}" },
     "mcpConnectionName": { "value": "${DOCWIKI_MCP_CONNECTION}" },
     "portalClientId": { "value": "${DOCWIKI_PORTAL_CLIENT_ID}" },
     "portalOwners": { "value": "${DOCWIKI_PORTAL_OWNERS}" },

@@ -197,6 +197,7 @@ never writes to the release it serves.
 | `DOCWIKI_RELEASE` | — | Default for `--release` |
 | `DOCWIKI_MCP_MAX_CHARS` | `12000` | Output budget per tool result (minimum 2000) |
 | `DOCWIKI_MCP_POINTER_TTL_SECONDS` | `30` | Pointer re-check interval |
+| `DOCWIKI_MCP_WIKI_ABLATION` | `off` | `raw` on an evaluation server only: the compiled wiki is hidden and the read tools serve the documents' extracted blocks alone. `answer_context` and `search` return source blocks without revision status, home index, hub or views; `get_evidence` and `query_table` work as usual; `read_page`, `get_index`, `get_links`, `glossary`, `get_skill`, `list_skills` and `recent_changes` answer `not_found`. The search keeps the domain pack's synonyms. It is the "same agent, no wiki" arm of an ablation (Bicep `evalMcpWikiAblation`) |
 | `DOCWIKI_QUERY_TABLE_MAX_ROWS` | `200` | Row cap of `query_table` (at most 200) |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | — | HTTP mode exports traces and `docwiki` logs to Application Insights |
 
