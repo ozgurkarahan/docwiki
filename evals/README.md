@@ -340,3 +340,15 @@ Known limitations, stated rather than hidden:
   as `300 cm`) fails; the judge's response completeness covers semantic correctness.
 - The restricted-value check is a heuristic fingerprint (distinctive numbers and codes); the
   `restricted` category's `forbidden` strings are exact.
+
+## Knowledge-access study helpers
+
+The knowledge-access experiment (`evals/experiments/2026-11-10-knowledge-access.md`) adds three
+utilities:
+
+- `evals/compare.py`: multi-run arm comparison with clustered bootstrap CIs, paired
+  sign-flip permutation tests with Holm adjustment, safety exclusions and protocol decision logic.
+- `evals/router.py`: LLM question routing (`classify`), dev fitting with leave-one-out (`fit`),
+  and virtual routed/oracle result arms (`apply`, `oracle`).
+- `evals/judge_llm.py`: blind structured LLM judge over result files (never sees arm names),
+  with cited-evidence snippets and private-output handling for non-dev splits.
