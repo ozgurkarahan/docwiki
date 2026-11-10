@@ -16,22 +16,37 @@
   `enableEventTrigger` (true), `reconcileCron` (`0 */6 * * *`), `budgetAmount` (monthly, USD),
   `budgetContactEmails` (passed at deploy time, never committed), `audience` (`internal`),
   `domainPack` (`batiment`), `enableFoundrySkillsPreview` (false), `enableRoutine` (false),
-  `enableEvalMcp` (false).
-- Optional evaluation environment (`enableEvalMcp`, azd value `DOCWIKI_ENABLE_EVAL_MCP`, off by
-  default): a second MCP app `ca-mcp-eval-<token>` built like the production one (same image,
-  release, storage settings, managed identity, Entra built-in auth and token validation), at zero
-  replicas at rest, with the feature under evaluation switched on through its environment
-  (`evalMcpWikiAblation`, azd value `DOCWIKI_EVAL_MCP_WIKI_ABLATION`: `raw` sets
-  `DOCWIKI_MCP_WIKI_ABLATION=raw`, the agent without the wiki), and its own project connection
-  `<mcpConnectionName>-eval`. An evaluation Researcher `docwiki-researcher-eval`
-  (`agents/deploy.py --eval`), identical to the production one except its name and MCP
-  connection, answers through it, so a feature is A/B evaluated against production without
-  touching production resources. It needs a provisioned environment (`mcpApiClientId`); the
-  evaluation agent's identity is allowed by the evaluation app only
-  (`DOCWIKI_EVAL_MCP_ALLOWED_CLIENT_IDS`) and is granted `Wiki.Read` by hand (the hooks manage the
-  production agents only). Both are removed after the gates: `agents/deploy.py --eval --delete`,
-  then delete the app and the connection (turning the flag off does not delete them: provisions
-  are incremental) and set the flag back to false.
+  `evalMcpVariants` (empty).
+- Optional evaluation environment (`evalMcpVariants`, azd value `DOCWIKI_EVAL_MCP_VARIANTS`,
+  empty = off): one MCP app `ca-mcp-<name>-<token>` per variant, each built like the production
+  one (same managed identity, registry, storage settings, Entra built-in auth with the same
+  audience and token validation, external ingress) at zero replicas at rest, with the variant's
+  `DOCWIKI_MCP_*` settings added to the production environment (never the authentication ones),
+  and its own project connection `<mcpConnectionName>-<name>`. The value is the base64 of a JSON
+  array `[{"name": "<a-z0-9, at most 8>", "env": {"DOCWIKI_MCP_*": "<value>"}}]` (azd substitutes
+  values into the parameters file as raw text, so raw JSON would break it); `agents/variants.yaml`
+  declares the arms of the knowledge-access study and `scripts/eval_stack.py encode` produces the
+  value. Further settings: `evalMcpImage` (one explicit image or digest for every evaluation app;
+  empty = the production image), `evalReleaseId` (adds `DOCWIKI_MCP_PIN_RELEASE` to every
+  evaluation app, so a run reads one immutable release), `evalSmartCapacity` (when > 0, a
+  `smart-eval` deployment with the model, version and SKU of `smart`, so evaluation agents never
+  compete with production for tokens), `evalEmbedAccess` (grants the MCP identity Cognitive
+  Services User on the Foundry account so that evaluation apps can call the `embed` deployment,
+  and adds the embedding settings to their environment; the MCP identity is shared with the
+  production app, which therefore gets the permission too, though it does not use it). One output,
+  `DOCWIKI_EVAL_MCP_VARIANTS_OUT` (JSON, name -> `{url, connection}`), and
+  `DOCWIKI_EVAL_SMART_DEPLOYMENT`. Evaluation Researchers `docwiki-researcher-<name>`
+  (`agents/deploy.py --variant`) differ from the production one only by instructions, reasoning
+  effort, model deployment and MCP connection, so a feature is A/B evaluated against production
+  without touching production resources: with no variant, no evaluation resource exists and the
+  production resources are unchanged. It needs a provisioned environment (`mcpApiClientId`); the
+  agents' identities are allowed by the evaluation apps only
+  (`DOCWIKI_EVAL_MCP_ALLOWED_CLIENT_IDS`) and are granted `Wiki.Read` by
+  `scripts/eval_stack.py grant` (the hooks manage the production agents only). All of it is
+  removed after the gates: `agents/deploy.py --variant all --delete`, then delete the apps and the
+  connections (emptying the value does not delete them: provisions are incremental) and the
+  `smart-eval` deployment, and unset the settings. The operator sequence is in
+  [`agents/README.md`](../../agents/README.md).
 - Preflight script (`scripts/preflight.py`): azd/az versions, logged-in account, region allowed,
   model availability and quota in the region, deployer roles (Owner or Contributor + User Access
   Administrator; Entra Application Developer), Python and Node versions. Never switches region or
