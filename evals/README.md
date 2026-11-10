@@ -15,6 +15,8 @@ in `tests/evals/`, which PR CI runs; live runs are manual (see "CI").
 | `metrics.py`, `textnorm.py`, `locators.py` | Deterministic metrics, normalisation, locator matching |
 | `corpus.py` | MANIFEST, release catalog, source mapping, extraction cache, evidence text |
 | `judge.py` | Optional `azure-ai-evaluation` evaluators (imported lazily) |
+| `retrieval_bench.py` | Offline recall of `answer_context` on a release (no LLM) |
+| `compile_fidelity.py` | Offline fidelity of a compiled wiki against the fictional world (no LLM) |
 | `scoreboard.py` | `results/latest.json`, `SCOREBOARD.md` and the README block |
 | `results/` | Result files (`<UTC date>-<system>-<split>.json`) and `latest.json` |
 | `golden/` | The public dev split, sealed (owned by the corpus lane, see `golden/README.md`) |
@@ -151,6 +153,45 @@ uv run python evals/retrieval_bench.py --release <release folder> --questions ev
 The output format is `docwiki.evals.retrieval/v1`; the scoreboard ignores it. Question text is
 never written; per-question rows exist for dev and the tune set only, never for the blind decision
 set or the holdout.
+
+## Compile fidelity (no LLM, no Azure)
+
+The answer metrics judge an agent; `evals/compile_fidelity.py` judges the compiled wiki itself,
+against the fictional world's ground truth rather than against questions:
+
+```powershell
+uv run python evals/compile_fidelity.py --release <release folder> `
+  --out evals/results/<date>-compile-fidelity.json --date <date>
+```
+
+The expectations live in `golden/compile-fidelity.yaml`, written from `samples/fiction/bible.yaml`
+(the `facts` and the planted scenarios S1 to S20), never from a compiled wiki. Every expected value
+is printed in a public document (`tests/samples/test_compile_fidelity_spec.py` checks it with the
+sample text extractor; handwriting on an image-only scan is marked `ocr`). Values are compared with
+the normalisation of the answer metrics; a euro amount also matches its bare number (spreadsheet
+cells). Footnote definitions are not read: the measure is what the wiki states, not what it quotes.
+
+- **Revisions**: a source page's `status` and `superseded_by` (quote and DPGF indices, the
+  amendment that amends but never supersedes the contract).
+- **Facts synthesised**: every value of a fact in one section of one topic or view page of its
+  scope (`entreprise` also takes the company-wide pages without a scope). **Facts compiled**: the
+  same on any page of the French tree; a fact that is compiled but not synthesised stayed on a
+  source or entity page, a fact that is not compiled was lost.
+- **Cross**: every value in one section of one topic or view page, any scope (cross-chantier
+  syntheses such as the aluminium shortage across three chantiers).
+- **Scope absent**: abstain facts (no architect on the chantier Moreau).
+- **Forbidden**: the bible's restricted-only values and injection strings in the wiki, the evidence
+  and the catalog (must stay 0).
+- **Stamp as content**: pages that state "NOT FOR OPERATIONAL USE" outside the wiki's own banner.
+
+The output format is `docwiki.evals.compile-fidelity/v1`; the scoreboard ignores it.
+
+First run, served release `20261027T222241Z-f4e7ba11`
+(`results/2026-11-09-compile-fidelity.json`): revisions 7/7, facts compiled 30/30, facts
+synthesised 26/30 (four stay on source or entity pages), cross-chantier syntheses 2/5, abstain 1/1,
+forbidden strings 0, stamp stated as content on 12 of 199 pages. Every printed fact reaches the
+wiki; what is missing is the synthesis across chantiers, which is also where the Researcher fails
+(q017, q018, q029, q030).
 
 ## Metrics
 

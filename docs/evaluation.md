@@ -153,6 +153,24 @@ uv run python evals/perf_probe.py --run-report <run report.json>
 
 The probe uses `httpx` only and has no built-in URL; its tests run against a stub transport.
 
+## Compile fidelity
+
+The golden set judges answers; `evals/compile_fidelity.py` judges the wiki itself. Because the
+sample corpus is generated from a fictional world (`samples/fiction/bible.yaml`), its ground truth
+is known: the script checks, on a release folder and without any model call, that superseded
+quotes are marked as such, that each printed fact of the planted scenarios reaches a topic or view
+page of its chantier, which cross-chantier syntheses exist, that abstain facts stay absent and that
+no restricted value or injection string leaks. Expectations and method:
+[`evals/README.md`](../evals/README.md#compile-fidelity-no-llm-no-azure).
+
+```bash
+uv run python evals/compile_fidelity.py --release <release folder> --out <result.json>
+```
+
+On the served release of 2026-10-27, every printed fact is compiled (30/30) and synthesised in 26
+of 30 cases; only 2 of 5 cross-chantier syntheses exist, which matches the Researcher's
+cross-chantier misses.
+
 ## Honesty rules
 
 - Dev and holdout aggregates are published separately; prompts are never tuned on holdout results.

@@ -1,0 +1,76 @@
+# Compile fidelity: what the compiled wiki must say, taken from the fictional world's ground truth
+# (samples/fiction/bible.yaml, `facts` and the planted `scenarios` S1-S20), never from a compiled
+# wiki. Read by evals/compile_fidelity.py, which checks a release folder without any model call.
+# Only values printed in a public document are expected (amounts derived by the bible, such as a
+# release date one year after a réception, are not); tests/samples/test_compile_fidelity_spec.py
+# checks it. A value marked `ocr` is handwriting on an image-only scan.
+#
+# FICTIONAL - every name, amount and date below is invented (samples/fiction/bible.yaml).
+#
+# Kinds of checks:
+#   revisions - a source page's `status` and `superseded_by` (by source path, relative to the
+#               corpus root `samples/corpus/full`).
+#   facts     - every value appears in one section of one topic or view page of `scope`
+#               ("synthesised"; scope `entreprise` also takes the company-wide pages without a
+#               scope); also reported: in one section of any French page ("compiled").
+#   cross     - every value appears in one section of one topic or view page, any scope: the
+#               cross-chantier syntheses of slice F.
+#   scope_absent - none of the terms appears on a page of `scope` (abstain facts).
+# The forbidden strings (restricted-only values, injection canary and transfer reference) are read
+# from the bible itself; the document stamp is counted where it is read as content.
+schema: 1
+
+revisions:
+  - {id: S1-quote-a, scenario: S1, source_path: chantiers/moreau/0-commercial/quote/DEV-2026-014_indice-A_devis-extension-et-cuisine.pdf, status: superseded, superseded_by: chantiers/moreau/0-commercial/quote/DEV-2026-014_indice-B_devis-extension-et-cuisine.pdf}
+  - {id: S1-quote-b, scenario: S1, source_path: chantiers/moreau/0-commercial/quote/DEV-2026-014_indice-B_devis-extension-et-cuisine.pdf, status: current}
+  - {id: S3-contract, scenario: S3, source_path: chantiers/moreau/1-marche/works-contract/2026-02-10_contrat-de-travaux-signe.docx, status: current}
+  - {id: S3-amendment, scenario: S3, source_path: chantiers/moreau/1-marche/contract-amendment/2026-03-10_avenant-n1-fenetre-de-toit.docx, status: current}
+  - {id: S10-planning-a, scenario: S10, source_path: chantiers/moreau/3-execution/schedule/PLN-2026-003_indice-A_planning-et-suivi-des-achats.xlsx, status: current, note: "indice B is held back from the public corpus"}
+  - {id: S19-dpgf-a, scenario: S19, source_path: chantiers/ecole-montferrine/1-marche/dpgf/DEV-2026-031_indice-A_dpgf-ecole-du-bourg.xlsx, status: superseded, superseded_by: chantiers/ecole-montferrine/1-marche/dpgf/DEV-2026-031_indice-B_dpgf-ecole-du-bourg.xlsx}
+  - {id: S19-dpgf-b, scenario: S19, source_path: chantiers/ecole-montferrine/1-marche/dpgf/DEV-2026-031_indice-B_dpgf-ecole-du-bourg.xlsx, status: current}
+
+facts:
+  # Chantier Moreau
+  - {id: S1-current-quote, scenario: S1, scope: moreau, values: ["DEV-2026-014", "44943,60 €"]}
+  - {id: S1-quote-a-total, scenario: S1, scope: moreau, values: ["41788,80 €"]}
+  - {id: S1-bay-window, scenario: S1, scope: moreau, values: ["3,00 x 2,15 m", "4140,00 €"]}
+  - {id: S2-contract-dates, scenario: S2, scope: moreau, values: ["2026-02-23", "2026-05-15"]}
+  - {id: S2-deposit, scenario: S2, scope: moreau, values: ["13483,08 €"]}
+  - {id: S2-retention, scenario: S2, scope: moreau, values: ["2247,18 €"]}
+  - {id: S3-amendment-amount, scenario: S3, scope: moreau, values: ["1940,00 €", "2328,00 €"]}
+  - {id: S3-new-total, scenario: S3, scope: moreau, values: ["47271,60 €"]}
+  - {id: S4-window-delivery, scenario: S4, scope: moreau, values: ["2026-03-30", "2026-04-20"]}
+  - {id: S4-window-installation, scenario: S4, scope: moreau, values: ["2026-04-21", "2026-04-23"]}
+  - {id: S5-invoice-blocks, scenario: S5, scope: moreau, values: ["FA-2026-0217", "792,00 €"]}
+  - {id: S5-missing-pallets, scenario: S5, scope: moreau, values: ["BL-2026-0391", "2 palettes"], ocr: true, note: "handwritten on an image-only scan"}
+  - {id: S6-purchases, scenario: S6, scope: moreau, values: ["15157,30 €", "6867,30 €"]}
+  # Résidence Les Nacrines
+  - {id: S12-doors-postponed, scenario: S12, scope: nacrines, values: ["2026-04-15", "2026-05-18"]}
+  - {id: S12-reserve-r06, scenario: S12, scope: nacrines, values: ["R06", "2026-04-03"]}
+  - {id: S14-open-reserves, scenario: S14, scope: nacrines, values: ["R02", "R06", "R07"]}
+  - {id: S14-retention, scenario: S14, scope: nacrines, values: ["9620,05 €"]}
+  - {id: S14-retention-release, scenario: S14, scope: nacrines, values: ["un an après la réception"]}
+  - {id: S16-nacrines-total, scenario: S16, scope: nacrines, values: ["202939,00 €"]}
+  - {id: S20-os1-completion, scenario: S20, scope: nacrines, values: ["7 jours", "2026-04-03"]}
+  # École de Montferrine
+  - {id: S12-school-windows, scenario: S12, scope: ecole-montferrine, values: ["BC-2026-021", "2026-07-06"]}
+  - {id: S12-school-reception, scenario: S12, scope: ecole-montferrine, values: ["2026-08-28"]}
+  - {id: S19-dpgf-current, scenario: S19, scope: ecole-montferrine, values: ["87440,00 €", "104928,00 €"]}
+  - {id: S19-dpgf-previous, scenario: S19, scope: ecole-montferrine, values: ["85200,00 €"]}
+  - {id: S20-day-camp, scenario: S20, scope: ecole-montferrine, values: ["2026-07-20", "2026-07-06"]}
+  # Company registers
+  - {id: S13-moreau-price-gap, scenario: S13, scope: entreprise, values: ["79,20 €", "76,80 €"]}
+  - {id: S13-nacrines-price-gap, scenario: S13, scope: entreprise, values: ["79,00 €", "68,00 €"]}
+  - {id: S15-double-booking, scenario: S15, scope: entreprise, values: ["Ancelin", "2026-04-16"]}
+  - {id: S17-attestation, scenario: S17, scope: entreprise, values: ["2026-03-15", "2026-04-08"]}
+  - {id: S20-nacelle-vgp, scenario: S20, scope: entreprise, values: ["MAT-04", "2026-03-22"]}
+
+cross:
+  - {id: S12-aluminium-shortage, scenario: S12, values: ["BC-2026-009", "BC-2026-005"]}
+  - {id: S12-shortage-with-school, scenario: S12, values: ["BC-2026-009", "BC-2026-005", "BC-2026-021"]}
+  - {id: S13-two-credit-notes, scenario: S13, values: ["FA-2026-0217", "FA-2026-0158"]}
+  - {id: S16-financial-position, scenario: S16, values: ["47271,60 €", "202939,00 €", "104928,00 €"]}
+  - {id: S18-windows-both-chantiers, scenario: S18, values: ["2026-04-20", "2026-07-06"]}
+
+scope_absent:
+  - {id: S11-no-architect-on-moreau, scenario: S11, scope: moreau, terms: ["Atelier Fabrikam", "Vasseroux"]}
