@@ -191,13 +191,14 @@ class DenseLane:
             if result.model != self.metadata["model"] or result.dimensions != info.dimensions:
                 raise ValueError("query embedding model/dimensions mismatch")
             vector = np.asarray(result.vectors, dtype=np.float32)
-            if (
-                vector.shape != (1, info.dimensions)
-                or not np.isfinite(vector).all()
-                or not np.allclose(np.linalg.norm(vector, axis=1), 1.0, atol=1e-5)
-            ):
-                raise ValueError("query embedding must be one finite L2-normalised vector")
-            return vector[0]
+            if vector.shape != (1, info.dimensions) or not np.isfinite(vector).all():
+                raise ValueError("query embedding must be one finite vector")
+            norm = float(np.linalg.norm(vector[0]))
+            if norm == 0.0:
+                raise ValueError("query embedding must not be the zero vector")
+            # Same rule as the artifact rows (scripts/build_eval_vectors.py): cosine on unit
+            # vectors. Shortened text-embedding-3 vectors are not exactly unit length.
+            return vector[0] / norm
         finally:
             # Cancellation of the request must not turn into an unbounded SDK close.
             async with asyncio.timeout(min(self.timeout_s, 1.0)):

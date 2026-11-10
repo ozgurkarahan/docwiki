@@ -8,6 +8,7 @@ import importlib.util
 import json
 import threading
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -613,3 +614,29 @@ async def test_dense_language_tree_mirrors_fallback_and_raw_blocks(
     )
     assert any(h["page_id"] == PLAN_A and h["kind"] == "page-section" for h in fr)
     assert any(h["kind"] == "source-block" for h in fr)
+
+
+class _ShortenedEmbeddingClient(FakeEmbeddingClient):
+    """Like a shortened text-embedding-3 vector: right direction, not exactly unit length."""
+
+    async def embed(self, *args: Any, **kwargs: Any) -> Any:
+        result = await super().embed(*args, **kwargs)
+        return replace(result, vectors=[[x * 0.97 for x in vector] for vector in result.vectors])
+
+
+def test_query_vector_is_normalised_like_the_artifact_rows(
+    source: FolderReleaseSource, vectors: Path
+) -> None:
+    snap = source.current()
+    lane = DenseLane(
+        snap,
+        source,
+        McpConfig(vectors=str(vectors)),
+        lambda: _ShortenedEmbeddingClient(dimensions=4),
+    )
+    vector = lane.query("menuiseries")
+    assert abs(float(np.linalg.norm(vector)) - 1.0) < 1e-6
+    reference = DenseLane(
+        snap, source, McpConfig(vectors=str(vectors)), lambda: FakeEmbeddingClient(dimensions=4)
+    ).query("menuiseries")
+    assert np.allclose(vector, reference, atol=1e-6)
