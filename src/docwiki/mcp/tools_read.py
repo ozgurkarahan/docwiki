@@ -10,6 +10,7 @@ provenance; compiled wiki text comes with the citations it carries.
 from __future__ import annotations
 
 import difflib
+import logging
 import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
@@ -49,6 +50,8 @@ __all__ = [
 
 
 ToolInputError = ToolFailure
+
+logger = logging.getLogger("docwiki.mcp")
 """Anticipated, agent-correctable failure (returned to the agent as ``ok: false``)."""
 
 
@@ -659,6 +662,7 @@ class ReadTools:
             fused = fuse(lexical[:LANE_DEPTH], dense)
             return self._dedupe_context(snap, fused) if context else fused
         except Exception as exc:
+            logger.warning("dense lane failed: %s: %s", type(exc).__name__, str(exc)[:200])
             raise ToolInputError(
                 "hybrid retrieval unavailable: verify the vector artifact and embedding deployment",
                 code="unavailable",
