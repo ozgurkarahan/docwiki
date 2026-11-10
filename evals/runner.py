@@ -58,9 +58,9 @@ from evals.metrics import (
 )
 from evals.questions import GoldenQuestion, QuestionSet, QuestionSetError, load_questions
 from evals.records import Answer, Citation
+from evals.registry import get_system, register_system, system_names
 from evals.scoreboard import format_metric
 from evals.systems import (
-    SYSTEMS,
     BaselineLongContextSystem,
     BaselineRagSystem,
     EvalSystem,
@@ -87,8 +87,7 @@ PUBLIC_SPLIT = "dev"
 """The only split whose per-question records may be written to the repository."""
 PRIVATE_FOLDERS = ("evals/holdout", "private", ".local")
 """Git-ignored folders of the repository where private outputs may be written."""
-BASELINES = ("baseline-rag", "baseline-long-context")
-"""Systems that index the documents of ``--scope`` (the Researcher answers over its release)."""
+_RUN_LABEL_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,30}$")
 MAX_CONTEXT_CHARS = 30_000
 _SPLIT_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
 _AGENT_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
@@ -116,6 +115,7 @@ class RunOptions:
     budget_tokens: int = 120_000
     concurrency: int = 1
     judge: bool = False
+    run_label: str | None = None
     env: Mapping[str, str] = field(default_factory=lambda: dict(os.environ))
 
     @property
@@ -174,7 +174,7 @@ def _check_split_labels(options: RunOptions, questions: QuestionSet) -> None:
 def _check_documents(options: RunOptions) -> None:
     """The baselines index the documents of the selected scope: none at all is an error, reported
     before any extraction or model call."""
-    if options.system in BASELINES:
+    if get_system(options.system).indexes_documents:
         CorpusManifest.load(options.corpus).select(options.scope, options.audience)
 
 
@@ -184,9 +184,20 @@ def _display_path(path: Path) -> str:
     return relative if relative is not None else path.name
 
 
-def result_name(system: str, split: str, day: str, *, limit: int | None, complete: bool) -> str:
+def result_name(
+    system: str,
+    split: str,
+    day: str,
+    *,
+    limit: int | None,
+    complete: bool,
+    run_label: str | None = None,
+) -> str:
+    """``<day>-<system>-<split>[-limit<N>][-<run label>].json``: a run label (``r1``, ``r2``...)
+    keeps the repetitions of one day apart."""
     suffix = f"-limit{limit}" if limit and not complete else ""
-    return f"{day}-{system}-{split}{suffix}.json"
+    label = f"-{run_label}" if run_label else ""
+    return f"{day}-{system}-{split}{suffix}{label}.json"
 
 
 def public_view(result: Mapping[str, Any]) -> dict[str, Any]:
@@ -257,24 +268,35 @@ def scrub(text: str | None, *, limit: int = 300) -> str | None:
 
 
 def build_system(options: RunOptions, corpus: CorpusContext) -> EvalSystem:
-    """The system under test. The baselines index the documents of ``options.scope`` that the
-    audience may see; an empty selection raises ``ValueError``."""
-    if options.system == "docwiki-researcher":
-        return ResearcherSystem(agent=options.agent, env=options.env)
-    if options.system == "baseline-rag":
-        return BaselineRagSystem(
-            docs=corpus.docs,
-            files=corpus.manifest.select(options.scope, options.audience),
-            top_k=options.top_k,
-            chunk_tokens=options.chunk_tokens,
-        )
-    if options.system == "baseline-long-context":
-        return BaselineLongContextSystem(
-            docs=corpus.docs,
-            files=corpus.manifest.select(options.scope, options.audience),
-            budget_tokens=options.budget_tokens,
-        )
-    raise ValueError(f"unknown system {options.system!r}; use one of {', '.join(SYSTEMS)}")
+    """The system under test (``evals/registry.py``). Systems that index documents use those of
+    ``options.scope`` that the audience may see; an empty selection raises ``ValueError``."""
+    return get_system(options.system).factory(options, corpus)
+
+
+def _researcher(options: RunOptions, corpus: CorpusContext) -> EvalSystem:
+    return ResearcherSystem(agent=options.agent, env=options.env)
+
+
+def _baseline_rag(options: RunOptions, corpus: CorpusContext) -> EvalSystem:
+    return BaselineRagSystem(
+        docs=corpus.docs,
+        files=corpus.manifest.select(options.scope, options.audience),
+        top_k=options.top_k,
+        chunk_tokens=options.chunk_tokens,
+    )
+
+
+def _baseline_long_context(options: RunOptions, corpus: CorpusContext) -> EvalSystem:
+    return BaselineLongContextSystem(
+        docs=corpus.docs,
+        files=corpus.manifest.select(options.scope, options.audience),
+        budget_tokens=options.budget_tokens,
+    )
+
+
+register_system("docwiki-researcher", _researcher)
+register_system("baseline-rag", _baseline_rag, indexes_documents=True)
+register_system("baseline-long-context", _baseline_long_context, indexes_documents=True)
 
 
 # ------------------------------------------------------------------------------- scoring
@@ -529,6 +551,7 @@ async def run_evaluation(
             "complete": questions.complete,
             "limit": options.limit,
             "concurrency": options.concurrency,
+            "label": options.run_label,
         },
         "questions_file": {
             "file": _display_path(options.questions),
@@ -539,7 +562,7 @@ async def run_evaluation(
         "config": {
             "system": system_config,
             "audience": options.audience,
-            "scope": options.scope if system.name in BASELINES else None,
+            "scope": options.scope if get_system(options.system).indexes_documents else None,
             "extract_mode": options.extract_mode,
             "catalog": catalog is not None,
             "judge": options.judge,
@@ -586,7 +609,7 @@ def _parser() -> argparse.ArgumentParser:
         prog="evals/run.py",
         description="Run a DocWiki evaluation (docs/spec/evals.md).",
     )
-    parser.add_argument("--system", required=True, choices=SYSTEMS)
+    parser.add_argument("--system", required=True, choices=system_names())
     parser.add_argument("--questions", required=True, type=Path, help="golden set (JSONL)")
     parser.add_argument(
         "--agent",
@@ -625,6 +648,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--chunk-tokens", type=int, default=800)
     parser.add_argument("--budget-tokens", type=int, default=120_000)
     parser.add_argument("--concurrency", type=int, default=1)
+    parser.add_argument(
+        "--run-label",
+        help="repetition label added to the result file name (r1, r2...): same-day runs of one "
+        "system and split do not overwrite each other",
+    )
     parser.add_argument("--judge", action="store_true", help="also run azure-ai-evaluation")
     return parser
 
@@ -663,6 +691,9 @@ async def _main(options: RunOptions) -> int:
             "--agent must be a Foundry agent name (lower-case letters, digits, '-')",
             file=sys.stderr,
         )
+        return 2
+    if options.run_label is not None and not _RUN_LABEL_RE.match(options.run_label):
+        print("--run-label must be lower-case letters, digits and '-'", file=sys.stderr)
         return 2
     if options.agent != DEFAULT_AGENT and options.system != "docwiki-researcher":
         print("--agent only applies to --system docwiki-researcher", file=sys.stderr)
@@ -721,6 +752,7 @@ async def _main(options: RunOptions) -> int:
         result["run"]["date"],
         limit=options.limit,
         complete=questions.complete,
+        run_label=options.run_label,
     )
     public_path, private_path = write_results(
         result, out=options.out, name=name, private_out=options.private_out
@@ -757,6 +789,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         budget_tokens=args.budget_tokens,
         concurrency=args.concurrency,
         judge=args.judge,
+        run_label=args.run_label,
     )
     try:
         return asyncio.run(_main(options))
