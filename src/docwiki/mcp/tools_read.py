@@ -108,6 +108,16 @@ ANSWER_CONTEXT_EMPTY_HINT = (
     "No hits: try other words or the glossary; if the wiki has no answer, say 'Not found in the "
     "wiki.'"
 )
+RAW_KIND = "source-block"
+"""Search rows of the documents' extracted blocks (the only rows of a ``raw`` ablation server)."""
+RAW_ONLY_HINT = (
+    "Answer from these extracted document blocks when they suffice, citing their citations. For "
+    "more: search for other blocks, query_table for numbers, get_evidence to read a block."
+)
+RAW_ONLY_MESSAGE = (
+    "{tool} is switched off on this evaluation server: it serves only the documents' extracted "
+    "blocks, without the compiled wiki. Use answer_context, search, get_evidence or query_table."
+)
 
 
 @dataclass
@@ -165,6 +175,19 @@ class ReadTools:
     @property
     def max_chars(self) -> int:
         return self.config.max_chars
+
+    @property
+    def raw_only(self) -> bool:
+        """Evaluation ablation: the compiled wiki is hidden, only extracted blocks are served."""
+        return self.config.wiki_ablation == "raw"
+
+    def _wiki_tool(self, tool: str) -> None:
+        if self.raw_only:
+            raise ToolInputError(
+                RAW_ONLY_MESSAGE.format(tool=tool),
+                code="not_found",
+                details={"wiki_ablation": "raw"},
+            )
 
     def snapshot(self) -> Snapshot:
         return self.source.current()
@@ -456,6 +479,12 @@ class ReadTools:
         snap = self.snapshot()
         if not query.strip():
             raise ToolInputError("query must not be empty")
+        if self.raw_only:
+            if (kinds and RAW_KIND not in kinds) or types or entity or topic:
+                raise ToolInputError(
+                    RAW_ONLY_MESSAGE.format(tool="search by wiki page kind, type, entity or topic")
+                )
+            kinds = [RAW_KIND]
         scope = self._within(snap, within)
         language = self._lang(snap, lang)
         if topic and not topic.startswith("topic:"):
@@ -518,7 +547,7 @@ class ReadTools:
         language = getattr(hit, "lang", None) or (entry.lang if entry is not None else None)
         if language:
             row["lang"] = language
-        if entry is not None and entry.status:
+        if entry is not None and entry.status and not self.raw_only:
             row["status"] = entry.status
         if entry is not None and entry.scope:
             row["scope"] = entry.scope
@@ -561,7 +590,11 @@ class ReadTools:
         """Search hits for the question, one per section or per source locator, best first,
         without content above the release's audience."""
         raw = snap.search.search(
-            question, limit=min(max(wanted * 3, 20), 100), within=scope, lang=language
+            question,
+            kinds=[RAW_KIND] if self.raw_only else None,
+            limit=min(max(wanted * 3, 20), 100),
+            within=scope,
+            lang=language,
         )
         by_path, by_id = self._by_path(snap), self._by_id(snap)
         seen: set[tuple[str, str]] = set()
@@ -717,7 +750,7 @@ class ReadTools:
             return rows
 
         context: dict[str, Any] = {}
-        if offset == 0:
+        if offset == 0 and not self.raw_only:
             home = self._by_id(snap, language).get("index:home")
             if home is not None and self._allowed(snap, home.sensitivity):
                 context["home_index"] = self._bounded_page(snap, home, CONTEXT_INDEX_CHARS, scope)
@@ -747,7 +780,9 @@ class ReadTools:
                 **context,
                 "truncated": truncated,
                 "next_offset": offset + len(items) if truncated or more else None,
-                "hint": ANSWER_CONTEXT_HINT if items else ANSWER_CONTEXT_EMPTY_HINT,
+                "hint": (RAW_ONLY_HINT if self.raw_only else ANSWER_CONTEXT_HINT)
+                if items
+                else ANSWER_CONTEXT_EMPTY_HINT,
             }
 
         # shorten the section texts first; drop hits only when even the shortest do not fit
@@ -762,6 +797,7 @@ class ReadTools:
     def read_page(
         self, page: str, section: str | None = None, offset: int = 0, lang: str | None = None
     ) -> str:
+        self._wiki_tool("read_page")
         snap = self.snapshot()
         entry, anchor = self._resolve_page(snap, page, self._lang(snap, lang))
         section = section or anchor
@@ -840,6 +876,7 @@ class ReadTools:
         within: str | None = None,
         lang: str | None = None,
     ) -> str:
+        self._wiki_tool("get_index")
         snap = self.snapshot()
         wanted = (scope or "home").strip().strip("/").lower().removeprefix("index:")
         language = self._lang(snap, lang)
@@ -891,6 +928,7 @@ class ReadTools:
         return fit_text(body, offset, build, self.max_chars)
 
     def get_links(self, page: str, offset: int = 0) -> str:
+        self._wiki_tool("get_links")
         snap = self.snapshot()
         entry, _ = self._resolve_page(snap, page)
         by_id = self._by_id(snap)
@@ -976,6 +1014,7 @@ class ReadTools:
         return snap.cached("glossary-entries", build)
 
     def glossary(self, term: str | None = None, offset: int = 0) -> str:
+        self._wiki_tool("glossary")
         snap = self.snapshot()
         entries = self._glossary_entries(snap)
         matched: list[dict[str, Any]]
@@ -1189,6 +1228,7 @@ class ReadTools:
         return out
 
     def get_skill(self, name: str, offset: int = 0) -> str:
+        self._wiki_tool("get_skill")
         snap = self.snapshot()
         skills = {skill.name: skill for skill in snap.reader.list_skills()}
         wanted = name.strip()
@@ -1216,6 +1256,7 @@ class ReadTools:
         return fit_text(text, offset, build, self.max_chars)
 
     def list_skills(self) -> str:
+        self._wiki_tool("list_skills")
         snap = self.snapshot()
         skills = [
             {"name": skill.name, "description": skill.description, "path": skill.path}
@@ -1268,6 +1309,7 @@ class ReadTools:
         return snap.cached("log-entries", build)
 
     def recent_changes(self, since: date | None = None, limit: int = 20, offset: int = 0) -> str:
+        self._wiki_tool("recent_changes")
         snap = self.snapshot()
         entries = self._log_entries(snap)
         if since is not None:

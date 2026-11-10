@@ -105,7 +105,7 @@ param mcpMinReplicas int = 0
 @description('Bearer-token validation by the MCP server behind built-in auth (DOCWIKI_MCP_TOKEN_VALIDATION). off trusts the platform principal header alone: only for a platform that does not forward the Authorization header (src/docwiki/mcp/README.md).')
 param mcpTokenValidation string = 'required'
 
-@description('Deploy the evaluation-only MCP app (ca-mcp-eval-<token>) and its project connection (<mcpConnectionName>-eval) beside the production ones: same image, release, identity and Entra built-in auth, zero replicas at rest, with the feature under evaluation switched on (DOCWIKI_ANSWER_CONTEXT_COVERAGE=on). Needs a provisioned environment (mcpApiClientId). Turning it off does not delete them: remove them after the gates (docs/spec/infra-ops-security.md section 1).')
+@description('Deploy the evaluation-only MCP app (ca-mcp-eval-<token>) and its project connection (<mcpConnectionName>-eval) beside the production ones: same image, release, identity and Entra built-in auth, zero replicas at rest, with the feature under evaluation (DOCWIKI_EVAL_MCP_WIKI_ABLATION). Needs a provisioned environment (mcpApiClientId). Turning it off does not delete them: remove them after the gates (docs/spec/infra-ops-security.md section 1).')
 param enableEvalMcp bool = false
 
 @description('Deploy the optional portal (Entra sign-in, or no sign-in for a public-audience build: portalAccess).')
@@ -203,6 +203,9 @@ param mcpAllowedClientIds string = ''
 
 @description('Comma-separated client IDs of the evaluation agent identities (docwiki-researcher-eval), allowed only by the evaluation MCP app in addition to mcpAllowedClientIds (DOCWIKI_EVAL_MCP_ALLOWED_CLIENT_IDS, set by the operator; agents/README.md).')
 param evalMcpAllowedClientIds string = ''
+
+@description('Feature under evaluation on the evaluation MCP app only: raw hides the compiled wiki and serves only the documents\' extracted blocks, their evidence and tables (DOCWIKI_MCP_WIKI_ABLATION, the agent-without-the-wiki arm of an ablation); any other value is off (DOCWIKI_EVAL_MCP_WIKI_ABLATION).')
+param evalMcpWikiAblation string = 'off'
 
 @minLength(3)
 @maxLength(33)
@@ -985,10 +988,10 @@ module mcpEvalApp 'modules/container-app.bicep' = if (evalMcpEnabled) {
             }
           ],
       [
-        // F3 (coverage of every chantier in answer_context), evaluated before production.
+        // The feature under evaluation: the agent without the wiki (src/docwiki/mcp/README.md).
         {
-          name: 'DOCWIKI_ANSWER_CONTEXT_COVERAGE'
-          value: 'on'
+          name: 'DOCWIKI_MCP_WIKI_ABLATION'
+          value: evalMcpWikiAblation == 'raw' ? 'raw' : 'off'
         }
       ]
     )

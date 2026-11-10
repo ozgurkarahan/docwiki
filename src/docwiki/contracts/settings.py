@@ -53,6 +53,7 @@ class SettingsKeys:
     MCP_AUDIENCE = "DOCWIKI_MCP_AUDIENCE"  # accepted token audiences (comma-separated)
     MCP_ALLOWED_CLIENT_IDS = "DOCWIKI_MCP_ALLOWED_CLIENT_IDS"  # caller azp/appid allowlist
     MCP_TOKEN_VALIDATION = "DOCWIKI_MCP_TOKEN_VALIDATION"  # required | off (easyauth mode)
+    MCP_WIKI_ABLATION = "DOCWIKI_MCP_WIKI_ABLATION"  # off | raw (evaluation: source blocks only)
     RESEARCH_MAX_TOOL_CALLS = "DOCWIKI_RESEARCH_MAX_TOOL_CALLS"
     QUERY_TABLE_MAX_ROWS = "DOCWIKI_QUERY_TABLE_MAX_ROWS"
     DENYLIST = "DOCWIKI_DENYLIST"  # leak-guard deny-list path, outside the repository
@@ -87,6 +88,7 @@ SETTINGS_DEFAULTS: dict[str, str] = {
     SettingsKeys.MCP_MAX_CHARS: "12000",
     SettingsKeys.MCP_POINTER_TTL_SECONDS: "30",
     SettingsKeys.MCP_TOKEN_VALIDATION: "required",
+    SettingsKeys.MCP_WIKI_ABLATION: "off",
     SettingsKeys.RESEARCH_MAX_TOOL_CALLS: "12",
     SettingsKeys.QUERY_TABLE_MAX_ROWS: "200",
 }
