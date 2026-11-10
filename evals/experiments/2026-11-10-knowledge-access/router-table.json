@@ -1,0 +1,168 @@
+{
+  "format": "docwiki.evals.router-table/v1",
+  "prompt_version": "knowledge-access-router-v1",
+  "routes": {
+    "aggregate-or-cross": "W2",
+    "lookup": "A2",
+    "revision-or-absent": "R2"
+  },
+  "classes": [
+    "aggregate-or-cross",
+    "lookup",
+    "revision-or-absent"
+  ],
+  "fitted_on": {
+    "classifications": {
+      "path": "classify-dev.json",
+      "sha256": "dac844fa470ea73c53764a96aded27d32bbc94e65b1e24bfb4fc5babbdbf5fe5"
+    },
+    "arms": {
+      "A0": [
+        {
+          "path": "2026-11-10-baseline-rag-dev-r1.json",
+          "sha256": "fde83bf7957d16c792c5566de64ec70989932cef622dee2f7317455d1e02a028"
+        },
+        {
+          "path": "2026-11-10-baseline-rag-dev-r2.json",
+          "sha256": "6efb2be8bccb28072abc7aa496f4b0c5ec739667f0dca70e7c11ecedf4bbf9d1"
+        },
+        {
+          "path": "2026-11-10-baseline-rag-dev-r3.json",
+          "sha256": "2f2ba66df3c5549db8732d772a502213435ce5963719b72eace4912ff807b5b8"
+        }
+      ],
+      "A1": [
+        {
+          "path": "2026-11-10-rag-plus-dev-r1.json",
+          "sha256": "078c55cc5b7c43cf66412e646a75817fe16db6c1ce4fcba5cdbb4c7e4aad79a6"
+        },
+        {
+          "path": "2026-11-10-rag-plus-dev-r2.json",
+          "sha256": "929e33d3bf236c73f123765384add3dffe4f89f7577a44c0ef1ba1ca0a5560c0"
+        },
+        {
+          "path": "2026-11-10-rag-plus-dev-r3.json",
+          "sha256": "d411c4c1bb7b74c652064487d927d4648c806ddec309faf9ac430f1c5cbf4add"
+        }
+      ],
+      "A2": [
+        {
+          "path": "2026-11-10-baseline-long-context-dev-r1.json",
+          "sha256": "f195a2457febbd9e3f2f0efdd3abcf9187426db27d3cf73ec3838833eef1909f"
+        },
+        {
+          "path": "2026-11-10-baseline-long-context-dev-r2.json",
+          "sha256": "bcab5e3c8acb24fed65c6cd336226cedae088fda8e42c2d9957834d12c00152e"
+        },
+        {
+          "path": "2026-11-10-baseline-long-context-dev-r3.json",
+          "sha256": "cbb121b2a6705da4e72c7040e8ffb3261d02e4a1bf53f84b488bc8abd6e3e657"
+        }
+      ],
+      "A3": [
+        {
+          "path": "2026-11-10-wiki-long-context-dev-r1.json",
+          "sha256": "8a8479415b30aeddb878e7ece440fc15009ac334d832539829d84da70fc54d75"
+        },
+        {
+          "path": "2026-11-10-wiki-long-context-dev-r2.json",
+          "sha256": "a2b314c61b6ccdd5f29bfef572ecdb1ee3cf7ce74c1641adca81964be516519d"
+        },
+        {
+          "path": "2026-11-10-wiki-long-context-dev-r3.json",
+          "sha256": "d6e470a280ee6450b19927495398ae9eb047737ed2452c3693624f8b9014ff0e"
+        }
+      ],
+      "A8": [
+        {
+          "path": "2026-11-10-foundry-iq-dev-r1.json",
+          "sha256": "2df7665789feacf24d2507d152f71cc0cd4f37783c2f47296305f8508a1f136e"
+        },
+        {
+          "path": "2026-11-10-foundry-iq-dev-r2.json",
+          "sha256": "d70c499a8eb32eb0e714cb471103303a4a4220491619a0c4c68556c793ec0366"
+        },
+        {
+          "path": "2026-11-10-foundry-iq-dev-r3.json",
+          "sha256": "95b33f5a750a1907840b618d18107fbeee3f8b840a4e247b455e81e438cc69ab"
+        }
+      ],
+      "R1": [
+        {
+          "path": "2026-11-10-docwiki-researcher-r1-dev-r1.json",
+          "sha256": "c7056dbc0218d4e39872a69e7ff3db75b9ef20958ac570f1cfb21c43c8d5229b"
+        },
+        {
+          "path": "2026-11-10-docwiki-researcher-r1-dev-r2.json",
+          "sha256": "024d48aa621ff32c1977be8d2d3952cf2cd5a11590af1b1c474d7d8e25f3d089"
+        },
+        {
+          "path": "2026-11-10-docwiki-researcher-r1-dev-r3.json",
+          "sha256": "2f1f046e94b7d480fdc0293975256d0b2997943bf3b0cefc2cc6daf88b8daebd"
+        }
+      ],
+      "R2": [
+        {
+          "path": "2026-11-10-docwiki-researcher-r2-dev-r1.json",
+          "sha256": "2e9d5d5caef7f6538ac19395572ce566c2b695606ecbccf3221381357a920c94"
+        },
+        {
+          "path": "2026-11-10-docwiki-researcher-r2-dev-r2.json",
+          "sha256": "dbcd1fd562f2b5c2af8d09d70e5f4d8f43dfb22a127e86e9464c0a7e978c02de"
+        },
+        {
+          "path": "2026-11-10-docwiki-researcher-r2-dev-r3.json",
+          "sha256": "c51324f7b8ceec4562996d48fca83f6207e0a04889975198456dc12a08614112"
+        }
+      ],
+      "W1": [
+        {
+          "path": "2026-11-10-docwiki-researcher-w1-dev-r1.json",
+          "sha256": "833aa7ccf83227ea7c34d8b73e97f61a1d398e35601eda064cd4fcecd1ac22e0"
+        },
+        {
+          "path": "2026-11-10-docwiki-researcher-w1-dev-r2.json",
+          "sha256": "c9b6167c64c5cc54833073477c08f6fae1238dc6cea505a838f9826d2555033c"
+        },
+        {
+          "path": "2026-11-10-docwiki-researcher-w1-dev-r3.json",
+          "sha256": "06c84aebf55f3e53ae16c83510bc154b58e4b1c7705100b6c93933a1cf0aeb6b"
+        }
+      ],
+      "W2": [
+        {
+          "path": "2026-11-10-docwiki-researcher-w2-dev-r1.json",
+          "sha256": "3105903bd555c8967437bbb6b1f6928daceac713205162ac956092a6a14d9837"
+        },
+        {
+          "path": "2026-11-10-docwiki-researcher-w2-dev-r2.json",
+          "sha256": "2a558761b0b8bfef0e489ca9107c19e9f29fc56b8b22dfa7cc311857952e663e"
+        },
+        {
+          "path": "2026-11-10-docwiki-researcher-w2-dev-r3.json",
+          "sha256": "2fa8792f7fd8792523553fd76181c8d224457094904ed33507cbd24e81c9bda3"
+        }
+      ],
+      "W2H": [
+        {
+          "path": "2026-11-10-docwiki-researcher-w2high-dev-r1.json",
+          "sha256": "fed3be875cb98b1b80d8b2f7957d3f2da2dffc0977f5e0e8e67617ba31ee2da5"
+        },
+        {
+          "path": "2026-11-10-docwiki-researcher-w2high-dev-r2.json",
+          "sha256": "64a336a3559376dd8e5ec06cee0aee27925137a8a79b0d187923c5493e0a39a1"
+        },
+        {
+          "path": "2026-11-10-docwiki-researcher-w2high-dev-r3.json",
+          "sha256": "4ab0ae76466fff7998e6fd1dce71abfa159165fec11784f813acc398e02aa560"
+        }
+      ]
+    },
+    "hash": "0552d749e311ba9837ad6eb16872133dd233efd236a0185b70603759e0051ff2"
+  },
+  "dev_estimate": {
+    "questions": 32,
+    "loo_accuracy": 0.78125,
+    "loo_cost_per_question_usd": 0.12669
+  }
+}

@@ -115,3 +115,21 @@ commit; the blind results are under embargo until every arm has run.
   results. Blind classes (counts only): aggregate-or-cross 40, lookup 52, revision-or-absent 28.
 - **Blind runs**: 3 repetitions of every arm (`--run-label r1..r3`), per-question details written
   outside the repository; only aggregates are committed until the blind file is published.
+## Freeze addendum, part 2 (2026-11-10, before any blind accuracy is read)
+
+Written after the dev runs of every arm and while the blind runs are in progress; the builder has
+read only the error counts of the blind result files, never a score.
+
+- **Router table** fitted on dev only (`evals/router.py fit`, three repetitions of every arm,
+  leave-one-out estimate 78.1 % on dev): `aggregate-or-cross` -> W2, `lookup` -> A2,
+  `revision-or-absent` -> R2. Frozen file:
+  [`2026-11-10-knowledge-access/router-table.json`](2026-11-10-knowledge-access/router-table.json)
+  (hash of its inputs `0552d749...51ff2`). The oracle router (best arm per question, an upper
+  bound) is reported next to it, labelled as such.
+- **Infrastructure failures are re-asked.** Some blind questions failed before any answer because
+  the local Azure CLI credential timed out under parallel load (`CredentialUnavailableError`,
+  `LlmAuthError` on token acquisition): 20 of the first 5,400 planned answers. Such questions
+  (credential, HTTP 429 after the retries, HTTP 5xx, network timeouts; never a wrong or empty
+  answer) are asked again once with the same frozen arm, and the new record replaces the failed
+  one; the count of re-asked questions per arm is published. A question that fails again is
+  scored 0.
