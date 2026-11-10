@@ -387,7 +387,7 @@ async def test_embedding_failure_is_unavailable_through_mcp(
     monkeypatch.setattr(FoundryEmbeddingClient, "describe", describe)
     monkeypatch.setattr(FoundryEmbeddingClient, failure_method, fail)
     # Avoid live client construction; this still exercises the server's real tool wrappers.
-    monkeypatch.setattr(FoundryEmbeddingClient, "__init__", lambda self: None)
+    monkeypatch.setattr(FoundryEmbeddingClient, "__init__", lambda self, *args, **kwargs: None)
     monkeypatch.setattr(FoundryEmbeddingClient, "aclose", FakeEmbeddingClient.aclose)
     server = build_server(source, config=McpConfig(dense=True, vectors=str(vectors)))
     async with Client(server) as client:
@@ -406,7 +406,7 @@ async def test_dense_async_direct_calls_cache_and_threaded_mcp(
     made: list[FakeEmbeddingClient] = []
     threads: list[int] = []
 
-    def factory() -> FakeEmbeddingClient:
+    def factory(*args: Any, **kwargs: Any) -> FakeEmbeddingClient:
         threads.append(threading.get_ident())
         client = FakeEmbeddingClient(dimensions=4)
         made.append(client)

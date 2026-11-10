@@ -66,10 +66,12 @@ ENV: dict[str, str] = {
 
 def _agents_dir(tmp_path: Path, *, v2: bool = True) -> Path:
     agents_dir = copy_agents(tmp_path)
+    path = agents_dir / "variants" / "v2" / "instructions.md"
     if v2:
-        path = tmp_path / "agents" / "variants" / "v2" / "instructions.md"
-        path.parent.mkdir(parents=True)
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(V2_TEXT, encoding="utf-8")
+    else:
+        path.unlink(missing_ok=True)
     return agents_dir
 
 

@@ -12,7 +12,7 @@ import json
 import threading
 from collections import OrderedDict
 from collections.abc import Callable, Coroutine, Sequence
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -110,6 +110,18 @@ def _artifact_bytes(source: ReleaseSource, config: McpConfig) -> bytes:
     return Path(location).read_bytes()
 
 
+def query_embedding_client(timeout_s: float) -> EmbeddingClient:
+    """Interactive queries fail fast instead of sleeping through a batch-oriented Retry-After."""
+    from docwiki.llm.foundry_embeddings import FoundryEmbeddingClient
+    from docwiki.llm.retry import RetryPolicy
+    from docwiki.llm.settings import LlmSettings
+
+    settings = LlmSettings.from_env().model_copy(update={"timeout_s": timeout_s})
+    return FoundryEmbeddingClient(
+        settings, retry_policy=RetryPolicy(max_retries=0, max_retry_after_s=0)
+    )
+
+
 class DenseLane:
     """A validated matrix and bounded, thread-safe query cache for one served snapshot."""
 
@@ -122,8 +134,10 @@ class DenseLane:
     ) -> None:
         self.snap = snap
         self.client_factory = client_factory
+        self.timeout_s = config.dense_timeout_s
         self._query_lock = threading.Lock()
         self._queries: OrderedDict[str, np.ndarray] = OrderedDict()
+        self._inflight: dict[str, Future[np.ndarray]] = {}
         with np.load(io.BytesIO(_artifact_bytes(source, config)), allow_pickle=False) as artifact:
             self.metadata = json.loads(str(artifact["metadata"].item()))
             keys = json.loads(str(artifact["rows"].item()))
@@ -160,6 +174,10 @@ class DenseLane:
         self.sensitivity = {row["rowid"]: row["sensitivity"] for row in rows}
 
     async def _embed(self, text: str) -> np.ndarray:
+        async with asyncio.timeout(self.timeout_s):
+            return await self._embed_with_client(text)
+
+    async def _embed_with_client(self, text: str) -> np.ndarray:
         client = self.client_factory()
         try:
             info = await client.describe()
@@ -181,17 +199,36 @@ class DenseLane:
                 raise ValueError("query embedding must be one finite L2-normalised vector")
             return vector[0]
         finally:
-            await client.aclose()
+            # Cancellation of the request must not turn into an unbounded SDK close.
+            async with asyncio.timeout(min(self.timeout_s, 1.0)):
+                await client.aclose()
 
     def query(self, text: str) -> np.ndarray:
         with self._query_lock:
-            if text not in self._queries:
-                vector = _run(lambda: self._embed(text))
-                self._queries[text] = vector
-                if len(self._queries) > QUERY_CACHE_SIZE:
-                    self._queries.popitem(last=False)
-            self._queries.move_to_end(text)
-            return self._queries[text]
+            if text in self._queries:
+                self._queries.move_to_end(text)
+                return self._queries[text]
+            pending = self._inflight.get(text)
+            owner = pending is None
+            if pending is None:
+                pending = Future()
+                self._inflight[text] = pending
+        if not owner:
+            return pending.result(timeout=self.timeout_s)
+        try:
+            vector = _run(lambda: self._embed(text))
+        except BaseException as exc:
+            with self._query_lock:
+                self._inflight.pop(text)
+            pending.set_exception(exc)
+            raise
+        with self._query_lock:
+            self._queries[text] = vector
+            if len(self._queries) > QUERY_CACHE_SIZE:
+                self._queries.popitem(last=False)
+            self._inflight.pop(text)
+        pending.set_result(vector)
+        return vector
 
     def search(
         self,

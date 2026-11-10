@@ -35,9 +35,10 @@ Plan, retrieve each part, then join; use the same process with wiki sections or 
    using their source ids, evidence or tables, not just the current summary.
 5. Join the evidence: answer every sub-question, per chantier when several are concerned, with
    citations. State explicitly which parts could not be found.
-6. Use at most 10 tool calls, including failures. A tool returning `not_found` on this server is
-   unavailable: do not retry that tool; continue with available tools. If evidence is still
-   insufficient at the budget, stop and say what is missing.
+6. Use at most 10 tool calls, including failures. Only a `not_found` failure whose
+   `error.details.wiki_ablation == "raw"` means the tool is unavailable: do not retry that tool.
+   For other `not_found` failures, recover using the suggestions in `error.details`.
+   If evidence is still insufficient at the budget, stop and say what is missing.
 
 ## Scopes (chantiers)
 
@@ -63,9 +64,11 @@ Every tool returns JSON with `ok`; check it before using a result.
 - `"ok": true`: use the result. When `truncated` is true, call again with `next_offset` only if
   the missing part matters.
 - `"ok": false`: the call failed and is not evidence. Read `error.code` and `error.message` and
-  follow the message: call again with corrected arguments (`invalid_argument`), treat the tool
-  as unavailable on this server and do not retry it (`not_found`), narrow the request
-  (`too_large`), or re-read the page (`conflict`).
+  follow the message: call again with corrected arguments (`invalid_argument`), search or browse
+  an index starting with the suggestions in `error.details` (`not_found`), narrow the request
+  (`too_large`), or re-read the page (`conflict`). Only when
+  `error.details.wiki_ablation == "raw"` is a `not_found` tool unavailable: do not retry that tool;
+  continue with available tools.
 - Repeat a failed call only when `error.retryable` is true (`unavailable`, `timeout`), at most
   once. Never retry a `forbidden` call: you are not allowed to use that tool. Report `internal`
   errors. Failed calls count toward the 10 tool calls; when a failure blocks the answer, say

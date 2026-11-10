@@ -121,6 +121,7 @@ class McpConfig:
     arm of an ablation). Never set on a production server."""
     pin_release: str | None = None
     dense: bool = False
+    dense_timeout_s: float = 20.0
     vectors: str | None = None
     supersession_companions: bool = False
 
@@ -129,6 +130,8 @@ class McpConfig:
             raise ValueError(f"{SettingsKeys.MCP_PIN_RELEASE} must be a release id")
         if self.dense and not self.vectors:
             raise ValueError(f"{SettingsKeys.MCP_DENSE}=on requires {SettingsKeys.MCP_VECTORS}")
+        if not 0 < self.dense_timeout_s <= 60:
+            raise ValueError(f"{SettingsKeys.MCP_DENSE_TIMEOUT_SECONDS} must be in (0, 60]")
         if self.auth_mode not in ("none", "easyauth"):
             raise ValueError(f"unknown {SettingsKeys.AUTH_MODE}: {self.auth_mode!r}")
         if self.max_chars < MIN_MAX_CHARS:
@@ -247,6 +250,7 @@ class McpConfig:
             wiki_ablation=(get(SettingsKeys.MCP_WIKI_ABLATION, "off") or "off").lower(),  # type: ignore[arg-type]
             pin_release=get(SettingsKeys.MCP_PIN_RELEASE),
             dense=enabled(SettingsKeys.MCP_DENSE),
+            dense_timeout_s=number(SettingsKeys.MCP_DENSE_TIMEOUT_SECONDS, "20"),
             vectors=get(SettingsKeys.MCP_VECTORS),
             supersession_companions=enabled(SettingsKeys.MCP_SUPERSESSION_COMPANIONS),
         )

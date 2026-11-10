@@ -197,6 +197,7 @@ never writes to the release it serves.
 | `DOCWIKI_RELEASE` | — | Default for `--release` |
 | `DOCWIKI_MCP_PIN_RELEASE` | — | Evaluation only: serve this immutable release id, ignoring `current.json`, in local and Azure modes; a missing release fails on first call. A direct release or portable folder must match this id |
 | `DOCWIKI_MCP_DENSE` | `off` | Evaluation only: `on` adds the dense lane to `answer_context` and `search` (RRF k=60, 50 hits per lane); requires `DOCWIKI_MCP_VECTORS`. No lexical fallback on failure |
+| `DOCWIKI_MCP_DENSE_TIMEOUT_SECONDS` | `20` | Query embedding deadline in seconds, including deployment metadata; must be in (0, 60]. Network retries and Retry-After sleeps are disabled for interactive dense queries; timeouts return `unavailable` |
 | `DOCWIKI_MCP_VECTORS` | — | Evaluation vector NPZ: a local filename, or `blob:work/<blob path>` (also `work/<blob path>` in Azure mode), read through the server's storage abstraction and managed identity |
 | `DOCWIKI_MCP_SUPERSESSION_COMPANIONS` | `off` | Evaluation only: `on` adds audience-filtered `revisions` metadata to source hits in `answer_context` and `search`; entirely omitted in raw ablation mode |
 | `DOCWIKI_MCP_MAX_CHARS` | `12000` | Output budget per tool result (minimum 2000) |
@@ -247,6 +248,11 @@ model, version and dimensions. A wrong or missing artifact, or a failed embeddin
 `query-verbatim-v1` rule and a per-snapshot LRU cache of at most 256 question embeddings.
 Dense tools run in worker threads; async embedding clients are created and closed on the same
 event loop, including for direct Python callers.
+The query-cache lock protects only cache and per-question in-flight futures: different questions
+embed concurrently, while identical overlapping questions share one call (including its failure).
+Timed-out or failed calls are not cached and can be retried. SDK cleanup has a separate bound of
+at most one second. Dense tools share a dedicated eight-request worker limiter, leaving the
+default AnyIO pool available to `/healthz`; waiting callers also have a bounded wait.
 
 Both lanes share SearchIndex's kinds/types/entity/topic/within/language-tree filters. The dense
 lane also applies row and catalog audience checks before ranking; existing context de-duplication,

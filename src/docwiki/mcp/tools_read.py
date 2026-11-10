@@ -626,8 +626,7 @@ class ReadTools:
     def _hybrid(
         self, snap: Snapshot, query: str, *, context: bool = False, **filters: Any
     ) -> list[Any]:
-        from docwiki.llm.foundry_embeddings import FoundryEmbeddingClient
-        from docwiki.mcp.dense import LANE_DEPTH, DenseLane, fuse
+        from docwiki.mcp.dense import LANE_DEPTH, DenseLane, fuse, query_embedding_client
 
         def accept(hit: Any) -> bool:
             entry = self._by_path(snap).get(hit.path) or self._by_id(snap).get(hit.page_id)
@@ -644,7 +643,8 @@ class ReadTools:
                     snap,
                     self.source,
                     self.config,
-                    self._embedding_factory or FoundryEmbeddingClient,
+                    self._embedding_factory
+                    or (lambda: query_embedding_client(self.config.dense_timeout_s)),
                 ),
             )
             # Context's pre-fusion lexical rules are exactly the Gate A pilot's: fetch 100,
