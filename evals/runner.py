@@ -61,6 +61,7 @@ from evals.records import Answer, Citation
 from evals.registry import get_system, register_system, system_names
 from evals.scoreboard import format_metric
 from evals.systems import (
+    RETRY_WAIT_KEY,
     BaselineLongContextSystem,
     BaselineRagSystem,
     EvalSystem,
@@ -324,7 +325,8 @@ async def _answer_all(
                 raise
             except Exception as exc:  # recorded per question; the run goes on
                 answer, error = Answer(), scrub(f"{type(exc).__name__}: {exc}")
-            return _Outcome(question, answer, round(time.perf_counter() - started, 3), error)
+            elapsed = time.perf_counter() - started - float(answer.info.get(RETRY_WAIT_KEY) or 0.0)
+            return _Outcome(question, answer, round(max(elapsed, 0.0), 3), error)
 
     return list(await asyncio.gather(*(one(question) for question in questions)))
 

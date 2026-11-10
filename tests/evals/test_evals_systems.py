@@ -346,3 +346,52 @@ def test_mini_corpus_is_consistent() -> None:
     assert set(corpus.docs) == set(corpus.manifest.files)
     assert PHOTO in corpus.docs and MAIL in corpus.docs
     assert PLAN in {entry.path for entry in corpus.manifest.select("full")}
+
+
+def test_researcher_retries_rate_limits_and_reports_the_wait(
+    corpus: CorpusContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from docwiki.agents_client import AgentInvocationError
+    from evals import systems
+
+    client = FakeAgentClient({question().question: RESEARCHER_TEXT})
+    failures = {"left": 2}
+    sleeps: list[float] = []
+
+    async def fake_sleep(delay: float) -> None:
+        sleeps.append(delay)
+
+    import docwiki.agents_client as agents_client
+
+    real = agents_client.ask
+
+    async def flaky_ask(*args: Any, **kwargs: Any) -> Any:
+        if failures["left"]:
+            failures["left"] -= 1
+            raise AgentInvocationError("HTTP 429 (rate_limit_exceeded)", status_code=429)
+        return await real(*args, **kwargs)
+
+    monkeypatch.setattr(agents_client, "ask", flaky_ask)
+    monkeypatch.setattr(systems.asyncio, "sleep", fake_sleep)
+    system = ResearcherSystem(client=client, env={}, prices=PRICES)
+    run(system.setup())
+    result = run(system.answer(question()))
+    assert result.body.startswith("The total price")
+    assert result.info["rate_limit_retries"] == 2 and len(sleeps) == 2
+    assert result.info[systems.RETRY_WAIT_KEY] == pytest.approx(sum(sleeps), abs=1e-3)
+
+
+def test_researcher_does_not_retry_other_errors(
+    corpus: CorpusContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import docwiki.agents_client as agents_client
+    from docwiki.agents_client import AgentInvocationError
+
+    async def broken(*args: Any, **kwargs: Any) -> Any:
+        raise AgentInvocationError("HTTP 400 (bad_request)", status_code=400)
+
+    monkeypatch.setattr(agents_client, "ask", broken)
+    system = ResearcherSystem(client=FakeAgentClient({}), env={}, prices=PRICES)
+    run(system.setup())
+    with pytest.raises(AgentInvocationError):
+        run(system.answer(question()))
