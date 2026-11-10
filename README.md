@@ -392,6 +392,14 @@ vulnerabilities privately: [SECURITY.md](SECURITY.md).
   Microsoft's managed knowledge layer that turns enterprise data into permission-aware knowledge
   bases for agents. It is the managed-retrieval alternative, and the documented extension for very
   large corpora ([ADR 0001](docs/adr/0001-compiled-wiki-over-vector-index.md)).
+- **[GraphRAG](https://github.com/microsoft/graphrag)** (Microsoft Research),
+  **[LightRAG](https://github.com/HKUDS/LightRAG)**, **[RAPTOR](https://arxiv.org/abs/2401.18059)**
+  and **[HippoRAG](https://arxiv.org/abs/2405.14831)**: retrieval that also does work at indexing
+  time (entity graphs and community summaries, summary trees, graph walks for multi-hop). DocWiki
+  shares the idea of compiling once, but its output is a wiki people read: Markdown pages whose
+  every claim is cited to a page, row or cue, with revisions and contradictions made explicit,
+  published as immutable releases. It has not been measured against them
+  ([FAQ](docs/faq.md#why-not-graphrag)).
 
 ## Contributing
 

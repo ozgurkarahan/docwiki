@@ -110,3 +110,22 @@ estimates: tokens × the unverified price table.
 
 The identity spike (about 1.5 hours of throwaway resources, three remote image builds and about 25
 agent turns on a small model) cost less than USD 1.
+
+### Cost per correct answer
+
+Per question, the wiki does not save money: the Researcher reads more context and makes several
+tool calls. Dividing each system's cost by its answer accuracy on the dev split (same receipts,
+unverified prices):
+
+| System | Cost a question | Answer accuracy | Cost per correct answer |
+|---|---|---|---|
+| `docwiki-researcher` | $0.124 | 68.8 % (22/32) | about $0.18 |
+| `baseline-long-context` | $0.053 | 62.5 % (20/32) | about $0.085 |
+| `baseline-rag` | $0.045 | 56.2 % (18/32) | about $0.08 |
+
+Add the compilation: about $12 for the 39 documents, that is $0.12 a question over 100 questions
+and $0.012 over 1,000, plus about $1.30 for each new document. So the case for the wiki is not
+cost per answer: it is the answers the baselines get wrong (numbers exact on 9 of 9 against 6 of 9
+for RAG), the readers who browse the wiki without asking anything, and the agents that get a map
+instead of chunks. Measure the trade-off on your own questions before relying on it; on 32
+questions, one or two answers are noise.

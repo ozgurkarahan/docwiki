@@ -1,6 +1,8 @@
 # FAQ
 
 - [Why not vector RAG?](#why-not-vector-rag)
+- [Why not GraphRAG?](#why-not-graphrag)
+- [How do I know the wiki is faithful to the documents?](#how-do-i-know-the-wiki-is-faithful-to-the-documents)
 - [Why an Azure Container Apps Job and not a hosted agent?](#why-an-azure-container-apps-job-and-not-a-hosted-agent)
 - [Why prompt agents?](#why-prompt-agents)
 - [How are citations verified?](#how-are-citations-verified)
@@ -30,6 +32,34 @@ against a naive RAG baseline and a long-context baseline on the same questions, 
 published either way ([evaluation](evaluation.md)). For very large or fast-changing corpora, a
 managed retrieval layer such as Foundry IQ is the documented extension
 ([ADR 0001](adr/0001-compiled-wiki-over-vector-index.md)).
+
+## Why not GraphRAG?
+
+GraphRAG, LightRAG, RAPTOR and HippoRAG also do work at indexing time: they extract entity graphs,
+summarise communities or build summary trees, then retrieve from those structures. DocWiki shares
+the idea of compiling once. What differs is the product of the compilation: a wiki that people
+read and agents navigate, where every claim is cited to the page, sheet rows, slide or cue it came
+from and quotes are verified by code, where superseded revisions and contradictions get their own
+sections, and where each build is an immutable, rollback-able release. A graph index is an
+internal structure for retrieval; the wiki is the deliverable.
+
+DocWiki has not been measured against these systems. Its published baselines are a naive RAG
+(BM25, top 8 chunks) and a long-context reading of every document; a stronger retrieval baseline
+(hybrid search with re-ranking, or a graph-based method) is the comparison an expert would ask for
+next. On the sample, the misses that remain are cross-chantier questions, which is precisely what
+graph methods target; the [compile fidelity](evaluation.md#compile-fidelity) check shows that the
+wiki compiles every printed fact but only 2 of 5 cross-chantier syntheses.
+
+## How do I know the wiki is faithful to the documents?
+
+Three layers. Quotes are checked by code against the cited block (next question). Gates block a
+release with broken links, unverified quotes, leaked restricted values or injection canaries. And
+on the sample, whose ground truth is known because it is generated from a fictional world,
+`evals/compile_fidelity.py` checks what the wiki states without any model: revision statuses,
+whether each printed fact of the planted scenarios reaches a topic page of its chantier,
+cross-chantier syntheses, abstain facts and leaks ([evaluation](evaluation.md#compile-fidelity)).
+Paraphrased claims on a real corpus have no such ground truth: they carry a `paraphrase` badge and
+their footnote opens the evidence, so a reader can check them in one click.
 
 ## Why an Azure Container Apps Job and not a hosted agent?
 
@@ -85,9 +115,13 @@ sources, Foundry IQ is designed for that.
 
 ## Which languages are supported?
 
-Documents can be in any language the models read; the sample corpus is written in French. The
-wiki itself is written in **English**, one canonical language that is easy to search,
-while **quotes stay in their original language** so that verification runs on the source text.
+Documents can be in any language the models read; the sample corpus is written in French. A domain
+pack declares the wiki's languages: the sample's wiki is written in **French**, the documents'
+language, with an **English mirror** translated from it, and a locked trade vocabulary keeps terms
+such as réception or retenue de garantie as written
+([ADR 0012](adr/0012-french-canonical-and-locked-vocabulary.md)). A pack that declares no languages
+gets one English wiki. **Quotes stay in their original language** so that verification runs on the
+source text.
 Glossary synonyms and entity and topic aliases are multilingual, and search expands queries with
 them, so a question in French can find pages written in English. The Researcher answers in the
 language of the question and never translates locator labels.
