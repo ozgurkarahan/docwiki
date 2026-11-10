@@ -30,8 +30,8 @@ from docwiki.stages import agentkit
 
 INFRA = REPO_ROOT / "infra"
 MAIN = INFRA / "main.bicep"
-# The feature under evaluation, set on the evaluation MCP app only (enableEvalMcp).
-EVAL_FEATURE_ENV = "DOCWIKI_MCP_WIKI_ABLATION"
+# The release pinned on the evaluation MCP apps only (evalReleaseId).
+EVAL_PIN_ENV = "DOCWIKI_MCP_PIN_RELEASE"
 GUID = re.compile(
     r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
 )
@@ -240,7 +240,7 @@ def test_container_settings_are_known_keys() -> None:
     known.add(ENABLE_ENV)  # the portal's live ask (docwiki.portal.live_ask)
     known.add(STREAM_PROGRESS_ENV)  # its progress steps (docwiki.portal.live_ask)
     known.add(OWNERS_ENV)  # the portal's owners (docwiki.portal.owner, ADR 0009)
-    known.add(EVAL_FEATURE_ENV)  # the feature under evaluation (eval MCP app only)
+    known.add(EVAL_PIN_ENV)  # the release pinned on the evaluation MCP apps only
     assert names <= known, f"unknown settings: {sorted(names - known)}"
     for required in (
         "DOCWIKI_FOUNDRY_PROJECT_ENDPOINT",
@@ -892,7 +892,7 @@ def test_compiled_portal_custom_domain(compiled: dict[str, Any]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Optional evaluation environment (enableEvalMcp, off by default; S7)
+# Optional evaluation environment (evalMcpVariants, empty by default)
 # ---------------------------------------------------------------------------
 
 
@@ -900,7 +900,9 @@ def _eval_blocks(main: str) -> dict[str, str]:
     return {
         "app": main[main.index("module mcpEvalApp") : main.index("module mcpEvalAuth")],
         "auth": main[main.index("module mcpEvalAuth") : main.index("module mcpEvalConnection")],
-        "connection": main[main.index("module mcpEvalConnection") : main.index("// Outputs")],
+        "connection": main[
+            main.index("module mcpEvalConnection") : main.index("// name -> { url, connection }")
+        ],
     }
 
 
@@ -916,44 +918,72 @@ def _settings(block: str, *keys: str) -> dict[str, str]:
     }
 
 
-def test_eval_mcp_is_off_by_default_and_needs_the_production_auth() -> None:
+def _names_eval(text: str) -> bool:
+    return bool(re.search(r"\beval|[a-z]Eval|Eval[A-Z]|EVAL_|-eval", text))
+
+
+def test_eval_mcp_variants_are_off_by_default_and_need_the_production_auth() -> None:
     main = main_text()
-    assert re.search(r"^param enableEvalMcp bool = false$", main, re.MULTILINE)
-    assert re.search(r"^param evalMcpAllowedClientIds string = ''$", main, re.MULTILINE)
-    assert "var evalMcpEnabled = enableEvalMcp && mcpPublic" in main
+    for declaration in (
+        "evalMcpVariants string = ''",
+        "evalMcpImage string = ''",
+        "evalReleaseId string = ''",
+        "evalSmartCapacity int = 0",
+        "evalEmbedAccess bool = false",
+        "evalMcpAllowedClientIds string = ''",
+    ):
+        assert re.search(rf"^param {re.escape(declaration)}$", main, re.MULTILINE), declaration
+    assert not re.search(r"enableEvalMcp|evalMcpWikiAblation|mcpEvalApp:", main)
+    assert "base64ToJson(evalMcpVariants)" in main, "azd substitutes raw text: base64, not JSON"
+    assert "var evalMcpVariantList = mcpPublic && !empty(evalMcpVariants)" in main
+    assert "var evalMcpEnabled = !empty(evalMcpVariantList)" in main
     mapped = json.loads((INFRA / "main.parameters.json").read_text(encoding="utf-8"))["parameters"]
-    assert mapped["enableEvalMcp"] == {"value": "${DOCWIKI_ENABLE_EVAL_MCP}"}
-    assert mapped["evalMcpAllowedClientIds"] == {"value": "${DOCWIKI_EVAL_MCP_ALLOWED_CLIENT_IDS}"}
-    assert mapped["evalMcpWikiAblation"] == {"value": "${DOCWIKI_EVAL_MCP_WIKI_ABLATION}"}
-    assert re.search(r"^param evalMcpWikiAblation string = 'off'$", main, re.MULTILINE)
-    for module in ("mcpEvalApp", "mcpEvalAuth", "mcpEvalConnection"):
-        assert re.search(rf"^module {module} '[^']+' = if \(evalMcpEnabled\) \{{", main, re.M)
-    # Production is untouched: nothing outside the evaluation section names it.
-    production = main[: main.index("// Evaluation environment")]
-    for declared in ("param enableEvalMcp", "param evalMcpAllowedClientIds", "param evalMcpWiki"):
-        production = production.replace(declared, "")
-    assert "evalMcp" not in production
-    assert "mcpEvalApp: 'ca-mcp-eval-${resourceToken}'" in main
-    assert "var evalMcpConnectionName = '${take(mcpConnectionName, 28)}-eval'" in main
-    assert "output DOCWIKI_EVAL_MCP_URL string = evalMcpEnabled ? evalMcpUrl : ''" in main
+    assert {name: value for name, value in mapped.items() if name.startswith("eval")} == {
+        "evalMcpAllowedClientIds": {"value": "${DOCWIKI_EVAL_MCP_ALLOWED_CLIENT_IDS}"},
+        "evalMcpVariants": {"value": "${DOCWIKI_EVAL_MCP_VARIANTS}"},
+        "evalMcpImage": {"value": "${DOCWIKI_EVAL_MCP_IMAGE}"},
+        "evalReleaseId": {"value": "${DOCWIKI_EVAL_RELEASE_ID}"},
+        "evalSmartCapacity": {"value": "${DOCWIKI_EVAL_SMART_CAPACITY}"},
+        "evalEmbedAccess": {"value": "${DOCWIKI_EVAL_EMBED_ACCESS}"},
+    }
+    assert "enableEvalMcp" not in json.dumps(mapped)
+    assert re.search(r"^module mcpEvalApp 'modules/container-app.bicep' = \[$", main, re.M)
+    assert "for (variant, index) in evalMcpVariantList" in _eval_blocks(main)["app"]
+    for module in ("mcpEvalAuth", "mcpEvalConnection"):
+        assert re.search(rf"^module {module} '[^']+' = \[$", main, re.M), module
+    # Production is untouched: nothing between the production MCP app and the evaluation section
+    # (MCP app, portal, auth, connection, budget) names the evaluation environment.
+    production = main[main.index("module mcpApp ") : main.index("// Evaluation environment")]
+    assert not _names_eval(production)
+    for production_module in ("ingestJob", "reconcileJob", "storage", "registry", "monitoring"):
+        start = main.index(f"module {production_module} ")
+        assert not _names_eval(main[start : main.index("\nmodule ", start + 10)])
+    assert "var evalMcpConnectionPrefix = take(mcpConnectionName, 24)" in main
+    assert "connection: '${evalMcpConnectionPrefix}-${variant.name}'" in main
     assert (
-        "output DOCWIKI_EVAL_MCP_CONNECTION string = evalMcpEnabled ? evalMcpConnectionName : ''"
-        in main
-    )
+        "var evalMcpAppNames = [for variant in evalMcpVariantList: "
+        "'ca-mcp-${variant.name}-${resourceToken}']"
+    ) in main
+    outputs = re.findall(r"^output (DOCWIKI_EVAL_\w+) string = (.+)$", main, re.MULTILINE)
+    assert outputs == [
+        ("DOCWIKI_EVAL_MCP_VARIANTS_OUT", "evalMcpVariantsOut"),
+        ("DOCWIKI_EVAL_SMART_DEPLOYMENT", "foundry.outputs.evalSmartDeploymentName"),
+    ]
+    assert "string(toObject(evalMcpEndpoints" in main
+    assert "url: 'https://${endpoint.app}.${evalMcpDomain}/mcp'" in main
+    assert "  : ''\n" in main[main.index("var evalMcpVariantsOut") :]
 
 
-def test_eval_mcp_app_mirrors_production_with_the_feature_on() -> None:
+def test_eval_mcp_app_mirrors_production_except_name_replicas_tags_and_env() -> None:
     main = main_text()
     prod = main[main.index("module mcpApp") : main.index("// The live ask needs")]
     app = _eval_blocks(main)["app"]
-    assert EVAL_FEATURE_ENV not in prod, "production keeps the feature off"
     same = (
         "containerName",
         "environmentId",
         "workloadProfileName",
         "identityResourceId",
         "registryServer",
-        "image",
         "cpu",
         "memory",
         "maxReplicas",
@@ -962,22 +992,48 @@ def test_eval_mcp_app_mirrors_production_with_the_feature_on() -> None:
     )
     assert _settings(app, *same) == _settings(prod, *same)
     assert len(_settings(app, *same)) == len(same)
-    assert "    name: names.mcpEvalApp\n" in app
+    assert "name: evalMcpAppNames[index]" in app
     assert _settings(app, "minReplicas", "ingressMode", "tags") == {
         "minReplicas": "0",
         "ingressMode": "'external'",
         "tags": "tags",
     }, "zero replicas at rest; no azd service tag (azd deploy updates production only)"
+    assert _settings(app, "image") == {"image": "evalMcpAppImage"}
+    image = main[main.index("var evalMcpAppImage") : main.index("// A variant may only set")]
+    assert "? evalMcpImage" in image
+    assert "!empty(resolvedMcpImage) ? resolvedMcpImage : placeholderAppImage" in image
+    assert "!empty(resolvedMcpImage) ? resolvedMcpImage : placeholderAppImage" in prod
     prod_env, eval_env = _env(prod), _env(app)
-    assert eval_env.pop(EVAL_FEATURE_ENV) == "evalMcpWikiAblation == 'raw' ? 'raw' : 'off'"
-    assert eval_env.pop("OTEL_SERVICE_NAME") == "'docwiki-mcp-eval'"
+    assert eval_env.pop("OTEL_SERVICE_NAME") == "'docwiki-mcp-${variant.name}'"
     assert prod_env.pop("OTEL_SERVICE_NAME") == "'docwiki-mcp'"
     assert eval_env.pop("DOCWIKI_MCP_ALLOWED_CLIENT_IDS") == "join(evalMcpAllowedApplications, ',')"
     prod_env.pop("DOCWIKI_MCP_ALLOWED_CLIENT_IDS")
     assert eval_env == prod_env, "same identity, release, tenant, audience and token validation"
     assert re.search(r"env: concat\(\s*sharedEnv,", app), "same storage and release settings"
-    allowed = main[main.index("var evalMcpAllowedApplications") : main.index("module mcpEvalApp")]
+    allowed = main[main.index("var evalMcpAllowedApplications") : main.index("var evalMcpAppImage")]
     assert "union(\n  mcpAllowedApplications," in allowed, "the production agents stay allowed"
+    # Additions: the pin and embedding settings, then the variant env (DOCWIKI_MCP_* only, never
+    # the authentication settings), which wins over both.
+    extra = _env(main[main.index("var evalMcpExtraEnv") : main.index("module mcpEvalApp")])
+    assert extra == {
+        "DOCWIKI_MCP_PIN_RELEASE": "evalReleaseId",
+        "DOCWIKI_FOUNDRY_PROJECT_ENDPOINT": "foundry.outputs.projectEndpoint",
+        "DOCWIKI_EMBED_DEPLOYMENT": "foundry.outputs.embedDeploymentName",
+        "DOCWIKI_EMBED_MODEL": "embedModel",
+        "DOCWIKI_EMBED_DIMENSIONS": "string(embedDimensions)",
+        "DOCWIKI_EMBED_TPM": "string(embedTokensPerMinute)",
+        "DOCWIKI_EMBED_RPM": "string(embedRequestsPerMinute)",
+    }
+    assert "evalEmbedAccess && embedCapacity > 0" in main
+    assert "empty(evalReleaseId)" in main
+    assert "startsWith(item.key, 'DOCWIKI_MCP_') && !contains(evalMcpProtectedEnv, item.key)" in app
+    protected = main[main.index("var evalMcpProtectedEnv") : main.index("// What every evaluation")]
+    assert set(re.findall(r"'(DOCWIKI_\w+)'", protected)) == {
+        "DOCWIKI_MCP_AUDIENCE",
+        "DOCWIKI_MCP_TENANT_ID",
+        "DOCWIKI_MCP_TOKEN_VALIDATION",
+        "DOCWIKI_MCP_ALLOWED_CLIENT_IDS",
+    }
 
 
 def test_eval_mcp_auth_and_connection_mirror_production() -> None:
@@ -987,43 +1043,76 @@ def test_eval_mcp_auth_and_connection_mirror_production() -> None:
     prod_connection = main[main.index("module mcpConnection") : main.index("// Entra sign-in")]
     keys = ("clientId", "unauthenticatedClientAction")
     assert _settings(blocks["auth"], *keys) == _settings(auth_block, *keys)
-    for fragment in ("allowedAudiences: [\n      'api://${mcpApiClientId}'\n    ]", "'/healthz'"):
-        assert fragment in auth_block and fragment in blocks["auth"], fragment
-    assert "containerAppName: names.mcpEvalApp" in blocks["auth"]
+    squash = lambda text: re.sub(r"\s+", " ", text)  # noqa: E731
+    for fragment in ("allowedAudiences: [ 'api://${mcpApiClientId}' ]", "'/healthz'"):
+        assert fragment in squash(auth_block) and fragment in squash(blocks["auth"]), fragment
+    assert "containerAppName: mcpEvalApp[index].outputs.name" in blocks["auth"]
     assert "allowedApplications: evalMcpAllowedApplications" in blocks["auth"]
     keys = ("accountName", "projectName", "audience")
     assert _settings(blocks["connection"], *keys) == _settings(prod_connection, *keys)
     assert _settings(blocks["connection"], "connectionName", "mcpUrl") == {
-        "connectionName": "evalMcpConnectionName",
-        "mcpUrl": "evalMcpUrl",
+        "connectionName": "evalMcpEndpoints[index].connection",
+        "mcpUrl": "'https://${evalMcpAppNames[index]}.${evalMcpDomain}/mcp'",
     }
-    assert (
-        "var evalMcpUrl = 'https://${names.mcpEvalApp}.${containerAppsEnvironment.outputs"
-        ".defaultDomain}/mcp'" in main
-    )
 
 
 def test_compiled_eval_mcp_is_conditional(compiled: dict[str, Any]) -> None:
-    assert compiled["parameters"]["enableEvalMcp"]["defaultValue"] is False
-    assert compiled["variables"]["evalMcpEnabled"] == (
-        "[and(parameters('enableEvalMcp'), variables('mcpPublic'))]"
+    assert compiled["parameters"]["evalMcpVariants"]["defaultValue"] == ""
+    assert compiled["variables"]["evalMcpVariantList"] == (
+        "[if(and(variables('mcpPublic'), not(empty(parameters('evalMcpVariants')))), "
+        "base64ToJson(parameters('evalMcpVariants')), createArray())]"
     )
     modules = {
         resource["name"]: resource
         for resource in _values(compiled["resources"])
         if resource["type"] == "Microsoft.Resources/deployments"
     }
-    for name in ("mcpEvalApp", "mcpEvalAuth", "mcpEvalConnection"):
-        assert modules[name]["condition"] == "[variables('evalMcpEnabled')]", name
-    for name in ("mcpApp", "mcpAuth", "mcpConnection"):
+    looped = {
+        name: resource
+        for name, resource in modules.items()
+        if name.startswith(("mcpEvalApp-", "mcpEvalAuth-", "mcpEvalConnection-"))
+        or "mcpEval" in name
+    }
+    assert len(looped) == 3
+    for resource in looped.values():
+        assert resource["copy"]["count"] == "[length(variables('evalMcpVariantList'))]"
+    for name in ("mcpApp", "mcpAuth", "mcpConnection", "portalApp", "ingestJob", "reconcileJob"):
         text = json.dumps(modules[name]["properties"]["parameters"])
-        assert "evalMcp" not in text and "mcpEval" not in text, name
-    prod = modules["mcpApp"]["properties"]["parameters"]
-    app = modules["mcpEvalApp"]["properties"]["parameters"]
-    for key in ("image", "identityResourceId", "registryServer", "environmentId", "cpu", "memory"):
-        assert app[key] == prod[key], key
-    assert app["minReplicas"] == {"value": 0}
+        assert not _names_eval(text), name
+    foundry = modules["foundry"]["properties"]["parameters"]
+    assert foundry["evalSmartCapacity"] == {"value": "[parameters('evalSmartCapacity')]"}
+    assert "evalEmbedAccess" in json.dumps(foundry["evalMcpPrincipalId"])
     outputs = compiled["outputs"]
-    for name in ("DOCWIKI_EVAL_MCP_URL", "DOCWIKI_EVAL_MCP_CONNECTION"):
-        assert outputs[name]["value"].startswith("[if(variables('evalMcpEnabled'), "), name
-        assert outputs[name]["value"].endswith(", '')]"), name
+    assert "DOCWIKI_EVAL_MCP_URL" not in outputs and "DOCWIKI_EVAL_MCP_CONNECTION" not in outputs
+    value = outputs["DOCWIKI_EVAL_MCP_VARIANTS_OUT"]["value"]
+    assert value.startswith("[if(variables('evalMcpEnabled'), string(toObject("), value
+    assert value.endswith(", '')]")
+    assert outputs["DOCWIKI_EVAL_SMART_DEPLOYMENT"]["value"].startswith("[reference(")
+    assert len(outputs) <= 64
+
+
+def test_eval_smart_deployment_and_embed_access_are_optional_in_the_foundry_module() -> None:
+    foundry = (INFRA / "modules" / "foundry.bicep").read_text(encoding="utf-8")
+    assert re.search(r"^param evalSmartCapacity int = 0$", foundry, re.MULTILINE)
+    assert re.search(r"^param evalMcpPrincipalId string = ''$", foundry, re.MULTILINE)
+    smart = foundry[foundry.index("resource smartDeployment") : foundry.index("// Embeddings")]
+    twin = foundry[foundry.index("resource evalSmartDeployment") : foundry.index("// Server-side")]
+    assert (
+        "if (deployEvalSmart)" in twin and "var deployEvalSmart = evalSmartCapacity > 0" in foundry
+    )
+    assert (
+        "name: evalSmartDeploymentName" in twin
+        and "evalSmartDeploymentName = 'smart-eval'" in foundry
+    )
+    for same in ("name: deploymentSku", "name: smartModel", "version: smartModelVersion"):
+        assert same in smart and same in twin, same
+    assert "capacity: evalSmartCapacity" in twin
+    assert "output evalSmartDeploymentName string = deployEvalSmart ? " in foundry
+    role = foundry[foundry.index("resource evalMcpCognitiveServicesUser") :]
+    role = role[: role.index("// The deployer creates agents")]
+    assert (
+        "if (grantEvalMcp)" in role and "var grantEvalMcp = !empty(evalMcpPrincipalId)" in foundry
+    )
+    assert "roleIds.cognitiveServicesUser" in role and "principalId: evalMcpPrincipalId" in role
+    main = main_text()
+    assert "evalMcpPrincipalId: evalEmbedAccess && evalMcpEnabled ? mcpIdentity" in main

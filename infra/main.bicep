@@ -105,8 +105,21 @@ param mcpMinReplicas int = 0
 @description('Bearer-token validation by the MCP server behind built-in auth (DOCWIKI_MCP_TOKEN_VALIDATION). off trusts the platform principal header alone: only for a platform that does not forward the Authorization header (src/docwiki/mcp/README.md).')
 param mcpTokenValidation string = 'required'
 
-@description('Deploy the evaluation-only MCP app (ca-mcp-eval-<token>) and its project connection (<mcpConnectionName>-eval) beside the production ones: same image, release, identity and Entra built-in auth, zero replicas at rest, with the feature under evaluation (DOCWIKI_EVAL_MCP_WIKI_ABLATION). Needs a provisioned environment (mcpApiClientId). Turning it off does not delete them: remove them after the gates (docs/spec/infra-ops-security.md section 1).')
-param enableEvalMcp bool = false
+@description('Evaluation MCP apps (ca-mcp-<name>-<token>) and their project connections (<mcpConnectionName>-<name>), as the BASE64 OF A JSON ARRAY of { "name": "<a-z0-9, at most 8>", "env": { "DOCWIKI_MCP_*": "<value>" } } (azd value DOCWIKI_EVAL_MCP_VARIANTS; encoded because azd substitutes values into the parameters file as raw text: scripts/eval_stack.py encodes it from agents/variants.yaml). Each app mirrors the production MCP app (identity, registry, Entra built-in auth, external ingress) at zero replicas at rest, with the variant env added. Needs a provisioned environment (mcpApiClientId). Emptying it does not delete the apps: remove them after the gates (docs/spec/infra-ops-security.md section 1).')
+param evalMcpVariants string = ''
+
+@description('Explicit image reference or digest of ALL evaluation MCP apps (azd value DOCWIKI_EVAL_MCP_IMAGE); empty = the production MCP image.')
+param evalMcpImage string = ''
+
+@description('Release pinned on every evaluation MCP app (DOCWIKI_MCP_PIN_RELEASE) so that a run reads one immutable release; empty = no pin (azd value DOCWIKI_EVAL_RELEASE_ID).')
+param evalReleaseId string = ''
+
+@minValue(0)
+@description('When > 0, a `smart-eval` model deployment with the model, version and SKU of `smart` and this capacity (units of 1,000 tokens per minute), for the evaluation agents only (azd value DOCWIKI_EVAL_SMART_CAPACITY; output DOCWIKI_EVAL_SMART_DEPLOYMENT).')
+param evalSmartCapacity int = 0
+
+@description('Grant the MCP identity Cognitive Services User on the Foundry account so that evaluation apps can call the `embed` deployment, and add the embedding settings to their environment (azd value DOCWIKI_EVAL_EMBED_ACCESS). The identity is SHARED with the production MCP app, which gets the permission too (it does not use it unless configured to). Only applies when evaluation apps exist.')
+param evalEmbedAccess bool = false
 
 @description('Deploy the optional portal (Entra sign-in, or no sign-in for a public-audience build: portalAccess).')
 param enablePortal bool = false
@@ -201,11 +214,8 @@ param mcpApiClientId string = ''
 @description('Comma-separated client IDs of the agent identities allowed through the MCP app built-in auth and by the server itself (DOCWIKI_MCP_ALLOWED_CLIENT_IDS, written by the postprovision hook; empty rejects every agent at the built-in auth).')
 param mcpAllowedClientIds string = ''
 
-@description('Comma-separated client IDs of the evaluation agent identities (docwiki-researcher-eval), allowed only by the evaluation MCP app in addition to mcpAllowedClientIds (DOCWIKI_EVAL_MCP_ALLOWED_CLIENT_IDS, set by the operator; agents/README.md).')
+@description('Comma-separated client IDs of the evaluation agent identities (docwiki-researcher-<variant>), allowed only by the evaluation MCP apps in addition to mcpAllowedClientIds (DOCWIKI_EVAL_MCP_ALLOWED_CLIENT_IDS, set by the operator; agents/README.md).')
 param evalMcpAllowedClientIds string = ''
-
-@description('Feature under evaluation on the evaluation MCP app only: raw hides the compiled wiki and serves only the documents\' extracted blocks, their evidence and tables (DOCWIKI_MCP_WIKI_ABLATION, the agent-without-the-wiki arm of an ablation); any other value is off (DOCWIKI_EVAL_MCP_WIKI_ABLATION).')
-param evalMcpWikiAblation string = 'off'
 
 @minLength(3)
 @maxLength(33)
@@ -262,7 +272,6 @@ var names = {
   ingestJob: 'caj-ingest-${resourceToken}'
   reconcileJob: 'caj-reconcile-${resourceToken}'
   mcpApp: 'ca-mcp-${resourceToken}'
-  mcpEvalApp: 'ca-mcp-eval-${resourceToken}'
   portalApp: 'ca-portal-${resourceToken}'
   actionGroup: 'ag-docwiki-${resourceToken}'
   budget: 'budget-docwiki-${resourceToken}'
@@ -453,6 +462,8 @@ module foundry 'modules/foundry.bicep' = {
     smartModel: smartModel
     smartModelVersion: smartModelVersion
     smartCapacity: smartCapacity
+    evalSmartCapacity: evalSmartCapacity
+    evalMcpPrincipalId: evalEmbedAccess && evalMcpEnabled ? mcpIdentity.outputs.principalId : ''
     embedModel: embedModel
     embedModelVersion: embedModelVersion
     embedCapacity: embedCapacity
@@ -921,121 +932,204 @@ module budget 'modules/budget.bicep' = if (deployBudget) {
 }
 
 // ---------------------------------------------------------------------------
-// Evaluation environment (enableEvalMcp, off by default; removed after the gates)
-// A second MCP app built exactly like mcpApp (same image, release, identity, Entra built-in
-// auth and token validation) with the feature under evaluation switched on, and its own project
-// connection for the evaluation Researcher (agents/deploy.py --eval). It has no azd service tag:
-// `azd deploy` only updates the production app; `azd provision` gives the eval app the image of
-// SERVICE_MCP_IMAGE_NAME. It needs the MCP API app registration of a provisioned environment
-// (mcpApiClientId); before that the flag deploys nothing. Production resources do not change.
+// Evaluation environment (evalMcpVariants, empty by default; removed after the gates)
+// One MCP app per variant, each built exactly like mcpApp (same identity, registry, Entra
+// built-in auth and token validation, external ingress) at zero replicas at rest, with the
+// variant env added, and its own project connection for the evaluation Researcher
+// (agents/variants.yaml, agents/deploy.py --variant). They have no azd service tag: `azd deploy`
+// only updates the production app; `azd provision` gives them evalMcpImage, or the image of
+// SERVICE_MCP_IMAGE_NAME. They need the MCP API app registration of a provisioned environment
+// (mcpApiClientId); before that nothing is deployed. Without variants no evaluation resource
+// exists and the production resources do not change.
 // ---------------------------------------------------------------------------
 
-var evalMcpEnabled = enableEvalMcp && mcpPublic
-var evalMcpConnectionName = '${take(mcpConnectionName, 28)}-eval'
-var evalMcpUrl = 'https://${names.mcpEvalApp}.${containerAppsEnvironment.outputs.defaultDomain}/mcp'
+var evalMcpVariantList = mcpPublic && !empty(evalMcpVariants) ? base64ToJson(evalMcpVariants) : []
+var evalMcpEnabled = !empty(evalMcpVariantList)
+var evalMcpConnectionPrefix = take(mcpConnectionName, 24)
+var evalMcpAppNames = [for variant in evalMcpVariantList: 'ca-mcp-${variant.name}-${resourceToken}']
+var evalMcpDomain = containerAppsEnvironment.outputs.defaultDomain
 var evalMcpAllowedApplications = union(
   mcpAllowedApplications,
   filter(map(split(evalMcpAllowedClientIds, ','), id => trim(id)), id => !empty(id))
 )
+var evalMcpAppImage = !empty(evalMcpImage)
+  ? evalMcpImage
+  : (!empty(resolvedMcpImage) ? resolvedMcpImage : placeholderAppImage)
 
-module mcpEvalApp 'modules/container-app.bicep' = if (evalMcpEnabled) {
-  name: 'mcpEvalApp'
-  scope: rg
-  params: {
-    location: location
-    tags: tags
-    name: names.mcpEvalApp
-    containerName: 'mcp'
-    environmentId: containerAppsEnvironment.outputs.id
-    workloadProfileName: containerAppsEnvironment.outputs.workloadProfileName
-    identityResourceId: mcpIdentity.outputs.resourceId
-    registryServer: registry.outputs.loginServer
-    image: !empty(resolvedMcpImage) ? resolvedMcpImage : placeholderAppImage
-    env: concat(
-      sharedEnv,
-      [
+// A variant may only set DOCWIKI_MCP_* settings of the server, never the authentication ones.
+var evalMcpProtectedEnv = [
+  'DOCWIKI_MCP_AUDIENCE'
+  'DOCWIKI_MCP_TENANT_ID'
+  'DOCWIKI_MCP_TOKEN_VALIDATION'
+  'DOCWIKI_MCP_ALLOWED_CLIENT_IDS'
+]
+
+// What every evaluation app adds to the production environment (the variant env comes last and
+// wins): the pinned release, and the embedding settings when the identity may call `embed`.
+var evalMcpExtraEnv = concat(
+  empty(evalReleaseId)
+    ? []
+    : [
         {
-          name: 'AZURE_CLIENT_ID'
-          value: mcpIdentity.outputs.clientId
-        }
-        {
-          name: 'DOCWIKI_AUTH_MODE'
-          value: 'easyauth'
-        }
-        {
-          name: 'DOCWIKI_MCP_TENANT_ID'
-          value: tenant().tenantId
-        }
-        {
-          name: 'DOCWIKI_MCP_TOKEN_VALIDATION'
-          value: mcpTokenValidation
-        }
-        {
-          name: 'OTEL_SERVICE_NAME'
-          value: 'docwiki-mcp-eval'
-        }
-        {
-          name: 'DOCWIKI_MCP_AUDIENCE'
-          value: 'api://${mcpApiClientId},${mcpApiClientId}'
+          name: 'DOCWIKI_MCP_PIN_RELEASE'
+          value: evalReleaseId
         }
       ],
-      empty(evalMcpAllowedApplications)
-        ? []
-        : [
-            {
-              name: 'DOCWIKI_MCP_ALLOWED_CLIENT_IDS'
-              value: join(evalMcpAllowedApplications, ',')
-            }
-          ],
-      [
-        // The feature under evaluation: the agent without the wiki (src/docwiki/mcp/README.md).
+  evalEmbedAccess && embedCapacity > 0
+    ? [
         {
-          name: 'DOCWIKI_MCP_WIKI_ABLATION'
-          value: evalMcpWikiAblation == 'raw' ? 'raw' : 'off'
+          name: 'DOCWIKI_FOUNDRY_PROJECT_ENDPOINT'
+          value: foundry.outputs.projectEndpoint
+        }
+        {
+          name: 'DOCWIKI_EMBED_DEPLOYMENT'
+          value: foundry.outputs.embedDeploymentName
+        }
+        {
+          name: 'DOCWIKI_EMBED_MODEL'
+          value: embedModel
+        }
+        {
+          name: 'DOCWIKI_EMBED_DIMENSIONS'
+          value: string(embedDimensions)
+        }
+        {
+          name: 'DOCWIKI_EMBED_TPM'
+          value: string(embedTokensPerMinute)
+        }
+        {
+          name: 'DOCWIKI_EMBED_RPM'
+          value: string(embedRequestsPerMinute)
         }
       ]
-    )
-    cpu: '0.5'
-    memory: '1Gi'
-    minReplicas: 0
-    maxReplicas: 3
-    ingressMode: 'external'
-    targetPort: 8080
-    tcpProbes: true
-  }
-}
+    : []
+)
 
-module mcpEvalAuth 'modules/app-auth.bicep' = if (evalMcpEnabled) {
-  name: 'mcpEvalAuth'
-  scope: rg
-  dependsOn: [
-    mcpEvalApp
-  ]
-  params: {
-    containerAppName: names.mcpEvalApp
-    clientId: mcpApiClientId
-    allowedAudiences: [
-      'api://${mcpApiClientId}'
-    ]
-    unauthenticatedClientAction: 'Return401'
-    excludedPaths: [
-      '/healthz'
-    ]
-    allowedApplications: evalMcpAllowedApplications
+module mcpEvalApp 'modules/container-app.bicep' = [
+  for (variant, index) in evalMcpVariantList: {
+    name: 'mcpEvalApp-${variant.name}'
+    scope: rg
+    params: {
+      location: location
+      tags: tags
+      name: evalMcpAppNames[index]
+      containerName: 'mcp'
+      environmentId: containerAppsEnvironment.outputs.id
+      workloadProfileName: containerAppsEnvironment.outputs.workloadProfileName
+      identityResourceId: mcpIdentity.outputs.resourceId
+      registryServer: registry.outputs.loginServer
+      image: evalMcpAppImage
+      env: concat(
+        sharedEnv,
+        [
+          {
+            name: 'AZURE_CLIENT_ID'
+            value: mcpIdentity.outputs.clientId
+          }
+          {
+            name: 'DOCWIKI_AUTH_MODE'
+            value: 'easyauth'
+          }
+          {
+            name: 'DOCWIKI_MCP_TENANT_ID'
+            value: tenant().tenantId
+          }
+          {
+            name: 'DOCWIKI_MCP_TOKEN_VALIDATION'
+            value: mcpTokenValidation
+          }
+          {
+            name: 'DOCWIKI_MCP_AUDIENCE'
+            value: 'api://${mcpApiClientId},${mcpApiClientId}'
+          }
+        ],
+        empty(evalMcpAllowedApplications)
+          ? []
+          : [
+              {
+                name: 'DOCWIKI_MCP_ALLOWED_CLIENT_IDS'
+                value: join(evalMcpAllowedApplications, ',')
+              }
+            ],
+        filter(
+          evalMcpExtraEnv,
+          extra => !contains(map(items(variant.?env ?? {}), item => item.key), extra.name)
+        ),
+        [
+          {
+            name: 'OTEL_SERVICE_NAME'
+            value: 'docwiki-mcp-${variant.name}'
+          }
+        ],
+        map(
+          filter(
+            items(variant.?env ?? {}),
+            item => startsWith(item.key, 'DOCWIKI_MCP_') && !contains(evalMcpProtectedEnv, item.key)
+          ),
+          item => {
+            name: item.key
+            value: string(item.value)
+          }
+        )
+      )
+      cpu: '0.5'
+      memory: '1Gi'
+      minReplicas: 0
+      maxReplicas: 3
+      ingressMode: 'external'
+      targetPort: 8080
+      tcpProbes: true
+    }
   }
-}
+]
 
-module mcpEvalConnection 'modules/mcp-connection.bicep' = if (evalMcpEnabled) {
-  name: 'mcpEvalConnection'
-  scope: rg
-  params: {
-    accountName: foundry.outputs.accountName
-    projectName: foundry.outputs.projectName
-    connectionName: evalMcpConnectionName
-    mcpUrl: evalMcpUrl
-    audience: 'api://${mcpApiClientId}'
+module mcpEvalAuth 'modules/app-auth.bicep' = [
+  for (variant, index) in evalMcpVariantList: {
+    name: 'mcpEvalAuth-${variant.name}'
+    scope: rg
+    params: {
+      containerAppName: mcpEvalApp[index].outputs.name
+      clientId: mcpApiClientId
+      allowedAudiences: [
+        'api://${mcpApiClientId}'
+      ]
+      unauthenticatedClientAction: 'Return401'
+      excludedPaths: [
+        '/healthz'
+      ]
+      allowedApplications: evalMcpAllowedApplications
+    }
   }
-}
+]
+
+module mcpEvalConnection 'modules/mcp-connection.bicep' = [
+  for (variant, index) in evalMcpVariantList: {
+    name: 'mcpEvalConnection-${variant.name}'
+    scope: rg
+    params: {
+      accountName: foundry.outputs.accountName
+      projectName: foundry.outputs.projectName
+      connectionName: evalMcpEndpoints[index].connection
+      mcpUrl: 'https://${evalMcpAppNames[index]}.${evalMcpDomain}/mcp'
+      audience: 'api://${mcpApiClientId}'
+    }
+  }
+]
+
+// name -> { url, connection } of every evaluation variant, read by agents/deploy.py --variant.
+var evalMcpEndpoints = [
+  for (variant, index) in evalMcpVariantList: {
+    name: variant.name
+    app: evalMcpAppNames[index]
+    connection: '${evalMcpConnectionPrefix}-${variant.name}'
+  }
+]
+var evalMcpVariantsOut = evalMcpEnabled
+  ? string(toObject(evalMcpEndpoints, endpoint => endpoint.name, endpoint => {
+      url: 'https://${endpoint.app}.${evalMcpDomain}/mcp'
+      connection: endpoint.connection
+    }))
+  : ''
 
 // ---------------------------------------------------------------------------
 // Outputs (azd writes them to .azure/<env>/.env; the hooks and BOOTSTRAP.md read them).
@@ -1102,9 +1196,9 @@ output DOCWIKI_MCP_APP_NAME string = mcpApp.outputs.name
 output DOCWIKI_MCP_FQDN string = mcpFqdn
 output DOCWIKI_MCP_URL string = mcpUrl
 output DOCWIKI_MCP_CONNECTION string = mcpConnectionName
-// The evaluation environment (enableEvalMcp): empty when it is off.
-output DOCWIKI_EVAL_MCP_URL string = evalMcpEnabled ? evalMcpUrl : ''
-output DOCWIKI_EVAL_MCP_CONNECTION string = evalMcpEnabled ? evalMcpConnectionName : ''
+// The evaluation environment (evalMcpVariants): empty when it is off.
+output DOCWIKI_EVAL_MCP_VARIANTS_OUT string = evalMcpVariantsOut
+output DOCWIKI_EVAL_SMART_DEPLOYMENT string = foundry.outputs.evalSmartDeploymentName
 output DOCWIKI_PORTAL_APP_NAME string = portalApp.outputs.name
 output DOCWIKI_ENABLE_PORTAL bool = enablePortal
 output DOCWIKI_PORTAL_ANONYMOUS bool = portalAnonymous
