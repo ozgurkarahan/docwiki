@@ -275,6 +275,16 @@ agent of [ADR 0013](docs/adr/0013-index-first-researcher.md), measured on 2026-1
 baselines were measured on 2026-10-23 on the same questions and corpus. On 32 questions, a
 difference of one or two questions is noise.
 
+**The same agent without the wiki.** The baselines above are one-shot; the Researcher is an agent.
+To separate the two, the same Researcher was run on the same day with the compiled wiki hidden
+(only the documents' extracted blocks, their evidence and their tables:
+[the ablation](evals/experiments/2026-11-09-wiki-ablation.md)). Both arms answered 20 of 32
+questions: on this small corpus, the agent answers as many questions from the raw blocks as from
+the wiki, so the wiki's value is not in the answer count. The wiki made
+numbers more exact (8/9 against 6/9) and citations more precise (75 % against 67 %), and its
+computed views answered the cross-chantier money questions in one call; without it, the agent
+compared superseded revisions better.
+
 ## Cost
 
 - **Idle is close to zero.** Jobs and apps scale to zero, models are pay-per-token, and there is no
