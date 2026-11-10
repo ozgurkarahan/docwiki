@@ -17,6 +17,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from typing import Literal
 
+from docwiki.contracts.ids import RELEASE_ID_RE
 from docwiki.contracts.settings import SETTINGS_DEFAULTS, SettingsKeys
 
 __all__ = [
@@ -118,8 +119,16 @@ class McpConfig:
     """``raw``: an evaluation-only server that hides the compiled wiki and serves only the
     documents' extracted blocks, their evidence and their tables (the "agent without the wiki"
     arm of an ablation). Never set on a production server."""
+    pin_release: str | None = None
+    dense: bool = False
+    vectors: str | None = None
+    supersession_companions: bool = False
 
     def __post_init__(self) -> None:
+        if self.pin_release is not None and not RELEASE_ID_RE.fullmatch(self.pin_release):
+            raise ValueError(f"{SettingsKeys.MCP_PIN_RELEASE} must be a release id")
+        if self.dense and not self.vectors:
+            raise ValueError(f"{SettingsKeys.MCP_DENSE}=on requires {SettingsKeys.MCP_VECTORS}")
         if self.auth_mode not in ("none", "easyauth"):
             raise ValueError(f"unknown {SettingsKeys.AUTH_MODE}: {self.auth_mode!r}")
         if self.max_chars < MIN_MAX_CHARS:
@@ -200,6 +209,12 @@ class McpConfig:
             except ValueError:
                 raise ValueError(f"{key} must be a number, got {raw!r}") from None
 
+        def enabled(key: str) -> bool:
+            value = (get(key, "off") or "off").lower()
+            if value not in ("on", "off"):
+                raise ValueError(f"{key} must be 'on' or 'off'")
+            return value == "on"
+
         defaults = RoleConfig()
         roles = RoleConfig(
             claim_types=_split(get(SettingsKeys.ROLE_CLAIM)) or defaults.claim_types,
@@ -230,4 +245,8 @@ class McpConfig:
                 get(SettingsKeys.MCP_TOKEN_VALIDATION, "required") or "required"
             ).lower(),  # type: ignore[arg-type]
             wiki_ablation=(get(SettingsKeys.MCP_WIKI_ABLATION, "off") or "off").lower(),  # type: ignore[arg-type]
+            pin_release=get(SettingsKeys.MCP_PIN_RELEASE),
+            dense=enabled(SettingsKeys.MCP_DENSE),
+            vectors=get(SettingsKeys.MCP_VECTORS),
+            supersession_companions=enabled(SettingsKeys.MCP_SUPERSESSION_COMPANIONS),
         )
