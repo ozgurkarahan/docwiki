@@ -356,6 +356,7 @@ Known limitations, stated rather than hidden:
 - The restricted-value check is a heuristic fingerprint (distinctive numbers and codes); the
   `restricted` category's `forbidden` strings are exact.
 
+<<<<<<< HEAD
 ## Knowledge-access study helpers
 
 The knowledge-access experiment (`evals/experiments/2026-11-10-knowledge-access.md`) adds three
@@ -367,3 +368,60 @@ utilities:
   and virtual routed/oracle result arms (`apply`, `oracle`).
 - `evals/judge_llm.py`: blind structured LLM judge over result files (never sees arm names),
   with cited-evidence snippets and private-output handling for non-dev splits.
+=======
+## Search arms: `rag-plus` and `foundry-iq` (knowledge-access study, A1 and A8)
+
+`evals/systems_search.py` registers two systems over an Azure AI Search index of the same chunks
+as `baseline-rag` (`chunk_document`, 800 tokens, the documents of `--scope` the audience may see),
+answered with the same prompt, schema and citation mapping (`RAG_SYSTEM_PROMPT`,
+`BaselineAnswer`, one passage = one citation unit mapped to every locator of its blocks) and the
+same `smart` tier, so the arms differ only by retrieval:
+
+- `rag-plus` (A1): the `fast` tier splits the question into 1 to 4 search queries
+  (`rag-plus-decompose-v1`, structured output; the question itself is always searched too); each
+  query is a hybrid query (BM25 + vectors through the index vectorizer) with the semantic ranker,
+  top 20; the rankings are fused by reciprocal rank fusion (k 60) over the reranker order and the
+  8 best chunks are answered.
+- `foundry-iq` (A8): the question goes to the retrieve action of an Azure AI Search knowledge
+  base (query planning by the `fast` deployment, retrieval reasoning effort pinned to `low` on the
+  knowledge base, output mode `extractiveData`, no answer synthesis, at most 8 output documents);
+  its references map back to the index chunks and become the passages.
+
+The passage text always comes from the local chunks: `setup` checks that the index holds exactly
+those chunks (ids and text hashes) and refuses a stale index. Per question, `info` records the
+queries (or the knowledge base's planned queries), retrieved chunk ids, paths and locator keys
+(never text), timings and a cost breakdown; `cost_usd` adds to the LLM calls an estimate of the
+search charges at list price (semantic ranker USD 1 per 1,000 queries, agentic reasoning
+USD 0.022 per 1M tokens; monthly free grants and the hourly service unit are not attributed).
+`versions` records the API versions (`2026-04-01` for the index and queries, `2026-08-01-preview`
+for the knowledge source, knowledge base and retrieve), the index and knowledge base definition
+hashes, name hashes (never names or endpoints), the reasoning effort and the planner model.
+
+Set up once per environment with `scripts/eval_search_index.py` (idempotent; Entra only):
+
+```powershell
+uv run python scripts/eval_search_index.py provision   # Basic search service, Entra only, roles
+uv run python scripts/eval_search_index.py index       # chunks + embeddings, only what changed
+uv run python scripts/eval_search_index.py knowledge   # knowledge source + knowledge base
+uv run python scripts/eval_search_index.py status --ps1 <file outside the repository>
+```
+
+`provision` creates the service `srch-docwiki-eval-<resource token>` in the azd environment's
+resource group and region (Basic tier, semantic ranker standard plan, local authentication
+disabled, system-assigned identity), grants the signed-in user Search Index Data Contributor and
+Search Service Contributor, and the service identity Cognitive Services OpenAI User and
+Cognitive Services User on the Foundry account (vectorizer and planner). The runner needs
+`DOCWIKI_EVAL_SEARCH_ENDPOINT`, `DOCWIKI_EVAL_SEARCH_INDEX` and, for `foundry-iq`,
+`DOCWIKI_EVAL_SEARCH_KB` (printed by `status`; never commit them), plus the usual `fast`, `smart`
+and `embed` settings. Without them the systems report `not configured`.
+
+```powershell
+uv run python evals/run.py --system rag-plus --questions evals/golden/dev.jsonl
+uv run python evals/run.py --system foundry-iq --questions evals/golden/dev.jsonl
+```
+
+Limits: both arms depend on Azure AI Search (the knowledge base on a preview API that may change);
+the knowledge base sees the index, not the question's audience, so the index must be built with
+the run's `--scope` and `--audience` (the parity check enforces it). Local extraction has no OCR,
+as for the baselines.
+>>>>>>> 85d4ff8 (evals: rag-plus and foundry-iq search arms on Azure AI Search (A1, A8))
