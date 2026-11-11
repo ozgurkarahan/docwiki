@@ -1,15 +1,15 @@
 """Evaluation variants of the Researcher and of the MCP app it reads: ``agents/variants.yaml``.
 
-The knowledge-access study compares several arms; each arm is one MCP app (Bicep
-``evalMcpVariants``, ``DOCWIKI_*`` settings on top of the production ones) read by one evaluation
-Researcher agent (``docwiki-researcher-<name>``) that differs from the production Researcher only
-by its instructions, reasoning effort, model deployment and MCP endpoint.
+An evaluation compares several arms, as the knowledge-access study did; each arm is one MCP app
+(Bicep ``evalMcpVariants``, ``DOCWIKI_*`` settings on top of the production ones) read by one
+evaluation Researcher agent (``docwiki-researcher-<name>``) that differs from the production
+Researcher only by its instructions, reasoning effort, model deployment and MCP endpoint.
 
 Schema of ``variants.yaml``::
 
     mcp_variants:                          # value of the azd setting DOCWIKI_EVAL_MCP_VARIANTS
       raw: {DOCWIKI_MCP_WIKI_ABLATION: raw}
-      wiki2: {DOCWIKI_MCP_VECTORS: "${DOCWIKI_EVAL_MCP_VECTORS}"}   # ${NAME}: from the environment
+      wide: {DOCWIKI_MCP_MAX_CHARS: "${DOCWIKI_EVAL_MAX_CHARS}"}   # ${NAME}: from the environment
     agents:
       - name: r1                           # agent docwiki-researcher-r1
         base: researcher

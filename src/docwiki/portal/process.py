@@ -593,7 +593,6 @@ class ProcessService:
         }
 
     @staticmethod
-    @staticmethod
     def _follow_run(row: dict[str, Any], stage: str | None, in_run: bool) -> dict[str, Any]:
         """A document of the run at work is processing, even one whose earlier version is in the
         wiki: before its own stages (extract, classify, compile, recorded in its state) it is at
@@ -611,24 +610,6 @@ class ProcessService:
         elif stage not in PER_SOURCE_STAGES and (at > own or own == len(STAGE_NAMES)):
             row.update(stage=stage, step=at)
         row["phase"] = document_phase(row["stage"])
-        return row
-        at = STAGE_NAMES.index(stage) + 1
-        own = row["step"] if row["state"] == "processing" else None
-        if own is None:
-            # not started on its own stages yet: the run is discovering it, or it waits for extract
-            where = "extract" if stage in PER_SOURCE_STAGES else stage
-            row.update(state="processing", stage=where, step=STAGE_NAMES.index(where) + 1)
-        elif stage not in PER_SOURCE_STAGES and (at > own or own == len(STAGE_NAMES)):
-            row.update(stage=stage, step=at)
-        row["phase"] = document_phase(row["stage"])
-        return row
-        if row["state"] == "received" and stage == "discover":
-            row.update(state="processing", stage="discover", step=1, phase="read")
-        elif row["state"] == "processing" and stage not in PER_SOURCE_STAGES:
-            own = row["step"] or 0
-            at = STAGE_NAMES.index(stage) + 1
-            if at > own or own == len(STAGE_NAMES):
-                row.update(stage=stage, step=at, phase=document_phase(stage))
         return row
 
     @staticmethod

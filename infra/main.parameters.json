@@ -48,7 +48,6 @@
     "evalMcpImage": { "value": "${DOCWIKI_EVAL_MCP_IMAGE}" },
     "evalReleaseId": { "value": "${DOCWIKI_EVAL_RELEASE_ID}" },
     "evalSmartCapacity": { "value": "${DOCWIKI_EVAL_SMART_CAPACITY}" },
-    "evalEmbedAccess": { "value": "${DOCWIKI_EVAL_EMBED_ACCESS}" },
     "mcpConnectionName": { "value": "${DOCWIKI_MCP_CONNECTION}" },
     "portalClientId": { "value": "${DOCWIKI_PORTAL_CLIENT_ID}" },
     "portalOwners": { "value": "${DOCWIKI_PORTAL_OWNERS}" },

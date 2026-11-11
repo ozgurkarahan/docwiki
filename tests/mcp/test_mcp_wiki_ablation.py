@@ -8,7 +8,7 @@ from collections.abc import Callable
 from typing import Any
 
 import pytest
-from mcp_testkit import FIXTURE_ROOT, MINUTES
+from mcp_testkit import FIXTURE_ROOT, MINUTES, TOPIC_ID
 
 from docwiki.mcp.config import McpConfig
 from docwiki.mcp.source import FolderReleaseSource
@@ -70,6 +70,22 @@ def test_wiki_tools_are_switched_off(
         call(raw_reads)
     assert caught.value.code == "not_found"
     assert caught.value.details == {"wiki_ablation": "raw"}
+
+
+def test_not_found_recovery_distinguishes_raw_tools_from_bad_arguments(
+    reads: ReadTools, raw_reads: ReadTools
+) -> None:
+    with pytest.raises(ToolInputError) as unknown:
+        reads.read_page("topic:plannin")
+    assert unknown.value.code == "not_found"
+    assert TOPIC_ID in unknown.value.details["suggestions"]
+    assert "wiki_ablation" not in unknown.value.details
+    # Recovery on the same tool remains valid for a corrected page argument.
+    assert reads.read_page(TOPIC_ID)
+    with pytest.raises(ToolInputError) as unavailable:
+        raw_reads.read_page(TOPIC_ID)
+    assert unavailable.value.code == "not_found"
+    assert unavailable.value.details == {"wiki_ablation": "raw"}
 
 
 def test_evidence_and_tables_stay_available(raw_reads: ReadTools, as_json: Json) -> None:

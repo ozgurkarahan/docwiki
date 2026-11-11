@@ -196,13 +196,9 @@ never writes to the release it serves.
 | `DOCWIKI_WORK_DIR` | `.local` | Local work folder (`work/…`, folder queue `work/queue/*.json`) |
 | `DOCWIKI_RELEASE` | — | Default for `--release` |
 | `DOCWIKI_MCP_PIN_RELEASE` | — | Evaluation only: serve this immutable release id, ignoring `current.json`, in local and Azure modes; a missing release fails on first call. A direct release or portable folder must match this id |
-| `DOCWIKI_MCP_DENSE` | `off` | Evaluation only: `on` adds the dense lane to `answer_context` and `search` (RRF k=60, 50 hits per lane); requires `DOCWIKI_MCP_VECTORS`. No lexical fallback on failure |
-| `DOCWIKI_MCP_DENSE_TIMEOUT_SECONDS` | `20` | Query embedding deadline in seconds, including deployment metadata; must be in (0, 60]. Network retries and Retry-After sleeps are disabled for interactive dense queries; timeouts return `unavailable` |
-| `DOCWIKI_MCP_VECTORS` | — | Evaluation vector NPZ: a local filename, or `blob:work/<blob path>` (also `work/<blob path>` in Azure mode), read through the server's storage abstraction and managed identity |
-| `DOCWIKI_MCP_SUPERSESSION_COMPANIONS` | `off` | Evaluation only: `on` adds audience-filtered `revisions` metadata to source hits in `answer_context` and `search`; entirely omitted in raw ablation mode |
 | `DOCWIKI_MCP_MAX_CHARS` | `12000` | Output budget per tool result (minimum 2000) |
 | `DOCWIKI_MCP_POINTER_TTL_SECONDS` | `30` | Pointer re-check interval |
-| `DOCWIKI_MCP_WIKI_ABLATION` | `off` | `raw` on an evaluation server only: the compiled wiki is hidden and the read tools serve the documents' extracted blocks alone. `answer_context` and `search` return source blocks without revision status, home index, hub or views; `get_evidence` and `query_table` work as usual; `read_page`, `get_index`, `get_links`, `glossary`, `get_skill`, `list_skills` and `recent_changes` answer `not_found`. The search keeps the domain pack's synonyms. It is the "same agent, no wiki" arm of an ablation (Bicep `evalMcpWikiAblation`) |
+| `DOCWIKI_MCP_WIKI_ABLATION` | `off` | `raw` on an evaluation server only: the compiled wiki is hidden and the read tools serve the documents' extracted blocks alone. `answer_context` and `search` return source blocks without revision status, home index, hub or views; `get_evidence` and `query_table` work as usual; `read_page`, `get_index`, `get_links`, `glossary`, `get_skill`, `list_skills` and `recent_changes` answer `not_found`. The search keeps the domain pack's synonyms. It is the "same agent, no wiki" arm of an ablation (the `raw` variant of `agents/variants.yaml`) |
 | `DOCWIKI_QUERY_TABLE_MAX_ROWS` | `200` | Row cap of `query_table` (at most 200) |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | — | HTTP mode exports traces and `docwiki` logs to Application Insights |
 
@@ -210,64 +206,16 @@ HTTP endpoints: `POST /mcp` (stateless streamable HTTP, JSON responses; no trail
 `GET /healthz` (`{"status": "ok", "release_id": …}` or 503 while no release can be served).
 `create_app(...)` returns the ASGI application for other hosts and for tests.
 
-## Knowledge-access evaluation (W2 / R2, opt-in only)
+## Evaluation switches (opt-in only)
 
-Leave all evaluation switches unset in production. With the switches off, the existing result
-bytes and lexical ranking are unchanged; no embedding client or artifact is opened.
-`DOCWIKI_RELEASE` is a **local path** default for `--release`, even in Azure mode; it is not an
-Azure release-id pin. Use `DOCWIKI_MCP_PIN_RELEASE` for a release id in either mode. A pin can
-select a release from a releases root without a current pointer.
+Leave `DOCWIKI_MCP_PIN_RELEASE` and `DOCWIKI_MCP_WIKI_ABLATION` unset in production: they are for
+evaluation MCP apps only. `DOCWIKI_RELEASE` is a **local path** default for `--release`, even in
+Azure mode; it is not an Azure release-id pin. Use `DOCWIKI_MCP_PIN_RELEASE` for a release id in
+either mode. A pin can select a release from a releases root without a current pointer.
 
-Build an artifact from the exact release to be served:
-
-```powershell
-# Configure DOCWIKI_FOUNDRY_PROJECT_ENDPOINT, DOCWIKI_EMBED_DEPLOYMENT and
-# DOCWIKI_EMBED_DIMENSIONS for the evaluation deployment (managed identity / Azure CLI).
-uv run python scripts\build_eval_vectors.py --release <release-folder> --out .local\eval-vectors.npz --batch-size 64
-```
-
-The script embeds **every** `search.db` docs row in rowid order with Gate A's
-`build_embed_input(title, section, text)` rule (`embed-input-v1`). It prints the row count,
-embedding calls, tokens and ledger cost estimate (with `prices_verified`; not a price quote).
-It uses the `DOCWIKI_EMBED_*` settings of `docwiki.llm`, including dimensions, batch size,
-model/pricing override and rate limits. It never uses an answer model.
-
-Artifact format `docwiki.eval-vectors/v1` is an NPZ, read with `allow_pickle=False`:
-
-| NPZ entry | Type and content |
-|---|---|
-| `metadata` | Scalar JSON string: `format`, `release_id`, `model`, `model_version`, `dimensions`, `input_version`, `search_sha256` |
-| `rows` | Scalar JSON string: one stable key per row, in order: `[kind, page_id, path, anchor, source_id, locator_key]` |
-| `rowids` | int64 array, exactly every docs rowid in ascending order |
-| `matrix` | N × D float32, finite L2-normalised vectors |
-
-Artifacts are cached per served snapshot. First retrieval checks release, database hash, input
-version, complete row identities, matrix dimensions/dtype/norms and the live embedding client's
-model, version and dimensions. A wrong or missing artifact, or a failed embedding call, is an
-`unavailable` tool failure, never an implicit lexical answer. Queries use Gate A's verbatim
-`query-verbatim-v1` rule and a per-snapshot LRU cache of at most 256 question embeddings.
-Dense tools run in worker threads; async embedding clients are created and closed on the same
-event loop, including for direct Python callers.
-The query-cache lock protects only cache and per-question in-flight futures: different questions
-embed concurrently, while identical overlapping questions share one call (including its failure).
-Timed-out or failed calls are not cached and can be retried. SDK cleanup has a separate bound of
-at most one second. Dense tools share a dedicated eight-request worker limiter, leaving the
-default AnyIO pool available to `/healthz`; waiting callers also have a bounded wait.
-
-Both lanes share SearchIndex's kinds/types/entity/topic/within/language-tree filters. The dense
-lane also applies row and catalog audience checks before ranking; existing context de-duplication,
-audience and navigation-page exclusions remain after fusion. Enabled results alone add
-`retrieval: {"mode": "hybrid", "rrf_k": 60, "lane_depth": 50}`; search scores are fused RRF scores.
-The hybrid candidate set is bounded by the two lanes (at most 100 unique hits); offsets page
-within that set.
-
-Companions contain only `{source_id, title, status, path, relation}` for `supersedes` or
-`superseded_by`, derived from source frontmatter and catalog edges, never companion text.
-They are omitted entirely in `DOCWIKI_MCP_WIKI_ABLATION=raw`, even when the companion flag is
-on: revision status and links are compiled knowledge, not raw-document evidence.
-Use `agents/variants/v2/instructions.md` for evaluation only; production Researcher instructions
-are unchanged. W2 enables dense retrieval and companions; R2 also sets the existing raw ablation
-flag (so companions stay hidden).
+The knowledge-access study also tried a dense lane and superseded revisions shown next to current
+ones (arms W2 and R2). Both were removed after the study; commit `e8bbd14` reproduces them
+(`evals/experiments/2026-11-10-knowledge-access.md`).
 
 ## Local agents
 

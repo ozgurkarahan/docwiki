@@ -929,11 +929,10 @@ def test_eval_mcp_variants_are_off_by_default_and_need_the_production_auth() -> 
         "evalMcpImage string = ''",
         "evalReleaseId string = ''",
         "evalSmartCapacity int = 0",
-        "evalEmbedAccess bool = false",
         "evalMcpAllowedClientIds string = ''",
     ):
         assert re.search(rf"^param {re.escape(declaration)}$", main, re.MULTILINE), declaration
-    assert not re.search(r"enableEvalMcp|evalMcpWikiAblation|mcpEvalApp:", main)
+    assert not re.search(r"enableEvalMcp|evalMcpWikiAblation|mcpEvalApp:|evalEmbedAccess", main)
     assert "base64ToJson(evalMcpVariants)" in main, "azd substitutes raw text: base64, not JSON"
     assert "var evalMcpVariantList = mcpPublic && !empty(evalMcpVariants)" in main
     assert "var evalMcpEnabled = !empty(evalMcpVariantList)" in main
@@ -944,7 +943,6 @@ def test_eval_mcp_variants_are_off_by_default_and_need_the_production_auth() -> 
         "evalMcpImage": {"value": "${DOCWIKI_EVAL_MCP_IMAGE}"},
         "evalReleaseId": {"value": "${DOCWIKI_EVAL_RELEASE_ID}"},
         "evalSmartCapacity": {"value": "${DOCWIKI_EVAL_SMART_CAPACITY}"},
-        "evalEmbedAccess": {"value": "${DOCWIKI_EVAL_EMBED_ACCESS}"},
     }
     assert "enableEvalMcp" not in json.dumps(mapped)
     assert re.search(r"^module mcpEvalApp 'modules/container-app.bicep' = \[$", main, re.M)
@@ -1012,19 +1010,10 @@ def test_eval_mcp_app_mirrors_production_except_name_replicas_tags_and_env() -> 
     assert re.search(r"env: concat\(\s*sharedEnv,", app), "same storage and release settings"
     allowed = main[main.index("var evalMcpAllowedApplications") : main.index("var evalMcpAppImage")]
     assert "union(\n  mcpAllowedApplications," in allowed, "the production agents stay allowed"
-    # Additions: the pin and embedding settings, then the variant env (DOCWIKI_MCP_* only, never
-    # the authentication settings), which wins over both.
+    # Additions: the pin, then the variant env (DOCWIKI_MCP_* only, never the authentication
+    # settings), which wins over it.
     extra = _env(main[main.index("var evalMcpExtraEnv") : main.index("module mcpEvalApp")])
-    assert extra == {
-        "DOCWIKI_MCP_PIN_RELEASE": "evalReleaseId",
-        "DOCWIKI_FOUNDRY_PROJECT_ENDPOINT": "foundry.outputs.projectEndpoint",
-        "DOCWIKI_EMBED_DEPLOYMENT": "foundry.outputs.embedDeploymentName",
-        "DOCWIKI_EMBED_MODEL": "embedModel",
-        "DOCWIKI_EMBED_DIMENSIONS": "string(embedDimensions)",
-        "DOCWIKI_EMBED_TPM": "string(embedTokensPerMinute)",
-        "DOCWIKI_EMBED_RPM": "string(embedRequestsPerMinute)",
-    }
-    assert "evalEmbedAccess && embedCapacity > 0" in main
+    assert extra == {"DOCWIKI_MCP_PIN_RELEASE": "evalReleaseId"}
     assert "empty(evalReleaseId)" in main
     assert "startsWith(item.key, 'DOCWIKI_MCP_') && !contains(evalMcpProtectedEnv, item.key)" in app
     protected = main[main.index("var evalMcpProtectedEnv") : main.index("// What every evaluation")]
@@ -1081,7 +1070,6 @@ def test_compiled_eval_mcp_is_conditional(compiled: dict[str, Any]) -> None:
         assert not _names_eval(text), name
     foundry = modules["foundry"]["properties"]["parameters"]
     assert foundry["evalSmartCapacity"] == {"value": "[parameters('evalSmartCapacity')]"}
-    assert "evalEmbedAccess" in json.dumps(foundry["evalMcpPrincipalId"])
     outputs = compiled["outputs"]
     assert "DOCWIKI_EVAL_MCP_URL" not in outputs and "DOCWIKI_EVAL_MCP_CONNECTION" not in outputs
     value = outputs["DOCWIKI_EVAL_MCP_VARIANTS_OUT"]["value"]
@@ -1091,10 +1079,9 @@ def test_compiled_eval_mcp_is_conditional(compiled: dict[str, Any]) -> None:
     assert len(outputs) <= 64
 
 
-def test_eval_smart_deployment_and_embed_access_are_optional_in_the_foundry_module() -> None:
+def test_eval_smart_deployment_is_optional_in_the_foundry_module() -> None:
     foundry = (INFRA / "modules" / "foundry.bicep").read_text(encoding="utf-8")
     assert re.search(r"^param evalSmartCapacity int = 0$", foundry, re.MULTILINE)
-    assert re.search(r"^param evalMcpPrincipalId string = ''$", foundry, re.MULTILINE)
     smart = foundry[foundry.index("resource smartDeployment") : foundry.index("// Embeddings")]
     twin = foundry[foundry.index("resource evalSmartDeployment") : foundry.index("// Server-side")]
     assert (
@@ -1108,11 +1095,7 @@ def test_eval_smart_deployment_and_embed_access_are_optional_in_the_foundry_modu
         assert same in smart and same in twin, same
     assert "capacity: evalSmartCapacity" in twin
     assert "output evalSmartDeploymentName string = deployEvalSmart ? " in foundry
-    role = foundry[foundry.index("resource evalMcpCognitiveServicesUser") :]
-    role = role[: role.index("// The deployer creates agents")]
-    assert (
-        "if (grantEvalMcp)" in role and "var grantEvalMcp = !empty(evalMcpPrincipalId)" in foundry
-    )
-    assert "roleIds.cognitiveServicesUser" in role and "principalId: evalMcpPrincipalId" in role
+    # The MCP identity is shared by the production and evaluation apps: no Foundry role for it.
     main = main_text()
-    assert "evalMcpPrincipalId: evalEmbedAccess && evalMcpEnabled ? mcpIdentity" in main
+    module = main[main.index("module foundry ") : main.index("module containerAppsEnvironment")]
+    assert "mcpIdentity" not in module and "evalMcp" not in foundry

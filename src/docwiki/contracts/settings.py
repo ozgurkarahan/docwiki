@@ -55,10 +55,6 @@ class SettingsKeys:
     MCP_TOKEN_VALIDATION = "DOCWIKI_MCP_TOKEN_VALIDATION"  # required | off (easyauth mode)
     MCP_WIKI_ABLATION = "DOCWIKI_MCP_WIKI_ABLATION"  # off | raw (evaluation: source blocks only)
     MCP_PIN_RELEASE = "DOCWIKI_MCP_PIN_RELEASE"  # evaluation: immutable release id
-    MCP_DENSE = "DOCWIKI_MCP_DENSE"  # off | on (evaluation only)
-    MCP_DENSE_TIMEOUT_SECONDS = "DOCWIKI_MCP_DENSE_TIMEOUT_SECONDS"
-    MCP_VECTORS = "DOCWIKI_MCP_VECTORS"  # local artifact or work/ blob key
-    MCP_SUPERSESSION_COMPANIONS = "DOCWIKI_MCP_SUPERSESSION_COMPANIONS"  # off | on
     RESEARCH_MAX_TOOL_CALLS = "DOCWIKI_RESEARCH_MAX_TOOL_CALLS"
     QUERY_TABLE_MAX_ROWS = "DOCWIKI_QUERY_TABLE_MAX_ROWS"
     DENYLIST = "DOCWIKI_DENYLIST"  # leak-guard deny-list path, outside the repository
@@ -94,9 +90,6 @@ SETTINGS_DEFAULTS: dict[str, str] = {
     SettingsKeys.MCP_POINTER_TTL_SECONDS: "30",
     SettingsKeys.MCP_TOKEN_VALIDATION: "required",
     SettingsKeys.MCP_WIKI_ABLATION: "off",
-    SettingsKeys.MCP_DENSE: "off",
-    SettingsKeys.MCP_DENSE_TIMEOUT_SECONDS: "20",
-    SettingsKeys.MCP_SUPERSESSION_COMPANIONS: "off",
     SettingsKeys.RESEARCH_MAX_TOOL_CALLS: "12",
     SettingsKeys.QUERY_TABLE_MAX_ROWS: "200",
 }
