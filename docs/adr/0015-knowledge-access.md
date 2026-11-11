@@ -56,9 +56,26 @@ effect of the wiki from the effect of v2.
 
 ## Decision
 
-**No single approach wins. For this corpus, the recommended way to consume the documents is long
-context (A2); the production Researcher (W1, agent on the compiled wiki) stays, because it is
-tied with it and has the highest accuracy.**
+**DocWiki keeps the agent working inside the compiled wiki (W1, the production Researcher of
+ADR 0013) as its way to consume the documents.** Owner decision of 2026-11-11, taken after
+reading the blind results below.
+
+How sure is it? The blind study ranks W1 first (81.9 %) but cannot separate it from long context
+(78.3 %) or optimised retrieval (77.8 %): the gaps are inside the noise of 120 questions. The
+pre-registered tie-break, applied mechanically, recommends long context (A2) for this corpus,
+and that outcome stays on record. The owner chooses W1 because:
+
+- it has the highest accuracy and the best numeric exactness, and the largest leads where the
+  domain needs them: superseded revisions (79 % against 61 to 67 % for the other agents and 27 to
+  55 % for retrieval and long context) and tables (+12 points over the same agent without the
+  wiki);
+- long context only works while every document fits in one prompt; the wiki and its tools do not
+  have that ceiling;
+- every claim points to a verified quote in the wiki, which is what DocWiki exists to show.
+
+This is a product choice made on a statistical tie, not a proof that the wiki is the best
+approach. The guide keeps long context and hybrid retrieval as the baselines to beat on other
+corpora.
 
 Blind results (120 questions, 3 runs per arm, mean single-run accuracy):
 
@@ -79,7 +96,8 @@ Applying the pre-registered rule:
 
 1. No arm beats every other significantly. Only A0 is worse than W1 (Holm p = 0.005).
 2. The set within 5 points of the best is {W1, W2-high, W2, A2, A1, Router}. Ordered by claim
-   support (the first tie-break), A2 leads with 81.5 %, so A2 is the recommended arm.
+   support (the first tie-break), A2 leads with 81.5 % (W1 79.1 %; the 2.4-point gap was not
+   tested), so the rule's recommended arm is A2.
 3. No arm leaked a restricted value or followed the planted injection.
 
 What the 2 x 2 says: the compiled wiki adds +4.4 points inside the same agent (not significant
@@ -87,9 +105,15 @@ after correction, raw p = 0.031); the v2 instructions and dense lane add nothing
 does not beat its best arm, while an oracle that picks the best arm per question reaches 95 %: the
 approaches fail on different questions, but not in a way a question classifier can predict.
 
-Where the wiki earns its cost: superseded revisions (79 % for the wiki agents against 27 to 55 %
-for every retrieval and long-context arm), tables (87 %), contradictions and numeric exactness.
-Where it does not: lookups that one search finds, and abstention (81 %, lower than retrieval).
+Where the wiki earns its cost: superseded revisions (79 % for W1 against 61 to 67 % for the other
+agents and 27 to 55 % for every retrieval and long-context arm), tables (87 %), contradictions and
+numeric exactness. Where it does not: lookups that one search finds, and abstention (81 %, lower
+than retrieval).
+
+On the 32 development questions the order was reversed (W2-high first at 77.1 %, W1 last at
+59.4 %): deciding on the development split would have shipped a costlier agent that is not
+better. How the study was run, the research behind each arm and every check:
+[method](../../evals/experiments/2026-11-10-knowledge-access/method.md).
 
 The rule is fixed in the study before any blind run: the primary measure is mean single-run
 accuracy over 3 runs on 120 blind questions; the recommended arm must beat every other arm by a
@@ -100,10 +124,9 @@ restricted-value leak or an injection success excludes an arm.
 
 ## Consequences
 
-- **Production does not change.** The Researcher keeps the definition of ADR 0013 (W1): it is in
-  the recommended set, has the highest accuracy, and DocWiki's purpose is to show a cited wiki
-  that agents work inside. Switching the demo to long context would hide the pattern it shows and
-  would not scale past a corpus that fits in one prompt.
+- **Production does not change.** The Researcher keeps the definition of ADR 0013 (W1). Moving
+  to long context, a router, the v2 instructions or high reasoning effort needs a new
+  pre-registered study that beats W1 on blind questions.
 - **ADR 0001 is refined, not reversed.** The compiled wiki is worth it for revisions, tables,
   contradictions and audit; it is not a better general retriever. The guide now says so, with
   long context or hybrid retrieval as the baseline to beat on other corpora.
@@ -121,6 +144,7 @@ restricted-value leak or an injection success excludes an arm.
 ## Links
 
 - Study and freeze addendum: [`evals/experiments/2026-11-10-knowledge-access.md`](../../evals/experiments/2026-11-10-knowledge-access.md)
+- Method, research and checks: [`method.md`](../../evals/experiments/2026-11-10-knowledge-access/method.md)
 - Previous result: [`evals/experiments/2026-11-09-wiki-ablation.md`](../../evals/experiments/2026-11-09-wiki-ablation.md)
 - Failed gates: [A](../../evals/experiments/2026-11-01-gate-a.md),
   [F3](../../evals/experiments/2026-11-01-f3-coverage.md),

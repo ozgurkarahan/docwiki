@@ -293,9 +293,12 @@ by an independent author, 3 times each, under a decision rule committed before a
 [ADR 0015](docs/adr/0015-knowledge-access.md)). The agent on the wiki scores highest (81.9 %),
 tied with one model reading every document (78.3 %, best claim support, 2.6 times cheaper per
 correct answer) and optimised hybrid RAG (77.8 %); only naive RAG is significantly worse
-(66.7 %). The wiki leads clearly on superseded revisions (79 % against 27 to 55 %) and tables. A
-router and high reasoning effort did not help. What this means for your own corpus:
-[How should an agent use a knowledge base?](docs/knowledge-access.md)
+(66.7 %). The wiki leads clearly on superseded revisions (79 % against 27 to 55 % for retrieval
+and long context) and tables. A router and high reasoning effort did not help. DocWiki keeps the
+agent on the wiki (a product choice on a statistical tie; the pre-registered tie-break pointed to
+long context). How the study was run, the research and every check:
+[method](evals/experiments/2026-11-10-knowledge-access/method.md). What this means for your own
+corpus: [How should an agent use a knowledge base?](docs/knowledge-access.md)
 
 ## Cost
 

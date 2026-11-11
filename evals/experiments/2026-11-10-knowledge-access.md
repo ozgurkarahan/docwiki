@@ -227,3 +227,10 @@ on the wiki, long context and optimised RAG, broken by claim support.
 
 Cost of the study (unverified prices): blind answers about $255 (the router reuses the answers of
 its arms), blind judge about $80, development runs about $100.
+
+**Owner decision (2026-11-11, after the results).** DocWiki keeps W1, the agent on the compiled
+wiki, as its Researcher: the most accurate arm, ahead on revisions, tables and numbers, and not
+limited to a corpus that fits in one prompt. The rule's recommendation (A2) stays on record; the
+choice is made on a statistical tie ([ADR 0015](../../docs/adr/0015-knowledge-access.md)). The
+method, the research behind each arm and every check:
+[`method.md`](2026-11-10-knowledge-access/method.md).
