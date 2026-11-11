@@ -285,6 +285,18 @@ numbers more exact (8/9 against 6/9) and citations more precise (75 % against 67
 computed views answered the cross-chantier money questions in one call; without it, the agent
 compared superseded revisions better.
 
+**Blind study: how should an agent consume the documents?** Ten approaches (naive and optimised
+RAG, long context, the wiki in context, managed agentic retrieval, the agent with and without the
+wiki, improved instructions, high reasoning effort, a router) answered 120 blind questions written
+by an independent author, 3 times each, under a decision rule committed before any blind run
+([the study](evals/experiments/2026-11-10-knowledge-access.md),
+[ADR 0015](docs/adr/0015-knowledge-access.md)). The agent on the wiki scores highest (81.9 %),
+tied with one model reading every document (78.3 %, best claim support, 2.6 times cheaper per
+correct answer) and optimised hybrid RAG (77.8 %); only naive RAG is significantly worse
+(66.7 %). The wiki leads clearly on superseded revisions (79 % against 27 to 55 %) and tables. A
+router and high reasoning effort did not help. What this means for your own corpus:
+[How should an agent use a knowledge base?](docs/knowledge-access.md)
+
 ## Cost
 
 - **Idle is close to zero.** Jobs and apps scale to zero, models are pay-per-token, and there is no
@@ -367,6 +379,7 @@ vulnerabilities privately: [SECURITY.md](SECURITY.md).
 | [Local agents](docs/local-agents.md) | GitHub Copilot (VS Code and CLI), Claude Code and Codex on a release |
 | [Security](docs/security.md) | Threat model, identity model, leak guard, publication process |
 | [Evaluation](docs/evaluation.md) | Golden set, systems, metrics, honesty rules |
+| [Knowledge access](docs/knowledge-access.md) | RAG, long context, compiled wiki or agent: research and DocWiki's blind results |
 | [Cost](docs/cost.md) | Cost model and levers |
 | [Domain packs](docs/domain-packs.md) | Adapting DocWiki to your industry |
 | [FAQ](docs/faq.md) | Short answers to the usual questions |

@@ -1,0 +1,452 @@
+[
+  {
+    "file": "2026-11-10-baseline-long-context-blind-test-r1-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.833333,
+      "partial_share": 0.158333,
+      "wrong_share": 0.008333,
+      "supported_mean": 0.8245,
+      "values_assigned_share": 0.93578,
+      "abstained_correctly_share": 1.0,
+      "estimated_cost_usd": 2.212338,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-baseline-long-context-blind-test-r2-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.8,
+      "partial_share": 0.191667,
+      "wrong_share": 0.008333,
+      "supported_mean": 0.796083,
+      "values_assigned_share": 0.945455,
+      "abstained_correctly_share": 0.833333,
+      "estimated_cost_usd": 2.275636,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-baseline-long-context-blind-test-r3-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.858333,
+      "partial_share": 0.141667,
+      "wrong_share": 0.0,
+      "supported_mean": 0.823917,
+      "values_assigned_share": 0.927928,
+      "abstained_correctly_share": 1.0,
+      "estimated_cost_usd": 2.33475,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-baseline-rag-blind-test-r1-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.658333,
+      "partial_share": 0.191667,
+      "wrong_share": 0.15,
+      "supported_mean": 0.631333,
+      "values_assigned_share": 0.781818,
+      "abstained_correctly_share": 0.333333,
+      "estimated_cost_usd": 3.139046,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-baseline-rag-blind-test-r2-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.658333,
+      "partial_share": 0.208333,
+      "wrong_share": 0.133333,
+      "supported_mean": 0.629667,
+      "values_assigned_share": 0.790909,
+      "abstained_correctly_share": 0.35,
+      "estimated_cost_usd": 3.027424,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-baseline-rag-blind-test-r3-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.691667,
+      "partial_share": 0.191667,
+      "wrong_share": 0.116667,
+      "supported_mean": 0.639917,
+      "values_assigned_share": 0.801802,
+      "abstained_correctly_share": 0.368421,
+      "estimated_cost_usd": 3.035472,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-docwiki-researcher-r1-blind-test-r1-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.8,
+      "partial_share": 0.183333,
+      "wrong_share": 0.016667,
+      "supported_mean": 0.789833,
+      "values_assigned_share": 0.918919,
+      "abstained_correctly_share": 0.857143,
+      "estimated_cost_usd": 2.42725,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-docwiki-researcher-r1-blind-test-r2-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.766667,
+      "partial_share": 0.2,
+      "wrong_share": 0.033333,
+      "supported_mean": 0.751417,
+      "values_assigned_share": 0.890909,
+      "abstained_correctly_share": 0.8,
+      "estimated_cost_usd": 2.440855,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-docwiki-researcher-r1-blind-test-r3-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.783333,
+      "partial_share": 0.166667,
+      "wrong_share": 0.05,
+      "supported_mean": 0.764333,
+      "values_assigned_share": 0.873874,
+      "abstained_correctly_share": 0.75,
+      "estimated_cost_usd": 2.346885,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-docwiki-researcher-r2-blind-test-r1-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.766667,
+      "partial_share": 0.2,
+      "wrong_share": 0.033333,
+      "supported_mean": 0.812583,
+      "values_assigned_share": 0.855856,
+      "abstained_correctly_share": 0.875,
+      "estimated_cost_usd": 2.613241,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-docwiki-researcher-r2-blind-test-r2-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.783333,
+      "partial_share": 0.216667,
+      "wrong_share": 0.0,
+      "supported_mean": 0.790333,
+      "values_assigned_share": 0.882883,
+      "abstained_correctly_share": 1.0,
+      "estimated_cost_usd": 2.532064,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-docwiki-researcher-r2-blind-test-r3-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.816667,
+      "partial_share": 0.141667,
+      "wrong_share": 0.041667,
+      "supported_mean": 0.801417,
+      "values_assigned_share": 0.90991,
+      "abstained_correctly_share": 1.0,
+      "estimated_cost_usd": 2.422166,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-docwiki-researcher-w1-blind-test-r1-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.791667,
+      "partial_share": 0.191667,
+      "wrong_share": 0.016667,
+      "supported_mean": 0.800417,
+      "values_assigned_share": 0.909091,
+      "abstained_correctly_share": 1.0,
+      "estimated_cost_usd": 2.380045,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-docwiki-researcher-w1-blind-test-r2-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.825,
+      "partial_share": 0.133333,
+      "wrong_share": 0.041667,
+      "supported_mean": 0.798,
+      "values_assigned_share": 0.927273,
+      "abstained_correctly_share": 0.5,
+      "estimated_cost_usd": 2.391003,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-docwiki-researcher-w1-blind-test-r3-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.8,
+      "partial_share": 0.141667,
+      "wrong_share": 0.058333,
+      "supported_mean": 0.774833,
+      "values_assigned_share": 0.872727,
+      "abstained_correctly_share": 0.555556,
+      "estimated_cost_usd": 2.352038,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-docwiki-researcher-w2-blind-test-r1-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.808333,
+      "partial_share": 0.166667,
+      "wrong_share": 0.025,
+      "supported_mean": 0.802667,
+      "values_assigned_share": 0.909091,
+      "abstained_correctly_share": 0.7,
+      "estimated_cost_usd": 2.453366,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-docwiki-researcher-w2-blind-test-r2-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.8,
+      "partial_share": 0.175,
+      "wrong_share": 0.025,
+      "supported_mean": 0.7745,
+      "values_assigned_share": 0.899083,
+      "abstained_correctly_share": 0.714286,
+      "estimated_cost_usd": 2.554009,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-docwiki-researcher-w2-blind-test-r3-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.841667,
+      "partial_share": 0.15,
+      "wrong_share": 0.008333,
+      "supported_mean": 0.819333,
+      "values_assigned_share": 0.927928,
+      "abstained_correctly_share": 1.0,
+      "estimated_cost_usd": 2.516707,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-docwiki-researcher-w2high-blind-test-r1-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.783333,
+      "partial_share": 0.183333,
+      "wrong_share": 0.033333,
+      "supported_mean": 0.7845,
+      "values_assigned_share": 0.890909,
+      "abstained_correctly_share": 1.0,
+      "estimated_cost_usd": 2.536681,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-docwiki-researcher-w2high-blind-test-r2-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.825,
+      "partial_share": 0.15,
+      "wrong_share": 0.025,
+      "supported_mean": 0.805,
+      "values_assigned_share": 0.936937,
+      "abstained_correctly_share": 1.0,
+      "estimated_cost_usd": 2.468587,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-docwiki-researcher-w2high-blind-test-r3-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.816667,
+      "partial_share": 0.166667,
+      "wrong_share": 0.016667,
+      "supported_mean": 0.8135,
+      "values_assigned_share": 0.90991,
+      "abstained_correctly_share": 1.0,
+      "estimated_cost_usd": 2.489368,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-foundry-iq-blind-test-r1-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.725,
+      "partial_share": 0.2,
+      "wrong_share": 0.075,
+      "supported_mean": 0.678,
+      "values_assigned_share": 0.844037,
+      "abstained_correctly_share": 0.636364,
+      "estimated_cost_usd": 3.143413,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-foundry-iq-blind-test-r2-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.716667,
+      "partial_share": 0.241667,
+      "wrong_share": 0.041667,
+      "supported_mean": 0.673417,
+      "values_assigned_share": 0.837838,
+      "abstained_correctly_share": 0.571429,
+      "estimated_cost_usd": 3.157465,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-foundry-iq-blind-test-r3-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.75,
+      "partial_share": 0.15,
+      "wrong_share": 0.1,
+      "supported_mean": 0.681333,
+      "values_assigned_share": 0.837838,
+      "abstained_correctly_share": 0.636364,
+      "estimated_cost_usd": 3.145719,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-rag-plus-blind-test-r1-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.7,
+      "partial_share": 0.25,
+      "wrong_share": 0.05,
+      "supported_mean": 0.679833,
+      "values_assigned_share": 0.899083,
+      "abstained_correctly_share": 0.625,
+      "estimated_cost_usd": 3.342814,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-rag-plus-blind-test-r2-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.816667,
+      "partial_share": 0.166667,
+      "wrong_share": 0.016667,
+      "supported_mean": 0.7135,
+      "values_assigned_share": 0.927928,
+      "abstained_correctly_share": 0.875,
+      "estimated_cost_usd": 3.283973,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-rag-plus-blind-test-r3-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.791667,
+      "partial_share": 0.191667,
+      "wrong_share": 0.016667,
+      "supported_mean": 0.682833,
+      "values_assigned_share": 0.9,
+      "abstained_correctly_share": 0.857143,
+      "estimated_cost_usd": 3.301995,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-wiki-long-context-blind-test-r1-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.8,
+      "partial_share": 0.125,
+      "wrong_share": 0.075,
+      "supported_mean": 0.8025,
+      "values_assigned_share": 0.825688,
+      "abstained_correctly_share": 0.421053,
+      "estimated_cost_usd": 2.075601,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-wiki-long-context-blind-test-r2-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.75,
+      "partial_share": 0.15,
+      "wrong_share": 0.1,
+      "supported_mean": 0.758,
+      "values_assigned_share": 0.836364,
+      "abstained_correctly_share": 0.35,
+      "estimated_cost_usd": 2.166128,
+      "errors": 0
+    }
+  },
+  {
+    "file": "2026-11-10-wiki-long-context-blind-test-r3-judge-llm.json",
+    "prompt_version": "knowledge-access-judge-v2",
+    "aggregates": {
+      "questions": 120,
+      "correct_share": 0.741667,
+      "partial_share": 0.166667,
+      "wrong_share": 0.091667,
+      "supported_mean": 0.78225,
+      "values_assigned_share": 0.818182,
+      "abstained_correctly_share": 0.315789,
+      "estimated_cost_usd": 2.154495,
+      "errors": 0
+    }
+  }
+]

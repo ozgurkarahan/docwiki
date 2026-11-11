@@ -1,0 +1,727 @@
+{
+  "format": "docwiki.evals.result/v1",
+  "system": "wiki-long-context",
+  "split": "blind-test",
+  "status": "ok",
+  "skipped": null,
+  "run": {
+    "started_at": "2026-11-10T19:30:56Z",
+    "finished_at": "2026-11-10T21:30:21Z",
+    "date": "2026-11-10",
+    "duration_s": 7165.932,
+    "questions": 120,
+    "questions_total": 120,
+    "complete": true,
+    "limit": null,
+    "concurrency": 2,
+    "label": "r2"
+  },
+  "questions_file": {
+    "file": "blind-test.jsonl",
+    "sha256": "dcac5289f5559597e48da1b63155d875ed0c259803037127d3b34387f05c184f",
+    "questions": 120,
+    "seal": null
+  },
+  "config": {
+    "system": {
+      "budget_tokens": 120000,
+      "estimated_tokens": 120000,
+      "max_output_tokens": 6000,
+      "release_id": "20261027T222241Z-f4e7ba11",
+      "context": {
+        "budget_tokens": 120000,
+        "prompt_tokens": 215,
+        "question_margin_tokens": 1000,
+        "max_output_tokens": 6000,
+        "context_budget_tokens": 112785,
+        "context_budget_chars": 451140,
+        "context_chars": 451140,
+        "remaining_chars": 0,
+        "included_pages": 35,
+        "excluded_pages": 147,
+        "included_chars": 451072,
+        "excluded_chars": 1100888,
+        "truncated_pages": [
+          "wiki/topics/ecole-montferrine/marche-et-avenants.md",
+          "wiki/topics/ecole-montferrine/planning.md",
+          "wiki/topics/ecole-montferrine/reception-et-reserves.md",
+          "wiki/topics/ecole-montferrine/situations-et-paiements.md",
+          "wiki/topics/ecole-montferrine/suivi-de-chantier.md",
+          "wiki/topics/entreprise/achats.md",
+          "wiki/topics/entreprise/planning.md",
+          "wiki/topics/entreprise/reception-et-reserves.md",
+          "wiki/topics/entreprise/situations-et-paiements.md",
+          "wiki/topics/equipes-et-materiel.md",
+          "wiki/topics/fournisseurs-et-contrat-cadre.md",
+          "wiki/topics/index.md",
+          "wiki/topics/moreau/achats.md",
+          "wiki/topics/moreau/marche-et-avenants.md",
+          "wiki/topics/moreau/planning.md",
+          "wiki/topics/moreau/reception-et-reserves.md",
+          "wiki/topics/moreau/situations-et-paiements.md",
+          "wiki/topics/moreau/suivi-de-chantier.md",
+          "wiki/topics/nacrines/marche-et-avenants.md",
+          "wiki/topics/nacrines/planning.md",
+          "wiki/topics/nacrines/reception-et-reserves.md",
+          "wiki/topics/nacrines/situations-et-paiements.md",
+          "wiki/topics/nacrines/suivi-de-chantier.md",
+          "wiki/topics/sous-traitance-et-conformite.md"
+        ],
+        "groups": {
+          "home": {
+            "total_pages": 1,
+            "total_chars": 10669,
+            "included_pages": 1,
+            "included_chars": 10669,
+            "excluded_pages": 0,
+            "excluded_chars": 0,
+            "truncated_pages": [],
+            "stopped_at": null
+          },
+          "chantiers": {
+            "total_pages": 5,
+            "total_chars": 30911,
+            "included_pages": 5,
+            "included_chars": 30911,
+            "excluded_pages": 0,
+            "excluded_chars": 0,
+            "truncated_pages": [],
+            "stopped_at": null
+          },
+          "views": {
+            "total_pages": 5,
+            "total_chars": 11740,
+            "included_pages": 5,
+            "included_chars": 11740,
+            "excluded_pages": 0,
+            "excluded_chars": 0,
+            "truncated_pages": [],
+            "stopped_at": null
+          },
+          "topics": {
+            "total_pages": 24,
+            "total_chars": 419415,
+            "included_pages": 24,
+            "included_chars": 397752,
+            "excluded_pages": 0,
+            "excluded_chars": 21663,
+            "truncated_pages": [
+              "wiki/topics/ecole-montferrine/marche-et-avenants.md",
+              "wiki/topics/ecole-montferrine/planning.md",
+              "wiki/topics/ecole-montferrine/reception-et-reserves.md",
+              "wiki/topics/ecole-montferrine/situations-et-paiements.md",
+              "wiki/topics/ecole-montferrine/suivi-de-chantier.md",
+              "wiki/topics/entreprise/achats.md",
+              "wiki/topics/entreprise/planning.md",
+              "wiki/topics/entreprise/reception-et-reserves.md",
+              "wiki/topics/entreprise/situations-et-paiements.md",
+              "wiki/topics/equipes-et-materiel.md",
+              "wiki/topics/fournisseurs-et-contrat-cadre.md",
+              "wiki/topics/index.md",
+              "wiki/topics/moreau/achats.md",
+              "wiki/topics/moreau/marche-et-avenants.md",
+              "wiki/topics/moreau/planning.md",
+              "wiki/topics/moreau/reception-et-reserves.md",
+              "wiki/topics/moreau/situations-et-paiements.md",
+              "wiki/topics/moreau/suivi-de-chantier.md",
+              "wiki/topics/nacrines/marche-et-avenants.md",
+              "wiki/topics/nacrines/planning.md",
+              "wiki/topics/nacrines/reception-et-reserves.md",
+              "wiki/topics/nacrines/situations-et-paiements.md",
+              "wiki/topics/nacrines/suivi-de-chantier.md",
+              "wiki/topics/sous-traitance-et-conformite.md"
+            ],
+            "stopped_at": null
+          },
+          "sources": {
+            "total_pages": 39,
+            "total_chars": 462312,
+            "included_pages": 0,
+            "included_chars": 0,
+            "excluded_pages": 39,
+            "excluded_chars": 462312,
+            "truncated_pages": [],
+            "stopped_at": null
+          },
+          "entities": {
+            "total_pages": 108,
+            "total_chars": 616913,
+            "included_pages": 0,
+            "included_chars": 0,
+            "excluded_pages": 108,
+            "excluded_chars": 616913,
+            "truncated_pages": [],
+            "stopped_at": null
+          }
+        },
+        "estimated_tokens": 120000
+      }
+    },
+    "audience": "public",
+    "scope": null,
+    "extract_mode": "local",
+    "catalog": true,
+    "judge": false
+  },
+  "versions": {
+    "docwiki": "0.1.0",
+    "git_sha": "b6957841cdea67dc7ec7397f5dd2ee8e2f5c37de",
+    "git_dirty": false,
+    "metrics": "evals-metrics-v1",
+    "release_id": "20261027T222241Z-f4e7ba11",
+    "release_audience": "public",
+    "corpus_manifest_sha256": "9b1a7ade30a6e1ea02cc447d85023e53e63cf3b0619b6594781c483e47efdb4d",
+    "extraction": "local-1.0.0",
+    "extractors": {
+      "local": "1.0.0",
+      "content-understanding": "1.0.0+cu.2025-11-01",
+      "pypdfium2": "5.14.0",
+      "python-docx": "1.2.0",
+      "openpyxl": "3.1.5",
+      "python-pptx": "1.0.2",
+      "pillow": "12.3.0"
+    },
+    "system": {
+      "tier": "smart",
+      "prompt_version": "wiki-long-context-v1",
+      "deployment": "smart-dz",
+      "model": "gpt-5.5",
+      "model_version": "2026-04-24",
+      "model_source": "service",
+      "price_table": {
+        "name": "prices.yaml (packaged)",
+        "sha256": "bc555ff45ff165670716855dcb89974d911b0cde33878b5aa0b260426fbd0f07",
+        "verified": false,
+        "source": "placeholder - verify at https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/"
+      }
+    },
+    "judge": null
+  },
+  "aggregates": {
+    "overall": {
+      "questions": 120,
+      "errors": 1,
+      "answer_accuracy": {
+        "value": 0.7167,
+        "n": 120,
+        "passed": 86
+      },
+      "must_include_coverage": {
+        "value": 0.8236,
+        "n": 111,
+        "passed": 77
+      },
+      "numeric_exactness": {
+        "value": 0.8519,
+        "n": 27,
+        "passed": 23
+      },
+      "citation_precision": {
+        "value": 0.8802,
+        "n": 103,
+        "passed": 73
+      },
+      "citation_recall": {
+        "value": 0.8003,
+        "n": 111,
+        "passed": 76
+      },
+      "abstention_accuracy": {
+        "value": 0.9333,
+        "n": 120,
+        "passed": 112
+      },
+      "injection_resistance": {
+        "value": 1.0,
+        "n": 2,
+        "passed": 2
+      },
+      "restricted_exclusion": {
+        "value": 0.9917,
+        "n": 120,
+        "passed": 119
+      }
+    },
+    "by_category": {
+      "abstain": {
+        "questions": 9,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 1.0,
+          "n": 9,
+          "passed": 9
+        },
+        "must_include_coverage": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_recall": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 9,
+          "passed": 9
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 9,
+          "passed": 9
+        }
+      },
+      "contradiction": {
+        "questions": 8,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.5,
+          "n": 8,
+          "passed": 4
+        },
+        "must_include_coverage": {
+          "value": 0.8125,
+          "n": 8,
+          "passed": 4
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 0.7562,
+          "n": 8,
+          "passed": 3
+        },
+        "citation_recall": {
+          "value": 0.6667,
+          "n": 8,
+          "passed": 3
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 8,
+          "passed": 8
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 8,
+          "passed": 8
+        }
+      },
+      "injection": {
+        "questions": 2,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.5,
+          "n": 2,
+          "passed": 1
+        },
+        "must_include_coverage": {
+          "value": 0.5,
+          "n": 2,
+          "passed": 1
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 1.0,
+          "n": 1,
+          "passed": 1
+        },
+        "citation_recall": {
+          "value": 0.5,
+          "n": 2,
+          "passed": 1
+        },
+        "abstention_accuracy": {
+          "value": 0.5,
+          "n": 2,
+          "passed": 1
+        },
+        "injection_resistance": {
+          "value": 1.0,
+          "n": 2,
+          "passed": 2
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 2,
+          "passed": 2
+        }
+      },
+      "multi-hop": {
+        "questions": 28,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.75,
+          "n": 28,
+          "passed": 21
+        },
+        "must_include_coverage": {
+          "value": 0.8661,
+          "n": 28,
+          "passed": 21
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 0.8778,
+          "n": 26,
+          "passed": 17
+        },
+        "citation_recall": {
+          "value": 0.756,
+          "n": 28,
+          "passed": 16
+        },
+        "abstention_accuracy": {
+          "value": 0.9286,
+          "n": 28,
+          "passed": 26
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 28,
+          "passed": 28
+        }
+      },
+      "numeric": {
+        "questions": 9,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.7778,
+          "n": 9,
+          "passed": 7
+        },
+        "must_include_coverage": {
+          "value": 0.8519,
+          "n": 9,
+          "passed": 7
+        },
+        "numeric_exactness": {
+          "value": 0.8889,
+          "n": 9,
+          "passed": 8
+        },
+        "citation_precision": {
+          "value": 0.9688,
+          "n": 8,
+          "passed": 7
+        },
+        "citation_recall": {
+          "value": 0.8889,
+          "n": 9,
+          "passed": 8
+        },
+        "abstention_accuracy": {
+          "value": 0.8889,
+          "n": 9,
+          "passed": 8
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 9,
+          "passed": 9
+        }
+      },
+      "ocr": {
+        "questions": 5,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 1.0,
+          "n": 5,
+          "passed": 5
+        },
+        "must_include_coverage": {
+          "value": 1.0,
+          "n": 5,
+          "passed": 5
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 0.95,
+          "n": 5,
+          "passed": 4
+        },
+        "citation_recall": {
+          "value": 0.7667,
+          "n": 5,
+          "passed": 2
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 5,
+          "passed": 5
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 5,
+          "passed": 5
+        }
+      },
+      "single-hop": {
+        "questions": 23,
+        "errors": 1,
+        "answer_accuracy": {
+          "value": 0.8261,
+          "n": 23,
+          "passed": 19
+        },
+        "must_include_coverage": {
+          "value": 0.8732,
+          "n": 23,
+          "passed": 19
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 0.9262,
+          "n": 21,
+          "passed": 18
+        },
+        "citation_recall": {
+          "value": 0.8696,
+          "n": 23,
+          "passed": 20
+        },
+        "abstention_accuracy": {
+          "value": 0.913,
+          "n": 23,
+          "passed": 21
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 0.9565,
+          "n": 23,
+          "passed": 22
+        }
+      },
+      "skill": {
+        "questions": 5,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.6,
+          "n": 5,
+          "passed": 3
+        },
+        "must_include_coverage": {
+          "value": 0.75,
+          "n": 5,
+          "passed": 3
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 0.5015,
+          "n": 4,
+          "passed": 1
+        },
+        "citation_recall": {
+          "value": 0.6333,
+          "n": 5,
+          "passed": 2
+        },
+        "abstention_accuracy": {
+          "value": 0.8,
+          "n": 5,
+          "passed": 4
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 5,
+          "passed": 5
+        }
+      },
+      "supersession": {
+        "questions": 11,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.1818,
+          "n": 11,
+          "passed": 2
+        },
+        "must_include_coverage": {
+          "value": 0.5455,
+          "n": 11,
+          "passed": 2
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 0.7652,
+          "n": 11,
+          "passed": 5
+        },
+        "citation_recall": {
+          "value": 0.7727,
+          "n": 11,
+          "passed": 7
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 11,
+          "passed": 11
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 11,
+          "passed": 11
+        }
+      },
+      "table": {
+        "questions": 20,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.75,
+          "n": 20,
+          "passed": 15
+        },
+        "must_include_coverage": {
+          "value": 0.8583,
+          "n": 20,
+          "passed": 15
+        },
+        "numeric_exactness": {
+          "value": 0.8333,
+          "n": 18,
+          "passed": 15
+        },
+        "citation_precision": {
+          "value": 0.9693,
+          "n": 19,
+          "passed": 17
+        },
+        "citation_recall": {
+          "value": 0.8917,
+          "n": 20,
+          "passed": 17
+        },
+        "abstention_accuracy": {
+          "value": 0.95,
+          "n": 20,
+          "passed": 19
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 20,
+          "passed": 20
+        }
+      }
+    }
+  },
+  "cost": {
+    "currency": "USD",
+    "input_tokens": 17087594,
+    "cached_input_tokens": 17029376,
+    "output_tokens": 79304,
+    "reasoning_tokens": 59605,
+    "estimated_cost_usd": 11.184898,
+    "per_question_usd": 0.093991,
+    "priced_questions": 119,
+    "prices_verified": false,
+    "receipt_totals": {
+      "calls": 120,
+      "failed_calls": 1,
+      "attempts": 119,
+      "retries": 0,
+      "input_tokens": 17087594,
+      "cached_input_tokens": 17029376,
+      "output_tokens": 79304,
+      "reasoning_tokens": 59605,
+      "latency_s": 14235.958,
+      "wait_s": 12974.769,
+      "estimated_cost_usd": 11.184898,
+      "unpriced_calls": 0
+    }
+  },
+  "latency": {
+    "mean_s": 118.649,
+    "p50_s": 120.153,
+    "p95_s": 135.62,
+    "max_s": 141.921,
+    "total_s": 14237.921
+  },
+  "judge": {
+    "enabled": false,
+    "notice": null,
+    "notices": [],
+    "summary": null
+  },
+  "privacy": "aggregates only: per-question records of non-dev splits are written to --private-out"
+}

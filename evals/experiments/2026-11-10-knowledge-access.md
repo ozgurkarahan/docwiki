@@ -133,3 +133,97 @@ read only the error counts of the blind result files, never a score.
   answer) are asked again once with the same frozen arm, and the new record replaces the failed
   one; the count of re-asked questions per arm is published. A question that fails again is
   scored 0.
+---
+
+## Results (blind runs of 2026-11-10 and 2026-11-11)
+
+All 11 arms ran the 120 blind questions 3 times (3,960 answers) on the frozen release. 45 answers
+first failed for infrastructure reasons and were asked again once under the rule of part 2:
+credential timeouts of the local Azure CLI (A2, A3, R1, W1), and 24 turns that Foundry ended with
+`tool_user_error` because the `wiki2` evaluation MCP app (shared by W2 and W2-high, run at the
+same time) stopped answering under load: its proxy cancelled requests after 600 s. None failed
+again. The blind questions are now published:
+[`blind-test.jsonl`](2026-11-10-knowledge-access/blind-test.jsonl) (sha256 matches
+[`blind-test.sha256`](blind-test.sha256)). Reports:
+[`compare-blind.md`](2026-11-10-knowledge-access/compare-blind.md) (abstention v1, primary),
+[`compare-blind-abst-v2.md`](2026-11-10-knowledge-access/compare-blind-abst-v2.md),
+[`judge-aggregates.json`](2026-11-10-knowledge-access/judge-aggregates.json), per-run aggregates in
+[`results/`](2026-11-10-knowledge-access/results/).
+
+| Arm | Accuracy (mean of 3 runs, 95 % CI) | Judge: claims supported | Judge: wrong | Numeric exactness | Citation overlap | Latency p50 | Cost per correct answer |
+|---|---|---|---|---|---|---|---|
+| W1 agent + wiki | **81.9 %** [76.1, 87.2] | 79.1 % | 3.9 % | 87.7 % | 81.2 % | 19.7 s | $0.111 |
+| W2-high agent + wiki v2, high effort | 80.0 % [73.9, 85.8] | 80.1 % | 2.5 % | 80.2 % | 74.8 % | 28.9 s | $0.160 |
+| W2 agent + wiki v2 | 79.4 % [72.8, 85.6] | 79.9 % | 1.9 % | 84.0 % | 76.9 % | 22.3 s | $0.126 |
+| A2 all documents in context | 78.3 % [71.1, 85.0] | **81.5 %** | **0.6 %** | 77.8 % | 84.3 % | 37.6 s | $0.043 |
+| A1 optimised RAG (hybrid + semantic ranker + decomposition) | 77.8 % [71.1, 83.9] | 69.2 % | 2.8 % | 82.7 % | 93.7 % | 25.4 s | $0.053 |
+| R router (fitted on dev) | 77.2 % [70.6, 83.6] | - | - | 76.5 % | 80.8 % | 36.8 s | $0.095 |
+| R2 agent + raw blocks v2 | 76.7 % [70.0, 82.8] | 80.1 % | 2.5 % | 77.8 % | 77.3 % | 20.7 s | $0.114 |
+| R1 agent + raw blocks | 75.8 % [68.6, 82.5] | 76.9 % | 3.3 % | 80.2 % | 79.5 % | 18.2 s | $0.095 |
+| A3 the wiki in context | 73.1 % [65.3, 80.6] | 78.1 % | 8.9 % | 81.5 % | 87.7 % | 119.8 s | $0.134 |
+| A8 managed agentic retrieval (Foundry IQ) | 72.2 % [64.7, 79.7] | 67.8 % | 7.2 % | 81.5 % | 93.8 % | 24.3 s | $0.042 |
+| A0 naive RAG (BM25 top 8) | 66.7 % [58.6, 74.4] | 63.4 % | 13.3 % | 75.3 % | 93.2 % | 25.3 s | $0.037 |
+| *Oracle (best arm per question, upper bound, not deployable)* | *95.0 %* | | | | | | |
+
+Latencies of the one-shot arms (A0 to A8, `smart-dz`) and of the agents (`smart`) come from two
+deployments and are compared within each group only. Costs use the unverified price table.
+
+**Safety**: no restricted value and no injection success in any of the 3,960 answers; no arm is
+excluded.
+
+**Tests** (Holm-adjusted paired permutation tests, 120 questions): against W1, only naive RAG is
+significantly worse (A0 -15.3 points, p = 0.005). A8 (-9.7, p = 0.076), A3 (-8.9, p = 0.17) and
+every other arm are not significantly different. Best against second (W1 - W2-high +1.9) is not
+significant. Wiki effect of the 2 x 2 ((W1 + W2) - (R1 + R2)) +4.4 points, raw p = 0.031,
+Holm p = 0.31: not significant after correction. v2 effect ((W2 + R2) - (W1 + R1)) -0.8 points:
+none.
+
+**Decision under the pre-registered rule.** No arm beats all others significantly, so the arms
+within 5 points of the best and not significantly worse form a set: W1, W2-high, W2, A2, A1 and
+the router. Ordered by claim support (judge), the first criterion: **A2 (81.5 %)**, W2-high
+(80.1 %), W2 (79.9 %), W1 (79.1 %), A1 (69.2 %), router (no judge record). The recommended arm is
+**A2, every public document in one prompt**. The support differences between A2, W2-high, W2 and
+W1 are small (2.4 points) and were not tested; the result is a tie in accuracy between the agent
+on the wiki, long context and optimised RAG, broken by claim support.
+
+**By category** (mean accuracy, %):
+
+| Category (questions) | A0 | A1 | A8 | A2 | A3 | W1 | R1 | W2 | R2 | W2-high | Router |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| single-hop (23) | 91 | 100 | 97 | 100 | 86 | 91 | 96 | 93 | 97 | 97 | 93 |
+| multi-hop (28) | 65 | 79 | 62 | 86 | 75 | 83 | 69 | 80 | 71 | 81 | 77 |
+| table (20) | 67 | 73 | 73 | 65 | 72 | 87 | 75 | 82 | 70 | 77 | 67 |
+| numeric (9) | 59 | 67 | 59 | 67 | 78 | 81 | 67 | 74 | 70 | 74 | 85 |
+| supersession (11) | 27 | 48 | 45 | 55 | 27 | 79 | 67 | 67 | 64 | 61 | 70 |
+| contradiction (8) | 50 | 58 | 62 | 62 | 54 | 71 | 62 | 75 | 71 | 83 | 58 |
+| abstain (9) | 100 | 96 | 96 | 93 | 100 | 81 | 78 | 70 | 85 | 70 | 89 |
+| OCR (5) | 47 | 87 | 87 | 73 | 100 | 67 | 87 | 80 | 80 | 80 | 80 |
+| skill (5) | 53 | 73 | 60 | 80 | 67 | 53 | 67 | 67 | 67 | 73 | 53 |
+| injection (2) | 50 | 50 | 50 | 50 | 50 | 83 | 83 | 83 | 83 | 83 | 83 |
+
+**What it says.**
+
+1. On a corpus that fits in one prompt (39 documents, about 35,000 tokens), reading every document
+   at once is as accurate as the best agent, supports its claims best, is wrong least often and
+   costs 2.6 times less per correct answer than the agent on the wiki; it is the slowest one-shot
+   arm and stops working when the corpus outgrows the context.
+2. The agent on the compiled wiki (W1, the production design) has the highest accuracy and the
+   best numeric exactness, and clearly wins where compilation did the work: superseded revisions
+   (79 % against 27 to 55 % for every retrieval and long-context arm), tables (87 %) and contradictions. It
+   abstains less well (81 %): it tends to answer with something it found.
+3. Optimised retrieval (A1) is a strong, cheap default: +11 points over naive RAG, the best
+   citation overlap, statistically tied with the agent. Managed agentic retrieval (A8) did not beat
+   it here.
+4. The wiki effect inside the agent (+4.4 points) is in the expected direction but not
+   significant at 120 questions; it comes from tables, multi-hop and supersession.
+5. Neither v2 (question decomposition, a dense lane, revision companions) nor high reasoning effort
+   improved accuracy; high effort costs 44 % more per correct answer.
+6. A router fitted on 32 development questions did not beat its best arm (77.2 %), although an
+   oracle choosing the best arm per question would reach 95 %: the arms are complementary, but a
+   three-class question classifier cannot tell in advance which one will succeed.
+7. Putting the compiled wiki itself in one prompt (A3, 120,000 tokens of hubs, views and topics,
+   sources dropped) is worse than the raw documents (73.1 % against 78.3 %): the summaries lose
+   details the questions ask for.
+
+Cost of the study (unverified prices): blind answers about $255 (the router reuses the answers of
+its arms), blind judge about $80, development runs about $100.
