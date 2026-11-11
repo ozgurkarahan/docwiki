@@ -186,9 +186,11 @@ azd env get-values | ForEach-Object {
    `--limit`, and check that the answer cites sources (a 401/403 means step 3 or 4 is incomplete).
 6. **Teardown** after the gates: `uv run python agents/deploy.py --variant all --delete` (before
    `azd down`, which only deletes the agents recorded by the hook), then delete the evaluation
-   apps (`ca-mcp-<name>-<token>`), the connections (`<mcpConnectionName>-<name>`) and the
-   `smart-eval` deployment (provisions are incremental: emptying the settings does not delete
-   them), and unset `DOCWIKI_EVAL_*` and `DOCWIKI_SKIP_AGENTS`.
+   apps (`ca-mcp-<name>-<token>`), the connections (`<mcpConnectionName>-<name>`) and the extra
+   model deployments (`smart-eval` or `smart-dz`; provisions are incremental: emptying the
+   settings does not delete them), delete the Azure AI Search service used by the retrieval arms,
+   set the `embed` deployment back to its usual capacity, and unset `DOCWIKI_EVAL_*` and
+   `DOCWIKI_SKIP_AGENTS`.
 
 `scripts/eval_stack.py grant` calls Microsoft Graph with `DefaultAzureCredential`
 (`servicePrincipals/{MCP API}/appRoleAssignedTo`, as the hook does for production agents) and needs

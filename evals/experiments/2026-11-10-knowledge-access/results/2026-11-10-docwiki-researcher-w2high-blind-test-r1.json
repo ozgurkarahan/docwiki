@@ -1,0 +1,581 @@
+{
+  "format": "docwiki.evals.result/v1",
+  "system": "docwiki-researcher-w2high",
+  "split": "blind-test",
+  "status": "ok",
+  "skipped": null,
+  "run": {
+    "started_at": "2026-11-10T19:44:03Z",
+    "finished_at": "2026-11-10T20:46:35Z",
+    "date": "2026-11-10",
+    "duration_s": 3752.323,
+    "questions": 120,
+    "questions_total": 120,
+    "complete": true,
+    "limit": null,
+    "concurrency": 2,
+    "label": "r1"
+  },
+  "questions_file": {
+    "file": "blind-test.jsonl",
+    "sha256": "dcac5289f5559597e48da1b63155d875ed0c259803037127d3b34387f05c184f",
+    "questions": 120,
+    "seal": null
+  },
+  "config": {
+    "system": {
+      "agent": "docwiki-researcher-w2high"
+    },
+    "audience": "public",
+    "scope": null,
+    "extract_mode": "local",
+    "catalog": true,
+    "judge": false
+  },
+  "versions": {
+    "docwiki": "0.1.0",
+    "git_sha": "b6957841cdea67dc7ec7397f5dd2ee8e2f5c37de",
+    "git_dirty": false,
+    "metrics": "evals-metrics-v1",
+    "release_id": "20261027T222241Z-f4e7ba11",
+    "release_audience": "public",
+    "corpus_manifest_sha256": "9b1a7ade30a6e1ea02cc447d85023e53e63cf3b0619b6594781c483e47efdb4d",
+    "extraction": "local-1.0.0",
+    "extractors": {
+      "local": "1.0.0",
+      "content-understanding": "1.0.0+cu.2025-11-01",
+      "pypdfium2": "5.14.0",
+      "python-docx": "1.2.0",
+      "openpyxl": "3.1.5",
+      "python-pptx": "1.0.2",
+      "pillow": "12.3.0"
+    },
+    "system": {
+      "agent": "docwiki-researcher-w2high",
+      "agent_version": "1",
+      "agent_definition_sha256": "92f97ee5914c4d43ca7193927403a8d19bea4635d20c13216463127cb870123e",
+      "model_deployment": "smart",
+      "price_table": {
+        "name": "prices.yaml (packaged)",
+        "sha256": "bc555ff45ff165670716855dcb89974d911b0cde33878b5aa0b260426fbd0f07",
+        "verified": false,
+        "source": "placeholder - verify at https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/"
+      }
+    },
+    "judge": null
+  },
+  "aggregates": {
+    "overall": {
+      "questions": 120,
+      "errors": 1,
+      "answer_accuracy": {
+        "value": 0.775,
+        "n": 120,
+        "passed": 93
+      },
+      "must_include_coverage": {
+        "value": 0.8896,
+        "n": 111,
+        "passed": 86
+      },
+      "numeric_exactness": {
+        "value": 0.7778,
+        "n": 27,
+        "passed": 21
+      },
+      "citation_precision": {
+        "value": 0.7445,
+        "n": 112,
+        "passed": 60
+      },
+      "citation_recall": {
+        "value": 0.7943,
+        "n": 111,
+        "passed": 75
+      },
+      "abstention_accuracy": {
+        "value": 0.975,
+        "n": 120,
+        "passed": 117
+      },
+      "injection_resistance": {
+        "value": 1.0,
+        "n": 2,
+        "passed": 2
+      },
+      "restricted_exclusion": {
+        "value": 0.9917,
+        "n": 120,
+        "passed": 119
+      }
+    },
+    "by_category": {
+      "abstain": {
+        "questions": 9,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.7778,
+          "n": 9,
+          "passed": 7
+        },
+        "must_include_coverage": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 0.0,
+          "n": 2,
+          "passed": 0
+        },
+        "citation_recall": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "abstention_accuracy": {
+          "value": 0.7778,
+          "n": 9,
+          "passed": 7
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 9,
+          "passed": 9
+        }
+      },
+      "contradiction": {
+        "questions": 8,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.75,
+          "n": 8,
+          "passed": 6
+        },
+        "must_include_coverage": {
+          "value": 0.8958,
+          "n": 8,
+          "passed": 6
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 0.7812,
+          "n": 8,
+          "passed": 4
+        },
+        "citation_recall": {
+          "value": 0.7292,
+          "n": 8,
+          "passed": 4
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 8,
+          "passed": 8
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 8,
+          "passed": 8
+        }
+      },
+      "injection": {
+        "questions": 2,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.5,
+          "n": 2,
+          "passed": 1
+        },
+        "must_include_coverage": {
+          "value": 0.8333,
+          "n": 2,
+          "passed": 1
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 1.0,
+          "n": 2,
+          "passed": 2
+        },
+        "citation_recall": {
+          "value": 0.75,
+          "n": 2,
+          "passed": 1
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 2,
+          "passed": 2
+        },
+        "injection_resistance": {
+          "value": 1.0,
+          "n": 2,
+          "passed": 2
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 2,
+          "passed": 2
+        }
+      },
+      "multi-hop": {
+        "questions": 28,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.8214,
+          "n": 28,
+          "passed": 23
+        },
+        "must_include_coverage": {
+          "value": 0.9405,
+          "n": 28,
+          "passed": 23
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 0.8155,
+          "n": 28,
+          "passed": 16
+        },
+        "citation_recall": {
+          "value": 0.7262,
+          "n": 28,
+          "passed": 14
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 28,
+          "passed": 28
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 28,
+          "passed": 28
+        }
+      },
+      "numeric": {
+        "questions": 9,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.6667,
+          "n": 9,
+          "passed": 6
+        },
+        "must_include_coverage": {
+          "value": 0.7685,
+          "n": 9,
+          "passed": 6
+        },
+        "numeric_exactness": {
+          "value": 0.7778,
+          "n": 9,
+          "passed": 7
+        },
+        "citation_precision": {
+          "value": 0.4444,
+          "n": 9,
+          "passed": 3
+        },
+        "citation_recall": {
+          "value": 0.4815,
+          "n": 9,
+          "passed": 4
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 9,
+          "passed": 9
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 9,
+          "passed": 9
+        }
+      },
+      "ocr": {
+        "questions": 5,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.8,
+          "n": 5,
+          "passed": 4
+        },
+        "must_include_coverage": {
+          "value": 0.85,
+          "n": 5,
+          "passed": 4
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 0.95,
+          "n": 5,
+          "passed": 4
+        },
+        "citation_recall": {
+          "value": 0.8667,
+          "n": 5,
+          "passed": 3
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 5,
+          "passed": 5
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 5,
+          "passed": 5
+        }
+      },
+      "single-hop": {
+        "questions": 23,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.9565,
+          "n": 23,
+          "passed": 22
+        },
+        "must_include_coverage": {
+          "value": 0.9855,
+          "n": 23,
+          "passed": 22
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 0.808,
+          "n": 23,
+          "passed": 14
+        },
+        "citation_recall": {
+          "value": 0.913,
+          "n": 23,
+          "passed": 21
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 23,
+          "passed": 23
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 23,
+          "passed": 23
+        }
+      },
+      "skill": {
+        "questions": 5,
+        "errors": 1,
+        "answer_accuracy": {
+          "value": 0.6,
+          "n": 5,
+          "passed": 3
+        },
+        "must_include_coverage": {
+          "value": 0.75,
+          "n": 5,
+          "passed": 3
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 0.4579,
+          "n": 4,
+          "passed": 0
+        },
+        "citation_recall": {
+          "value": 0.5667,
+          "n": 5,
+          "passed": 1
+        },
+        "abstention_accuracy": {
+          "value": 0.8,
+          "n": 5,
+          "passed": 4
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 0.8,
+          "n": 5,
+          "passed": 4
+        }
+      },
+      "supersession": {
+        "questions": 11,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.5455,
+          "n": 11,
+          "passed": 6
+        },
+        "must_include_coverage": {
+          "value": 0.803,
+          "n": 11,
+          "passed": 6
+        },
+        "numeric_exactness": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "citation_precision": {
+          "value": 0.6894,
+          "n": 11,
+          "passed": 4
+        },
+        "citation_recall": {
+          "value": 0.8636,
+          "n": 11,
+          "passed": 9
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 11,
+          "passed": 11
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 11,
+          "passed": 11
+        }
+      },
+      "table": {
+        "questions": 20,
+        "errors": 0,
+        "answer_accuracy": {
+          "value": 0.75,
+          "n": 20,
+          "passed": 15
+        },
+        "must_include_coverage": {
+          "value": 0.8583,
+          "n": 20,
+          "passed": 15
+        },
+        "numeric_exactness": {
+          "value": 0.7778,
+          "n": 18,
+          "passed": 14
+        },
+        "citation_precision": {
+          "value": 0.7774,
+          "n": 20,
+          "passed": 13
+        },
+        "citation_recall": {
+          "value": 0.925,
+          "n": 20,
+          "passed": 18
+        },
+        "abstention_accuracy": {
+          "value": 1.0,
+          "n": 20,
+          "passed": 20
+        },
+        "injection_resistance": {
+          "value": null,
+          "n": 0,
+          "passed": 0
+        },
+        "restricted_exclusion": {
+          "value": 1.0,
+          "n": 20,
+          "passed": 20
+        }
+      }
+    }
+  },
+  "cost": {
+    "currency": "USD",
+    "input_tokens": 2019574,
+    "cached_input_tokens": 554496,
+    "output_tokens": 246522,
+    "reasoning_tokens": 182159,
+    "estimated_cost_usd": 14.998298,
+    "per_question_usd": 0.126036,
+    "priced_questions": 119,
+    "prices_verified": false,
+    "receipt_totals": null
+  },
+  "latency": {
+    "mean_s": 50.524,
+    "p50_s": 24.176,
+    "p95_s": 150.091,
+    "max_s": 946.5,
+    "total_s": 6062.903
+  },
+  "judge": {
+    "enabled": false,
+    "notice": null,
+    "notices": [],
+    "summary": null
+  },
+  "privacy": "aggregates only: per-question records of non-dev splits are written to --private-out"
+}
