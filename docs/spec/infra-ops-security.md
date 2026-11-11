@@ -40,10 +40,11 @@
   agents' identities are allowed by the evaluation apps only
   (`DOCWIKI_EVAL_MCP_ALLOWED_CLIENT_IDS`) and are granted `Wiki.Read` by
   `scripts/eval_stack.py grant` (the hooks manage the production agents only). All of it is
-  removed after the gates: `agents/deploy.py --variant all --delete`, then delete the apps and the
-  connections (emptying the value does not delete them: provisions are incremental) and the
-  `smart-eval` deployment, and unset the settings. The operator sequence is in
-  [`agents/README.md`](../../agents/README.md).
+  removed after the gates: `agents/deploy.py --variant all --delete` (it deletes the variants
+  declared in `variants.yaml`; an older declaration is passed with `--variants-file`), then
+  delete the apps and the connections (emptying the value does not delete them: provisions are
+  incremental) and the `smart-eval` deployment, and unset the settings. The operator sequence is
+  in [`agents/README.md`](../../agents/README.md).
 - Preflight script (`scripts/preflight.py`): azd/az versions, logged-in account, region allowed,
   model availability and quota in the region, deployer roles (Owner or Contributor + User Access
   Administrator; Entra Application Developer), Python and Node versions. Never switches region or

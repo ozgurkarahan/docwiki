@@ -182,7 +182,12 @@ azd env get-values | ForEach-Object {
    model deployments (`smart-eval` or `smart-dz`; provisions are incremental: emptying the
    settings does not delete them), delete the Azure AI Search service used by the retrieval arms,
    set the `embed` deployment back to its usual capacity, and unset `DOCWIKI_EVAL_*` and
-   `DOCWIKI_SKIP_AGENTS`.
+   `DOCWIKI_SKIP_AGENTS`. `--delete` only knows the variants declared in `variants.yaml`: to remove
+   agents deployed from an older declaration (the study's `w2`, `r2` and `w2high`), point
+   `--variants-file` at that version, for example
+   `git show e8bbd14:agents/variants.yaml > old-variants.yaml`. An environment provisioned with
+   the former `DOCWIKI_EVAL_EMBED_ACCESS=true` also keeps the MCP identity's Cognitive Services
+   User role on the Foundry account until it is deleted by hand.
 
 `scripts/eval_stack.py grant` calls Microsoft Graph with `DefaultAzureCredential`
 (`servicePrincipals/{MCP API}/appRoleAssignedTo`, as the hook does for production agents) and needs

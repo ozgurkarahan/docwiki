@@ -139,9 +139,11 @@ restricted-value leak or an injection success excludes an arm.
 - **Robustness finding:** the MCP server with the dense lane hung under concurrent load (24 agent
   turns ended after its proxy cancelled requests at 600 s, all recovered on re-ask). The lane was
   removed after the study; bringing it back needs a load test first.
-- **The evaluation stack is temporary.** The variant agents, the evaluation MCP apps, the Azure
-  AI Search service and the extra model deployment are removed after this ADR; the commands are
-  in [`agents/README.md`](../../agents/README.md). They never called production.
+- **The evaluation stack was temporary.** The variant agents and their identities, the
+  evaluation MCP apps and connections, the Azure AI Search service, the extra model deployment,
+  the evaluation image and vectors, and the MCP identity's embedding role were removed on
+  2026-11-11; the generic commands are in [`agents/README.md`](../../agents/README.md). They never
+  called production.
 
 ## Links
 

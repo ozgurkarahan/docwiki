@@ -593,7 +593,6 @@ class ProcessService:
         }
 
     @staticmethod
-    @staticmethod
     def _follow_run(row: dict[str, Any], stage: str | None, in_run: bool) -> dict[str, Any]:
         """A document of the run at work is processing, even one whose earlier version is in the
         wiki: before its own stages (extract, classify, compile, recorded in its state) it is at
