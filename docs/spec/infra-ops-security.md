@@ -25,15 +25,12 @@
   and its own project connection `<mcpConnectionName>-<name>`. The value is the base64 of a JSON
   array `[{"name": "<a-z0-9, at most 8>", "env": {"DOCWIKI_MCP_*": "<value>"}}]` (azd substitutes
   values into the parameters file as raw text, so raw JSON would break it); `agents/variants.yaml`
-  declares the arms of the knowledge-access study and `scripts/eval_stack.py encode` produces the
-  value. Further settings: `evalMcpImage` (one explicit image or digest for every evaluation app;
-  empty = the production image), `evalReleaseId` (adds `DOCWIKI_MCP_PIN_RELEASE` to every
-  evaluation app, so a run reads one immutable release), `evalSmartCapacity` (when > 0, a
-  `smart-eval` deployment with the model, version and SKU of `smart`, so evaluation agents never
-  compete with production for tokens), `evalEmbedAccess` (grants the MCP identity Cognitive
-  Services User on the Foundry account so that evaluation apps can call the `embed` deployment,
-  and adds the embedding settings to their environment; the MCP identity is shared with the
-  production app, which therefore gets the permission too, though it does not use it). One output,
+  declares the arms (W1 and R1 of the knowledge-access study as a template) and
+  `scripts/eval_stack.py encode` produces the value. Further settings: `evalMcpImage` (one explicit
+  image or digest for every evaluation app; empty = the production image), `evalReleaseId` (adds
+  `DOCWIKI_MCP_PIN_RELEASE` to every evaluation app, so a run reads one immutable release),
+  `evalSmartCapacity` (when > 0, a `smart-eval` deployment with the model, version and SKU of
+  `smart`, so evaluation agents never compete with production for tokens). One output,
   `DOCWIKI_EVAL_MCP_VARIANTS_OUT` (JSON, name -> `{url, connection}`), and
   `DOCWIKI_EVAL_SMART_DEPLOYMENT`. Evaluation Researchers `docwiki-researcher-<name>`
   (`agents/deploy.py --variant`) differ from the production one only by instructions, reasoning

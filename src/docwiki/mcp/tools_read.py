@@ -10,13 +10,11 @@ provenance; compiled wiki text comes with the citations it carries.
 from __future__ import annotations
 
 import difflib
-import logging
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
-from uuid import uuid4
 
 from docwiki.contracts.catalog import CatalogPage
 from docwiki.contracts.enums import BADGE_BY_PROVENANCE, allowed_for_audience
@@ -32,7 +30,6 @@ from docwiki.contracts.markdown import (
     split_sections,
     strip_backlinks_block,
 )
-from docwiki.llm.embeddings import EmbeddingClient
 from docwiki.mcp.bounds import ResultTooLargeError, clip, fit_items, fit_text, result_json
 from docwiki.mcp.config import McpConfig
 from docwiki.mcp.errors import ToolFailure
@@ -50,8 +47,6 @@ __all__ = [
 
 
 ToolInputError = ToolFailure
-
-logger = logging.getLogger("docwiki.mcp")
 """Anticipated, agent-correctable failure (returned to the agent as ``ok: false``)."""
 
 
@@ -173,17 +168,9 @@ def _strip_footnote_definitions(body: str, defs: Sequence[FootnoteDef]) -> str:
 class ReadTools:
     """Implementation of the read tools (no MCP types; easy to test directly)."""
 
-    def __init__(
-        self,
-        source: ReleaseSource,
-        config: McpConfig,
-        *,
-        embedding_factory: Callable[[], EmbeddingClient] | None = None,
-    ) -> None:
+    def __init__(self, source: ReleaseSource, config: McpConfig) -> None:
         self.source = source
         self.config = config
-        self._embedding_factory = embedding_factory
-        self._dense_cache_key = f"eval-dense:{uuid4().hex}"
 
     @property
     def max_chars(self) -> int:
@@ -509,18 +496,16 @@ class ReadTools:
                     f"unknown {what} {value!r}; use get_index('entities') or get_index('topics')",
                     code="not_found",
                 )
-        filters = {
-            "kinds": list(kinds) if kinds else None,
-            "types": list(types) if types else None,
-            "entity": entity or None,
-            "topic": topic or None,
-            "within": scope,
-            "lang": language,
-        }
-        if self.config.dense:
-            hits = self._hybrid(snap, query, **filters)[offset : offset + limit]
-        else:
-            hits = snap.search.search(query, limit=offset + limit, **filters)[offset:]
+        hits = snap.search.search(
+            query,
+            kinds=list(kinds) if kinds else None,
+            types=list(types) if types else None,
+            entity=entity or None,
+            topic=topic or None,
+            limit=offset + limit,
+            within=scope,
+            lang=language,
+        )[offset:]
         expanded = [" ".join(phrase) for phrase in snap.search.expand(query)]
         rows = [self._hit(snap, hit) for hit in hits]
 
@@ -528,7 +513,6 @@ class ReadTools:
             payload: dict[str, Any] = {
                 "release_id": snap.release_id,
                 "query": query,
-                **self._retrieval_marker(),
                 **({"within": scope} if scope else {}),
                 **({"lang": language} if language else {}),
                 "expanded_terms": expanded,
@@ -575,99 +559,7 @@ class ReadTools:
             evidence = self._evidence_meta(snap, hit.source_id, hit.locator_key)
             row["evidence_path"] = evidence["path"] if evidence else None
             row["provenance"] = evidence["provenance"] if evidence else None
-        if self.config.supersession_companions and not self.raw_only and hit.source_id:
-            revisions = self._revisions(snap, hit.source_id)
-            if revisions:
-                row["revisions"] = revisions
         return row
-
-    def _revisions(self, snap: Snapshot, source_id: str) -> list[dict[str, Any]]:
-        """Only source metadata, never companion text; raw ablation never calls this."""
-
-        def build() -> list[dict[str, Any]]:
-            by_id = self._by_id(snap)
-            entry = by_id.get(source_id)
-            if (
-                entry is None
-                or entry.type != "source"
-                or not self._allowed(snap, entry.sensitivity)
-            ):
-                return []
-            fm = snap.reader.read_page(entry.path).frontmatter
-            relations = {
-                (target, relation)
-                for relation in ("supersedes", "superseded_by")
-                for target in getattr(fm, relation, [])
-            }
-            for edge in snap.catalog.edges:
-                if edge.kind == "supersedes":
-                    if edge.from_ == source_id:
-                        relations.add((edge.to, "supersedes"))
-                    if edge.to == source_id:
-                        relations.add((edge.from_, "superseded_by"))
-            return [
-                {
-                    "source_id": target.id,
-                    "title": target.title,
-                    "status": target.status,
-                    "path": target.path,
-                    "relation": relation,
-                }
-                for target_id, relation in sorted(relations)
-                if (target := by_id.get(target_id)) is not None
-                and target.type == "source"
-                and self._allowed(snap, target.sensitivity)
-            ]
-
-        return snap.cached(f"eval-revisions:{source_id}", build)
-
-    def _retrieval_marker(self) -> dict[str, Any]:
-        if not self.config.dense:
-            return {}
-        return {"retrieval": {"mode": "hybrid", "rrf_k": 60, "lane_depth": 50}}
-
-    def _hybrid(
-        self, snap: Snapshot, query: str, *, context: bool = False, **filters: Any
-    ) -> list[Any]:
-        from docwiki.mcp.dense import LANE_DEPTH, DenseLane, fuse, query_embedding_client
-
-        def accept(hit: Any) -> bool:
-            entry = self._by_path(snap).get(hit.path) or self._by_id(snap).get(hit.page_id)
-            return (
-                entry is not None
-                and self._allowed(snap, entry.sensitivity)
-                and (not context or entry.type not in _CONTEXT_SKIPPED_TYPES)
-            )
-
-        try:
-            lane = snap.cached(
-                self._dense_cache_key,
-                lambda: DenseLane(
-                    snap,
-                    self.source,
-                    self.config,
-                    self._embedding_factory
-                    or (lambda: query_embedding_client(self.config.dense_timeout_s)),
-                ),
-            )
-            # Context's pre-fusion lexical rules are exactly the Gate A pilot's: fetch 100,
-            # dedupe/guard, then take 50. Search itself needs only its 50 lexical rows.
-            lexical = snap.search.search(query, limit=100 if context else LANE_DEPTH, **filters)
-            lexical = (
-                self._dedupe_context(snap, lexical)
-                if context
-                else [hit for hit in lexical if accept(hit)]
-            )
-            dense = lane.search(query, accept=accept, **filters)
-            fused = fuse(lexical[:LANE_DEPTH], dense)
-            return self._dedupe_context(snap, fused) if context else fused
-        except Exception as exc:
-            logger.warning("dense lane failed: %s: %s", type(exc).__name__, str(exc)[:200])
-            raise ToolInputError(
-                "hybrid retrieval unavailable: verify the vector artifact and embedding deployment",
-                code="unavailable",
-                details={"cause": type(exc).__name__},
-            ) from exc
 
     def _evidence_meta(self, snap: Snapshot, source_id: str, key: str) -> dict[str, Any] | None:
         def build() -> dict[str, Any] | None:
@@ -697,15 +589,6 @@ class ReadTools:
     ) -> list[Any]:
         """Search hits for the question, one per section or per source locator, best first,
         without content above the release's audience."""
-        if self.config.dense:
-            return self._hybrid(
-                snap,
-                question,
-                context=True,
-                kinds=[RAW_KIND] if self.raw_only else None,
-                within=scope,
-                lang=language,
-            )
         raw = snap.search.search(
             question,
             kinds=[RAW_KIND] if self.raw_only else None,
@@ -713,9 +596,6 @@ class ReadTools:
             within=scope,
             lang=language,
         )
-        return self._dedupe_context(snap, raw)
-
-    def _dedupe_context(self, snap: Snapshot, raw: Sequence[Any]) -> list[Any]:
         by_path, by_id = self._by_path(snap), self._by_id(snap)
         seen: set[tuple[str, str]] = set()
         out: list[Any] = []
@@ -893,7 +773,6 @@ class ReadTools:
             return {
                 "release_id": snap.release_id,
                 "question": question,
-                **self._retrieval_marker(),
                 **({"within": scope} if scope else {}),
                 **({"lang": language} if language else {}),
                 "offset": offset,

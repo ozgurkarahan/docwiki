@@ -1,23 +1,18 @@
-# Evaluation variants of the knowledge-access study (evals/experiments/2026-11-10-knowledge-access.md).
+# Evaluation variants: opt-in arms of the Researcher, each reading its own evaluation MCP app
+# (agents/README.md, "Evaluation variants"). w1 (the agent on the wiki) and r1 (the same agent on
+# the raw extracted blocks) are the template; the other variants of the knowledge-access study
+# (evals/experiments/2026-11-10-knowledge-access.md) are in commit e8bbd14.
 # Schema and rules: docwiki.agents_client.variants. Opt-in: no ordinary deploy, hook or teardown reads
 # this file. Nothing environment-specific is stored here; ${NAME} values come from the environment.
 #
 # mcp_variants: the evaluation MCP apps (Bicep param evalMcpVariants, azd value
 #   DOCWIKI_EVAL_MCP_VARIANTS, base64 of this mapping as a JSON array:
 #   `uv run python scripts/eval_stack.py encode`). Each app is the production MCP app plus these
-#   DOCWIKI_MCP_* settings. Quote "on": unquoted YAML turns it into a boolean.
+#   DOCWIKI_MCP_* settings. Quote "on" and "off": unquoted YAML turns them into booleans.
 mcp_variants:
   wiki: {}
   raw:
     DOCWIKI_MCP_WIKI_ABLATION: raw
-  wiki2:
-    DOCWIKI_MCP_DENSE: "on"
-    DOCWIKI_MCP_SUPERSESSION_COMPANIONS: "on"
-    DOCWIKI_MCP_VECTORS: ${DOCWIKI_EVAL_MCP_VECTORS}   # set at deploy time
-  raw2:
-    DOCWIKI_MCP_WIKI_ABLATION: raw
-    DOCWIKI_MCP_DENSE: "on"
-    DOCWIKI_MCP_VECTORS: ${DOCWIKI_EVAL_MCP_VECTORS}   # set at deploy time
 
 # agents: the evaluation Researchers (docwiki-researcher-<name>), each reading one MCP variant.
 #   instructions: null = the production instructions, or a path from the repository root.
@@ -36,22 +31,4 @@ agents:
     mcp_variant: raw
     instructions: null
     reasoning_effort: null
-    model_env: DOCWIKI_EVAL_SMART_DEPLOYMENT
-  - name: w2
-    base: researcher
-    mcp_variant: wiki2
-    instructions: agents/variants/v2/instructions.md
-    reasoning_effort: null
-    model_env: DOCWIKI_EVAL_SMART_DEPLOYMENT
-  - name: r2
-    base: researcher
-    mcp_variant: raw2
-    instructions: agents/variants/v2/instructions.md
-    reasoning_effort: null
-    model_env: DOCWIKI_EVAL_SMART_DEPLOYMENT
-  - name: w2high
-    base: researcher
-    mcp_variant: wiki2
-    instructions: agents/variants/v2/instructions.md
-    reasoning_effort: high
     model_env: DOCWIKI_EVAL_SMART_DEPLOYMENT

@@ -234,3 +234,9 @@ limited to a corpus that fits in one prompt. The rule's recommendation (A2) stay
 choice is made on a statistical tie ([ADR 0015](../../docs/adr/0015-knowledge-access.md)). The
 method, the research behind each arm and every check:
 [`method.md`](2026-11-10-knowledge-access/method.md).
+
+**Code after the study (2026-11-11).** The dense lane, the superseded-revision companions, the
+vector artifact builder (`scripts/build_eval_vectors.py`), the v2 instructions, the W2, R2 and
+W2-high variant declarations and the `evalEmbedAccess` setting were removed from the code; the
+release pin, the wiki ablation flag and the W1 and R1 variants stay. Commit `e8bbd14` and the
+evaluation MCP image digest of part 1 of the freeze addendum reproduce every arm.

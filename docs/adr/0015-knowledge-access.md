@@ -131,12 +131,14 @@ restricted-value leak or an injection success excludes an arm.
   contradictions and audit; it is not a better general retriever. The guide now says so, with
   long context or hybrid retrieval as the baseline to beat on other corpora.
 - **No router, no high reasoning effort, no v2 instructions in production.** None beat W1 here.
-  The evaluation-only MCP flags (pin, dense lane, revision companions) stay off by default.
+  The dense lane, the revision companions and the v2 instructions were removed after the study
+  (reproducible at commit `e8bbd14`); the release pin and the wiki ablation flag stay for future
+  studies.
 - **Next improvements target what the wiki agent misses:** abstention (it answers when it should
   say "not found") and the cross-site syntheses that compile fidelity found missing.
 - **Robustness finding:** the MCP server with the dense lane hung under concurrent load (24 agent
-  turns ended after its proxy cancelled requests at 600 s, all recovered on re-ask). Any
-  production use of the dense lane needs a load test first.
+  turns ended after its proxy cancelled requests at 600 s, all recovered on re-ask). The lane was
+  removed after the study; bringing it back needs a load test first.
 - **The evaluation stack is temporary.** The variant agents, the evaluation MCP apps, the Azure
   AI Search service and the extra model deployment are removed after this ADR; the commands are
   in [`agents/README.md`](../../agents/README.md). They never called production.

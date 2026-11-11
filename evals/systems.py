@@ -147,7 +147,7 @@ class ResearcherSystem(EvalSystem):
     (``DOCWIKI_SMART_DEPLOYMENT`` / ``DOCWIKI_SMART_MODEL``); MCP server costs are not included.
 
     ``agent`` is the logical key ``researcher`` (Foundry agent ``docwiki-researcher``) or another
-    Foundry agent name, such as the evaluation Researcher ``docwiki-researcher-eval``; any other
+    Foundry agent name, such as the evaluation Researcher ``docwiki-researcher-w1``; any other
     agent becomes the system name, so its results never overwrite the production Researcher's.
     """
 

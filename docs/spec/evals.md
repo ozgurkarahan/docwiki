@@ -27,7 +27,7 @@
 
 - `evals/run.py --system <name> --split dev [--limit N]` → `evals/results/<date>-<system>-<split>.json`
   with per-question records (answer, citations, tool calls, metrics, tokens, cost, versions).
-  `--system docwiki-researcher --agent docwiki-researcher-eval` targets the evaluation Researcher
+  `--system docwiki-researcher --agent docwiki-researcher-w1` targets an evaluation Researcher
   of the optional evaluation environment ([infra-ops-security.md](infra-ops-security.md) §1); the
   run is then recorded under that agent name, beside the production one, for an A/B comparison.
 - `evals/scoreboard.py` → `evals/results/latest.json` and a Markdown table injected into the README

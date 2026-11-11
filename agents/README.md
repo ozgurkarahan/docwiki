@@ -22,7 +22,6 @@ agents/
   librarian/routine.yaml       # optional daily health report (disabled by default)
   deploy.py                    # idempotent deployment (docwiki.agents_client.deploy)
   variants.yaml                # opt-in evaluation variants (agents + MCP apps), see below
-  variants/                    # instructions of the variants (v2/instructions.md)
 ```
 
 ## Definition schema
@@ -103,19 +102,17 @@ SDK calls (`azure-ai-projects` 2.9, async): `agents.get`, `agents.create_version
 
 ## Evaluation variants (optional, opt-in)
 
-The knowledge-access study compares several arms (`evals/experiments/2026-11-10-knowledge-access.md`).
+The knowledge-access study compared several arms (`evals/experiments/2026-11-10-knowledge-access.md`).
 Each arm is one **evaluation MCP app** (Bicep `evalMcpVariants`,
 [`docs/spec/infra-ops-security.md`](../docs/spec/infra-ops-security.md) §1: the production app plus a
 few `DOCWIKI_MCP_*` settings) read by one **evaluation Researcher** `docwiki-researcher-<name>`.
-[`variants.yaml`](variants.yaml) declares both, and the arms W1, R1, W2, R2 and W2-high:
+[`variants.yaml`](variants.yaml) declares both. It keeps the arms W1 and R1 as a template (the
+study's other arms are in commit `e8bbd14`):
 
 | Agent | MCP variant (`env` on top of production) | Instructions | Effort |
 |---|---|---|---|
 | `docwiki-researcher-w1` | `wiki`: none | production | unset |
 | `docwiki-researcher-r1` | `raw`: `DOCWIKI_MCP_WIKI_ABLATION=raw` | production | unset |
-| `docwiki-researcher-w2` | `wiki2`: `DOCWIKI_MCP_DENSE=on`, `DOCWIKI_MCP_SUPERSESSION_COMPANIONS=on`, `DOCWIKI_MCP_VECTORS` | `agents/variants/v2/instructions.md` | unset |
-| `docwiki-researcher-r2` | `raw2`: raw + `DOCWIKI_MCP_DENSE=on`, `DOCWIKI_MCP_VECTORS` | v2 | unset |
-| `docwiki-researcher-w2high` | `wiki2` | v2 | `high` |
 
 An agent variant (`name` <= 8 characters `a-z0-9`, `base: researcher`, `mcp_variant`,
 `instructions` null or a path, `reasoning_effort` null or `low|medium|high`, `model_env`) is the
@@ -134,9 +131,7 @@ uv run python agents/deploy.py --variant w1 --delete      # remove one (--dry-ru
 
 Variants are opt-in: an ordinary `deploy.py`, the post-provision hook and `azd down`'s predown
 never create, update or delete them, and `--delete` only accepts names declared in `variants.yaml`
-(never a production agent). `--eval` (the former single `docwiki-researcher-eval`, reading
-`DOCWIKI_EVAL_MCP_URL` and `DOCWIKI_EVAL_MCP_CONNECTION`) still works but is deprecated: those
-outputs no longer exist, so set them by hand or declare a variant.
+(never a production agent).
 
 ### Operator sequence
 
@@ -149,17 +144,14 @@ azd env get-values | ForEach-Object {
 ```
 
 1. **Provision the evaluation apps**, without touching production agents. `evalReleaseId` pins one
-   release; `evalSmartCapacity` creates `smart-eval`; `evalEmbedAccess` lets the apps call `embed`
-   (it grants the *shared* MCP identity, so production gets the permission too):
+   release; `evalSmartCapacity` creates `smart-eval`:
 
    ```powershell
    azd env set DOCWIKI_SKIP_AGENTS true
-   azd env set DOCWIKI_EVAL_MCP_VECTORS <vectors setting of the dense variants>
    azd env set DOCWIKI_EVAL_MCP_VARIANTS (uv run python scripts/eval_stack.py encode)
    azd env set DOCWIKI_EVAL_MCP_IMAGE <image reference or digest>   # optional: default = production image
    azd env set DOCWIKI_EVAL_RELEASE_ID <release id>                 # optional: DOCWIKI_MCP_PIN_RELEASE
    azd env set DOCWIKI_EVAL_SMART_CAPACITY 100                      # optional: the smart-eval deployment
-   azd env set DOCWIKI_EVAL_EMBED_ACCESS true                       # for the dense variants
    azd provision
    ```
 

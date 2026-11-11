@@ -6,7 +6,6 @@
     uv run python agents/deploy.py --variant w1       # evaluation Researcher (agents/variants.yaml)
     uv run python agents/deploy.py --variant all --json     # every variant; note identity_client_id
     uv run python agents/deploy.py --variant w1 --delete    # remove it after the gates
-    uv run python agents/deploy.py --eval             # (deprecated) docwiki-researcher-eval
 
 ``--variant`` deploys the evaluation Researchers declared in ``agents/variants.yaml`` (see
 ``docwiki.agents_client.variants``): ``docwiki-researcher-<name>``, the production definition with
@@ -14,13 +13,6 @@ its own instructions, reasoning effort, model deployment (``DOCWIKI_EVAL_SMART_D
 MCP endpoint, taken from ``DOCWIKI_EVAL_MCP_VARIANTS_OUT`` (the Bicep output of the evaluation MCP
 apps). Variants are opt-in: no other invocation deploys them, and ``--variant X --delete`` only
 accepts declared variants, never a production agent.
-
-``--eval`` (deprecated, use ``--variant``) deploys one evaluation variant of the selected agents
-(the Researcher by default): the same definition, instructions and metadata, named
-``<name>-eval``, whose MCP tools read ``DOCWIKI_EVAL_MCP_URL`` and ``DOCWIKI_EVAL_MCP_CONNECTION``
-instead of ``DOCWIKI_MCP_URL`` and ``DOCWIKI_MCP_CONNECTION``; the infrastructure no longer
-outputs them, so set them by hand. Production agents are never touched by ``--eval``, and
-``--delete`` with it only accepts names ending in ``-eval``.
 
 Every agent version carries ``docwiki_definition_sha256`` in its metadata: the SHA-256 of the
 resolved request body (name, description, model, instructions, tools and YAML metadata, after the
@@ -62,7 +54,6 @@ from docwiki.agents_client.definitions import (
     HASH_METADATA_KEY,
     ROLES_METADATA_KEY,
     VERSION_METADATA_KEY,
-    AgentDefinition,
     LoadedAgent,
     LoadedRoutine,
     default_agents_dir,
@@ -86,8 +77,6 @@ from docwiki.agents_client.variants import (
 )
 
 __all__ = [
-    "EVAL_AGENT_SUFFIX",
-    "EVAL_ENV_PREFIX",
     "PROJECT_ENDPOINT_ENV",
     "ROUTINE_FEATURE_HEADER",
     "AgentPayload",
@@ -100,16 +89,11 @@ __all__ = [
     "delete_agent",
     "deploy_agent",
     "deploy_routine",
-    "eval_agent",
-    "eval_env_name",
     "main",
     "verify_connection",
 ]
 
 PROJECT_ENDPOINT_ENV = "DOCWIKI_FOUNDRY_PROJECT_ENDPOINT"
-EVAL_AGENT_SUFFIX = "-eval"
-EVAL_ENV_PREFIX = "DOCWIKI_EVAL_"
-EVAL_DEFAULT_AGENTS: tuple[str, ...] = ("researcher",)
 ROUTINE_FEATURE_HEADER = {"Foundry-Features": "Routines=V2Preview"}
 _UNHASHED_METADATA = (HASH_METADATA_KEY, VERSION_METADATA_KEY)
 _SECRET_AUTH_TYPES = frozenset({"", "apikey", "customkeys", "sas", "none", "oauth2"})
@@ -216,30 +200,6 @@ def definition_hash(agent_name: str, body: Mapping[str, Any]) -> str:
         separators=(",", ":"),
     )
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
-def eval_env_name(name: str) -> str:
-    """Evaluation counterpart of a ``DOCWIKI_*`` variable (``DOCWIKI_MCP_URL`` ->
-    ``DOCWIKI_EVAL_MCP_URL``)."""
-    return EVAL_ENV_PREFIX + name.removeprefix("DOCWIKI_")
-
-
-def eval_agent(agent: LoadedAgent) -> LoadedAgent:
-    """The evaluation variant of an agent: identical except its name (``<name>-eval``) and the
-    environment variables naming its MCP endpoints and project connections."""
-    definition = agent.definition
-    data = definition.model_dump()
-    data["name"] = definition.name + EVAL_AGENT_SUFFIX
-    for tool in data["tools"]:
-        tool["server_url_env"] = eval_env_name(tool["server_url_env"])
-        tool["auth"]["connection_env"] = eval_env_name(tool["auth"]["connection_env"])
-    try:
-        variant = AgentDefinition.model_validate(data)
-    except ValueError as exc:
-        raise AgentDefinitionError(f"{agent.name}: no valid evaluation variant: {exc}") from None
-    return LoadedAgent(
-        key=agent.key, path=agent.path, definition=variant, instructions=agent.instructions
-    )
 
 
 def build_agent_payload(
@@ -459,21 +419,15 @@ async def deploy_agent(project: Any, payload: AgentPayload) -> DeployResult:
     )
 
 
-async def delete_agent(
-    project: Any, agent_name: str, *, allowed: Collection[str] | None = None
-) -> bool:
+async def delete_agent(project: Any, agent_name: str, *, allowed: Collection[str]) -> bool:
     """Delete an agent and all its versions; ``False`` when it does not exist.
 
-    Only evaluation agents: a name in ``allowed`` (the declared variants) or, without it, a name
-    ending in ``-eval``.
+    Only evaluation agents: a name in ``allowed`` (the declared variants).
     """
-    if allowed is not None:
-        if agent_name not in allowed:
-            raise AgentConfigurationError(
-                f"refusing to delete {agent_name}: not a declared evaluation variant"
-            )
-    elif not agent_name.endswith(EVAL_AGENT_SUFFIX):
-        raise AgentConfigurationError(f"refusing to delete {agent_name}: not an evaluation agent")
+    if agent_name not in allowed:
+        raise AgentConfigurationError(
+            f"refusing to delete {agent_name}: not a declared evaluation variant"
+        )
     errors = _azure_exceptions()
     try:
         await project.agents.delete(agent_name)
@@ -599,7 +553,7 @@ async def _delete(
     *,
     project_client: Any | None,
     report: Callable[[str, bool], None],
-    allowed: Collection[str] | None = None,
+    allowed: Collection[str],
 ) -> None:
     endpoint = (env.get(PROJECT_ENDPOINT_ENV) or "").strip()
     if not endpoint and project_client is None:
@@ -676,13 +630,6 @@ def _parser(agents_dir: Path) -> argparse.ArgumentParser:
     )
     parser.add_argument("--json", action="store_true", help="print the results as JSON")
     parser.add_argument(
-        "--eval",
-        action="store_true",
-        help="(deprecated: use --variant) deploy the evaluation variant (<name>-eval, "
-        "DOCWIKI_EVAL_MCP_URL and DOCWIKI_EVAL_MCP_CONNECTION) of the selected agents, the "
-        "Researcher by default",
-    )
-    parser.add_argument(
         "--variant",
         action="append",
         metavar="NAME",
@@ -697,7 +644,7 @@ def _parser(agents_dir: Path) -> argparse.ArgumentParser:
     parser.add_argument(
         "--delete",
         action="store_true",
-        help="with --variant (or --eval): delete the evaluation agents instead of deploying them",
+        help="with --variant: delete the evaluation agents instead of deploying them",
     )
     return parser
 
@@ -708,7 +655,7 @@ def _main_delete(
     args: argparse.Namespace,
     project_client: Any | None,
     *,
-    allowed: Collection[str] | None = None,
+    allowed: Collection[str],
 ) -> int:
     if args.dry_run:
         plan = {
@@ -749,16 +696,14 @@ def main(
         collected.append if args.json else _print_result
     )
     try:
-        if args.delete and not (args.eval or args.variant):
+        if args.delete and not args.variant:
             raise AgentConfigurationError(
-                "--delete only removes evaluation agents: add --variant NAME (or --eval)"
+                "--delete only removes evaluation agents: add --variant NAME"
             )
-        if args.variant and (args.eval or args.agent or args.routine):
+        if args.variant and (args.agent or args.routine):
             raise AgentConfigurationError(
-                "--variant deploys evaluation Researchers only: drop --eval, --agent and --routine"
+                "--variant deploys evaluation Researchers only: drop --agent and --routine"
             )
-        if args.eval and args.routine:
-            raise AgentConfigurationError("--eval deploys agents only: drop --routine")
         agents = load_agents(args.agents_dir)
         variants: list[AgentVariant] = []
         if args.variant:
@@ -775,20 +720,7 @@ def main(
             ]
             values = variant_environment(values, variants, strict=not args.dry_run)
         else:
-            if args.eval:
-                print(
-                    "warning: --eval is deprecated; declare the arm in agents/variants.yaml and "
-                    "use --variant NAME",
-                    file=sys.stderr,
-                )
-            wanted = args.agent or (list(EVAL_DEFAULT_AGENTS) if args.eval else None)
-            selected = _select(agents, wanted)
-            if args.eval:
-                selected = [eval_agent(agent) for agent in selected]
-            if args.delete:
-                return _main_delete(
-                    [agent.name for agent in selected], values, args, project_client
-                )
+            selected = _select(agents, args.agent)
         routines = load_routines(agents, args.agents_dir) if args.routine else []
         if args.dry_run:
             plan = _dry_run(selected, routines, values, enable_routine=args.routine == "enable")

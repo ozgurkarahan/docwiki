@@ -202,7 +202,8 @@ a Foundry project and `az login` (no keys).
    compares a compiled wiki with a known ground truth, without a model.
 8. **Agents and Azure search:** the agent variants and the isolated evaluation stack are described
    in [`agents/README.md`](../agents/README.md#evaluation-variants-optional-opt-in) and set up with
-   `scripts/eval_stack.py`; the search arms use `scripts/eval_search_index.py`.
+   `scripts/eval_stack.py`; `agents/variants.yaml` keeps W1 and R1 as a template (the other agent
+   arms of this study are in commit `e8bbd14`). The search arms use `scripts/eval_search_index.py`.
 
 Rules that keep the result honest: write the arms, measures and decision rule before the blind
 run; freeze versions and the release; publish all runs, losses and costs; and say when the result

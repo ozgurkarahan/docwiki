@@ -23,9 +23,6 @@ param smartCapacity int
 @description('Capacity of the evaluation-only `smart-eval` deployment (same model, version and SKU as `smart`); 0 = none.')
 param evalSmartCapacity int = 0
 
-@description('Principal ID of the MCP identity to allow to call the model deployments (the evaluation apps\' `embed` calls); empty = no assignment. The identity is shared with the production MCP app.')
-param evalMcpPrincipalId string = ''
-
 @description('Model of the `embed` deployment (hybrid retrieval, ADR 0014).')
 param embedModel string = 'text-embedding-3-small'
 param embedModelVersion string = '1'
@@ -66,7 +63,6 @@ var embedDeploymentName = 'embed'
 var evalSmartDeploymentName = 'smart-eval'
 var deployEmbed = embedCapacity > 0
 var deployEvalSmart = evalSmartCapacity > 0
-var grantEvalMcp = !empty(evalMcpPrincipalId)
 var grantDeployer = !empty(deployerPrincipalId)
 
 resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
@@ -232,18 +228,6 @@ resource runtimeAzureAiUser 'Microsoft.Authorization/roleAssignments@2022-04-01'
     principalId: runtimePrincipalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.azureAiUser)
-  }
-}
-
-// The evaluation MCP apps call the `embed` deployment as the MCP identity (shared with the
-// production MCP app); only created with evaluation apps and evalEmbedAccess.
-resource evalMcpCognitiveServicesUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (grantEvalMcp) {
-  scope: account
-  name: guid(account.id, evalMcpPrincipalId, roleIds.cognitiveServicesUser)
-  properties: {
-    principalId: evalMcpPrincipalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.cognitiveServicesUser)
   }
 }
 

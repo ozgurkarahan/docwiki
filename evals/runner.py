@@ -617,7 +617,7 @@ def _parser() -> argparse.ArgumentParser:
         "--agent",
         default=DEFAULT_AGENT,
         help="agent of --system docwiki-researcher: 'researcher' (docwiki-researcher, default) or "
-        "a Foundry agent name such as docwiki-researcher-eval, which then also names the results",
+        "a Foundry agent name such as docwiki-researcher-w1, which then also names the results",
     )
     parser.add_argument(
         "--split-name",

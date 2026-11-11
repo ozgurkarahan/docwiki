@@ -36,8 +36,27 @@ from docwiki.agents_client.variants import (
 REPO_ROOT = AGENTS_DIR.parent
 URL_TEMPLATE = "https://{name}.variants.example/mcp"
 CONN_TEMPLATE = "docwiki-mcp-{name}"
-MCP_NAMES = ("wiki", "raw", "wiki2", "raw2")
-V2_TEXT = "# DocWiki Researcher v2\n\nPlan sub-questions, search each, join.\n"
+MCP_NAMES = ("wiki", "raw", "wide")
+X1_INSTRUCTIONS = "agents/variants/x1/instructions.md"
+X1_TEXT = "# DocWiki Researcher x1\n\nA test arm with instructions of its own.\n"
+# The committed template (w1, r1) plus a test arm x1 with its own MCP setting (filled from the
+# environment), instructions file and reasoning effort.
+TEST_VARIANTS = """\
+mcp_variants:
+  wiki: {}
+  raw:
+    DOCWIKI_MCP_WIKI_ABLATION: raw
+  wide:
+    DOCWIKI_MCP_MAX_CHARS: ${DOCWIKI_EVAL_MAX_CHARS}
+agents:
+  - {name: w1, base: researcher, mcp_variant: wiki}
+  - {name: r1, base: researcher, mcp_variant: raw}
+  - name: x1
+    base: researcher
+    mcp_variant: wide
+    instructions: agents/variants/x1/instructions.md
+    reasoning_effort: high
+"""
 API_CLIENT_ID = str(uuid.UUID(int=0xA1))
 READ_ROLE_ID = str(uuid.UUID(int=0xB1))
 API_SP_ID = str(uuid.UUID(int=0xC1))
@@ -59,19 +78,18 @@ ENV: dict[str, str] = {
     **DEPLOY_ENV,
     "DOCWIKI_EVAL_SMART_DEPLOYMENT": "smart-eval",
     "DOCWIKI_EVAL_MCP_VARIANTS_OUT": _out(),
-    "DOCWIKI_EVAL_MCP_VECTORS": "vectors-2026-11",
+    "DOCWIKI_EVAL_MAX_CHARS": "20000",
     "DOCWIKI_MCP_API_CLIENT_ID": API_CLIENT_ID,
 }
 
 
-def _agents_dir(tmp_path: Path, *, v2: bool = True) -> Path:
+def _agents_dir(tmp_path: Path, *, x1: bool = True) -> Path:
     agents_dir = copy_agents(tmp_path)
-    path = agents_dir / "variants" / "v2" / "instructions.md"
-    if v2:
+    (agents_dir / "variants.yaml").write_text(TEST_VARIANTS, encoding="utf-8")
+    if x1:
+        path = tmp_path / X1_INSTRUCTIONS
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(V2_TEXT, encoding="utf-8")
-    else:
-        path.unlink(missing_ok=True)
+        path.write_text(X1_TEXT, encoding="utf-8")
     return agents_dir
 
 
@@ -97,37 +115,17 @@ def _run(
 # ---------------------------------------------------------------- the declaration
 
 
-def test_committed_variants_match_the_study_arms() -> None:
+def test_committed_variants_are_the_w1_r1_template() -> None:
     declared = load_variants(AGENTS_DIR / "variants.yaml")
     arms = {
         agent.name: (agent.mcp_variant, agent.instructions, agent.reasoning_effort)
         for agent in declared.agents
     }
-    v2 = "agents/variants/v2/instructions.md"
-    assert arms == {
-        "w1": ("wiki", None, None),
-        "r1": ("raw", None, None),
-        "w2": ("wiki2", v2, None),
-        "r2": ("raw2", v2, None),
-        "w2high": ("wiki2", v2, "high"),
-    }
-    assert [agent.name for agent in declared.agents] == ["w1", "r1", "w2", "r2", "w2high"]
+    assert arms == {"w1": ("wiki", None, None), "r1": ("raw", None, None)}
+    assert [agent.name for agent in declared.agents] == ["w1", "r1"]
     assert all(agent.base == "researcher" for agent in declared.agents)
     assert all(agent.model_env == "DOCWIKI_EVAL_SMART_DEPLOYMENT" for agent in declared.agents)
-    assert declared.mcp_variants == {
-        "wiki": {},
-        "raw": {"DOCWIKI_MCP_WIKI_ABLATION": "raw"},
-        "wiki2": {
-            "DOCWIKI_MCP_DENSE": "on",
-            "DOCWIKI_MCP_SUPERSESSION_COMPANIONS": "on",
-            "DOCWIKI_MCP_VECTORS": "${DOCWIKI_EVAL_MCP_VECTORS}",
-        },
-        "raw2": {
-            "DOCWIKI_MCP_WIKI_ABLATION": "raw",
-            "DOCWIKI_MCP_DENSE": "on",
-            "DOCWIKI_MCP_VECTORS": "${DOCWIKI_EVAL_MCP_VECTORS}",
-        },
-    }
+    assert declared.mcp_variants == {"wiki": {}, "raw": {"DOCWIKI_MCP_WIKI_ABLATION": "raw"}}
 
 
 @pytest.mark.parametrize(
@@ -153,13 +151,14 @@ def test_mcp_variant_env_rules() -> None:
     def make(env: dict[str, Any]) -> VariantsFile:
         return VariantsFile.model_validate({"mcp_variants": {"wiki": env}, "agents": []})
 
-    assert make({"DOCWIKI_MCP_DENSE": "on"}).mcp_variants["wiki"] == {"DOCWIKI_MCP_DENSE": "on"}
+    raw = {"DOCWIKI_MCP_WIKI_ABLATION": "raw"}
+    assert make(raw).mcp_variants["wiki"] == raw
     with pytest.raises(ValueError, match="authentication settings"):
         make({"DOCWIKI_MCP_AUDIENCE": "x"})
     with pytest.raises(ValueError, match="DOCWIKI_MCP_"):
         make({"DOCWIKI_FAST_DEPLOYMENT": "x"})
     with pytest.raises(ValueError, match="string"):
-        make({"DOCWIKI_MCP_DENSE": True})  # unquoted YAML `on`
+        make({"DOCWIKI_MCP_WIKI_ABLATION": False})  # unquoted YAML `off`
     with pytest.raises(ValueError, match="duplicate"):
         VariantsFile.model_validate(
             {
@@ -209,7 +208,7 @@ def test_variant_payload_equals_production_except_name_model_endpoint_and_metada
     assert payload.definition_sha256 != prod.definition_sha256
 
 
-def test_v2_variants_use_their_instructions_and_effort(tmp_path: Path) -> None:
+def test_variants_use_their_own_instructions_and_effort(tmp_path: Path) -> None:
     agents_dir = _agents_dir(tmp_path)
     base = load_agents(agents_dir)["researcher"]
     declared = load_variants(agents_dir / "variants.yaml")
@@ -220,20 +219,20 @@ def test_v2_variants_use_their_instructions_and_effort(tmp_path: Path) -> None:
         ).body
         for agent in declared.agents
     }
-    assert bodies["w2"]["definition"]["instructions"] == V2_TEXT.strip()
+    assert bodies["x1"]["definition"]["instructions"] == X1_TEXT.strip()
     assert bodies["w1"]["definition"]["instructions"] == base.instructions
-    assert bodies["w2high"]["definition"]["reasoning"] == {"effort": "high"}
-    assert "reasoning" not in bodies["w2"]["definition"]
-    assert bodies["w2"]["definition"]["tools"][0]["server_url"] == URL_TEMPLATE.format(name="wiki2")
-    assert bodies["r2"]["definition"]["tools"][0]["server_url"] == URL_TEMPLATE.format(name="raw2")
+    assert bodies["x1"]["definition"]["reasoning"] == {"effort": "high"}
+    assert "reasoning" not in bodies["w1"]["definition"]
+    assert bodies["x1"]["definition"]["tools"][0]["server_url"] == URL_TEMPLATE.format(name="wide")
+    assert bodies["r1"]["definition"]["tools"][0]["server_url"] == URL_TEMPLATE.format(name="raw")
 
 
 def test_missing_instructions_file_is_a_clear_deploy_time_error(tmp_path: Path) -> None:
-    agents_dir = _agents_dir(tmp_path, v2=False)
+    agents_dir = _agents_dir(tmp_path, x1=False)
     base = load_agents(agents_dir)["researcher"]
-    w2 = next(a for a in load_variants(agents_dir / "variants.yaml").agents if a.name == "w2")
-    with pytest.raises(AgentConfigurationError, match=r"agents/variants/v2/instructions\.md"):
-        build_variant_agent(w2, base, tmp_path)
+    x1 = next(a for a in load_variants(agents_dir / "variants.yaml").agents if a.name == "x1")
+    with pytest.raises(AgentConfigurationError, match=r"agents/variants/x1/instructions\.md"):
+        build_variant_agent(x1, base, tmp_path)
     # Variants without a file of their own do not need it.
     w1 = next(a for a in load_variants(agents_dir / "variants.yaml").agents if a.name == "w1")
     assert build_variant_agent(w1, base, tmp_path).instructions == base.instructions
@@ -295,11 +294,11 @@ def test_deploy_all_variants(tmp_path: Path, capsys: pytest.CaptureFixture[str])
     code, _, err = _run(capsys, agents_dir, "--variant", "all", env=ENV, project_client=project)
     assert code == 0, err
     assert [name for name, _ in project.agents.created] == [
-        f"docwiki-researcher-{n}" for n in ("w1", "r1", "w2", "r2", "w2high")
+        f"docwiki-researcher-{n}" for n in ("w1", "r1", "x1")
     ]
     efforts = {name: body["definition"].get("reasoning") for name, body in project.agents.created}
-    assert efforts["docwiki-researcher-w2high"] == {"effort": "high"}
-    assert efforts["docwiki-researcher-w2"] is None
+    assert efforts["docwiki-researcher-x1"] == {"effort": "high"}
+    assert efforts["docwiki-researcher-w1"] is None
 
 
 def test_ordinary_deploy_never_touches_variants(
@@ -335,11 +334,11 @@ def test_deploy_variant_without_provisioned_apps_fails_clearly(
 def test_deploy_variant_with_a_missing_instructions_file_fails_before_azure(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    agents_dir = _agents_dir(tmp_path, v2=False)
+    agents_dir = _agents_dir(tmp_path, x1=False)
     project = _project()
     code, _, err = _run(capsys, agents_dir, "--variant", "all", env=ENV, project_client=project)
     assert code == 2
-    assert "agents/variants/v2/instructions.md" in err and "does not exist" in err
+    assert "agents/variants/x1/instructions.md" in err and "does not exist" in err
     assert project.agents.created == []
 
 
@@ -347,17 +346,17 @@ def test_variant_dry_run_prints_the_resolved_bodies(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     agents_dir = _agents_dir(tmp_path)
-    code, out, _ = _run(capsys, agents_dir, "--variant", "w2high", "--dry-run", env=ENV)
+    code, out, _ = _run(capsys, agents_dir, "--variant", "x1", "--dry-run", env=ENV)
     assert code == 0
     plan = json.loads(out)
     (agent,) = plan["agents"]
-    assert agent["agent"] == "docwiki-researcher-w2high"
+    assert agent["agent"] == "docwiki-researcher-x1"
     definition = agent["body"]["definition"]
     assert definition["model"] == "smart-eval"
     assert definition["reasoning"] == {"effort": "high"}
-    assert definition["instructions"] == V2_TEXT.strip()
-    assert definition["tools"][0]["server_url"] == URL_TEMPLATE.format(name="wiki2")
-    assert agent["body"]["metadata"]["docwiki_variant"] == "w2high"
+    assert definition["instructions"] == X1_TEXT.strip()
+    assert definition["tools"][0]["server_url"] == URL_TEMPLATE.format(name="wide")
+    assert agent["body"]["metadata"]["docwiki_variant"] == "x1"
     assert plan["missing_env"] == []
     # Before the apps exist the dry run still works and lists what is missing.
     code, out, err = _run(capsys, agents_dir, "--variant", "w1", "--dry-run", env={})
@@ -392,7 +391,7 @@ def test_variant_delete_only_removes_declared_variants(
     code, out, _ = _run(capsys, agents_dir, "--variant", "all", "--delete", "--dry-run", env={})
     assert code == 0
     assert [item["http"] for item in json.loads(out)["delete"]] == [
-        f"DELETE /agents/docwiki-researcher-{n}" for n in ("w1", "r1", "w2", "r2", "w2high")
+        f"DELETE /agents/docwiki-researcher-{n}" for n in ("w1", "r1", "x1")
     ]
 
 
@@ -402,9 +401,8 @@ def test_variant_delete_only_removes_declared_variants(
         (["--variant", "researcher", "--delete"], "unknown variant"),
         (["--variant", "nope"], "unknown variant"),
         (["--delete"], "--delete only removes evaluation agents"),
-        (["--variant", "w1", "--agent", "researcher"], "drop --eval, --agent and --routine"),
-        (["--variant", "w1", "--routine", "enable"], "drop --eval, --agent and --routine"),
-        (["--variant", "w1", "--eval"], "drop --eval, --agent and --routine"),
+        (["--variant", "w1", "--agent", "researcher"], "drop --agent and --routine"),
+        (["--variant", "w1", "--routine", "enable"], "drop --agent and --routine"),
     ],
 )
 def test_variant_refusal_rules(
@@ -422,18 +420,7 @@ async def test_delete_agent_refuses_names_outside_the_allowed_set() -> None:
     project = FakeProject(versions={"docwiki-researcher": [{"version": "1"}]})
     with pytest.raises(AgentConfigurationError, match="not a declared evaluation variant"):
         await delete_agent(project, "docwiki-researcher", allowed=["docwiki-researcher-w1"])
-    with pytest.raises(AgentConfigurationError, match="not an evaluation agent"):
-        await delete_agent(project, "docwiki-researcher")
     assert project.agents.deleted == []
-
-
-def test_eval_flag_still_works_with_a_deprecation_note(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    code, out, err = _run(capsys, AGENTS_DIR, "--eval", "--dry-run", env={})
-    assert code == 0
-    assert "--eval is deprecated" in err
-    assert json.loads(out)["agents"][0]["agent"] == "docwiki-researcher-eval"
 
 
 # ---------------------------------------------------------------- the operator helpers
@@ -442,22 +429,23 @@ def test_eval_flag_still_works_with_a_deprecation_note(
 def test_encode_resolves_placeholders_and_survives_the_parameters_file(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    declared = load_variants(AGENTS_DIR / "variants.yaml")
+    agents_dir = _agents_dir(tmp_path)
+    declared = load_variants(agents_dir / "variants.yaml")
     resolved = resolve_mcp_variants(declared, ENV)
-    assert [item["name"] for item in resolved] == ["wiki", "raw", "wiki2", "raw2"]
-    assert resolved[2]["env"]["DOCWIKI_MCP_VECTORS"] == "vectors-2026-11"
+    assert [item["name"] for item in resolved] == ["wiki", "raw", "wide"]
+    assert resolved[2]["env"]["DOCWIKI_MCP_MAX_CHARS"] == "20000"
     encoded = encode_mcp_variants(resolved)
     assert encoded.isascii() and '"' not in encoded and "$" not in encoded
     assert json.loads(base64.b64decode(encoded)) == resolved
     assert [i["name"] for i in resolve_mcp_variants(declared, ENV, ["raw"])] == ["raw"]
-    with pytest.raises(AgentConfigurationError, match="DOCWIKI_EVAL_MCP_VECTORS"):
+    with pytest.raises(AgentConfigurationError, match="DOCWIKI_EVAL_MAX_CHARS"):
         resolve_mcp_variants(declared, {})
     with pytest.raises(AgentConfigurationError, match="unknown mcp variant"):
         resolve_mcp_variants(declared, ENV, ["nope"])
-    assert evalstack.main(["encode"], agents_dir=AGENTS_DIR, env=ENV) == 0
+    assert evalstack.main(["encode"], agents_dir=agents_dir, env=ENV) == 0
     assert json.loads(base64.b64decode(capsys.readouterr().out.strip())) == resolved
-    assert evalstack.main(["encode"], agents_dir=AGENTS_DIR, env={}) == 2
-    assert "DOCWIKI_EVAL_MCP_VECTORS" in capsys.readouterr().err
+    assert evalstack.main(["encode"], agents_dir=agents_dir, env={}) == 2
+    assert "DOCWIKI_EVAL_MAX_CHARS" in capsys.readouterr().err
 
 
 class FakeGraph:
@@ -499,7 +487,7 @@ def test_identities_print_the_allowlist(tmp_path: Path, capsys: pytest.CaptureFi
     code = evalstack.main(argv, agents_dir=agents_dir, env=ENV, project_client=project)
     assert code == 0
     data = json.loads(capsys.readouterr().out)
-    ids = [f"client-docwiki-researcher-{n}" for n in ("w1", "r1", "w2", "r2", "w2high")]
+    ids = [f"client-docwiki-researcher-{n}" for n in ("w1", "r1", "x1")]
     assert [item["client_id"] for item in data["agents"]] == ids
     assert data["DOCWIKI_EVAL_MCP_ALLOWED_CLIENT_IDS"] == ",".join(sorted(ids))
     code = evalstack.main(
@@ -621,4 +609,4 @@ def test_grant_command_end_to_end(
     assert out.count("Wiki.Read granted") == 2 and len(graph.posts) == 2
     assert evalstack.main(["grant", "--json"], **common) == 0
     statuses = [r["status"] for r in json.loads(capsys.readouterr().out)]
-    assert statuses == ["exists", "exists", "granted", "granted", "granted"]
+    assert statuses == ["exists", "exists", "granted"]

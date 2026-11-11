@@ -118,9 +118,6 @@ param evalReleaseId string = ''
 @description('When > 0, a `smart-eval` model deployment with the model, version and SKU of `smart` and this capacity (units of 1,000 tokens per minute), for the evaluation agents only (azd value DOCWIKI_EVAL_SMART_CAPACITY; output DOCWIKI_EVAL_SMART_DEPLOYMENT).')
 param evalSmartCapacity int = 0
 
-@description('Grant the MCP identity Cognitive Services User on the Foundry account so that evaluation apps can call the `embed` deployment, and add the embedding settings to their environment (azd value DOCWIKI_EVAL_EMBED_ACCESS). The identity is SHARED with the production MCP app, which gets the permission too (it does not use it unless configured to). Only applies when evaluation apps exist.')
-param evalEmbedAccess bool = false
-
 @description('Deploy the optional portal (Entra sign-in, or no sign-in for a public-audience build: portalAccess).')
 param enablePortal bool = false
 
@@ -463,7 +460,6 @@ module foundry 'modules/foundry.bicep' = {
     smartModelVersion: smartModelVersion
     smartCapacity: smartCapacity
     evalSmartCapacity: evalSmartCapacity
-    evalMcpPrincipalId: evalEmbedAccess && evalMcpEnabled ? mcpIdentity.outputs.principalId : ''
     embedModel: embedModel
     embedModelVersion: embedModelVersion
     embedCapacity: embedCapacity
@@ -965,45 +961,15 @@ var evalMcpProtectedEnv = [
 ]
 
 // What every evaluation app adds to the production environment (the variant env comes last and
-// wins): the pinned release, and the embedding settings when the identity may call `embed`.
-var evalMcpExtraEnv = concat(
-  empty(evalReleaseId)
-    ? []
-    : [
-        {
-          name: 'DOCWIKI_MCP_PIN_RELEASE'
-          value: evalReleaseId
-        }
-      ],
-  evalEmbedAccess && embedCapacity > 0
-    ? [
-        {
-          name: 'DOCWIKI_FOUNDRY_PROJECT_ENDPOINT'
-          value: foundry.outputs.projectEndpoint
-        }
-        {
-          name: 'DOCWIKI_EMBED_DEPLOYMENT'
-          value: foundry.outputs.embedDeploymentName
-        }
-        {
-          name: 'DOCWIKI_EMBED_MODEL'
-          value: embedModel
-        }
-        {
-          name: 'DOCWIKI_EMBED_DIMENSIONS'
-          value: string(embedDimensions)
-        }
-        {
-          name: 'DOCWIKI_EMBED_TPM'
-          value: string(embedTokensPerMinute)
-        }
-        {
-          name: 'DOCWIKI_EMBED_RPM'
-          value: string(embedRequestsPerMinute)
-        }
-      ]
-    : []
-)
+// wins): the pinned release.
+var evalMcpExtraEnv = empty(evalReleaseId)
+  ? []
+  : [
+      {
+        name: 'DOCWIKI_MCP_PIN_RELEASE'
+        value: evalReleaseId
+      }
+    ]
 
 module mcpEvalApp 'modules/container-app.bicep' = [
   for (variant, index) in evalMcpVariantList: {
