@@ -9,7 +9,7 @@ Microsoft Foundry models and two Foundry agents (Librarian and Researcher).
 If code and spec disagree, the spec wins; propose spec changes in your summary instead of
 silently diverging.
 
-## Owner decisions (2026-10-21 and 2026-10-22, apply now; they win over older spec text until the spec is updated)
+## Owner decisions (2026-10-21 to 2026-11-11, apply now; they win over older spec text until the spec is updated)
 
 DocWiki is a **public proof of concept**. Its job is to show one pattern clearly: messy documents
 become a cited wiki that is served on Azure Container Apps, with Microsoft Foundry agents working
@@ -40,6 +40,11 @@ become a cited wiki that is served on Azure Container Apps, with Microsoft Found
 7. **Decisions live here.** When the owner makes a new decision, record it in this section (and in
    an ADR when it changes the design), so every coding agent, including GitHub Copilot sessions,
    works from the same facts.
+8. **The Researcher stays an agent working inside the compiled wiki (2026-11-11, ADR 0015).** The
+   blind knowledge-access study ranked it first but statistically tied with long context and
+   optimised retrieval; the owner keeps it. Do not switch the Researcher to long context, a
+   router, the v2 instructions or high reasoning effort without a new pre-registered study that
+   beats it on blind questions written by someone who cannot see the system.
 
 ## Hard rules (non-negotiable)
 

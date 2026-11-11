@@ -7,6 +7,8 @@ to repeat the test on your own documents.
 
 Decision record: [ADR 0015](adr/0015-knowledge-access.md). Pre-registered study:
 [`evals/experiments/2026-11-10-knowledge-access.md`](../evals/experiments/2026-11-10-knowledge-access.md).
+How it was run, the research behind each arm and every check:
+[method](../evals/experiments/2026-11-10-knowledge-access/method.md).
 
 > **Read this first.** DocWiki measured one small fictional corpus (39 public documents), one
 > model family and 32 development questions, plus a blind set of 120. What it measured is stated
@@ -122,10 +124,12 @@ unless stated.
 - Only naive RAG is significantly worse than the agent on the wiki (-15 points, Holm p = 0.005).
   The agent on the wiki, long context, optimised RAG, the v2 variants and the router are
   statistically tied; the pre-registered tie-break (claim support) recommends **long context** for
-  this corpus.
-- The compiled wiki wins where compilation did the work: superseded revisions (79 % against 27 to
-  55 % for every retrieval and long-context arm), tables (87 %), contradictions and numeric
-  exactness (87.7 %). The agent abstains less well (81 %).
+  this corpus. DocWiki keeps the agent on the wiki, the most accurate arm, for the reasons in
+  [ADR 0015](adr/0015-knowledge-access.md): a product choice on a tie, not a proof.
+- The compiled wiki wins where compilation did the work: superseded revisions (79 % for the agent
+  on the wiki, 61 to 67 % for the other agents, 27 to 55 % for every retrieval and long-context
+  arm), tables (87 %, +12 points over the same agent without the wiki), contradictions and
+  numeric exactness (87.7 %). The agent abstains less well (81 %).
 - The wiki's effect inside the same agent is +4.4 points, not significant after correction.
 - Question planning, a dense lane and high reasoning effort did not help. A three-class router did
   not beat its best arm, although an oracle would reach 95 %: the approaches are complementary,
@@ -137,7 +141,9 @@ Full results, per category, tests and costs:
 
 **Reading the numbers.** The development split was seen while building, so it is for tuning only;
 the blind split decides. On 120 questions, a difference under about 8 points is not significant
-here.
+here. The development split even reversed the order: there, the v2 instructions with high
+reasoning effort came first (77.1 %) and the production agent last (59.4 %)
+([method](../evals/experiments/2026-11-10-knowledge-access/method.md#4-what-the-development-runs-got-wrong)).
 
 ## 4. Choosing an approach
 
@@ -200,4 +206,5 @@ a Foundry project and `az login` (no keys).
 
 Rules that keep the result honest: write the arms, measures and decision rule before the blind
 run; freeze versions and the release; publish all runs, losses and costs; and say when the result
-is unresolved.
+is unresolved. The [method](../evals/experiments/2026-11-10-knowledge-access/method.md) lists the
+checks DocWiki ran and the lessons it would reuse.
