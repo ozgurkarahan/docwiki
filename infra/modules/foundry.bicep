@@ -19,10 +19,6 @@ param smartModel string
 param smartModelVersion string
 param smartCapacity int
 
-@minValue(0)
-@description('Capacity of the evaluation-only `smart-eval` deployment (same model, version and SKU as `smart`); 0 = none.')
-param evalSmartCapacity int = 0
-
 @description('Model of the `embed` deployment (hybrid retrieval, ADR 0014).')
 param embedModel string = 'text-embedding-3-small'
 param embedModelVersion string = '1'
@@ -60,9 +56,7 @@ param appInsightsConnectionString string
 var fastDeploymentName = 'fast'
 var smartDeploymentName = 'smart'
 var embedDeploymentName = 'embed'
-var evalSmartDeploymentName = 'smart-eval'
 var deployEmbed = embedCapacity > 0
-var deployEvalSmart = evalSmartCapacity > 0
 var grantDeployer = !empty(deployerPrincipalId)
 
 resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
@@ -167,28 +161,6 @@ resource embedDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-
   ]
 }
 
-// Evaluation-only twin of `smart` (same model, version and SKU), so that evaluation agents have
-// their own rate limit and never compete with production for tokens; not created at capacity 0.
-resource evalSmartDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = if (deployEvalSmart) {
-  parent: account
-  name: evalSmartDeploymentName
-  sku: {
-    name: deploymentSku
-    capacity: evalSmartCapacity
-  }
-  properties: {
-    model: {
-      format: 'OpenAI'
-      name: smartModel
-      version: smartModelVersion
-    }
-    versionUpgradeOption: 'OnceCurrentVersionExpired'
-  }
-  dependsOn: [
-    embedDeployment
-  ]
-}
-
 // Server-side tracing of the agents: Application Insights connection of the project.
 resource tracingConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01' = if (enableTracing) {
   parent: project
@@ -268,4 +240,3 @@ output projectPrincipalId string = project.identity.principalId
 output fastDeploymentName string = fastDeployment.name
 output smartDeploymentName string = smartDeployment.name
 output embedDeploymentName string = deployEmbed ? embedDeploymentName : ''
-output evalSmartDeploymentName string = deployEvalSmart ? evalSmartDeploymentName : ''

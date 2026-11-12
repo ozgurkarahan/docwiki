@@ -198,7 +198,7 @@ never writes to the release it serves.
 | `DOCWIKI_MCP_PIN_RELEASE` | — | Evaluation only: serve this immutable release id, ignoring `current.json`, in local and Azure modes; a missing release fails on first call. A direct release or portable folder must match this id |
 | `DOCWIKI_MCP_MAX_CHARS` | `12000` | Output budget per tool result (minimum 2000) |
 | `DOCWIKI_MCP_POINTER_TTL_SECONDS` | `30` | Pointer re-check interval |
-| `DOCWIKI_MCP_WIKI_ABLATION` | `off` | `raw` on an evaluation server only: the compiled wiki is hidden and the read tools serve the documents' extracted blocks alone. `answer_context` and `search` return source blocks without revision status, home index, hub or views; `get_evidence` and `query_table` work as usual; `read_page`, `get_index`, `get_links`, `glossary`, `get_skill`, `list_skills` and `recent_changes` answer `not_found`. The search keeps the domain pack's synonyms. It is the "same agent, no wiki" arm of an ablation (the `raw` variant of `agents/variants.yaml`) |
+| `DOCWIKI_MCP_WIKI_ABLATION` | `off` | `raw` on an evaluation server only: the compiled wiki is hidden and the read tools serve the documents' extracted blocks alone. `answer_context` and `search` return source blocks without revision status, home index, hub or views; `get_evidence` and `query_table` work as usual; `read_page`, `get_index`, `get_links`, `glossary`, `get_skill`, `list_skills` and `recent_changes` answer `not_found`. The search keeps the domain pack's synonyms. It is the "same agent, no wiki" arm of an ablation ([wiki ablation](../../../evals/experiments/2026-11-09-wiki-ablation.md)) |
 | `DOCWIKI_QUERY_TABLE_MAX_ROWS` | `200` | Row cap of `query_table` (at most 200) |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | — | HTTP mode exports traces and `docwiki` logs to Application Insights |
 
@@ -209,9 +209,12 @@ HTTP endpoints: `POST /mcp` (stateless streamable HTTP, JSON responses; no trail
 ## Evaluation switches (opt-in only)
 
 Leave `DOCWIKI_MCP_PIN_RELEASE` and `DOCWIKI_MCP_WIKI_ABLATION` unset in production: they are for
-evaluation MCP apps only. `DOCWIKI_RELEASE` is a **local path** default for `--release`, even in
-Azure mode; it is not an Azure release-id pin. Use `DOCWIKI_MCP_PIN_RELEASE` for a release id in
-either mode. A pin can select a release from a releases root without a current pointer.
+evaluation servers only, for example a local server over a downloaded release (`--release`, see
+"Run modes" above). The Azure evaluation stack that ran them as separate MCP apps was removed
+after the knowledge-access study (spec CHANGELOG v1.14; commit `364addd`). `DOCWIKI_RELEASE` is a
+**local path** default for `--release`, even in Azure mode; it is not an Azure release-id pin. Use
+`DOCWIKI_MCP_PIN_RELEASE` for a release id in either mode. A pin can select a release from a
+releases root without a current pointer.
 
 The knowledge-access study also tried a dense lane and superseded revisions shown next to current
 ones (arms W2 and R2). Both were removed after the study; commit `e8bbd14` reproduces them
