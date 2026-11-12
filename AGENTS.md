@@ -9,7 +9,7 @@ Microsoft Foundry models and two Foundry agents (Librarian and Researcher).
 If code and spec disagree, the spec wins; propose spec changes in your summary instead of
 silently diverging.
 
-## Owner decisions (2026-10-21 to 2026-11-11, apply now; they win over older spec text until the spec is updated)
+## Owner decisions (2026-10-21 to 2026-11-12, apply now; they win over older spec text until the spec is updated)
 
 DocWiki is a **public proof of concept**. Its job is to show one pattern clearly: messy documents
 become a cited wiki that is served on Azure Container Apps, with Microsoft Foundry agents working
@@ -45,6 +45,12 @@ become a cited wiki that is served on Azure Container Apps, with Microsoft Found
    optimised retrieval; the owner keeps it. Do not switch the Researcher to long context, a
    router, the v2 instructions or high reasoning effort without a new pre-registered study that
    beats it on blind questions written by someone who cannot see the system.
+9. **Keep only what the demo and the evaluation kit use (2026-11-12, spec v1.14).** Remove the
+   knowledge-access study's arms and tools, the evaluation stack (evaluation MCP apps,
+   `smart-eval`, Researcher variants) and the rejected embeddings of ADR 0014 (code, settings and
+   the `embed` deployment); commit `364addd` still has them. Keep the kit for future studies: the
+   runner and systems of the `evals` workflow, `compare.py`, `judge_llm.py`,
+   `compile_fidelity.py`, `perf_probe.py`, and the MCP release pin and wiki ablation flag.
 
 ## Hard rules (non-negotiable)
 

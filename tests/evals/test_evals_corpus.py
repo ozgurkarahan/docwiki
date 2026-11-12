@@ -374,15 +374,19 @@ def test_mock_release_sources_map_to_the_corpus(repo_root: Path) -> None:
     manifest = CorpusManifest.load(repo_root / "samples" / "corpus")
     catalog = ReleaseCatalog.load(repo_root / "samples" / "fixtures" / "mock-release")
     resolver = SourceResolver(manifest, catalog)
-    assert resolver.path_for_id("src-f0757603684a") == (
+
+    def path_of(source_id: str) -> str | None:
+        return resolver.resolve(Citation(source_id=source_id), unit="1").path
+
+    assert path_of("src-f0757603684a") == (
         "full/chantiers/moreau/3-execution/site-meeting-minutes/"
         "2026-03-24_compte-rendu-de-chantier-n3.docx"
     )
-    assert resolver.path_for_id("src-59cf9366e50c") == (
+    assert path_of("src-59cf9366e50c") == (
         "held-back/chantiers/moreau/3-execution/schedule/"
         "PLN-2026-003_indice-B_planning-et-suivi-des-achats.xlsx"
     )
-    assert resolver.path_for_id("src-000000000000") is None
+    assert path_of("src-000000000000") is None
 
 
 # -------------------------------------------------------------------------- extraction

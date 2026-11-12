@@ -32,12 +32,6 @@
   run is then recorded under that agent name, beside the production one, for an A/B comparison.
 - `evals/scoreboard.py` → `evals/results/latest.json` and a Markdown table injected into the README
   between `<!-- scoreboard:start -->` and `<!-- scoreboard:end -->`.
-- `evals/retrieval_bench.py` → `evals/results/<date>-retrieval-<mode>-<split>.json`
-  (`docwiki.evals.retrieval/v1`): offline candidate and served recall@k of `answer_context` on a
-  release, with no LLM call, and the classification of a recorded run's missed citations. Search
-  tool calls in Researcher records keep their hit ids (never text) for this purpose. Retrieval
-  probe sets (`evals/golden/probes.py`: a visible tune set and a blind decision set whose sha256 is
-  committed before the code it judges) add per-kind hit counts and filter violations.
 - `evals/compile_fidelity.py` → `evals/results/<date>-compile-fidelity.json`
   (`docwiki.evals.compile-fidelity/v1`): what the compiled wiki states, checked on a release with
   no LLM call against `evals/golden/compile-fidelity.yaml`, whose expectations come from the

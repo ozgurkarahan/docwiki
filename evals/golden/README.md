@@ -208,41 +208,10 @@ and the commit message must explain why the seal changed. Never tune prompts on 
 
 ## Retrieval probe sets
 
-Two small sets measure retrieval alone (`evals/retrieval_bench.py`), not answers. They follow the
-record format above plus three fields: `probe` (the kind), `within` (a scope of the corpus, or
-`null`) and `audience` (`public`). The bench runs each probe with its own `within` and `lang`, as
-the Researcher's `answer_context` call would.
-
-| Kind | What it tests |
-|---|---|
-| `paraphrase-fr` | a French question that avoids the words of its evidence |
-| `en-to-fr` | an English question on a French document, with no term or synonym of the domain glossary |
-| `lexical-control` | a question that carries a code or number printed in its evidence: plain word search must keep finding it |
-| `multi-chantier` | a question whose answer needs evidence from at least two chantiers (`within` is `null`) |
-
-- `retrieval-tune.jsonl` (12 probes, 3 per kind, `split: retrieval-tune`) is visible. It is used to
-  tune retrieval settings, never to decide.
-- The **blind decision set** (about 30 probes: 8, 8, 8 and 6, `split: retrieval-blind`) is written
-  by an independent agent session from the public fictional documents only, without access to the
-  retrieval code, this tune set or the results. It stays outside the repository while retrieval is
-  developed; only its sha256 is committed in `evals/experiments/` beforehand, and the file is
-  published after the last decision so anyone can check the fingerprint. It is blind by process,
-  not cryptographically. The bench writes aggregates only for it.
-
-```powershell
-uv run python evals/golden/probes.py --check --file evals/golden/retrieval-tune.jsonl
-uv run python evals/golden/probes.py --list                  # public documents of full/ and their scope
-uv run python evals/golden/probes.py --dump <source_path>    # the text units of one public document
-uv run pytest tests/samples/test_samples_probes.py
-```
-
-`probes.py --check` applies every record rule of `author.py` plus the probe rules (codes in
-`PROBE_ERRORS`: kind, split, public audience, never abstain, `within` is a scope of the corpus and
-holds every citation, language per kind, no glossary term in an `en-to-fr` question, a printed code
-or number in a `lexical-control` question, two chantiers for `multi-chantier`). Like `author.py`
-it prints only aggregates (counts per kind, language and split, the mean word overlap of question
-and evidence per kind), the sha256, and the ids and error codes of failing probes. `--dump` refuses
-restricted, held-back and photo documents.
+The probe sets of the hybrid-retrieval gate ([ADR 0014](../../docs/adr/0014-hybrid-retrieval.md)),
+their checker `probes.py` and the bench that ran them were removed after the knowledge-access
+study (spec CHANGELOG v1.14); commit `364addd` has them. The blind decision set's fingerprint
+and its results stay in `evals/experiments/` and `evals/results/`.
 
 ## Private holdout
 

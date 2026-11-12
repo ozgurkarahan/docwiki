@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+import evals.registry as registry
 import pytest
 from evals.registry import get_system, register_system, system_names
 from evals.runner import _parser, result_name
@@ -24,6 +27,18 @@ def test_a_name_cannot_be_taken_twice() -> None:
     register_system("test-registry-only", factory)  # same factory: idempotent
     with pytest.raises(ValueError, match="already registered"):
         register_system("test-registry-only", lambda options, corpus: None)
+
+
+def test_plugin_modules_are_imported_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``evals/systems_<name>.py`` modules register more systems: each is imported once."""
+    imported: list[str] = []
+    modules = [SimpleNamespace(name=name) for name in ("systems_b", "corpus", "systems_a")]
+    monkeypatch.setattr(registry, "_LOADED", False)
+    monkeypatch.setattr(registry, "pkgutil", SimpleNamespace(iter_modules=lambda paths: modules))
+    monkeypatch.setattr(registry, "importlib", SimpleNamespace(import_module=imported.append))
+    registry.load_plugins()
+    registry.load_plugins()
+    assert imported == ["evals.systems_a", "evals.systems_b"]
 
 
 def test_run_label_names_repetitions() -> None:

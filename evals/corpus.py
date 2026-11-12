@@ -309,9 +309,6 @@ class SourceResolver:
         matches = {path for path in self.manifest.files if path.endswith("/" + value)}
         return next(iter(matches)) if len(matches) == 1 else None
 
-    def path_for_id(self, source_id: str) -> str | None:
-        return self._by_id.get(source_id)
-
     def resolve(self, citation: Citation, *, unit: str) -> ResolvedCitation:
         path: str | None = None
         via: str | None = None
