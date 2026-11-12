@@ -27,18 +27,9 @@ MAX_DEPTH = 4
 MAX_MEMBER_BYTES = 64 * 1024 * 1024
 MAX_TABLE_ROWS = 200_000
 
-OOXML_EXTS = frozenset(
-    {
-        ".docx", ".docm", ".dotx", ".dotm",
-        ".xlsx", ".xlsm", ".xltx", ".xltm",
-        ".pptx", ".pptm", ".potx", ".potm", ".ppsx", ".ppsm",
-        ".vsdx", ".vsdm",
-    }
-)
 IMAGE_EXTS = frozenset(
     {".png", ".jpg", ".jpeg", ".gif", ".webp", ".tif", ".tiff", ".bmp", ".ico"}
 )
-SQLITE_EXTS = frozenset({".db", ".sqlite", ".sqlite3", ".db3"})
 PARQUET_EXTS = frozenset({".parquet", ".pq"})
 FONT_EXTS = frozenset({".woff", ".woff2", ".ttf", ".otf", ".eot"})
 MARKUP_EXTS = frozenset({".html", ".htm", ".xhtml", ".svg", ".xml", ".rss", ".atom"})
