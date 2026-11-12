@@ -249,9 +249,9 @@ Cleanup after the knowledge-access study.
 
 ## v1.14
 
-Second cleanup after the knowledge-access study: what neither the demo nor the kept evaluation kit
-uses is removed (owner decision of 2026-11-12, AGENTS.md decision 9). Commit `364addd` reproduces
-everything removed.
+Second cleanup after the knowledge-access study, in small pull requests: what neither the demo
+nor the kept evaluation kit uses is removed (owner decision of 2026-11-12, AGENTS.md decision 9).
+Commit `364addd` has everything removed.
 
 | Area | Change | Why |
 |---|---|---|

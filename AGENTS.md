@@ -45,11 +45,11 @@ become a cited wiki that is served on Azure Container Apps, with Microsoft Found
    optimised retrieval; the owner keeps it. Do not switch the Researcher to long context, a
    router, the v2 instructions or high reasoning effort without a new pre-registered study that
    beats it on blind questions written by someone who cannot see the system.
-9. **Keep only what the demo and the evaluation kit use (2026-11-12, spec v1.14).** The
+9. **Keep only what the demo and the evaluation kit use (2026-11-12, spec v1.14).** Remove the
    knowledge-access study's arms and tools, the evaluation stack (evaluation MCP apps,
    `smart-eval`, Researcher variants) and the rejected embeddings of ADR 0014 (code, settings and
-   the `embed` deployment) are removed; commit `364addd` reproduces them. The kit for future
-   studies stays: the runner and systems of the `evals` workflow, `compare.py`, `judge_llm.py`,
+   the `embed` deployment); commit `364addd` still has them. Keep the kit for future studies: the
+   runner and systems of the `evals` workflow, `compare.py`, `judge_llm.py`,
    `compile_fidelity.py`, `perf_probe.py`, and the MCP release pin and wiki ablation flag.
 
 ## Hard rules (non-negotiable)

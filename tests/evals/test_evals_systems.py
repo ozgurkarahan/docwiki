@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
+from pathlib import Path
 from typing import Any
 
 import pytest
 from evals.corpus import CorpusContext, CorpusFile
+from evals.records import ToolCallRecord, tool_hits
 from evals.systems import (
     LONG_CONTEXT_SYSTEM_PROMPT,
     RAG_PROMPT_VERSION,
@@ -33,6 +36,9 @@ from evals_testkit import (
 from docwiki.contracts import source_id_for
 from docwiki.contracts.locators import CsvRowsLocator, PdfPageLocator
 from docwiki.llm import FakeLlmClient, LlmConfigurationError, LlmRequest, PriceTable
+from docwiki.mcp.config import McpConfig
+from docwiki.mcp.source import FolderReleaseSource
+from docwiki.mcp.tools_read import ReadTools
 
 PRICES = PriceTable.from_mapping(
     {
@@ -395,3 +401,24 @@ def test_researcher_does_not_retry_other_errors(
     run(system.setup())
     with pytest.raises(AgentInvocationError):
         run(system.answer(question()))
+
+
+def test_tool_hits_keep_ids_only(repo_root: Path) -> None:
+    """Researcher records keep the hits of search calls as ids, never as text."""
+    release = FolderReleaseSource(repo_root / "samples" / "fixtures" / "mock-release")
+    output = ReadTools(release, McpConfig()).answer_context("Élévation des murs 70 %", limit=3)
+    hits = tool_hits("answer_context", output)
+    assert hits is not None and [hit.rank for hit in hits] == [1, 2, 3]
+    assert hits[0].kind == "source-block"
+    assert hits[0].source_id == "src-f0757603684a" and hits[0].locator_key == "para-0007"
+    assert ("src-f0757603684a", "para-0007") in hits[0].cited
+    dumped = json.dumps([hit.model_dump() for hit in hits], ensure_ascii=False)
+    assert "70 %" not in dumped and "text" not in dumped
+    assert tool_hits("search", [{"type": "text", "text": output}]) == hits
+    assert tool_hits("read_page", output) is None
+    assert tool_hits("answer_context", "not json") is None
+
+
+def test_tool_calls_without_hits_keep_their_old_shape() -> None:
+    record = ToolCallRecord(name="read_page", status="completed", arguments={"page": "x"})
+    assert "hits" not in record.model_dump(exclude_none=True)
