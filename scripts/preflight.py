@@ -48,7 +48,6 @@ from azdlib import (
     tools_from_environment,
 )
 
-MIN_PYTHON = (3, 12)
 MIN_AZ = (2, 67, 0)
 MIN_AZD = (1, 23, 8)  # Container Apps jobs as `host: containerapp` services
 MIN_BICEP = (0, 33, 0)

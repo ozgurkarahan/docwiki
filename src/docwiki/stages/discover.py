@@ -14,7 +14,7 @@ downloaded again.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import PurePosixPath
@@ -384,8 +384,3 @@ def _persist(store: StateStore, state: SourceState) -> SourceState:
 
     stored = store.update(state.source_id, mutate)
     return stored if stored is not None else state
-
-
-def unchanged_since(states: Sequence[SourceState]) -> dict[str, str]:
-    """``source_id → content_hash`` of active shards (used for no-op detection)."""
-    return {state.source_id: state.content_hash for state in states if not state.deleted}

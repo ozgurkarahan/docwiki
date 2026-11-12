@@ -53,8 +53,6 @@ CODE_EXTS = frozenset(
         ".toml", ".ini", ".cfg", ".lock", ".j2", ".jinja", ".dockerfile",
     }
 )
-# Binary types worth extracting from git history blobs.
-BINARY_EXTS = OOXML_EXTS | IMAGE_EXTS | SQLITE_EXTS | PARQUET_EXTS | FONT_EXTS | {".pdf", ".zip"}
 
 _STRUCTURE_RE = re.compile(r"^\s*(?:[-*+]\s|>\s?|\d{1,3}[.)]\s|[A-Za-z][.)]\s)")
 _HEADING_RE = re.compile(r"^\s*#{1,6}\s")
