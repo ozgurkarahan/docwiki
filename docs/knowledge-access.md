@@ -183,9 +183,9 @@ a Foundry project and `az login` (no keys).
    table numbers, multi-hop, superseded revisions and questions with no answer. Have someone who
    cannot see the system write the confirmation set.
 2. **Register your systems.** A module `evals/systems_<name>.py` calls `register_system` from
-   [`evals/registry.py`](../evals/registry.py); the runner does not change. Existing systems:
-   naive retrieval, long context, the wiki in context, two Azure AI Search arms
-   (`evals/systems_search.py`), and the agents.
+   [`evals/registry.py`](../evals/registry.py); the runner does not change. Built-in systems:
+   naive retrieval, long context and the agent. The study's other arms (the wiki in context, two
+   Azure AI Search arms) are in commit `364addd`.
 3. **Run each arm several times:**
    `uv run python evals/run.py --system <name> --questions <file> --split-name <split> --run-label r1`
    (see [`evals/README.md`](../evals/README.md) for the options). Keep every run.
@@ -196,14 +196,16 @@ a Foundry project and `az login` (no keys).
 5. **Judge claims blind:** `uv run python evals/judge_llm.py <result files> --out <folder>` asks a
    model, without the arm's name, whether each claim is supported by the cited passage. Read it
    next to the deterministic scores, not instead of them.
-6. **Try a router:** `evals/router.py classify`, then `fit` on the development split only, then
-   `apply` (and `oracle`, the upper bound) on the confirmation results.
+6. **Try a router:** the study's router (`evals/router.py` in commit `364addd`) classifies the
+   questions, fits a routing table on the development split only, then applies it (and an oracle,
+   the upper bound) to the confirmation results. It did not beat the agent here.
 7. **Check the wiki itself:** `uv run python evals/compile_fidelity.py --release <release folder>`
    compares a compiled wiki with a known ground truth, without a model.
 8. **Agents and Azure search:** the agent variants and the isolated evaluation stack are described
    in [`agents/README.md`](../agents/README.md#evaluation-variants-optional-opt-in) and set up with
    `scripts/eval_stack.py`; `agents/variants.yaml` keeps W1 and R1 as a template (the other agent
-   arms of this study are in commit `e8bbd14`). The search arms use `scripts/eval_search_index.py`.
+   arms of this study are in commit `e8bbd14`). The search arms' index script
+   (`scripts/eval_search_index.py`) is in commit `364addd`.
 
 Rules that keep the result honest: write the arms, measures and decision rule before the blind
 run; freeze versions and the release; publish all runs, losses and costs; and say when the result

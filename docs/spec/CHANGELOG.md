@@ -246,3 +246,13 @@ Cleanup after the knowledge-access study.
 | Infra | Removed `evalEmbedAccess` (`DOCWIKI_EVAL_EMBED_ACCESS`): the evaluation MCP apps no longer get the embedding settings, and the MCP identity, shared with the production app, is no longer granted Cognitive Services User on the Foundry account (a provision does not delete an existing assignment). The rest of the evaluation stack (`evalMcpVariants`, `evalMcpImage`, `evalReleaseId`, `evalSmartCapacity`, `evalMcpAllowedClientIds`) stays. | Only the dense lane called `embed` from the MCP apps; the grant also reached the production MCP app. |
 | Portal | `_follow_run` (`portal/process.py`): removed the unreachable code after its first `return` (two older versions of the same logic) and a duplicated `@staticmethod`. | Dead code found by a scan; behaviour unchanged. |
 | Docs | The MCP and agents READMEs, `infra-ops-security.md`, `evals.md`, `evals/README.md`, `docs/knowledge-access.md`, ADR 0015 and a closing note in the study say what was removed and where to reproduce it; the `evals/run.py --agent` examples name `docwiki-researcher-w1`. | The docs follow the code. |
+
+## v1.14
+
+Second cleanup after the knowledge-access study: what neither the demo nor the kept evaluation kit
+uses is removed (owner decision of 2026-11-12, AGENTS.md decision 9). Commit `364addd` reproduces
+everything removed.
+
+| Area | Change | Why |
+|---|---|---|
+| Evals | Removed the study-only arms and tools with their tests: `evals/router.py`, `evals/systems_wiki_lc.py` (`wiki-long-context`), `evals/systems_search.py` (`rag-plus`, `foundry-iq`) and `scripts/eval_search_index.py`, `evals/retrieval_bench.py`, `evals/golden/probes.py` and `evals/golden/retrieval-tune.jsonl`. Kept: the runner and its three systems, the system registry, `compare.py`, `judge_llm.py`, `compile_fidelity.py` and `perf_probe.py`; result files and experiment records stay. | Neither production nor the `evals` workflow calls them, and the search arms' Azure AI Search service was deleted after the study. |

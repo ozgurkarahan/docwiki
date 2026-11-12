@@ -15,8 +15,10 @@ in `tests/evals/`, which PR CI runs; live runs are manual (see "CI").
 | `metrics.py`, `textnorm.py`, `locators.py` | Deterministic metrics, normalisation, locator matching |
 | `corpus.py` | MANIFEST, release catalog, source mapping, extraction cache, evidence text |
 | `judge.py` | Optional `azure-ai-evaluation` evaluators (imported lazily) |
-| `retrieval_bench.py` | Offline recall of `answer_context` on a release (no LLM) |
+| `registry.py` | The systems under test; a module `systems_<name>.py` registers more |
+| `compare.py`, `judge_llm.py` | Multi-run comparison of systems and a blind LLM judge (see "Comparing systems") |
 | `compile_fidelity.py` | Offline fidelity of a compiled wiki against the fictional world (no LLM) |
+| `perf_probe.py` | Times a deployed site from the outside (`docs/evaluation.md`) |
 | `scoreboard.py` | `results/latest.json`, `SCOREBOARD.md` and the README block |
 | `results/` | Result files (`<UTC date>-<system>-<split>.json`) and `latest.json` |
 | `golden/` | The public dev split, sealed (owned by the corpus lane, see `golden/README.md`) |
@@ -122,37 +124,6 @@ tokens, cost, latency, error and judge scores. `baseline-rag` adds the retrieved
 For `docwiki-researcher`, each completed `search` or `answer_context` call also records its
 `hits`: rank, kind, page id, path, anchor, scope, source id, locator and the citations a section
 carries. Ids only, never text. Older result files without `hits` still load.
-
-## Retrieval bench (no LLM, no Azure)
-
-`evals/retrieval_bench.py` measures retrieval alone on a built release, offline and
-deterministically:
-
-```powershell
-uv run python evals/retrieval_bench.py --release <release folder> --questions evals/golden/dev.jsonl `
-  --misses-from evals/results/<date>-docwiki-researcher-dev.json `
-  --out evals/results/<date>-retrieval-lexical-dev.json --date <date>
-```
-
-- **Candidate recall@k** (k = 5, 10, 20, 50) and MRR: share of required citations found in the
-  first k `answer_context` candidates for the verbatim question. A source block counts directly; a
-  wiki section counts through the footnotes of its full text (proxy). `alternatives` count.
-- **Served recall@k** (k = 5, 10): same, on what `answer_context` actually returns after its text
-  budget, so a trimmed section loses the footnotes it no longer shows.
-- **Release stats**: rows by kind and tree, estimated tokens (chars/4), vector size at 512
-  dimensions and an indicative cost of one embedding build (`price_verified: false`).
-- **Misses** (`--misses-from`): each required citation a recorded run did not match is labelled
-  `absent` (not in the first 50 candidates), `candidate_cut` (a candidate, not served),
-  `served_unused` (served, not cited) or the question is `all_cited`.
-- **Probes** (`--questions evals/golden/retrieval-tune.jsonl`, see `evals/golden/README.md`): each
-  probe runs with its `within` and `lang`. Per kind: `questions_hit_all@10` and
-  `questions_hit_any@10` (questions with all, or at least one, required citation in the first 10
-  candidates), the recall metrics above and `violations`: candidates outside `within`, in a
-  language tree other than the requested or canonical one, or not public (must stay 0).
-
-The output format is `docwiki.evals.retrieval/v1`; the scoreboard ignores it. Question text is
-never written; per-question rows exist for dev and the tune set only, never for the blind decision
-set or the holdout.
 
 ## Compile fidelity (no LLM, no Azure)
 
@@ -319,21 +290,6 @@ artifact. It needs the repository secret `DOCWIKI_FOUNDRY_PROJECT_ENDPOINT`, the
 trusts only runs of `main` of this repository, and no password or key is stored. Commit dev
 results and the regenerated scoreboard through a reviewed pull request.
 
-## A3 plugin arm: `wiki-long-context`
-
-`evals/systems_wiki_lc.py` registers `wiki-long-context` (`register_system(..., indexes_documents=False)`).
-It answers from a compiled release wiki (`--catalog` must point to a release folder containing
-`wiki/`) with one structured `smart` call:
-
-- context order: `wiki/index.md`, `wiki/chantiers/*.md`, `wiki/views/*.md`, `wiki/topics/**`,
-  `wiki/sources/*.md` (source frontmatter subset + body), then entity pages;
-- only canonical wiki content (no `wiki/en/`, no `.agents`/`.claude`/`.github`, no `_meta`);
-- budget rule (default `--budget-tokens 120000`, ~4 chars/token, output reserved): include whole
-  pages in order; stop a non-mandatory group at the first page that does not fit; `views` and
-  `topics` always appear, with proportional body truncation when needed;
-- context accounting is explicit in `config()` and per-answer `info`: included/excluded
-  pages/chars per group, plus `truncated_pages`.
-
 ## Honesty rules
 
 From `docs/spec/evals.md` §4, enforced by the tooling where possible:
@@ -356,70 +312,17 @@ Known limitations, stated rather than hidden:
 - The restricted-value check is a heuristic fingerprint (distinctive numbers and codes); the
   `restricted` category's `forbidden` strings are exact.
 
-## Knowledge-access study helpers
+## Comparing systems
 
-The knowledge-access experiment (`evals/experiments/2026-11-10-knowledge-access.md`) adds three
-utilities:
+Two tools of the knowledge-access study (`evals/experiments/2026-11-10-knowledge-access.md`) stay
+for future comparisons:
 
 - `evals/compare.py`: multi-run arm comparison with clustered bootstrap CIs, paired
   sign-flip permutation tests with Holm adjustment, safety exclusions and protocol decision logic.
-- `evals/router.py`: LLM question routing (`classify`), dev fitting with leave-one-out (`fit`),
-  and virtual routed/oracle result arms (`apply`, `oracle`).
 - `evals/judge_llm.py`: blind structured LLM judge over result files (never sees arm names),
   with cited-evidence snippets and private-output handling for non-dev splits.
 
-## Search arms: `rag-plus` and `foundry-iq` (knowledge-access study, A1 and A8)
-
-`evals/systems_search.py` registers two systems over an Azure AI Search index of the same chunks
-as `baseline-rag` (`chunk_document`, 800 tokens, the documents of `--scope` the audience may see),
-answered with the same prompt, schema and citation mapping (`RAG_SYSTEM_PROMPT`,
-`BaselineAnswer`, one passage = one citation unit mapped to every locator of its blocks) and the
-same `smart` tier, so the arms differ only by retrieval:
-
-- `rag-plus` (A1): the `fast` tier splits the question into 1 to 4 search queries
-  (`rag-plus-decompose-v1`, structured output; the question itself is always searched too); each
-  query is a hybrid query (BM25 + vectors through the index vectorizer) with the semantic ranker,
-  top 20; the rankings are fused by reciprocal rank fusion (k 60) over the reranker order and the
-  8 best chunks are answered.
-- `foundry-iq` (A8): the question goes to the retrieve action of an Azure AI Search knowledge
-  base (query planning by the `fast` deployment, retrieval reasoning effort pinned to `low` on the
-  knowledge base, output mode `extractiveData`, no answer synthesis, at most 8 output documents);
-  its references map back to the index chunks and become the passages.
-
-The passage text always comes from the local chunks: `setup` checks that the index holds exactly
-those chunks (ids and text hashes) and refuses a stale index. Per question, `info` records the
-queries (or the knowledge base's planned queries), retrieved chunk ids, paths and locator keys
-(never text), timings and a cost breakdown; `cost_usd` adds to the LLM calls an estimate of the
-search charges at list price (semantic ranker USD 1 per 1,000 queries, agentic reasoning
-USD 0.022 per 1M tokens; monthly free grants and the hourly service unit are not attributed).
-`versions` records the API versions (`2026-04-01` for the index and queries, `2026-08-01-preview`
-for the knowledge source, knowledge base and retrieve), the index and knowledge base definition
-hashes, name hashes (never names or endpoints), the reasoning effort and the planner model.
-
-Set up once per environment with `scripts/eval_search_index.py` (idempotent; Entra only):
-
-```powershell
-uv run python scripts/eval_search_index.py provision   # Basic search service, Entra only, roles
-uv run python scripts/eval_search_index.py index       # chunks + embeddings, only what changed
-uv run python scripts/eval_search_index.py knowledge   # knowledge source + knowledge base
-uv run python scripts/eval_search_index.py status --ps1 <file outside the repository>
-```
-
-`provision` creates the service `srch-docwiki-eval-<resource token>` in the azd environment's
-resource group and region (Basic tier, semantic ranker standard plan, local authentication
-disabled, system-assigned identity), grants the signed-in user Search Index Data Contributor and
-Search Service Contributor, and the service identity Cognitive Services OpenAI User and
-Cognitive Services User on the Foundry account (vectorizer and planner). The runner needs
-`DOCWIKI_EVAL_SEARCH_ENDPOINT`, `DOCWIKI_EVAL_SEARCH_INDEX` and, for `foundry-iq`,
-`DOCWIKI_EVAL_SEARCH_KB` (printed by `status`; never commit them), plus the usual `fast`, `smart`
-and `embed` settings. Without them the systems report `not configured`.
-
-```powershell
-uv run python evals/run.py --system rag-plus --questions evals/golden/dev.jsonl
-uv run python evals/run.py --system foundry-iq --questions evals/golden/dev.jsonl
-```
-
-Limits: both arms depend on Azure AI Search (the knowledge base on a preview API that may change);
-the knowledge base sees the index, not the question's audience, so the index must be built with
-the run's `--scope` and `--audience` (the parity check enforces it). Local extraction has no OCR,
-as for the baselines.
+The study's other arms and tools were removed after it (spec CHANGELOG v1.14): the router, the
+compiled wiki in context (`wiki-long-context`), the two Azure AI Search arms (`rag-plus`,
+`foundry-iq`) and their index script, and the retrieval bench with its probe sets. Commit `364addd`
+has them; their results stay in `results/` and `experiments/`.
