@@ -104,7 +104,10 @@ SDK calls (`azure-ai-projects` 2.9, async): `agents.get`, `agents.create_version
 The knowledge-access study ran each Researcher variant on its own evaluation MCP app. That stack
 (`variants.yaml`, `deploy.py --variant`, `scripts/eval_stack.py` and the Bicep evaluation apps)
 was removed after the study (spec CHANGELOG v1.14); commit `364addd` has it. The evaluation
-runner still targets any deployed agent by its Foundry name (`evals/run.py --agent`).
+runner still asks any deployed agent by its Foundry name (`evals/run.py --agent`), but the
+production MCP app accepts only `docwiki-researcher` and `docwiki-librarian`: the post-provision
+hook resets its allowlist and `Wiki.Read` grants on every provision. A second Researcher therefore
+needs its own MCP app, allowlist entry and `Wiki.Read` grant, as that stack provided.
 
 ## Invoke
 

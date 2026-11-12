@@ -205,7 +205,8 @@ a Foundry project and `az login` (no keys).
    its own Researcher variant. That stack (`agents/variants.yaml`, `scripts/eval_stack.py`, the
    Bicep evaluation apps) and the search arms' index script (`scripts/eval_search_index.py`) are
    in commit `364addd`; the other agent arms of this study are in commit `e8bbd14`. The runner's
-   `--agent` option evaluates any deployed agent by its Foundry name.
+   `--agent` option names the agent to ask; a second Researcher also needs MCP access of its own
+   (allowlist entry and `Wiki.Read`), which that stack provided.
 
 Rules that keep the result honest: write the arms, measures and decision rule before the blind
 run; freeze versions and the release; publish all runs, losses and costs; and say when the result
