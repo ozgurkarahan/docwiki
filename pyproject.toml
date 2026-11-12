@@ -54,7 +54,7 @@ portal = [
   "uvicorn>=0.30",
 ]
 evals = [
-  "azure-ai-evaluation>=1.0",
+  "azure-ai-evaluation>=1.14",
 ]
 gen = [
   "fpdf2>=2.7",

@@ -31,9 +31,11 @@ class FakeEvaluator:
     created: ClassVar[list[dict[str, Any]]] = []
     key = "fake"
 
-    def __init__(self, model_config: dict[str, Any], *, credential: Any = None) -> None:
+    def __init__(
+        self, model_config: dict[str, Any], *, credential: Any = None, **options: Any
+    ) -> None:
         FakeEvaluator.created.append(
-            {"config": model_config, "credential": credential, "key": self.key}
+            {"config": model_config, "credential": credential, "key": self.key, "options": options}
         )
 
     def __call__(self, **inputs: Any) -> dict[str, Any]:
@@ -115,6 +117,23 @@ def test_judge_endpoint_override(monkeypatch: pytest.MonkeyPatch) -> None:
     Judge.from_env(env, credential=object())
     assert FakeEvaluator.created[0]["config"]["azure_endpoint"] == "https://judge.example"
     assert FakeEvaluator.created[0]["config"]["azure_deployment"] == "judge"
+
+
+def test_the_judge_is_a_reasoning_model_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(sys.modules, "azure.ai.evaluation", fake_module())
+    judge = Judge.from_env(ENV, credential=object())
+    assert len(FakeEvaluator.created) == len(EVALUATORS)
+    assert all(item["options"] == {"is_reasoning_model": True} for item in FakeEvaluator.created)
+    assert judge.versions["reasoning_model"] is True
+
+
+def test_reasoning_model_setting(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(sys.modules, "azure.ai.evaluation", fake_module())
+    judge = Judge.from_env({**ENV, "DOCWIKI_JUDGE_REASONING_MODEL": "false"}, credential=object())
+    assert all(item["options"] == {} for item in FakeEvaluator.created)
+    assert judge.versions["reasoning_model"] is False
+    with pytest.raises(JudgeUnavailable, match="DOCWIKI_JUDGE_REASONING_MODEL"):
+        Judge.from_env({**ENV, "DOCWIKI_JUDGE_REASONING_MODEL": "maybe"}, credential=object())
 
 
 def test_evaluate_routes_inputs_and_parses_outputs() -> None:

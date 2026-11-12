@@ -249,7 +249,10 @@ tool calls). The package needs `pandas`, which has no Windows ARM64 wheel: it is
 only by `judge.py`, and a missing package or setting only adds a notice to the results. Run judged
 evaluations on Linux CI or an x64 Python (`uv sync --all-extras`). Settings:
 `DOCWIKI_JUDGE_ENDPOINT` (default: the host of `DOCWIKI_FOUNDRY_PROJECT_ENDPOINT`),
-`DOCWIKI_JUDGE_DEPLOYMENT` (default: `DOCWIKI_SMART_DEPLOYMENT`), `DOCWIKI_JUDGE_API_VERSION`.
+`DOCWIKI_JUDGE_DEPLOYMENT` (default: `DOCWIKI_SMART_DEPLOYMENT`), `DOCWIKI_JUDGE_API_VERSION`,
+`DOCWIKI_JUDGE_REASONING_MODEL` (default `true`: the `smart` model is a reasoning model, so the
+evaluators send `max_completion_tokens` and no `temperature`; `false` for a judge deployment of
+another kind of model).
 
 ### Cost and latency
 
