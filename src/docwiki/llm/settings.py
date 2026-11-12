@@ -18,9 +18,6 @@ DEFAULT_REQUESTS_PER_MINUTE = 600
 DEFAULT_TIMEOUT_S = 600.0
 DEFAULT_MAX_RETRIES = 3
 DEFAULT_MAX_RETRY_AFTER_S = 120.0
-DEFAULT_EMBED_DIMENSIONS = 512
-DEFAULT_EMBED_BATCH_SIZE = 64
-MAX_EMBED_BATCH_SIZE = 2048
 
 ENV_PROJECT_ENDPOINT = "DOCWIKI_FOUNDRY_PROJECT_ENDPOINT"
 ENV_DEPLOYMENT = {"fast": "DOCWIKI_FAST_DEPLOYMENT", "smart": "DOCWIKI_SMART_DEPLOYMENT"}
@@ -34,12 +31,6 @@ ENV_MAX_RETRY_AFTER = "DOCWIKI_LLM_MAX_RETRY_AFTER_SECONDS"
 ENV_PRICE_TABLE = "DOCWIKI_LLM_PRICE_TABLE"
 ENV_MODE = "DOCWIKI_LLM_MODE"
 ENV_FIXTURES = "DOCWIKI_LLM_FIXTURES"
-ENV_EMBED_DEPLOYMENT = "DOCWIKI_EMBED_DEPLOYMENT"
-ENV_EMBED_MODEL = "DOCWIKI_EMBED_MODEL"
-ENV_EMBED_DIMENSIONS = "DOCWIKI_EMBED_DIMENSIONS"
-ENV_EMBED_BATCH_SIZE = "DOCWIKI_EMBED_BATCH_SIZE"
-ENV_EMBED_TPM = "DOCWIKI_EMBED_TPM"
-ENV_EMBED_RPM = "DOCWIKI_EMBED_RPM"
 
 LlmMode = Literal["foundry", "replay", "record"]
 
@@ -79,11 +70,6 @@ class LlmSettings(BaseModel):
     price_table: Path | None = None
     mode: LlmMode = "foundry"
     fixtures_dir: Path | None = None
-    embed_deployment: str | None = None
-    embed_model: str | None = None
-    embed_dimensions: int = Field(default=DEFAULT_EMBED_DIMENSIONS, ge=1, le=3072)
-    embed_batch_size: int = Field(default=DEFAULT_EMBED_BATCH_SIZE, ge=1, le=MAX_EMBED_BATCH_SIZE)
-    embed_rate_limit: RateLimit = RateLimit()
 
     @field_validator("project_endpoint")
     @classmethod
@@ -100,8 +86,6 @@ class LlmSettings(BaseModel):
         "smart_deployment",
         "fast_model",
         "smart_model",
-        "embed_deployment",
-        "embed_model",
     )
     @classmethod
     def _strip_names(cls, value: str | None) -> str | None:
@@ -127,14 +111,6 @@ class LlmSettings(BaseModel):
             "price_table": Path(env[ENV_PRICE_TABLE]) if ENV_PRICE_TABLE in env else None,
             "mode": env.get(ENV_MODE, "foundry").lower(),
             "fixtures_dir": Path(env[ENV_FIXTURES]) if ENV_FIXTURES in env else None,
-            "embed_deployment": env.get(ENV_EMBED_DEPLOYMENT),
-            "embed_model": env.get(ENV_EMBED_MODEL),
-            "embed_dimensions": _int(env, ENV_EMBED_DIMENSIONS, DEFAULT_EMBED_DIMENSIONS),
-            "embed_batch_size": _int(env, ENV_EMBED_BATCH_SIZE, DEFAULT_EMBED_BATCH_SIZE),
-            "embed_rate_limit": {
-                "tokens_per_minute": _int(env, ENV_EMBED_TPM, DEFAULT_TOKENS_PER_MINUTE),
-                "requests_per_minute": _int(env, ENV_EMBED_RPM, DEFAULT_REQUESTS_PER_MINUTE),
-            },
         }
         for tier in TIERS:
             values[f"{tier}_deployment"] = env.get(ENV_DEPLOYMENT[tier])
@@ -178,19 +154,6 @@ class LlmSettings(BaseModel):
         for tier in tiers:
             self.deployment(tier)
 
-    def embedding_deployment(self) -> str:
-        """The embedding deployment; raises if it is not configured."""
-        if not self.embed_deployment:
-            raise LlmConfigurationError(
-                f"No embedding deployment configured: set {ENV_EMBED_DEPLOYMENT}", tier="embed"
-            )
-        return self.embed_deployment
-
-    def require_embedding(self) -> None:
-        """Raise :class:`LlmConfigurationError` unless live embedding calls are possible."""
-        self.require_foundry(tiers=())
-        self.embedding_deployment()
-
     def require_fixtures_dir(self) -> Path:
         if self.fixtures_dir is None:
             raise LlmConfigurationError(
@@ -233,12 +196,6 @@ _FIELD_ENV = {
     "mode": ENV_MODE,
     "fixtures_dir": ENV_FIXTURES,
     "price_table": ENV_PRICE_TABLE,
-    "embed_deployment": ENV_EMBED_DEPLOYMENT,
-    "embed_model": ENV_EMBED_MODEL,
-    "embed_dimensions": ENV_EMBED_DIMENSIONS,
-    "embed_batch_size": ENV_EMBED_BATCH_SIZE,
-    "embed_rate_limit.tokens_per_minute": ENV_EMBED_TPM,
-    "embed_rate_limit.requests_per_minute": ENV_EMBED_RPM,
 }
 for _tier in TIERS:
     _FIELD_ENV[f"{_tier}_deployment"] = ENV_DEPLOYMENT[_tier]

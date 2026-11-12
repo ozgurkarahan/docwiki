@@ -14,7 +14,6 @@ from typing import Any
 from docwiki import __version__
 
 SPAN_NAME = "docwiki.llm.structured"
-EMBED_SPAN_NAME = "docwiki.llm.embed"
 _ATTRIBUTE_TYPES = (str, bool, int, float)
 
 
