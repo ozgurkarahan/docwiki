@@ -17,4 +17,5 @@ example.net                # RFC 2606 reserved
 .localhost                 # RFC 2606 reserved top-level domain
 git@github.com             # SSH remote user of GitHub, not a person
 noreply@github.com         # GitHub system sender, not a person
+support@github.com         # Signed-off-by trailer of Dependabot commits (public GitHub address)
 noreply@anthropic.com  # Co-Authored-By trailer of commits made with Claude Code (public bot address)
