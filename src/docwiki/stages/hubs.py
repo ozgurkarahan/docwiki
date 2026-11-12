@@ -72,7 +72,6 @@ __all__ = [
 ]
 
 STAGE_VERSION = "5"
-NO_PHASE = "No phase"
 MAX_SUBJECTS = 3
 """Subjects shown per open contradiction on a hub; the others are counted."""
 _PATH_DATE_RE = re.compile(r"(?<!\d)(\d{4}-\d{2}-\d{2})(?!\d)")
@@ -613,8 +612,6 @@ def _date_suffix(title: str, day: date) -> str:
 
 SHORT_TITLE = 40
 """Longest document title the dashboard shows whole; longer ones are cut at a word."""
-CONTRADICTIONS_ANCHOR = "open-contradictions"
-"""Anchor of the English ``## Open contradictions`` (see :func:`contradictions_anchor`)."""
 
 
 def contradictions_anchor(strings: Strings) -> str:
