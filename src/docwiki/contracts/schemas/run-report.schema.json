@@ -215,13 +215,12 @@
     },
     "LlmUsage": {
       "additionalProperties": false,
-      "description": "Token usage of one deployment during a run; prices are USD per 1M tokens.\n\n``role`` is the chat tier (``fast``/``smart``) or ``embed`` for the embedding deployment\n(``calls`` then counts embedding batches and ``output_tokens`` stays 0).",
+      "description": "Token usage of one deployment during a run; prices are USD per 1M tokens.\n\n``role`` is the chat tier (``fast``/``smart``) that made the calls.",
       "properties": {
         "role": {
           "enum": [
             "fast",
-            "smart",
-            "embed"
+            "smart"
           ],
           "title": "Role",
           "type": "string"

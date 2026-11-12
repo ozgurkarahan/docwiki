@@ -184,8 +184,7 @@ citation verification (never by schema validation, so one bad id does not fail t
   gates, versions, cost, errors, warnings}`; `warnings` lists problems that did not fail the run
   (overlay entries left out, retention failures, refused queue renewals);
   `CostReceipt{currency: USD, price_table, llm[LlmUsage],
-  content_understanding[…], duration_s, total_cost, notes}`; `LlmUsage.role` is `fast`, `smart`
-  or `embed` (embedding batches: `calls` counts batches, `output_tokens` stays 0);
+  content_understanding[…], duration_s, total_cost, notes}`; `LlmUsage.role` is `fast` or `smart`;
   `VersionInfo{docwiki, wiki_schema,
   domain_pack, domain_pack_hash, prompts, models{role: {deployment, model, version}}, extractors}`.
 - `Proposal` = union on `kind` (`entity|glossary|topic|injection|recompile`) with typed payloads,
