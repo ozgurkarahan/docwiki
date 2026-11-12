@@ -11,7 +11,10 @@ notice. Run judged evaluations on Linux CI or an x64 Python (``uv sync --extra e
 
 Settings: ``DOCWIKI_JUDGE_ENDPOINT`` (Azure OpenAI or AI Services endpoint; default: the scheme
 and host of ``DOCWIKI_FOUNDRY_PROJECT_ENDPOINT``), ``DOCWIKI_JUDGE_DEPLOYMENT`` (default:
-``DOCWIKI_SMART_DEPLOYMENT``) and ``DOCWIKI_JUDGE_API_VERSION`` (optional).
+``DOCWIKI_SMART_DEPLOYMENT``), ``DOCWIKI_JUDGE_API_VERSION`` (optional) and
+``DOCWIKI_JUDGE_REASONING_MODEL`` (default ``true``: the ``smart`` model is a reasoning model, which
+refuses the ``max_tokens`` and ``temperature`` of the evaluators' prompts; ``false`` for a judge
+deployment of another kind of model).
 """
 
 from __future__ import annotations
@@ -87,6 +90,7 @@ class Judge:
                 "judge skipped: set DOCWIKI_FOUNDRY_PROJECT_ENDPOINT (or DOCWIKI_JUDGE_ENDPOINT) "
                 "and DOCWIKI_SMART_DEPLOYMENT (or DOCWIKI_JUDGE_DEPLOYMENT)"
             )
+        reasoning = _reasoning_model(values.get("DOCWIKI_JUDGE_REASONING_MODEL"))
         if credential is None:
             try:
                 identity = importlib.import_module("azure.identity")
@@ -97,6 +101,10 @@ class Judge:
         api_version = (values.get("DOCWIKI_JUDGE_API_VERSION") or "").strip()
         if api_version:
             model_config["api_version"] = api_version
+        options: dict[str, Any] = {"credential": credential}
+        if reasoning:
+            # The prompts then send max_completion_tokens and no temperature, top_p or penalties.
+            options["is_reasoning_model"] = True
         evaluators: dict[str, Callable[..., Mapping[str, Any]]] = {}
         notices: list[str] = []
         for name in names:
@@ -106,7 +114,7 @@ class Judge:
                 notices.append(f"{name}: {class_name} is not available in this version")
                 continue
             try:
-                evaluators[name] = evaluator_class(model_config, credential=credential)
+                evaluators[name] = evaluator_class(model_config, **options)
             except Exception as exc:  # one evaluator must not stop the others
                 notices.append(f"{name}: {type(exc).__name__}")
         if not evaluators:
@@ -120,6 +128,7 @@ class Judge:
             versions={
                 "azure-ai-evaluation": package_version,
                 "judge_deployment": deployment,
+                "reasoning_model": reasoning,
                 "evaluators": sorted(evaluators),
             },
             notices=notices,
@@ -148,6 +157,16 @@ class Judge:
                 continue
             results[name] = _parse(name, raw)
         return results
+
+
+def _reasoning_model(value: str | None) -> bool:
+    """``DOCWIKI_JUDGE_REASONING_MODEL``; unset means ``true`` (the ``smart`` model)."""
+    text = (value or "").strip().lower()
+    if text in ("", "1", "true", "yes", "on"):
+        return True
+    if text in ("0", "false", "no", "off"):
+        return False
+    raise JudgeUnavailable("judge skipped: DOCWIKI_JUDGE_REASONING_MODEL must be true or false")
 
 
 def _host(endpoint: str) -> str:
