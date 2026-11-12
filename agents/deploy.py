@@ -3,8 +3,6 @@
     uv run python agents/deploy.py --dry-run          # exact request bodies, no Azure call
     uv run python agents/deploy.py                    # new agent versions only when changed
     uv run python agents/deploy.py --routine enable   # also the daily Librarian routine
-    uv run python agents/deploy.py --variant w1       # evaluation Researcher (agents/variants.yaml)
-    uv run python agents/deploy.py --variant all --delete   # remove the variants after the gates
 
 The implementation lives in ``docwiki.agents_client.deploy`` so that it is tested with the package.
 """

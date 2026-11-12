@@ -21,7 +21,6 @@ agents/
   librarian/instructions.md
   librarian/routine.yaml       # optional daily health report (disabled by default)
   deploy.py                    # idempotent deployment (docwiki.agents_client.deploy)
-  variants.yaml                # opt-in evaluation variants (agents + MCP apps), see below
 ```
 
 ## Definition schema
@@ -100,98 +99,15 @@ uv run python agents/deploy.py --agent researcher  # one agent
 SDK calls (`azure-ai-projects` 2.9, async): `agents.get`, `agents.create_version(name, body)`,
 `connections.get`, `beta.routines.create_or_update`.
 
-## Evaluation variants (optional, opt-in)
+## Evaluation agents
 
-The knowledge-access study compared several arms (`evals/experiments/2026-11-10-knowledge-access.md`).
-Each arm is one **evaluation MCP app** (Bicep `evalMcpVariants`,
-[`docs/spec/infra-ops-security.md`](../docs/spec/infra-ops-security.md) §1: the production app plus a
-few `DOCWIKI_MCP_*` settings) read by one **evaluation Researcher** `docwiki-researcher-<name>`.
-[`variants.yaml`](variants.yaml) declares both. It keeps the arms W1 and R1 as a template (the
-study's other arms are in commit `e8bbd14`):
-
-| Agent | MCP variant (`env` on top of production) | Instructions | Effort |
-|---|---|---|---|
-| `docwiki-researcher-w1` | `wiki`: none | production | unset |
-| `docwiki-researcher-r1` | `raw`: `DOCWIKI_MCP_WIKI_ABLATION=raw` | production | unset |
-
-An agent variant (`name` <= 8 characters `a-z0-9`, `base: researcher`, `mcp_variant`,
-`instructions` null or a path, `reasoning_effort` null or `low|medium|high`, `model_env`) is the
-production Researcher definition (tools, approvals, auth strategy, metadata) with its own name,
-instructions, effort, model deployment (default `DOCWIKI_EVAL_SMART_DEPLOYMENT`, the `smart-eval`
-deployment) and MCP endpoint: the URL and connection come from `DOCWIKI_EVAL_MCP_VARIANTS_OUT`, the
-`azd` output of the evaluation apps, never from the production variables. A missing instructions
-file is an error at deploy time. Production definitions are unchanged (effort stays unset).
-
-```powershell
-uv run python agents/deploy.py --variant w1 --dry-run     # exact body of one variant agent
-uv run python agents/deploy.py --variant w1 --variant r1  # repeatable
-uv run python agents/deploy.py --variant all --json       # every variant; identity_client_id each
-uv run python agents/deploy.py --variant w1 --delete      # remove one (--dry-run shows the DELETE)
-```
-
-Variants are opt-in: an ordinary `deploy.py`, the post-provision hook and `azd down`'s predown
-never create, update or delete them, and `--delete` only accepts names declared in `variants.yaml`
-(never a production agent).
-
-### Operator sequence
-
-Load the `azd` environment into the shell first (`DOCWIKI_FOUNDRY_PROJECT_ENDPOINT`,
-`DOCWIKI_EVAL_MCP_VARIANTS_OUT`, ...):
-
-```powershell
-azd env get-values | ForEach-Object {
-  if ($_ -match '^([^=]+)="?(.*?)"?$') { [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2].Replace('\"','"')) } }
-```
-
-1. **Provision the evaluation apps**, without touching production agents. `evalReleaseId` pins one
-   release; `evalSmartCapacity` creates `smart-eval`:
-
-   ```powershell
-   azd env set DOCWIKI_SKIP_AGENTS true
-   azd env set DOCWIKI_EVAL_MCP_VARIANTS (uv run python scripts/eval_stack.py encode)
-   azd env set DOCWIKI_EVAL_MCP_IMAGE <image reference or digest>   # optional: default = production image
-   azd env set DOCWIKI_EVAL_RELEASE_ID <release id>                 # optional: DOCWIKI_MCP_PIN_RELEASE
-   azd env set DOCWIKI_EVAL_SMART_CAPACITY 100                      # optional: the smart-eval deployment
-   azd provision
-   ```
-
-   `DOCWIKI_EVAL_MCP_VARIANTS` is the base64 of the JSON array of `mcp_variants` (`encode --json`
-   prints it): `azd` substitutes values into the parameters file as raw text. Outputs:
-   `DOCWIKI_EVAL_MCP_VARIANTS_OUT` (`{"<name>": {"url": "...", "connection": "..."}}`) and
-   `DOCWIKI_EVAL_SMART_DEPLOYMENT`. Reload the environment (command above).
-2. **Deploy the variant agents** and note their identities:
-   `uv run python agents/deploy.py --variant all --json`.
-3. **Grant access**: the apps accept an agent only if its client ID is in
-   `DOCWIKI_EVAL_MCP_ALLOWED_CLIENT_IDS` and its principal holds `Wiki.Read` on the MCP API.
-
-   ```powershell
-   uv run python scripts/eval_stack.py identities             # prints the allowlist value
-   azd env set DOCWIKI_EVAL_MCP_ALLOWED_CLIENT_IDS <value printed above>
-   uv run python scripts/eval_stack.py grant --dry-run        # idempotent; needs the MCP API owner
-   uv run python scripts/eval_stack.py grant
-   ```
-4. **Re-provision** so that the apps' built-in auth and server allowlist include the new
-   identities: `azd provision` (still with `DOCWIKI_SKIP_AGENTS=true`).
-5. **Authenticated smoke test** before spending anything: ask one question per variant, for
-   example `uv run python evals/run.py --system docwiki-researcher --agent docwiki-researcher-w1
-   --questions evals/golden/dev.jsonl --catalog <release folder or its catalog.json>` with a small
-   `--limit`, and check that the answer cites sources (a 401/403 means step 3 or 4 is incomplete).
-6. **Teardown** after the gates: `uv run python agents/deploy.py --variant all --delete` (before
-   `azd down`, which only deletes the agents recorded by the hook), then delete the evaluation
-   apps (`ca-mcp-<name>-<token>`), the connections (`<mcpConnectionName>-<name>`) and the extra
-   model deployments (`smart-eval` or `smart-dz`; provisions are incremental: emptying the
-   settings does not delete them), delete the Azure AI Search service used by the retrieval arms,
-   set the `embed` deployment back to its usual capacity, and unset `DOCWIKI_EVAL_*` and
-   `DOCWIKI_SKIP_AGENTS`. `--delete` only knows the variants declared in `variants.yaml`: to remove
-   agents deployed from an older declaration (the study's `w2`, `r2` and `w2high`), point
-   `--variants-file` at that version, for example
-   `git show e8bbd14:agents/variants.yaml > old-variants.yaml`. An environment provisioned with
-   the former `DOCWIKI_EVAL_EMBED_ACCESS=true` also keeps the MCP identity's Cognitive Services
-   User role on the Foundry account until it is deleted by hand.
-
-`scripts/eval_stack.py grant` calls Microsoft Graph with `DefaultAzureCredential`
-(`servicePrincipals/{MCP API}/appRoleAssignedTo`, as the hook does for production agents) and needs
-`DOCWIKI_MCP_API_CLIENT_ID` (an `azd` value written by the hook).
+The knowledge-access study ran each Researcher variant on its own evaluation MCP app. That stack
+(`variants.yaml`, `deploy.py --variant`, `scripts/eval_stack.py` and the Bicep evaluation apps)
+was removed after the study (spec CHANGELOG v1.14); commit `364addd` has it. The evaluation
+runner still asks any deployed agent by its Foundry name (`evals/run.py --agent`), but the
+production MCP app accepts only `docwiki-researcher` and `docwiki-librarian`: the post-provision
+hook resets its allowlist and `Wiki.Read` grants on every provision. A second Researcher therefore
+needs its own MCP app, allowlist entry and `Wiki.Read` grant, as that stack provided.
 
 ## Invoke
 

@@ -201,11 +201,12 @@ a Foundry project and `az login` (no keys).
    the upper bound) to the confirmation results. It did not beat the agent here.
 7. **Check the wiki itself:** `uv run python evals/compile_fidelity.py --release <release folder>`
    compares a compiled wiki with a known ground truth, without a model.
-8. **Agents and Azure search:** the agent variants and the isolated evaluation stack are described
-   in [`agents/README.md`](../agents/README.md#evaluation-variants-optional-opt-in) and set up with
-   `scripts/eval_stack.py`; `agents/variants.yaml` keeps W1 and R1 as a template (the other agent
-   arms of this study are in commit `e8bbd14`). The search arms' index script
-   (`scripts/eval_search_index.py`) is in commit `364addd`.
+8. **Agents and Azure search:** the study ran each agent arm on its own evaluation MCP app with
+   its own Researcher variant. That stack (`agents/variants.yaml`, `scripts/eval_stack.py`, the
+   Bicep evaluation apps) and the search arms' index script (`scripts/eval_search_index.py`) are
+   in commit `364addd`; the other agent arms of this study are in commit `e8bbd14`. The runner's
+   `--agent` option names the agent to ask; a second Researcher also needs MCP access of its own
+   (allowlist entry and `Wiki.Read`), which that stack provided.
 
 Rules that keep the result honest: write the arms, measures and decision rule before the blind
 run; freeze versions and the release; publish all runs, losses and costs; and say when the result

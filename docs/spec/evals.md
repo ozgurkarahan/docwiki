@@ -27,9 +27,10 @@
 
 - `evals/run.py --system <name> --split dev [--limit N]` → `evals/results/<date>-<system>-<split>.json`
   with per-question records (answer, citations, tool calls, metrics, tokens, cost, versions).
-  `--system docwiki-researcher --agent docwiki-researcher-w1` targets an evaluation Researcher
-  of the optional evaluation environment ([infra-ops-security.md](infra-ops-security.md) §1); the
-  run is then recorded under that agent name, beside the production one, for an A/B comparison.
+  `--system docwiki-researcher --agent <Foundry agent name>` asks another deployed agent and
+  records the run under that name, beside the production one. The production MCP app accepts only
+  the two production agents (the post-provision hook resets its allowlist and roles), so a second
+  Researcher also needs MCP access of its own, as the evaluation stack of commit `364addd` gave it.
 - `evals/scoreboard.py` → `evals/results/latest.json` and a Markdown table injected into the README
   between `<!-- scoreboard:start -->` and `<!-- scoreboard:end -->`.
 - `evals/compile_fidelity.py` → `evals/results/<date>-compile-fidelity.json`

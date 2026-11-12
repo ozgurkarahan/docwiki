@@ -3,16 +3,6 @@
     uv run python agents/deploy.py --dry-run          # exact request bodies, no Azure call
     uv run python agents/deploy.py                    # create agent versions that changed
     uv run python agents/deploy.py --routine enable   # also upsert the daily routine, enabled
-    uv run python agents/deploy.py --variant w1       # evaluation Researcher (agents/variants.yaml)
-    uv run python agents/deploy.py --variant all --json     # every variant; note identity_client_id
-    uv run python agents/deploy.py --variant w1 --delete    # remove it after the gates
-
-``--variant`` deploys the evaluation Researchers declared in ``agents/variants.yaml`` (see
-``docwiki.agents_client.variants``): ``docwiki-researcher-<name>``, the production definition with
-its own instructions, reasoning effort, model deployment (``DOCWIKI_EVAL_SMART_DEPLOYMENT``) and
-MCP endpoint, taken from ``DOCWIKI_EVAL_MCP_VARIANTS_OUT`` (the Bicep output of the evaluation MCP
-apps). Variants are opt-in: no other invocation deploys them, and ``--variant X --delete`` only
-accepts declared variants, never a production agent.
 
 Every agent version carries ``docwiki_definition_sha256`` in its metadata: the SHA-256 of the
 resolved request body (name, description, model, instructions, tools and YAML metadata, after the
@@ -41,7 +31,7 @@ import importlib
 import json
 import os
 import sys
-from collections.abc import AsyncIterator, Callable, Collection, Mapping, Sequence
+from collections.abc import AsyncIterator, Callable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -66,15 +56,6 @@ from docwiki.agents_client.errors import (
     AgentsClientError,
     DeployError,
 )
-from docwiki.agents_client.variants import (
-    ALL_VARIANTS,
-    VARIANTS_FILE,
-    AgentVariant,
-    build_variant_agent,
-    load_variants,
-    variant_agent_name,
-    variant_environment,
-)
 
 __all__ = [
     "PROJECT_ENDPOINT_ENV",
@@ -86,7 +67,6 @@ __all__ = [
     "build_agent_payload",
     "build_routine_body",
     "definition_hash",
-    "delete_agent",
     "deploy_agent",
     "deploy_routine",
     "main",
@@ -419,23 +399,6 @@ async def deploy_agent(project: Any, payload: AgentPayload) -> DeployResult:
     )
 
 
-async def delete_agent(project: Any, agent_name: str, *, allowed: Collection[str]) -> bool:
-    """Delete an agent and all its versions; ``False`` when it does not exist.
-
-    Only evaluation agents: a name in ``allowed`` (the declared variants).
-    """
-    if agent_name not in allowed:
-        raise AgentConfigurationError(
-            f"refusing to delete {agent_name}: not a declared evaluation variant"
-        )
-    errors = _azure_exceptions()
-    try:
-        await project.agents.delete(agent_name)
-    except errors.ResourceNotFoundError:
-        return False
-    return True
-
-
 async def deploy_routine(project: Any, routine: LoadedRoutine, *, enabled: bool) -> RoutineResult:
     """Create or replace the routine (idempotent ``PUT``) with the requested enabled state."""
     body = build_routine_body(routine, enabled=enabled)
@@ -547,26 +510,6 @@ async def _deploy(
                 raise DeployError(f"routine {routine.name}: {_azure_message(exc)}") from exc
 
 
-async def _delete(
-    names: Sequence[str],
-    env: Mapping[str, str],
-    *,
-    project_client: Any | None,
-    report: Callable[[str, bool], None],
-    allowed: Collection[str],
-) -> None:
-    endpoint = (env.get(PROJECT_ENDPOINT_ENV) or "").strip()
-    if not endpoint and project_client is None:
-        raise AgentConfigurationError(f"environment variable {PROJECT_ENDPOINT_ENV} is not set")
-    errors = _azure_exceptions()
-    async with _project_client(endpoint, project_client) as project:
-        for name in names:
-            try:
-                report(name, await delete_agent(project, name, allowed=allowed))
-            except errors.AzureError as exc:
-                raise DeployError(f"{name}: {_azure_message(exc)}") from exc
-
-
 def _azure_message(exc: Exception) -> str:
     status = getattr(exc, "status_code", None)
     message = getattr(exc, "message", None) or str(exc)
@@ -629,55 +572,7 @@ def _parser(agents_dir: Path) -> argparse.ArgumentParser:
         help="do not read the MCP project connection before deploying",
     )
     parser.add_argument("--json", action="store_true", help="print the results as JSON")
-    parser.add_argument(
-        "--variant",
-        action="append",
-        metavar="NAME",
-        help=f"deploy the evaluation Researcher NAME declared in {VARIANTS_FILE} "
-        f"(docwiki-researcher-NAME); repeatable, or '{ALL_VARIANTS}'",
-    )
-    parser.add_argument(
-        "--variants-file",
-        type=Path,
-        help=f"evaluation variants (default: {VARIANTS_FILE} next to the agent definitions)",
-    )
-    parser.add_argument(
-        "--delete",
-        action="store_true",
-        help="with --variant: delete the evaluation agents instead of deploying them",
-    )
     return parser
-
-
-def _main_delete(
-    names: Sequence[str],
-    env: Mapping[str, str],
-    args: argparse.Namespace,
-    project_client: Any | None,
-    *,
-    allowed: Collection[str],
-) -> int:
-    if args.dry_run:
-        plan = {
-            "dry_run": True,
-            "delete": [
-                {"agent": name, "operation": "agents.delete", "http": f"DELETE /agents/{name}"}
-                for name in names
-            ],
-        }
-        print(json.dumps(plan, indent=2, ensure_ascii=False))
-        return 0
-    outcome: dict[str, list[str]] = {"deleted": [], "absent": []}
-
-    def report(name: str, deleted: bool) -> None:
-        outcome["deleted" if deleted else "absent"].append(name)
-        if not args.json:
-            print(f"{name}: {'deleted' if deleted else 'not found (nothing to delete)'}")
-
-    asyncio.run(_delete(names, env, project_client=project_client, report=report, allowed=allowed))
-    if args.json:
-        print(json.dumps(outcome, indent=2, ensure_ascii=False))
-    return 0
 
 
 def main(
@@ -696,31 +591,8 @@ def main(
         collected.append if args.json else _print_result
     )
     try:
-        if args.delete and not args.variant:
-            raise AgentConfigurationError(
-                "--delete only removes evaluation agents: add --variant NAME"
-            )
-        if args.variant and (args.agent or args.routine):
-            raise AgentConfigurationError(
-                "--variant deploys evaluation Researchers only: drop --agent and --routine"
-            )
         agents = load_agents(args.agents_dir)
-        variants: list[AgentVariant] = []
-        if args.variant:
-            declared = load_variants(args.variants_file or args.agents_dir / VARIANTS_FILE)
-            variants = declared.select(args.variant)
-            base = agents.get("researcher")
-            if base is None:
-                raise AgentDefinitionError(f"no researcher agent under {args.agents_dir}")
-            names = [variant_agent_name(base, variant) for variant in variants]
-            if args.delete:
-                return _main_delete(names, values, args, project_client, allowed=names)
-            selected = [
-                build_variant_agent(variant, base, args.agents_dir.parent) for variant in variants
-            ]
-            values = variant_environment(values, variants, strict=not args.dry_run)
-        else:
-            selected = _select(agents, args.agent)
+        selected = _select(agents, args.agent)
         routines = load_routines(agents, args.agents_dir) if args.routine else []
         if args.dry_run:
             plan = _dry_run(selected, routines, values, enable_routine=args.routine == "enable")

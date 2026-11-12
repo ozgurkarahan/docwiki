@@ -15,36 +15,7 @@
   default; `DataZoneStandard` for data residency), `mcpMinReplicas` (0; set 1 for demos), `enablePortal` (false),
   `enableEventTrigger` (true), `reconcileCron` (`0 */6 * * *`), `budgetAmount` (monthly, USD),
   `budgetContactEmails` (passed at deploy time, never committed), `audience` (`internal`),
-  `domainPack` (`batiment`), `enableFoundrySkillsPreview` (false), `enableRoutine` (false),
-  `evalMcpVariants` (empty).
-- Optional evaluation environment (`evalMcpVariants`, azd value `DOCWIKI_EVAL_MCP_VARIANTS`,
-  empty = off): one MCP app `ca-mcp-<name>-<token>` per variant, each built like the production
-  one (same managed identity, registry, storage settings, Entra built-in auth with the same
-  audience and token validation, external ingress) at zero replicas at rest, with the variant's
-  `DOCWIKI_MCP_*` settings added to the production environment (never the authentication ones),
-  and its own project connection `<mcpConnectionName>-<name>`. The value is the base64 of a JSON
-  array `[{"name": "<a-z0-9, at most 8>", "env": {"DOCWIKI_MCP_*": "<value>"}}]` (azd substitutes
-  values into the parameters file as raw text, so raw JSON would break it); `agents/variants.yaml`
-  declares the arms (W1 and R1 of the knowledge-access study as a template) and
-  `scripts/eval_stack.py encode` produces the value. Further settings: `evalMcpImage` (one explicit
-  image or digest for every evaluation app; empty = the production image), `evalReleaseId` (adds
-  `DOCWIKI_MCP_PIN_RELEASE` to every evaluation app, so a run reads one immutable release),
-  `evalSmartCapacity` (when > 0, a `smart-eval` deployment with the model, version and SKU of
-  `smart`, so evaluation agents never compete with production for tokens). One output,
-  `DOCWIKI_EVAL_MCP_VARIANTS_OUT` (JSON, name -> `{url, connection}`), and
-  `DOCWIKI_EVAL_SMART_DEPLOYMENT`. Evaluation Researchers `docwiki-researcher-<name>`
-  (`agents/deploy.py --variant`) differ from the production one only by instructions, reasoning
-  effort, model deployment and MCP connection, so a feature is A/B evaluated against production
-  without touching production resources: with no variant, no evaluation resource exists and the
-  production resources are unchanged. It needs a provisioned environment (`mcpApiClientId`); the
-  agents' identities are allowed by the evaluation apps only
-  (`DOCWIKI_EVAL_MCP_ALLOWED_CLIENT_IDS`) and are granted `Wiki.Read` by
-  `scripts/eval_stack.py grant` (the hooks manage the production agents only). All of it is
-  removed after the gates: `agents/deploy.py --variant all --delete` (it deletes the variants
-  declared in `variants.yaml`; an older declaration is passed with `--variants-file`), then
-  delete the apps and the connections (emptying the value does not delete them: provisions are
-  incremental) and the `smart-eval` deployment, and unset the settings. The operator sequence is
-  in [`agents/README.md`](../../agents/README.md).
+  `domainPack` (`batiment`), `enableFoundrySkillsPreview` (false), `enableRoutine` (false).
 - Preflight script (`scripts/preflight.py`): azd/az versions, logged-in account, region allowed,
   model availability and quota in the region, deployer roles (Owner or Contributor + User Access
   Administrator; Entra Application Developer), Python and Node versions. Never switches region or

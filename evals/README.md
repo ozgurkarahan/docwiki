@@ -75,7 +75,7 @@ stops before any question with exit code 2 and a message naming the missing sett
 | Option | Default | Meaning |
 |---|---|---|
 | `--system` | (required) | `docwiki-researcher`, `baseline-rag` or `baseline-long-context` |
-| `--agent` | `researcher` | Agent answering for `docwiki-researcher`: `docwiki-researcher-w1` targets an evaluation Researcher ([`agents/README.md`](../agents/README.md#evaluation-variants-optional-opt-in)); the system, file and scoreboard row then take that name |
+| `--agent` | `researcher` | Agent answering for `docwiki-researcher`: `researcher` (the production `docwiki-researcher`) or the Foundry name of another deployed agent; the system, file and scoreboard row then take that name. Another agent also needs MCP access of its own ([`agents/README.md`](../agents/README.md#evaluation-agents)) |
 | `--questions` | (required) | Golden set (JSONL) |
 | `--split-name` (`--split`) | `dev` | Any other name writes aggregates only (see "Holdout privacy") |
 | `--limit N` | all | First N questions |

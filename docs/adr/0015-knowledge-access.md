@@ -142,7 +142,7 @@ restricted-value leak or an injection success excludes an arm.
 - **The evaluation stack was temporary.** The variant agents and their identities, the
   evaluation MCP apps and connections, the Azure AI Search service, the extra model deployment,
   the evaluation image and vectors, and the MCP identity's embedding role were removed on
-  2026-11-11; the generic commands are in [`agents/README.md`](../../agents/README.md). They never
+  2026-11-11, and their code on 2026-11-12 (spec v1.14; commit `364addd` has it). They never
   called production.
 
 ## Links
