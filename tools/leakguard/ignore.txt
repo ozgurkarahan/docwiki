@@ -5,3 +5,5 @@
 # Prefer fixing the content or extending an allowlist; keep this list short and reviewed.
 LG-06b837632d  # docs/studio.md, an earlier revision: "ca-studio-…" was the generic Container App name prefix in an example log line, not a host; replaced by a placeholder
 LG-5174f800ca  # tests/studio/studio_testkit.py, an earlier revision: fake all-zero test object ID; now built with uuid.UUID(int=...)
+LG-01f0c1656d  # tests/portal/test_process_runs.py, an earlier revision: fake forged principal ID 00000000-...-000000000bad; no longer in the file
+LG-8fd49f3c46  # tests/site/test_pipeline_text.py, an earlier revision: a deliberately off-site one-letter URL fed to siteUrl, not a host; no longer in the file

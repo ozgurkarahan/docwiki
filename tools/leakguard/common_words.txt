@@ -2333,6 +2333,7 @@ paragraph
 paragraphs
 parameter
 parameters
+paraphrase
 parc
 park
 parking
